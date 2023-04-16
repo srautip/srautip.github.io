@@ -1,0 +1,24 @@
+{
+  "files": {
+    "main.css": "/static/css/main.2ea4583e.css",
+    "main.js": "/static/js/main.7a9782a8.js",
+    "static/js/787.5e37224e.chunk.js": "/static/js/787.5e37224e.chunk.js",
+    "static/media/roboto-serif-all-400-normal.woff": "/static/media/roboto-serif-all-400-normal.c4e4416f83da67f50d05.woff",
+    "static/media/montez-all-400-normal.woff": "/static/media/montez-all-400-normal.79b5dfe53039dd35baa7.woff",
+    "static/media/roboto-serif-latin-400-normal.woff2": "/static/media/roboto-serif-latin-400-normal.04edcbf96e3579258e1c.woff2",
+    "static/media/montez-latin-400-normal.woff2": "/static/media/montez-latin-400-normal.e3ec19d3e32d3976b075.woff2",
+    "static/media/leckerli-one-latin-400.woff": "/static/media/leckerli-one-latin-400.3b5ce5d24401f976ccfc.woff",
+    "static/media/roboto-serif-latin-ext-400-normal.woff2": "/static/media/roboto-serif-latin-ext-400-normal.ff5e52fd2c02a71bcc12.woff2",
+    "static/media/leckerli-one-latin-400.woff2": "/static/media/leckerli-one-latin-400.cb11f745272a5f11377e.woff2",
+    "static/media/roboto-serif-vietnamese-400-normal.woff2": "/static/media/roboto-serif-vietnamese-400-normal.5d278e2499bfbf4d739a.woff2",
+    "static/media/roboto-serif-cyrillic-ext-400-normal.woff2": "/static/media/roboto-serif-cyrillic-ext-400-normal.5207bc72fb56859d520c.woff2",
+    "index.html": "/index.html",
+    "main.2ea4583e.css.map": "/static/css/main.2ea4583e.css.map",
+    "main.7a9782a8.js.map": "/static/js/main.7a9782a8.js.map",
+    "787.5e37224e.chunk.js.map": "/static/js/787.5e37224e.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.2ea4583e.css",
+    "static/js/main.7a9782a8.js"
+  ]
+}
