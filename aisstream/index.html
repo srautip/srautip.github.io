@@ -307,11 +307,26 @@
   var storedKey = localStorage.getItem("aisstream_api_key");
   if (storedKey) apiKeyInput.value = storedKey;
 
-  var map = L.map("map", { worldCopyJump: true }).setView([54.5, 10.5], 5);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap contributors",
-    maxZoom: 18
-  }).addTo(map);
+  var map = null;
+  var mapAvailable = typeof L !== "undefined";
+  if (mapAvailable) {
+    try {
+      map = L.map("map", { worldCopyJump: true }).setView([54.5, 10.5], 5);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+        maxZoom: 18
+      }).addTo(map);
+    } catch (e) {
+      mapAvailable = false;
+    }
+  }
+  if (!mapAvailable) {
+    document.getElementById("map").innerHTML =
+      '<div style="height:100%;display:flex;align-items:center;justify-content:center;' +
+      'color:var(--muted);font-size:0.85rem;text-align:center;padding:1rem;">' +
+      "Karte konnte nicht geladen werden (Leaflet/OpenStreetMap nicht erreichbar).<br/>" +
+      "Live-Daten funktionieren trotzdem &ndash; siehe Tabelle unten.</div>";
+  }
 
   function log(msg) {
     var line = document.createElement("div");
@@ -341,23 +356,26 @@
   }
 
   function upsertShip(mmsi, data) {
-    var existing = ships.get(mmsi);
-    if (existing && existing.marker) {
-      existing.marker.setLatLng([data.lat, data.lon]);
-      Object.assign(existing, data);
-    } else {
-      var marker = L.marker([data.lat, data.lon], { icon: shipIcon() }).addTo(map);
-      data.marker = existing ? existing.marker : marker;
-      if (existing) { data.marker = marker; }
-      ships.set(mmsi, Object.assign({}, existing, data, { marker: marker }));
+    var existing = ships.get(mmsi) || {};
+    if (mapAvailable) {
+      if (existing.marker) {
+        existing.marker.setLatLng([data.lat, data.lon]);
+      } else {
+        data.marker = L.marker([data.lat, data.lon], { icon: shipIcon() }).addTo(map);
+      }
     }
-    var entry = ships.get(mmsi);
-    entry.marker.bindPopup(
-      "<b>" + (entry.name || "MMSI " + mmsi) + "</b><br/>" +
-      "MMSI: " + mmsi + "<br/>" +
-      "Speed: " + (entry.speed != null ? entry.speed + " kn" : "-") + "<br/>" +
-      "Kurs: " + (entry.course != null ? entry.course + "°" : "-")
-    );
+    var entry = Object.assign({}, existing, data);
+    if (!entry.marker && existing.marker) entry.marker = existing.marker;
+    ships.set(mmsi, entry);
+
+    if (mapAvailable && entry.marker) {
+      entry.marker.bindPopup(
+        "<b>" + (entry.name || "MMSI " + mmsi) + "</b><br/>" +
+        "MMSI: " + mmsi + "<br/>" +
+        "Speed: " + (entry.speed != null ? entry.speed + " kn" : "-") + "<br/>" +
+        "Kurs: " + (entry.course != null ? entry.course + "°" : "-")
+      );
+    }
     shipCountEl.textContent = ships.size;
     renderTableRow(mmsi, entry);
   }
