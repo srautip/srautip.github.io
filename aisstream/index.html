@@ -410,12 +410,20 @@
       log("Konnte Nachricht nicht parsen: " + e.message);
       return;
     }
+    if (payload.error) {
+      log("Fehler vom Server: " + payload.error);
+      return;
+    }
+
     msgCount++;
     msgCountEl.textContent = msgCount;
 
     var meta = payload.MetaData || {};
     var mmsi = meta.MMSI;
-    if (mmsi == null) return;
+    if (mmsi == null) {
+      log("Unerwartete Nachricht ohne MMSI: " + evt.data.slice(0, 200));
+      return;
+    }
 
     var type = payload.MessageType;
     var msg = payload.Message && payload.Message[type];
@@ -471,11 +479,13 @@
 
       var subscription = {
         APIKey: apiKey,
-        BoundingBoxes: [[[latMin, lonMin], [latMax, lonMax]]]
+        // AISstream.io expects each point as [Longitude, Latitude] (GeoJSON order).
+        BoundingBoxes: [[[lonMin, latMin], [lonMax, latMax]]]
       };
       if (messageTypes.length > 0) {
         subscription.FilterMessageTypes = messageTypes;
       }
+      log("Subscription gesendet: BBox [" + latMin + "," + lonMin + "] - [" + latMax + "," + lonMax + "]");
       socket.send(JSON.stringify(subscription));
     };
 
