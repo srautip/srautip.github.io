@@ -288,6 +288,10 @@
 
   var socket = null;
   var msgCount = 0;
+  var reconnectTimer = null;
+  var reconnectAttempt = 0;
+  var manualDisconnect = true;
+  var RECONNECT_DELAYS = [2000, 5000, 10000, 20000, 30000];
   var ships = new Map(); // mmsi -> { name, lat, lon, speed, course, time, marker }
 
   var statusDot = document.getElementById("statusDot");
@@ -448,7 +452,26 @@
     }
   }
 
+  function scheduleReconnect() {
+    var delay = RECONNECT_DELAYS[Math.min(reconnectAttempt, RECONNECT_DELAYS.length - 1)];
+    reconnectAttempt++;
+    log("Automatischer Wiederverbindungsversuch in " + (delay / 1000) + "s (Versuch " + reconnectAttempt + ")…");
+    setStatus("", "warte auf Wiederverbindung…");
+    connectBtn.disabled = true;
+    disconnectBtn.disabled = false;
+    reconnectTimer = setTimeout(function () {
+      reconnectTimer = null;
+      connect();
+    }, delay);
+  }
+
   function connect() {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    manualDisconnect = false;
+
     var apiKey = apiKeyInput.value.trim();
     if (!apiKey) {
       alert("Bitte einen API-Key eingeben.");
@@ -473,6 +496,7 @@
     socket = new WebSocket(STREAM_URL);
 
     socket.onopen = function () {
+      reconnectAttempt = 0;
       setStatus("connected", "verbunden");
       disconnectBtn.disabled = false;
       log("WebSocket verbunden, sende Subscription…");
@@ -497,15 +521,28 @@
     };
 
     socket.onclose = function (evt) {
-      setStatus("", "nicht verbunden");
-      connectBtn.disabled = false;
-      disconnectBtn.disabled = true;
-      log("Verbindung geschlossen (Code " + evt.code + ").");
       socket = null;
+      log("Verbindung geschlossen (Code " + evt.code + ").");
+      if (manualDisconnect) {
+        setStatus("", "nicht verbunden");
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+      } else {
+        scheduleReconnect();
+      }
     };
   }
 
   function disconnect() {
+    manualDisconnect = true;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+      setStatus("", "nicht verbunden");
+      connectBtn.disabled = false;
+      disconnectBtn.disabled = true;
+      log("Automatische Wiederverbindung abgebrochen.");
+    }
     if (socket) {
       socket.close(1000, "Client disconnect");
     }
