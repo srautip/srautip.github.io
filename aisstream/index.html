@@ -211,19 +211,19 @@
     <div class="bbox-grid">
       <div>
         <label for="latMin">Lat min</label>
-        <input type="number" id="latMin" value="53.0" step="0.1" />
+        <input type="number" id="latMin" value="53.7049" step="0.01" />
       </div>
       <div>
         <label for="lonMin">Lon min</label>
-        <input type="number" id="lonMin" value="7.0" step="0.1" />
+        <input type="number" id="lonMin" value="7.6627" step="0.01" />
       </div>
       <div>
         <label for="latMax">Lat max</label>
-        <input type="number" id="latMax" value="60.0" step="0.1" />
+        <input type="number" id="latMax" value="53.8845" step="0.01" />
       </div>
       <div>
         <label for="lonMax">Lon max</label>
-        <input type="number" id="lonMax" value="15.0" step="0.1" />
+        <input type="number" id="lonMax" value="8.1189" step="0.01" />
       </div>
     </div>
 
@@ -311,7 +311,7 @@
   var mapAvailable = typeof L !== "undefined";
   if (mapAvailable) {
     try {
-      map = L.map("map", { worldCopyJump: true }).setView([54.5, 10.5], 5);
+      map = L.map("map", { worldCopyJump: true }).setView([53.7947, 7.8908], 11);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "&copy; OpenStreetMap contributors",
         maxZoom: 18
