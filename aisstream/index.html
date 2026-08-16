@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AISstream.io Client</title>
+<meta name="description" content="Browserbasierter Live-Client für die AISstream.io WebSocket-API zur Verfolgung von Schiffspositionen (AIS)." />
+<link rel="icon" href="../favicon.ico" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171e2e;
+    --panel-2: #1e2740;
+    --border: #2a3550;
+    --text: #e6ebf5;
+    --muted: #93a0bd;
+    --accent: #3fa9ff;
+    --ok: #35c37c;
+    --err: #ff5d6c;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  header h1 {
+    font-size: 1.15rem;
+    margin: 0;
+    font-weight: 600;
+  }
+  header h1 span { color: var(--muted); font-weight: 400; }
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--muted);
+    display: inline-block;
+  }
+  .dot.connected { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  .dot.error { background: var(--err); box-shadow: 0 0 6px var(--err); }
+  main {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 1rem;
+    padding: 1rem 1.5rem 2rem;
+  }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+  }
+  .panel h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 0 0 0.75rem;
+  }
+  label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin: 0.6rem 0 0.25rem;
+  }
+  input[type="text"], input[type="password"], input[type="number"] {
+    width: 100%;
+    padding: 0.45rem 0.55rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--text);
+    font-size: 0.85rem;
+  }
+  .bbox-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 0.5rem;
+  }
+  .checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.4rem;
+  }
+  .checkboxes label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--text);
+    font-size: 0.82rem;
+    margin: 0;
+  }
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  button {
+    flex: 1;
+    padding: 0.55rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    font-size: 0.85rem;
+    cursor: pointer;
+    background: var(--panel-2);
+    color: var(--text);
+  }
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #06131f;
+    font-weight: 600;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .hint {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 0.75rem;
+    line-height: 1.4;
+  }
+  .hint a { color: var(--accent); }
+  #map {
+    height: 420px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .stats {
+    display: flex;
+    gap: 1.5rem;
+    margin: 0.9rem 0;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .stats b { color: var(--text); font-size: 0.95rem; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  th {
+    color: var(--muted);
+    font-weight: 500;
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+  }
+  .table-wrap {
+    max-height: 360px;
+    overflow: auto;
+    margin-top: 0.5rem;
+  }
+  .log {
+    max-height: 140px;
+    overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    background: var(--panel-2);
+    border-radius: 6px;
+    padding: 0.5rem;
+    margin-top: 0.75rem;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>AISstream.io <span>Live-Client</span></h1>
+  <div class="status">
+    <span class="dot" id="statusDot"></span>
+    <span id="statusText">nicht verbunden</span>
+  </div>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>Verbindung</h2>
+
+    <label for="apiKey">API-Key</label>
+    <input type="password" id="apiKey" placeholder="Dein AISstream.io API-Key" autocomplete="off" />
+
+    <h2 style="margin-top:1.2rem">Bounding Box</h2>
+    <div class="bbox-grid">
+      <div>
+        <label for="latMin">Lat min</label>
+        <input type="number" id="latMin" value="53.0" step="0.1" />
+      </div>
+      <div>
+        <label for="lonMin">Lon min</label>
+        <input type="number" id="lonMin" value="7.0" step="0.1" />
+      </div>
+      <div>
+        <label for="latMax">Lat max</label>
+        <input type="number" id="latMax" value="60.0" step="0.1" />
+      </div>
+      <div>
+        <label for="lonMax">Lon max</label>
+        <input type="number" id="lonMax" value="15.0" step="0.1" />
+      </div>
+    </div>
+
+    <h2 style="margin-top:1.2rem">Nachrichtentypen</h2>
+    <div class="checkboxes" id="msgTypes">
+      <label><input type="checkbox" value="PositionReport" checked /> PositionReport</label>
+      <label><input type="checkbox" value="ShipStaticData" /> ShipStaticData</label>
+      <label><input type="checkbox" value="StandardClassBPositionReport" /> StandardClassBPositionReport</label>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="connectBtn">Verbinden</button>
+      <button id="disconnectBtn" disabled>Trennen</button>
+    </div>
+
+    <div class="stats">
+      <div>Nachrichten<br /><b id="msgCount">0</b></div>
+      <div>Schiffe<br /><b id="shipCount">0</b></div>
+    </div>
+
+    <div class="log" id="log"></div>
+
+    <p class="hint">
+      Der API-Key wird ausschließlich lokal im Browser gehalten und direkt per
+      WebSocket an <code>wss://stream.aisstream.io/v0/stream</code> gesendet — es gibt
+      keinen Server dazwischen. Kostenlosen Key gibt es auf
+      <a href="https://aisstream.io" target="_blank" rel="noopener">aisstream.io</a>.
+    </p>
+  </section>
+
+  <section>
+    <div id="map"></div>
+    <div class="panel" style="margin-top:1rem">
+      <h2>Zuletzt empfangene Schiffe</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>MMSI</th>
+              <th>Name</th>
+              <th>Lat</th>
+              <th>Lon</th>
+              <th>Speed (kn)</th>
+              <th>Kurs</th>
+              <th>Zeit (UTC)</th>
+            </tr>
+          </thead>
+          <tbody id="shipTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(function () {
+  "use strict";
+
+  var STREAM_URL = "wss://stream.aisstream.io/v0/stream";
+  var MAX_TABLE_ROWS = 200;
+
+  var socket = null;
+  var msgCount = 0;
+  var ships = new Map(); // mmsi -> { name, lat, lon, speed, course, time, marker }
+
+  var statusDot = document.getElementById("statusDot");
+  var statusText = document.getElementById("statusText");
+  var connectBtn = document.getElementById("connectBtn");
+  var disconnectBtn = document.getElementById("disconnectBtn");
+  var apiKeyInput = document.getElementById("apiKey");
+  var latMinInput = document.getElementById("latMin");
+  var lonMinInput = document.getElementById("lonMin");
+  var latMaxInput = document.getElementById("latMax");
+  var lonMaxInput = document.getElementById("lonMax");
+  var msgCountEl = document.getElementById("msgCount");
+  var shipCountEl = document.getElementById("shipCount");
+  var logEl = document.getElementById("log");
+  var tableBody = document.getElementById("shipTableBody");
+
+  var storedKey = localStorage.getItem("aisstream_api_key");
+  if (storedKey) apiKeyInput.value = storedKey;
+
+  var map = L.map("map", { worldCopyJump: true }).setView([54.5, 10.5], 5);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors",
+    maxZoom: 18
+  }).addTo(map);
+
+  function log(msg) {
+    var line = document.createElement("div");
+    var t = new Date().toLocaleTimeString();
+    line.textContent = "[" + t + "] " + msg;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function setStatus(state, text) {
+    statusDot.className = "dot" + (state ? " " + state : "");
+    statusText.textContent = text;
+  }
+
+  function selectedMessageTypes() {
+    var boxes = document.querySelectorAll("#msgTypes input[type=checkbox]:checked");
+    return Array.prototype.map.call(boxes, function (b) { return b.value; });
+  }
+
+  function shipIcon() {
+    return L.divIcon({
+      className: "",
+      html: '<div style="width:9px;height:9px;border-radius:50%;background:#3fa9ff;border:1px solid #06131f;"></div>',
+      iconSize: [9, 9],
+      iconAnchor: [4, 4]
+    });
+  }
+
+  function upsertShip(mmsi, data) {
+    var existing = ships.get(mmsi);
+    if (existing && existing.marker) {
+      existing.marker.setLatLng([data.lat, data.lon]);
+      Object.assign(existing, data);
+    } else {
+      var marker = L.marker([data.lat, data.lon], { icon: shipIcon() }).addTo(map);
+      data.marker = existing ? existing.marker : marker;
+      if (existing) { data.marker = marker; }
+      ships.set(mmsi, Object.assign({}, existing, data, { marker: marker }));
+    }
+    var entry = ships.get(mmsi);
+    entry.marker.bindPopup(
+      "<b>" + (entry.name || "MMSI " + mmsi) + "</b><br/>" +
+      "MMSI: " + mmsi + "<br/>" +
+      "Speed: " + (entry.speed != null ? entry.speed + " kn" : "-") + "<br/>" +
+      "Kurs: " + (entry.course != null ? entry.course + "°" : "-")
+    );
+    shipCountEl.textContent = ships.size;
+    renderTableRow(mmsi, entry);
+  }
+
+  function renderTableRow(mmsi, entry) {
+    var row = document.getElementById("row-" + mmsi);
+    if (!row) {
+      row = document.createElement("tr");
+      row.id = "row-" + mmsi;
+      tableBody.prepend(row);
+      while (tableBody.rows.length > MAX_TABLE_ROWS) {
+        tableBody.deleteRow(tableBody.rows.length - 1);
+      }
+    } else {
+      tableBody.prepend(row);
+    }
+    row.innerHTML =
+      "<td>" + mmsi + "</td>" +
+      "<td>" + (entry.name || "-") + "</td>" +
+      "<td>" + entry.lat.toFixed(4) + "</td>" +
+      "<td>" + entry.lon.toFixed(4) + "</td>" +
+      "<td>" + (entry.speed != null ? entry.speed : "-") + "</td>" +
+      "<td>" + (entry.course != null ? entry.course : "-") + "</td>" +
+      "<td>" + (entry.time || "-") + "</td>";
+  }
+
+  function handleMessage(evt) {
+    var payload;
+    try {
+      payload = JSON.parse(evt.data);
+    } catch (e) {
+      log("Konnte Nachricht nicht parsen: " + e.message);
+      return;
+    }
+    msgCount++;
+    msgCountEl.textContent = msgCount;
+
+    var meta = payload.MetaData || {};
+    var mmsi = meta.MMSI;
+    if (mmsi == null) return;
+
+    var type = payload.MessageType;
+    var msg = payload.Message && payload.Message[type];
+
+    if (type === "PositionReport" || type === "StandardClassBPositionReport") {
+      var lat = meta.latitude != null ? meta.latitude : (msg && msg.Latitude);
+      var lon = meta.longitude != null ? meta.longitude : (msg && msg.Longitude);
+      if (lat == null || lon == null) return;
+      upsertShip(mmsi, {
+        name: meta.ShipName ? meta.ShipName.trim() : (ships.get(mmsi) || {}).name,
+        lat: lat,
+        lon: lon,
+        speed: msg ? msg.Sog : null,
+        course: msg ? msg.Cog : null,
+        time: meta.time_utc || new Date().toISOString()
+      });
+    } else if (type === "ShipStaticData" && msg) {
+      var existing = ships.get(mmsi) || {};
+      existing.name = (msg.ShipName || existing.name || "").trim();
+      ships.set(mmsi, existing);
+      if (existing.lat != null) renderTableRow(mmsi, existing);
+    }
+  }
+
+  function connect() {
+    var apiKey = apiKeyInput.value.trim();
+    if (!apiKey) {
+      alert("Bitte einen API-Key eingeben.");
+      return;
+    }
+    localStorage.setItem("aisstream_api_key", apiKey);
+
+    var latMin = parseFloat(latMinInput.value);
+    var lonMin = parseFloat(lonMinInput.value);
+    var latMax = parseFloat(latMaxInput.value);
+    var lonMax = parseFloat(lonMaxInput.value);
+    if ([latMin, lonMin, latMax, lonMax].some(isNaN)) {
+      alert("Bitte gültige Bounding-Box-Koordinaten eingeben.");
+      return;
+    }
+
+    var messageTypes = selectedMessageTypes();
+
+    setStatus("", "verbinde…");
+    connectBtn.disabled = true;
+
+    socket = new WebSocket(STREAM_URL);
+
+    socket.onopen = function () {
+      setStatus("connected", "verbunden");
+      disconnectBtn.disabled = false;
+      log("WebSocket verbunden, sende Subscription…");
+
+      var subscription = {
+        APIKey: apiKey,
+        BoundingBoxes: [[[latMin, lonMin], [latMax, lonMax]]]
+      };
+      if (messageTypes.length > 0) {
+        subscription.FilterMessageTypes = messageTypes;
+      }
+      socket.send(JSON.stringify(subscription));
+    };
+
+    socket.onmessage = handleMessage;
+
+    socket.onerror = function () {
+      setStatus("error", "Fehler");
+      log("WebSocket-Fehler aufgetreten.");
+    };
+
+    socket.onclose = function (evt) {
+      setStatus("", "nicht verbunden");
+      connectBtn.disabled = false;
+      disconnectBtn.disabled = true;
+      log("Verbindung geschlossen (Code " + evt.code + ").");
+      socket = null;
+    };
+  }
+
+  function disconnect() {
+    if (socket) {
+      socket.close(1000, "Client disconnect");
+    }
+  }
+
+  connectBtn.addEventListener("click", connect);
+  disconnectBtn.addEventListener("click", disconnect);
+})();
+</script>
+</body>
+</html>
