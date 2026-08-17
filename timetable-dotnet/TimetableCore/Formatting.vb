@@ -65,6 +65,33 @@ Public Module Formatting
         Return grids
     End Function
 
+    ''' <summary>Same content as ToClassGrids, ready for JSON export
+    ''' (period keys converted to string since JSON object keys must be
+    ''' strings).</summary>
+    Public Function ToJsonPerClass(data As JsonObject, schedule As List(Of ScheduleEntry)) As JsonObject
+        Dim grids = ToClassGrids(data, schedule)
+        Dim result As New JsonObject()
+        For Each clsEntry In grids
+            Dim byDayObj As New JsonObject()
+            For Each dayEntry In clsEntry.Value
+                Dim byPeriodObj As New JsonObject()
+                For Each periodEntry In dayEntry.Value
+                    Dim cell = periodEntry.Value
+                    If cell Is Nothing Then
+                        byPeriodObj(periodEntry.Key.ToString()) = Nothing
+                    Else
+                        byPeriodObj(periodEntry.Key.ToString()) = New JsonObject From {
+                            {"subject", cell.Subject}, {"teacher", cell.Teacher}, {"room", cell.Room}
+                        }
+                    End If
+                Next
+                byDayObj(dayEntry.Key) = byPeriodObj
+            Next
+            result(clsEntry.Key) = byDayObj
+        Next
+        Return result
+    End Function
+
     Private Function ClassCellText(cell As GridCell) As String
         If cell Is Nothing Then Return "-"
         Dim text = $"{cell.Subject} ({cell.Teacher})"
