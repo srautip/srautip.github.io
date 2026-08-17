@@ -75,10 +75,11 @@ Verfuegbarkeit:
   nicht verfuegbar.
 
 Sperrzeiten:
-- Mittwochs ist die 7. Stunde fuer alle vier Klassen frei
-  (Mittwochnachmittag).
-- Freitags ist die 7. Stunde fuer alle vier Klassen frei (fruehere
-  Schulschluss).
+- Eine 7. Stunde (Nachmittagsunterricht) soll fuer alle vier Klassen
+  hoechstens an einem Tag pro Woche stattfinden, idealerweise dienstags.
+  An allen anderen Tagen (Montag, Mittwoch, Donnerstag, Freitag) endet der
+  Unterricht spaetestens nach der 6. Stunde - keine Klasse hat dann eine
+  7. Stunde.
 
 Zusaetzlich gilt fuer alle Klassen, Lehrkraefte und Fachraeume die
 uebliche Ueberschneidungsfreiheit: niemand kann zwei Dinge gleichzeitig
@@ -104,6 +105,37 @@ def _expected_weekly_hours() -> dict[tuple[str, str], tuple[int, int]]:
         for subject, _teacher, classes, hours, max_per_day, *_rest in ASSIGNMENTS
         for cls in classes
     }
+
+
+# Ground truth for teacher_availability: which days is each teacher fully
+# unavailable (not just "one period blocked"). Sourced from the prompt text
+# above, not from fixture_gymnasium_klasse5.py (that fixture's own
+# teacher_availability entries are for the separate, hand-built scenario).
+EXPECTED_UNAVAILABLE_DAYS = {
+    "Frau Nguyen": {"Do", "Fr"},
+    "Herr Werner": {"Fr"},
+}
+
+
+def _fully_unavailable_days(entry: dict, all_days: list[str], periods_per_day: int) -> set[str]:
+    """Days on which `entry` (a teacher_availability constraint) blocks
+    EVERY period - via a day missing from available_days, or via
+    unavailable_periods listing all periods of that day. A day with only
+    some periods blocked does NOT count: that's a real, catchable
+    difference between "unavailable all day" and "unavailable one period".
+    """
+    available_days = set(entry.get("available_days") or all_days)
+    via_available_days = set(all_days) - available_days
+
+    blocked_periods_by_day: dict[str, set[int]] = {}
+    for p in entry.get("unavailable_periods") or []:
+        blocked_periods_by_day.setdefault(p["day"], set()).add(p["period"])
+    via_unavailable_periods = {
+        day for day, periods in blocked_periods_by_day.items()
+        if len(periods) >= periods_per_day
+    }
+
+    return via_available_days | via_unavailable_periods
 
 
 def _completeness_report(extracted: list[dict]) -> dict[str, float]:
@@ -156,18 +188,33 @@ def _completeness_report(extracted: list[dict]) -> dict[str, float]:
     }
     consecutive_recall = len(expected_consecutive & actual_consecutive) / len(expected_consecutive)
 
-    expected_availability_teachers = {"Frau Nguyen", "Herr Werner"}
-    actual_availability_teachers = {
-        c.get("teacher") for c in extracted if c.get("type") == "teacher_availability"
+    # Sharpened check: not just "is there an entry for this teacher", but
+    # "does the entry actually block every period on the expected days".
+    # This is the check that would have caught the real bug found earlier:
+    # an entry for Herr Werner that only blocked Fr/period 7 instead of all
+    # of Friday still counted as "covered" under the old presence-only check.
+    all_days = ent["timeslots"]["days"]
+    periods_per_day = ent["timeslots"]["periods_per_day"]
+    expected_unavailability_pairs = {
+        (teacher, day)
+        for teacher, days in EXPECTED_UNAVAILABLE_DAYS.items()
+        for day in days
+    }
+    actual_unavailability_pairs = {
+        (c.get("teacher"), day)
+        for c in extracted if c.get("type") == "teacher_availability"
+        for day in _fully_unavailable_days(c, all_days, periods_per_day)
     }
     availability_recall = (
-        len(expected_availability_teachers & actual_availability_teachers)
-        / len(expected_availability_teachers)
+        len(expected_unavailability_pairs & actual_unavailability_pairs)
+        / len(expected_unavailability_pairs)
     )
 
-    periods = ent["timeslots"]["periods_per_day"]
+    # Sperrzeiten-Regel aus dem Prompt: 7. Stunde nur dienstags, an allen
+    # anderen Tagen (Mo, Mi, Do, Fr) muss sie fuer jede Klasse gesperrt sein.
+    periods = periods_per_day
     expected_forbidden = {
-        (cls, day, periods) for cls in ent["classes"] for day in ("Mi", "Fr")
+        (cls, day, periods) for cls in ent["classes"] for day in ("Mo", "Mi", "Do", "Fr")
     }
     actual_forbidden = {
         (c.get("entity"), c.get("day"), c.get("period"))
