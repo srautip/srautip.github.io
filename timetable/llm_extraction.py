@@ -121,6 +121,20 @@ _ITEM_SCHEMAS = {
         "class": {"type": "string"},
         "subject": {"type": "string"},
     }, ["type", "teacher", "class", "subject"]),
+
+    # NOT a CP-SAT-facing constraint type. This captures "period X only
+    # happens on days Y" as a single fact (an easy extraction) instead of
+    # asking the model to enumerate "every day EXCEPT Y" (a set-difference
+    # computation the model got wrong two different ways in testing - once
+    # incomplete, once with the polarity inverted). extract_all_constraints()
+    # deterministically expands this into forbidden_slot entries in pure
+    # Python - see _expand_period_exception() below.
+    "period_exception": _obj({
+        "type": {"const": "period_exception"},
+        "period": {"type": "integer"},
+        "allowed_days": {"type": "array", "items": {"type": "string"}},
+        "reason": {"type": "string"},
+    }, ["type", "period", "allowed_days"]),
 }
 
 _INSTRUCTIONS = {
@@ -152,15 +166,12 @@ _INSTRUCTIONS = {
         "Lehrkraft nicht gleichzeitig denselben Unterricht haben duerfen."
     ),
     "forbidden_slot": (
-        "Extrahiere feste Sperrzeiten (Tag+Stunde). Wenn die Sperrzeit "
-        "schulweit fuer alle Klassen gilt, erzeuge JE EIN Objekt PRO Klasse "
-        "aus entities.classes. WICHTIG bei Ausnahme-Formulierungen wie 'nur "
-        "an einem Tag erlaubt, idealerweise Tag X' oder 'hoechstens an "
-        "einem Tag': das bedeutet, die Stunde ist an JEDEM Tag aus "
-        "entities.timeslots.days AUSSER dem genannten Ausnahme-Tag "
-        "gesperrt. Erzeuge dann fuer JEDEN dieser anderen Tage UND JEDE "
-        "Klasse ein eigenes Objekt - zaehle die Tage einzeln durch, lasse "
-        "keinen aus."
+        "Extrahiere feste Sperrzeiten (Tag+Stunde), die der Text DIREKT als "
+        "gesperrt benennt (z.B. 'freitags 6. Stunde frei'). Wenn die "
+        "Sperrzeit schulweit fuer alle Klassen gilt, erzeuge JE EIN Objekt "
+        "PRO Klasse aus entities.classes. Ignoriere Ausnahme-Formulierungen "
+        "der Form 'nur an Tag X erlaubt' / 'hoechstens an einem Tag' - "
+        "dafuer gibt es einen anderen, spezialisierten Constraint-Typ."
     ),
     "consecutive_required": (
         "Extrahiere Faecher, die als zusammenhaengender Block (Doppelstunde "
@@ -172,9 +183,44 @@ _INSTRUCTIONS = {
         "unterrichtet. Ein Objekt PRO genannter Klasse, auch wenn eine "
         "Lehrkraft mehrere Klassen unterrichtet."
     ),
+    "period_exception": (
+        "Extrahiere Regeln der Form 'Stunde X findet hoechstens an einem "
+        "Tag pro Woche statt, idealerweise Tag Y' bzw. 'Stunde X nur an "
+        "bestimmten Tagen'. Erzeuge EIN Objekt mit der Stundennummer und "
+        "der Liste der ERLAUBTEN Tage (NICHT der gesperrten!). Beispiel: "
+        "'7. Stunde nur dienstags, idealerweise' -> "
+        "{\"period\": 7, \"allowed_days\": [\"Di\"]}. Ignoriere normale "
+        "Sperrzeiten, die direkt einen gesperrten Tag nennen (z.B. "
+        "'freitags 6. Stunde frei') - dafuer gibt es einen anderen "
+        "Constraint-Typ."
+    ),
 }
 
 ALL_TYPES = list(_ITEM_SCHEMAS)
+
+
+def _expand_period_exception(entities: dict, item: dict) -> list[dict]:
+    """Deterministically turns {"period": X, "allowed_days": [...]} into one
+    forbidden_slot entry per (blocked day, class) - pure set difference over
+    entities.timeslots.days, no LLM involved. See the module docstring and
+    the "period_exception" entries above for why this exists."""
+    all_days = entities["timeslots"]["days"]
+    allowed = set(item.get("allowed_days") or [])
+    blocked_days = [d for d in all_days if d not in allowed]
+    return [
+        {
+            "type": "forbidden_slot", "scope": "class", "entity": cls,
+            "day": day, "period": item["period"],
+            "reason": f"nur erlaubt an {sorted(allowed)}",
+        }
+        for day in blocked_days
+        for cls in entities["classes"]
+    ]
+
+
+_EXPANDERS = {
+    "period_exception": _expand_period_exception,
+}
 
 
 def extract_constraint_type(
@@ -237,13 +283,23 @@ def extract_constraint_type(
 def extract_all_constraints(
     entities: dict, prompt_text: str, types: list[str] | None = None, **kwargs,
 ) -> tuple[list[dict], list[dict]]:
-    """Runs extract_constraint_type() for each type (default: all 8),
-    sequentially. Returns (merged_constraints, meta_per_type)."""
+    """Runs extract_constraint_type() for each type (default: all, including
+    period_exception), sequentially. Types with an entry in _EXPANDERS are
+    deterministically expanded into their real CP-SAT constraint(s) before
+    being merged in - the caller always gets back a flat list of valid
+    constraint types, never period_exception itself.
+    Returns (merged_constraints, meta_per_type)."""
     types = types or ALL_TYPES
     all_constraints: list[dict] = []
     meta_list: list[dict] = []
     for ctype in types:
-        constraints, meta = extract_constraint_type(entities, prompt_text, ctype, **kwargs)
-        all_constraints.extend(constraints)
+        raw_constraints, meta = extract_constraint_type(entities, prompt_text, ctype, **kwargs)
+        expander = _EXPANDERS.get(ctype)
+        if expander:
+            expanded = [c for item in raw_constraints for c in expander(entities, item)]
+            meta["expanded_to_n_items"] = len(expanded)
+            all_constraints.extend(expanded)
+        else:
+            all_constraints.extend(raw_constraints)
         meta_list.append(meta)
     return all_constraints, meta_list

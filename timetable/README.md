@@ -37,6 +37,9 @@ timetable/
     ├── test_formatting.py             # 7 tests for the presentation layer
     ├── test_gymnasium_klasse5.py      # 3 integration tests against the
     │                                   # larger scenario
+    ├── test_llm_extraction_helpers.py # 3 fast, deterministic tests for
+    │                                   # llm_extraction.py's pure-Python
+    │                                   # parts (no Ollama needed)
     └── test_llm_extraction_e2e.py     # real prompt -> Qwen -> solved
                                         # schedule (skipped by default, see
                                         # "LLM-based end-to-end test" below)
@@ -200,10 +203,33 @@ Takeaway: this model handles direct factual extraction very reliably
 (6 of 7 categories consistently hit 100% across multiple runs), but a
 "complement of a set" / exception-day reasoning step is a genuinely
 harder failure mode that prompt tuning alone did not fully resolve in two
-tries. For a production pipeline, this kind of constraint should either
-be phrased in the source prompt as an explicit day list (no reasoning
-required) or checked with an automated post-hoc rule rather than trusted
-purely from a single narrow LLM call.
+tries.
+
+### Fix: push the set-difference into deterministic code, not the prompt
+
+Since prompt tuning couldn't reliably fix the reasoning step, `period_exception`
+was added as a new extraction type in `llm_extraction.py` that sidesteps
+it entirely. Instead of asking the model to enumerate "every day except
+Tuesday", it's asked for only the single fact actually stated in the text:
+the period number and the *allowed* day(s) - a plain extraction, exactly
+the kind of task this model handles reliably.
+
+```json
+{"type": "period_exception", "period": 7, "allowed_days": ["Di"]}
+```
+
+A new pure-Python function, `_expand_period_exception()`, then
+deterministically derives the real `forbidden_slot` entries as
+`entities.timeslots.days` minus `allowed_days`, once per class - a plain
+set difference with exactly one correct answer, computed in code where it
+cannot vary run to run. `extract_all_constraints()` applies this
+expansion transparently via an `_EXPANDERS` registry, so callers still
+just get back a flat list of ordinary, valid constraints; `period_exception`
+itself never reaches `validate_entities()` or the solver.
+`forbidden_slot`'s own instruction was reverted to its original, simpler
+form (direct statements only, e.g. "Friday period 6 is free") now that
+the exception-day case has its own path. Covered by 3 fast, deterministic
+unit tests in `tests/test_llm_extraction_helpers.py` (no Ollama needed).
 
 ## Output: rendering the solved schedule
 
@@ -255,7 +281,7 @@ pip install -r requirements.txt
 python -m pytest tests/ -v
 ```
 
-All 26 tests currently pass in well under a second. Test categories:
+All 29 tests currently pass in well under a second. Test categories:
 
 - One isolated unit test per constraint type, using minimal scenarios.
 - "Pigeonhole" tests for `no_overlap`, `room_requirement`,
@@ -280,7 +306,10 @@ All 26 tests currently pass in well under a second. Test categories:
 - Gymnasium-Klasse-5 integration tests: the larger 4-class scenario
   validates cleanly, solves to `OPTIMAL`/`FEASIBLE`, passes the
   independent verifier, and renders without error.
-- LLM e2e test (opt-in, `RUN_LLM_TESTS=1`, not counted in the 26): calls a
+- `llm_extraction.py` helper tests: `_expand_period_exception()` correctly
+  computes the day complement (single allowed day, multiple allowed days,
+  no allowed days) - fast and deterministic, no Ollama needed.
+- LLM e2e test (opt-in, `RUN_LLM_TESTS=1`, not counted in the 29): calls a
   live Ollama server, so it's excluded from the default fast/deterministic
   run - see "LLM-based end-to-end test" above for what it checks and the
   last measured result.
