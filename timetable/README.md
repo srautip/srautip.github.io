@@ -17,6 +17,9 @@ timetable/
 ├── validation.py              # deterministic pre-solve checks, called from
 │                               # build_model() (hard errors) plus advisory
 │                               # coverage warnings (soft, non-blocking)
+├── formatting.py               # solve()'s flat, unordered schedule list ->
+│                               # per-class/per-teacher grids, ASCII tables,
+│                               # JSON-per-class export
 ├── verifier.py                # independent solution checker (no shared code
 │                               # with timetable_model.py, on purpose)
 ├── requirements.txt
@@ -24,8 +27,9 @@ timetable/
     ├── fixture_full_scenario.py   # curated example scenario (see file header
     │                               # for the manual fixes applied on top of
     │                               # raw LLM output)
-    └── test_timetable_model.py    # 16 tests, see its docstring for the
-                                    # testing philosophy
+    ├── test_timetable_model.py    # 16 tests, see its docstring for the
+    │                               # testing philosophy
+    └── test_formatting.py         # 7 tests for the presentation layer
 ```
 
 ## Constraint JSON format
@@ -84,6 +88,49 @@ flags classes/teachers with no `no_overlap` entry as advisory warnings,
 since that omission may be intentional (e.g. a teacher who only ever
 teaches one class). Callers can log these without blocking a solve.
 
+## Output: rendering the solved schedule
+
+`solve()` on its own returns `schedule` as a **flat, unordered list** of
+lesson dicts (`{"class","subject","teacher","day","period","room"}`) — no
+grouping, no sorting, no table. `formatting.py` is the presentation layer
+on top of that:
+
+- `to_class_grids(data, schedule)` / `to_teacher_grids(...)` — nested
+  dicts `{entity: {day: {period: cell_or_None}}}`, fully populated (every
+  day/period is a key, `None` for a free period) so a UI can render a
+  complete week without `.get()`/`KeyError` handling.
+- `format_grid(...)` / `format_schedule(data, schedule)` — renders those
+  grids as aligned ASCII tables, one per class and (optionally) one per
+  teacher.
+- `to_json_per_class(data, schedule)` — the class grids with period keys
+  converted to strings, ready for `json.dumps()` (e.g. for a frontend or
+  file export).
+
+```
+$ python -c "
+from timetable_model import solve
+from formatting import format_schedule
+from tests.fixture_full_scenario import FULL_SCENARIO
+status, solver, schedule = solve(FULL_SCENARIO)
+print(format_schedule(FULL_SCENARIO, schedule))
+"
+
+KLASSEN
+
+=== 5a ===
+Std. | Mo | Di                      | Mi | Do                      | Fr
+------------------------------------------------------------------------
+1    | -  | -                       | -  | -                       | -
+2    | -  | Mathematik (Herr Meier) | -  | -                       | Chemie (Frau Wagner) [R101]
+3    | -  | Mathematik (Herr Meier) | -  | Mathematik (Herr Meier) | Chemie (Frau Wagner) [R101]
+...
+
+LEHRKRAEFTE
+
+=== Herr Meier ===
+...
+```
+
 ## Running the tests
 
 ```bash
@@ -91,7 +138,7 @@ pip install -r requirements.txt
 python -m pytest tests/ -v
 ```
 
-All 16 tests currently pass in well under a second. Test categories:
+All 23 tests currently pass in well under a second. Test categories:
 
 - One isolated unit test per constraint type, using minimal scenarios.
 - "Pigeonhole" tests for `no_overlap`, `room_requirement`,
@@ -109,6 +156,10 @@ All 16 tests currently pass in well under a second. Test categories:
   references (reproducing the exact bug described above) and accepts a
   valid scenario without raising; `coverage_warnings()` flags a missing
   `no_overlap` entry without blocking the solve.
+- Formatting tests: grids exactly match the raw schedule (every scheduled
+  lesson shows up, nothing extra), every slot is populated (including free
+  periods as `None`), the ASCII tables contain every scheduled lesson, and
+  the JSON export survives a `json.dumps`/`json.loads` round trip.
 
 ## Example usage
 
@@ -116,6 +167,7 @@ All 16 tests currently pass in well under a second. Test categories:
 from timetable_model import solve, status_name
 from validation import coverage_warnings
 from verifier import verify_schedule
+from formatting import format_schedule, to_json_per_class
 
 for w in coverage_warnings(my_constraints_json):
     print("WARNUNG:", w)  # advisory only, does not raise
@@ -127,4 +179,7 @@ print(status_name(status))
 if schedule is not None:
     violations = verify_schedule(my_constraints_json, schedule)
     assert not violations, violations
+
+    print(format_schedule(my_constraints_json, schedule))       # for a terminal/log
+    export = to_json_per_class(my_constraints_json, schedule)   # for a frontend/file
 ```
