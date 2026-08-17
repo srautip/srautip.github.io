@@ -226,16 +226,22 @@ Public Module Solver
 
                 Case "teacher_availability"
                     Dim teacher = JsonHelpers.GetString(c, "teacher")
-                    Dim unavailable = JsonHelpers.AsStringList(c, "unavailable_periods")
+                    Dim availDaysList = JsonHelpers.AsStringList(c, "available_days")
+                    Dim availDays As New HashSet(Of String)(If(availDaysList.Any(), availDaysList, days))
+                    Dim blocked As New HashSet(Of (Day As String, Period As Integer))
+                    If c.ContainsKey("unavailable_periods") AndAlso c("unavailable_periods") IsNot Nothing Then
+                        For Each node In c("unavailable_periods").AsArray()
+                            Dim entryObj = node.AsObject()
+                            blocked.Add((JsonHelpers.GetString(entryObj, "day"), JsonHelpers.GetInt(entryObj, "period").Value))
+                        Next
+                    End If
                     For Each s In sessionsOfTeacher(teacher)
-                        For Each entry In unavailable
-                            Dim parts = entry.Split(":"c)
-                            Dim d = parts(0)
-                            Dim p = Integer.Parse(parts(1))
-                            Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)
-                            If lesson.ContainsKey(key) Then
-                                model.Add(lesson(key) = 0)
-                            End If
+                        For Each d In days
+                            For Each p In periods
+                                If Not availDays.Contains(d) OrElse blocked.Contains((d, p)) Then
+                                    model.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)) = 0)
+                                End If
+                            Next
                         Next
                     Next
 
@@ -243,6 +249,7 @@ Public Module Solver
                     Dim className = JsonHelpers.GetString(c, "class")
                     Dim subject = JsonHelpers.GetString(c, "subject")
                     Dim hoursPerWeek = JsonHelpers.GetInt(c, "hours_per_week").Value
+                    Dim maxPerDay = JsonHelpers.GetInt(c, "max_per_day")
                     For Each s In sessionsOfSubjectClass(subject, className)
                         Dim terms As New List(Of BoolVar)
                         For Each d In days
@@ -251,6 +258,15 @@ Public Module Solver
                             Next
                         Next
                         model.Add(LinearExpr.Sum(terms) = hoursPerWeek)
+
+                        If maxPerDay.HasValue AndAlso maxPerDay.Value <> 0 Then
+                            For Each d In days
+                                Dim dayTerms = periods.
+                                    Select(Function(p) lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p))).
+                                    ToList()
+                                model.Add(LinearExpr.Sum(dayTerms) <= maxPerDay.Value)
+                            Next
+                        End If
                     Next
 
                 Case "no_overlap"
@@ -289,7 +305,12 @@ Public Module Solver
 
                 Case "shared_resource_conflict"
                     Dim classesInvolved = JsonHelpers.AsStringList(c, "classes")
-                    Dim relevantSessions = sessions.Where(Function(s) classesInvolved.Contains(s.ClassName)).ToList()
+                    Dim sharedSubject = JsonHelpers.GetString(c, "subject")
+                    Dim sharedTeacher = JsonHelpers.GetString(c, "teacher")
+                    Dim relevantSessions = classesInvolved.
+                        SelectMany(Function(cls) sessionsOfSubjectClass(sharedSubject, cls)).
+                        Where(Function(s) s.Teacher = sharedTeacher).
+                        ToList()
                     For Each d In days
                         For Each p In periods
                             Dim terms = relevantSessions.
