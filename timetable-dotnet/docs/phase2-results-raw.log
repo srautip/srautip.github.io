@@ -40,3 +40,24 @@
     overall                      100 %
   Solve status: Optimal   Verifier violations: 0   Extraction: 978.3s   Total: 978.6s
 
+=== [Gymnasium] Run 3/3 === 2026-08-17T22:32:08.9716057Z
+  teacher_availability         duration=  19.2s valid_json=true n_items=2
+  weekly_hours                 duration= 248.8s valid_json=true n_items=36
+  room_requirement             duration=  29.7s valid_json=true n_items=4
+  no_overlap                   duration= 101.3s valid_json=true n_items=24
+  shared_resource_conflict     duration= 138.1s valid_json=true n_items=15
+  forbidden_slot               duration=  56.4s valid_json=true n_items=4
+  consecutive_required         duration=  47.1s valid_json=true n_items=4
+  teacher_subject_assignment   duration= 284.7s valid_json=true n_items=36
+  period_exception             duration=   5.3s valid_json=true n_items=1
+  Scores:
+    teacher_subject_assignment   100 %
+    weekly_hours                 100 %
+    no_overlap                   100 %
+    room_requirement             100 %
+    consecutive_required         100 %
+    teacher_availability         100 %
+    forbidden_slot               100 %
+    overall                      100 %
+  Solve status: Optimal   Verifier violations: 0   Extraction: 930.5s   Total: 930.7s
+
