@@ -22,6 +22,8 @@ timetable/
 │                               # JSON-per-class export
 ├── verifier.py                # independent solution checker (no shared code
 │                               # with timetable_model.py, on purpose)
+├── llm_extraction.py           # NL requirements -> Qwen (via Ollama) ->
+│                               # constraint JSON, decomposed per type
 ├── requirements.txt
 └── tests/
     ├── fixture_full_scenario.py       # curated example scenario (see file
@@ -33,8 +35,11 @@ timetable/
     ├── test_timetable_model.py        # 16 tests, see its docstring for the
     │                                   # testing philosophy
     ├── test_formatting.py             # 7 tests for the presentation layer
-    └── test_gymnasium_klasse5.py      # 3 integration tests against the
-                                        # larger scenario
+    ├── test_gymnasium_klasse5.py      # 3 integration tests against the
+    │                                   # larger scenario
+    └── test_llm_extraction_e2e.py     # real prompt -> Qwen -> solved
+                                        # schedule (skipped by default, see
+                                        # "LLM-based end-to-end test" below)
 ```
 
 ## Constraint JSON format
@@ -122,6 +127,47 @@ fixture), it solves to `OPTIMAL` in well under a second and passes the
 independent verifier with zero violations - see
 `tests/test_gymnasium_klasse5.py`.
 
+## LLM-based end-to-end test: real prompt -> Qwen -> solved schedule
+
+`llm_extraction.py` + `tests/test_llm_extraction_e2e.py` close the loop:
+a natural-language prompt describing the same Gymnasium-Klasse-5
+requirements as `fixture_gymnasium_klasse5.ASSIGNMENTS` is sent to a
+locally hosted `qwen3.5:4b` (via Ollama), decomposed into one
+schema-constrained call per constraint type (see `llm_extraction.py`'s
+docstring for why - a single big call and a two-stage "extract then
+LLM-repair" pipeline were both tried first and performed worse). The
+result is merged, run through `validate_entities()` -> `solve()` ->
+`verify_schedule()`, and scored for completeness against the hand-built
+ground truth.
+
+This test is skipped by default (needs a running Ollama server, is not
+deterministic, and is slow) - opt in with:
+
+```bash
+RUN_LLM_TESTS=1 python -m pytest tests/test_llm_extraction_e2e.py -v -s
+```
+
+**Measured result** (CPU-only, 4 vCPUs, one full run): all 8 extraction
+calls returned valid, schema-conformant JSON; `validate_entities()` found
+zero invalid entity references; and completeness against the ground truth
+was **100% in every one of the 7 scored categories** (`teacher_subject_assignment`,
+`weekly_hours`, `no_overlap`, `room_requirement`, `consecutive_required`,
+`teacher_availability`, `forbidden_slot`) - all 36 teacher/class/subject
+assignments, all 36 weekly-hours entries, all 24 no-overlap rules, etc.
+were extracted correctly. The merged result solved to `OPTIMAL` with zero
+verifier violations. Total wall time for all 8 calls + solve + verify:
+**~15.5 minutes** (individual calls ranged from 38s to 249s - the two
+36-item extractions, `weekly_hours` and `teacher_subject_assignment`,
+were the slowest).
+
+This is a meaningfully better result than the earlier, smaller-scale
+experiments in this project's history (which had real gaps and
+occasional hallucinations) - the tighter per-type instructions and
+explicit `entities` payload developed since then appear to matter more
+than scenario size. Re-running is not guaranteed to reproduce 100% (LLM
+output varies run to run, hence the `>=50%` threshold enforced by the
+test rather than requiring an exact match), but it's the score to beat.
+
 ## Output: rendering the solved schedule
 
 `solve()` on its own returns `schedule` as a **flat, unordered list** of
@@ -197,6 +243,10 @@ All 26 tests currently pass in well under a second. Test categories:
 - Gymnasium-Klasse-5 integration tests: the larger 4-class scenario
   validates cleanly, solves to `OPTIMAL`/`FEASIBLE`, passes the
   independent verifier, and renders without error.
+- LLM e2e test (opt-in, `RUN_LLM_TESTS=1`, not counted in the 26): calls a
+  live Ollama server, so it's excluded from the default fast/deterministic
+  run - see "LLM-based end-to-end test" above for what it checks and the
+  last measured result.
 
 ## Example usage
 
