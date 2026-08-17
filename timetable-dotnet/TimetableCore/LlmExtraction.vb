@@ -47,10 +47,18 @@ Public Module LlmExtraction
 
     Private ReadOnly Instructions As New Dictionary(Of String, String) From {
         {"teacher_availability",
-            "Extrahiere NUR Verfuegbarkeits-Einschraenkungen einzelner Lehrkraefte " &
-            "(Teilzeit, feste Sperrtage/-stunden). Ein Objekt pro betroffener " &
-            "Lehrkraft, keine Duplikate. Keine Lehrkraft ohne Einschraenkung im " &
-            "Text erwaehnen."},
+            "Extrahiere Verfuegbarkeits-Einschraenkungen einzelner Lehrkraefte - " &
+            "auch wenn das Wort 'verfuegbar' nicht woertlich vorkommt, z.B. bei " &
+            "'ist nur montags bis mittwochs an der Schule', 'arbeitet Teilzeit " &
+            "und ist montags, dienstags da', 'kann an keinem Tag ausser Montag " &
+            "und Mittwoch unterrichten' oder aehnlichen Formulierungen. Bei einer " &
+            "Verneinung ('kann an keinem Tag ausser X, Y unterrichten') sind X " &
+            "und Y die available_days (die Tage NACH 'ausser'/'außer', nicht die " &
+            "davor genannten). JEDES Objekt MUSS available_days (Liste der Tage, " &
+            "an denen die Lehrkraft unterrichten kann) oder unavailable_periods " &
+            "gesetzt haben - niemals nur Typ und Lehrername ohne diese Angabe. " &
+            "Ein Objekt pro betroffener Lehrkraft, keine Duplikate. Keine " &
+            "Lehrkraft ohne im Text genannte Einschraenkung erwaehnen."},
         {"weekly_hours",
             "Extrahiere fuer JEDE im Text genannte Klasse+Fach-Kombination die " &
             "Wochenstunden (und, falls genannt, das Tagesmaximum). Erfinde keine " &
@@ -162,7 +170,13 @@ Public Module LlmExtraction
                 periodItemProps("period") = IntegerSchema()
                 props("unavailable_periods") = ArraySchema(ObjSchema(periodItemProps, {"day", "period"}))
                 props("reason") = StringSchema()
-                Return ObjSchema(props, {"type", "teacher"})
+                ' available_days is required (not just type/teacher) to force
+                ' the model to actually populate the constraint content -
+                ' Phase 2 found it would otherwise sometimes emit a bare
+                ' {type, teacher} object with no available_days/
+                ' unavailable_periods at all whenever the input text didn't
+                ' use the literal word "verfuegbar".
+                Return ObjSchema(props, {"type", "teacher", "available_days"})
 
             Case "weekly_hours"
                 Dim props As New JsonObject()
