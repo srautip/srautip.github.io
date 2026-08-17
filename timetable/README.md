@@ -168,6 +168,43 @@ than scenario size. Re-running is not guaranteed to reproduce 100% (LLM
 output varies run to run, hence the `>=50%` threshold enforced by the
 test rather than requiring an exact match), but it's the score to beat.
 
+### Two real failure modes found on later runs
+
+The `teacher_availability` scorer originally only checked whether *some*
+entry existed for a given teacher, not whether it correctly blocked every
+period of the right days. This missed a real bug: an entry for Herr
+Werner (`"Fortbildungstag freitags"`) that only blocked `Fr`/period 7
+instead of all of Friday still scored 100%. Fixed by
+`_fully_unavailable_days()` (see `test_llm_extraction_e2e.py`), which
+checks day-level completeness, not just presence.
+
+A later run also surfaced two distinct failures on the same requirement
+- "a 7th period should happen on at most one day, ideally Tuesday":
+
+1. One run extracted `weekly_hours` as invalid JSON (truncated at the
+   default token budget for a 36-item type) - `n_items=0`, so the solved
+   schedule was entirely empty (no `weekly_hours` means no minimum hour
+   count is enforced - see the "known simplification" in
+   `timetable_model.py`). Fixed for this case by raising
+   `num_predict`; still worth watching for other high-cardinality types.
+2. Even after sharpening the `forbidden_slot` instruction to explicitly
+   spell out "block every day except the named exception", two
+   independent attempts got it wrong in *different* ways: the first
+   forgot to enumerate all three non-exception days (only blocked
+   Friday), the second **inverted the logic** and blocked Tuesday (the
+   day that should stay open) instead of the other four. Both scored 0%
+   completeness for `forbidden_slot` while every other category still
+   scored 100%.
+
+Takeaway: this model handles direct factual extraction very reliably
+(6 of 7 categories consistently hit 100% across multiple runs), but a
+"complement of a set" / exception-day reasoning step is a genuinely
+harder failure mode that prompt tuning alone did not fully resolve in two
+tries. For a production pipeline, this kind of constraint should either
+be phrased in the source prompt as an explicit day list (no reasoning
+required) or checked with an automated post-hoc rule rather than trusted
+purely from a single narrow LLM call.
+
 ## Output: rendering the solved schedule
 
 `solve()` on its own returns `schedule` as a **flat, unordered list** of

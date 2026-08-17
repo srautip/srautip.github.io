@@ -154,7 +154,13 @@ _INSTRUCTIONS = {
     "forbidden_slot": (
         "Extrahiere feste Sperrzeiten (Tag+Stunde). Wenn die Sperrzeit "
         "schulweit fuer alle Klassen gilt, erzeuge JE EIN Objekt PRO Klasse "
-        "aus entities.classes."
+        "aus entities.classes. WICHTIG bei Ausnahme-Formulierungen wie 'nur "
+        "an einem Tag erlaubt, idealerweise Tag X' oder 'hoechstens an "
+        "einem Tag': das bedeutet, die Stunde ist an JEDEM Tag aus "
+        "entities.timeslots.days AUSSER dem genannten Ausnahme-Tag "
+        "gesperrt. Erzeuge dann fuer JEDEN dieser anderen Tage UND JEDE "
+        "Klasse ein eigenes Objekt - zaehle die Tage einzeln durch, lasse "
+        "keinen aus."
     ),
     "consecutive_required": (
         "Extrahiere Faecher, die als zusammenhaengender Block (Doppelstunde "
