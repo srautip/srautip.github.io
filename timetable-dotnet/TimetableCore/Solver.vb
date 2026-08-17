@@ -1,0 +1,397 @@
+' Ported 1:1 from timetable/timetable_model.py. Builds a CP-SAT model
+' (Google.OrTools.Sat) from the same entities/constraints JSON shape as the
+' Python original and solves it. ValidateEntities (Validation.vb) is called
+' first, exactly like the Python build_model() - an out-of-range reference
+' would otherwise be silently dropped by the model builder (no session/
+' variable to attach it to), which can make an incomplete schedule solve as
+' OPTIMAL. See Validation.vb's header comment for the concrete incident that
+' motivated this ordering.
+Imports System.Text.Json.Nodes
+Imports Google.OrTools.Sat
+
+
+Public NotInheritable Class Session
+    Public ReadOnly Property ClassName As String
+    Public ReadOnly Property Subject As String
+    Public ReadOnly Property Teacher As String
+
+    Public Sub New(className As String, subject As String, teacher As String)
+        Me.ClassName = className
+        Me.Subject = subject
+        Me.Teacher = teacher
+    End Sub
+End Class
+
+''' <summary>Composite key for the (class, subject, teacher, day, period)
+''' -keyed `lesson` dict and the (..., room)-keyed `room` dict in the
+''' Python original. VB.NET has no native tuple-hashing dict key like
+''' Python, so this struct stands in for it.</summary>
+Public Structure LessonKey
+    Implements IEquatable(Of LessonKey)
+
+    Public ReadOnly ClassName As String
+    Public ReadOnly Subject As String
+    Public ReadOnly Teacher As String
+    Public ReadOnly Day As String
+    Public ReadOnly Period As Integer
+
+    Public Sub New(className As String, subject As String, teacher As String, day As String, period As Integer)
+        Me.ClassName = className
+        Me.Subject = subject
+        Me.Teacher = teacher
+        Me.Day = day
+        Me.Period = period
+    End Sub
+
+    Public Overloads Function Equals(other As LessonKey) As Boolean Implements IEquatable(Of LessonKey).Equals
+        Return ClassName = other.ClassName AndAlso Subject = other.Subject AndAlso
+               Teacher = other.Teacher AndAlso Day = other.Day AndAlso Period = other.Period
+    End Function
+
+    Public Overrides Function Equals(obj As Object) As Boolean
+        Return TypeOf obj Is LessonKey AndAlso Equals(DirectCast(obj, LessonKey))
+    End Function
+
+    Public Overrides Function GetHashCode() As Integer
+        Return HashCode.Combine(ClassName, Subject, Teacher, Day, Period)
+    End Function
+End Structure
+
+Public Structure RoomKey
+    Implements IEquatable(Of RoomKey)
+
+    Public ReadOnly ClassName As String
+    Public ReadOnly Subject As String
+    Public ReadOnly Teacher As String
+    Public ReadOnly Day As String
+    Public ReadOnly Period As Integer
+    Public ReadOnly Room As String
+
+    Public Sub New(className As String, subject As String, teacher As String, day As String, period As Integer, room As String)
+        Me.ClassName = className
+        Me.Subject = subject
+        Me.Teacher = teacher
+        Me.Day = day
+        Me.Period = period
+        Me.Room = room
+    End Sub
+
+    Public Overloads Function Equals(other As RoomKey) As Boolean Implements IEquatable(Of RoomKey).Equals
+        Return ClassName = other.ClassName AndAlso Subject = other.Subject AndAlso
+               Teacher = other.Teacher AndAlso Day = other.Day AndAlso Period = other.Period AndAlso Room = other.Room
+    End Function
+
+    Public Overrides Function Equals(obj As Object) As Boolean
+        Return TypeOf obj Is RoomKey AndAlso Equals(DirectCast(obj, RoomKey))
+    End Function
+
+    Public Overrides Function GetHashCode() As Integer
+        Return HashCode.Combine(ClassName, Subject, Teacher, Day, Period, Room)
+    End Function
+End Structure
+
+Public NotInheritable Class BuiltModel
+    Public Property Model As CpModel
+    Public Property Lesson As Dictionary(Of LessonKey, BoolVar)
+    Public Property Room As Dictionary(Of RoomKey, BoolVar)
+    Public Property Sessions As List(Of Session)
+    Public Property Days As List(Of String)
+    Public Property Periods As List(Of Integer)
+End Class
+
+Public NotInheritable Class ScheduleEntry
+    Public Property ClassName As String
+    Public Property Subject As String
+    Public Property Teacher As String
+    Public Property Day As String
+    Public Property Period As Integer
+    Public Property Room As String
+End Class
+
+Public NotInheritable Class SolveResult
+    Public Property Status As CpSolverStatus
+    Public Property Solver As CpSolver
+    Public Property Schedule As List(Of ScheduleEntry)
+End Class
+
+Public Module Solver
+
+    Private Function SessionsFromAssignments(data As JsonObject) As List(Of Session)
+        Dim sessions = JsonHelpers.Constraints(data).
+            Where(Function(c) JsonHelpers.GetString(c, "type") = "teacher_subject_assignment").
+            Select(Function(c) New Session(
+                JsonHelpers.GetString(c, "class"),
+                JsonHelpers.GetString(c, "subject"),
+                JsonHelpers.GetString(c, "teacher"))).
+            ToList()
+        If sessions.Count = 0 Then
+            Throw New ArgumentException("Keine teacher_subject_assignment-Constraints gefunden - es gibt nichts zu planen.")
+        End If
+        Return sessions
+    End Function
+
+    Public Function BuildModel(data As JsonObject) As BuiltModel
+        Dim errors = Validation.ValidateEntities(data)
+        If errors.Any() Then
+            Throw New ArgumentException("Ungueltige Constraint-Referenzen:" & vbLf & String.Join(vbLf, errors))
+        End If
+
+        Dim model As New CpModel()
+        Dim ent = JsonHelpers.Entities(data)
+        Dim timeslots = JsonHelpers.Timeslots(ent)
+        Dim days = JsonHelpers.AsStringList(timeslots, "days")
+        Dim periodsPerDay = JsonHelpers.GetInt(timeslots, "periods_per_day").Value
+        Dim periods = Enumerable.Range(1, periodsPerDay).ToList()
+
+        Dim sessions = SessionsFromAssignments(data)
+
+        Dim lesson As New Dictionary(Of LessonKey, BoolVar)
+        For Each s In sessions
+            For Each d In days
+                For Each p In periods
+                    Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)
+                    lesson(key) = model.NewBoolVar($"lesson[{s.ClassName},{s.Subject},{s.Teacher},{d},{p}]")
+                Next
+            Next
+        Next
+
+        Dim roomReq As New Dictionary(Of String, List(Of String))
+        For Each c In JsonHelpers.Constraints(data)
+            If JsonHelpers.GetString(c, "type") = "room_requirement" Then
+                roomReq(JsonHelpers.GetString(c, "subject")) = JsonHelpers.AsStringList(c, "allowed_rooms")
+            End If
+        Next
+
+        Dim room As New Dictionary(Of RoomKey, BoolVar)
+        For Each s In sessions
+            If Not roomReq.ContainsKey(s.Subject) Then Continue For
+            Dim allowedRooms = roomReq(s.Subject)
+            If allowedRooms.Count = 0 Then Continue For
+            For Each d In days
+                For Each p In periods
+                    Dim choices As New List(Of BoolVar)
+                    For Each r In allowedRooms
+                        Dim v = model.NewBoolVar($"room[{s.ClassName},{s.Subject},{s.Teacher},{d},{p},{r}]")
+                        room(New RoomKey(s.ClassName, s.Subject, s.Teacher, d, p, r)) = v
+                        choices.Add(v)
+                    Next
+                    Dim lessonKey As New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)
+                    model.Add(LinearExpr.Sum(choices) = lesson(lessonKey))
+                Next
+            Next
+        Next
+
+        ApplyConstraints(model, data, sessions, lesson, room, days, periods)
+
+        Return New BuiltModel With {
+            .Model = model, .Lesson = lesson, .Room = room,
+            .Sessions = sessions, .Days = days, .Periods = periods
+        }
+    End Function
+
+    Private Sub AddBlockConstraint(model As CpModel, lesson As Dictionary(Of LessonKey, BoolVar),
+                                    session As Session, days As List(Of String), periods As List(Of Integer),
+                                    blockLen As Integer)
+        Dim lastPeriod = periods(periods.Count - 1)
+        For Each d In days
+            Dim validStarts = periods.Where(Function(p) p + blockLen - 1 <= lastPeriod).ToList()
+            Dim blockStart As New Dictionary(Of Integer, BoolVar)
+            For Each p0 In validStarts
+                blockStart(p0) = model.NewBoolVar($"blockstart[{session.ClassName},{session.Subject},{session.Teacher},{d},{p0}]")
+            Next
+            For Each p In periods
+                Dim covering = validStarts.
+                    Where(Function(p0) p0 <= p AndAlso p <= p0 + blockLen - 1).
+                    Select(Function(p0) blockStart(p0)).
+                    ToList()
+                Dim key As New LessonKey(session.ClassName, session.Subject, session.Teacher, d, p)
+                model.Add(lesson(key) = LinearExpr.Sum(covering))
+            Next
+        Next
+    End Sub
+
+    Private Sub ApplyConstraints(model As CpModel, data As JsonObject, sessions As List(Of Session),
+                                  lesson As Dictionary(Of LessonKey, BoolVar), room As Dictionary(Of RoomKey, BoolVar),
+                                  days As List(Of String), periods As List(Of Integer))
+
+        Dim sessionsOfClass = Function(className As String) sessions.Where(Function(s) s.ClassName = className).ToList()
+        Dim sessionsOfTeacher = Function(teacher As String) sessions.Where(Function(s) s.Teacher = teacher).ToList()
+        Dim sessionsOfSubjectClass = Function(subject As String, className As String) _
+            sessions.Where(Function(s) s.Subject = subject AndAlso s.ClassName = className).ToList()
+
+        For Each c In JsonHelpers.Constraints(data)
+            Dim constraintType = JsonHelpers.GetString(c, "type")
+
+            Select Case constraintType
+
+                Case "teacher_availability"
+                    Dim teacher = JsonHelpers.GetString(c, "teacher")
+                    Dim unavailable = JsonHelpers.AsStringList(c, "unavailable_periods")
+                    For Each s In sessionsOfTeacher(teacher)
+                        For Each entry In unavailable
+                            Dim parts = entry.Split(":"c)
+                            Dim d = parts(0)
+                            Dim p = Integer.Parse(parts(1))
+                            Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)
+                            If lesson.ContainsKey(key) Then
+                                model.Add(lesson(key) = 0)
+                            End If
+                        Next
+                    Next
+
+                Case "weekly_hours"
+                    Dim className = JsonHelpers.GetString(c, "class")
+                    Dim subject = JsonHelpers.GetString(c, "subject")
+                    Dim hoursPerWeek = JsonHelpers.GetInt(c, "hours_per_week").Value
+                    For Each s In sessionsOfSubjectClass(subject, className)
+                        Dim terms As New List(Of BoolVar)
+                        For Each d In days
+                            For Each p In periods
+                                terms.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)))
+                            Next
+                        Next
+                        model.Add(LinearExpr.Sum(terms) = hoursPerWeek)
+                    Next
+
+                Case "no_overlap"
+                    Dim resource = JsonHelpers.GetString(c, "resource")
+                    Dim entityVal = JsonHelpers.GetString(c, "entity")
+                    Dim relevantSessions As List(Of Session)
+                    Select Case resource
+                        Case "class"
+                            relevantSessions = sessionsOfClass(entityVal)
+                        Case "teacher"
+                            relevantSessions = sessionsOfTeacher(entityVal)
+                        Case "room"
+                            relevantSessions = sessions
+                        Case Else
+                            relevantSessions = New List(Of Session)
+                    End Select
+
+                    For Each d In days
+                        For Each p In periods
+                            Dim terms As New List(Of BoolVar)
+                            If resource = "room" Then
+                                For Each s In relevantSessions
+                                    Dim key As New RoomKey(s.ClassName, s.Subject, s.Teacher, d, p, entityVal)
+                                    If room.ContainsKey(key) Then terms.Add(room(key))
+                                Next
+                            Else
+                                For Each s In relevantSessions
+                                    terms.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)))
+                                Next
+                            End If
+                            If terms.Count > 0 Then
+                                model.Add(LinearExpr.Sum(terms) <= 1)
+                            End If
+                        Next
+                    Next
+
+                Case "shared_resource_conflict"
+                    Dim classesInvolved = JsonHelpers.AsStringList(c, "classes")
+                    Dim relevantSessions = sessions.Where(Function(s) classesInvolved.Contains(s.ClassName)).ToList()
+                    For Each d In days
+                        For Each p In periods
+                            Dim terms = relevantSessions.
+                                Select(Function(s) lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p))).
+                                ToList()
+                            If terms.Count > 0 Then
+                                model.Add(LinearExpr.Sum(terms) <= 1)
+                            End If
+                        Next
+                    Next
+
+                Case "forbidden_slot"
+                    Dim scope = JsonHelpers.GetString(c, "scope")
+                    Dim entityVal = JsonHelpers.GetString(c, "entity")
+                    Dim day = JsonHelpers.GetString(c, "day")
+                    Dim period = JsonHelpers.GetInt(c, "period").Value
+
+                    Dim relevantSessions As List(Of Session)
+                    Select Case scope
+                        Case "class"
+                            relevantSessions = sessionsOfClass(entityVal)
+                        Case "teacher"
+                            relevantSessions = sessionsOfTeacher(entityVal)
+                        Case "room"
+                            relevantSessions = sessions
+                        Case Else
+                            relevantSessions = New List(Of Session)
+                    End Select
+
+                    If scope = "room" Then
+                        For Each s In relevantSessions
+                            Dim key As New RoomKey(s.ClassName, s.Subject, s.Teacher, day, period, entityVal)
+                            If room.ContainsKey(key) Then
+                                model.Add(room(key) = 0)
+                            End If
+                        Next
+                    Else
+                        For Each s In relevantSessions
+                            Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, day, period)
+                            If lesson.ContainsKey(key) Then
+                                model.Add(lesson(key) = 0)
+                            End If
+                        Next
+                    End If
+
+                Case "consecutive_required"
+                    Dim className = JsonHelpers.GetString(c, "class")
+                    Dim subject = JsonHelpers.GetString(c, "subject")
+                    Dim blockLen = JsonHelpers.GetInt(c, "block_length").Value
+                    For Each s In sessionsOfSubjectClass(subject, className)
+                        AddBlockConstraint(model, lesson, s, days, periods, blockLen)
+                    Next
+
+                Case "teacher_subject_assignment", "room_requirement"
+                    ' Already consumed above (session/room-choice construction); no direct constraint here.
+
+                Case Else
+                    Throw New ArgumentException($"Unbekannter Constraint-Typ: '{constraintType}'")
+
+            End Select
+        Next
+    End Sub
+
+    Public Function Solve(data As JsonObject,
+                           Optional timeLimitS As Double = 30.0,
+                           Optional seed As Integer = 42,
+                           Optional numWorkers As Integer = 1) As SolveResult
+        Dim built = BuildModel(data)
+        Dim solver As New CpSolver()
+        solver.StringParameters = $"max_time_in_seconds:{timeLimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
+        Dim status = solver.Solve(built.Model)
+
+        Dim schedule As List(Of ScheduleEntry) = Nothing
+        If status = CpSolverStatus.Optimal OrElse status = CpSolverStatus.Feasible Then
+            schedule = New List(Of ScheduleEntry)
+            For Each kvp In built.Lesson
+                If solver.BooleanValue(kvp.Value) Then
+                    Dim key = kvp.Key
+                    Dim assignedRoom As String = Nothing
+                    For Each rkvp In built.Room
+                        Dim rk = rkvp.Key
+                        If rk.ClassName = key.ClassName AndAlso rk.Subject = key.Subject AndAlso
+                           rk.Teacher = key.Teacher AndAlso rk.Day = key.Day AndAlso rk.Period = key.Period AndAlso
+                           solver.BooleanValue(rkvp.Value) Then
+                            assignedRoom = rk.Room
+                            Exit For
+                        End If
+                    Next
+                    schedule.Add(New ScheduleEntry With {
+                        .ClassName = key.ClassName, .Subject = key.Subject, .Teacher = key.Teacher,
+                        .Day = key.Day, .Period = key.Period, .Room = assignedRoom
+                    })
+                End If
+            Next
+        End If
+
+        Return New SolveResult With {.Status = status, .Solver = solver, .Schedule = schedule}
+    End Function
+
+    Public Function StatusName(status As CpSolverStatus) As String
+        Return status.ToString()
+    End Function
+
+End Module
+
