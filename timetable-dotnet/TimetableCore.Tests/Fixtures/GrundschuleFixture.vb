@@ -84,11 +84,11 @@ Public Module GrundschuleFixture
 
     Public ReadOnly Prompt As String =
         "Grundschule, 2 Klassen: 1a, 1b. Mo-Fr, 4 Stunden pro Tag." & vbLf &
-        "Deutsch 6h/Woche, max 2/Tag, Frau Berger, beide Klassen." & vbLf &
-        "Mathe 5h/Woche, max 2/Tag, Herr Klein, beide Klassen." & vbLf &
-        "Sport 2h/Woche, max 1/Tag, Frau Wolf, beide Klassen, immer Turnhalle." & vbLf &
-        "Kunst 2h/Woche, max 1/Tag, Herr Otto, beide Klassen." & vbLf &
-        "Otto nur Mo-Mi da." & vbLf &
+        "Deutsch 6h/Woche pro Klasse, max 2/Tag, Frau Berger, beide Klassen." & vbLf &
+        "Mathe 5h/Woche pro Klasse, max 2/Tag, Herr Klein, beide Klassen." & vbLf &
+        "Sport 2h/Woche pro Klasse, max 1/Tag, Frau Wolf, beide Klassen, immer Turnhalle." & vbLf &
+        "Kunst 2h/Woche pro Klasse, max 1/Tag, Herr Otto, beide Klassen." & vbLf &
+        "Herr Otto nur Mo-Mi da." & vbLf &
         "Freitags Schluss nach der 3. Stunde, alle Klassen." & vbLf &
         "Ueberschneidungsfreiheit fuer alle Klassen, Lehrer, Raeume." & vbLf &
         "Erzeuge Constraints im JSON-Format fuer den Solver." & vbLf
