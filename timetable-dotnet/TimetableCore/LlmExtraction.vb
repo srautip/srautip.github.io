@@ -85,8 +85,14 @@ Public Module LlmExtraction
             "dafuer gibt es einen anderen, spezialisierten Constraint-Typ."},
         {"consecutive_required",
             "Extrahiere Faecher, die als zusammenhaengender Block (Doppelstunde " &
-            "o.ae.) unterrichtet werden muessen. Erzeuge JE EIN Objekt PRO " &
-            "betroffener Klasse."},
+            "o.ae.) unterrichtet werden muessen - NUR wenn der Text das EXPLIZIT " &
+            "so nennt (z.B. 'Doppelstunde', 'Block', 'zusammenhaengend', " &
+            "'zwei Stunden am Stueck', 'als Doppellektion'). Leite das NIEMALS " &
+            "nur aus Zahlen ab (z.B. 'max 1/Tag' bei mehreren Wochenstunden " &
+            "bedeutet NICHT automatisch eine Doppelstunde - das waere ein " &
+            "Widerspruch zu 'max 1/Tag', da ein Block 2 Stunden am selben Tag " &
+            "braucht). Steht kein solches Wort im Text, KEIN Objekt fuer dieses " &
+            "Fach erzeugen. Erzeuge JE EIN Objekt PRO betroffener Klasse."},
         {"teacher_subject_assignment",
             "Extrahiere, welche Lehrkraft welches Fach in welcher Klasse " &
             "unterrichtet. Ein Objekt PRO genannter Klasse, auch wenn eine " &
@@ -291,6 +297,40 @@ Public Module LlmExtraction
         {"period_exception", AddressOf ExpandPeriodException}
     }
 
+    ''' <summary>Deterministic safety net (same idea as ExpandPeriodException):
+    ''' the consecutive_required extraction call sometimes hallucinates a
+    ''' block_length purely from arithmetic (e.g. "2h/Woche, max 1/Tag") even
+    ''' when instructed not to - and a block of N periods on one day is
+    ''' mathematically impossible if that same class/subject's weekly_hours
+    ''' constraint caps max_per_day below N (a block needs all its periods on
+    ''' the SAME day). Rather than relying solely on prompting to prevent
+    ''' this, drop any consecutive_required item that is self-contradictory
+    ''' against the weekly_hours max_per_day already extracted for the same
+    ''' (class, subject) - this can only remove impossible combinations, never
+    ''' a legitimate one (a real block always has max_per_day &gt;= block_length).</summary>
+    Public Function DropContradictoryConsecutiveRequired(constraints As List(Of JsonObject)) As List(Of JsonObject)
+        Dim maxPerDayByClassSubject As New Dictionary(Of (String, String), Integer)
+        For Each c In constraints
+            If CStr(c("type")) = "weekly_hours" Then
+                Dim maxPerDay = JsonHelpers.GetInt(c, "max_per_day")
+                If maxPerDay.HasValue Then
+                    maxPerDayByClassSubject((JsonHelpers.GetString(c, "class"), JsonHelpers.GetString(c, "subject"))) = maxPerDay.Value
+                End If
+            End If
+        Next
+
+        Return constraints.Where(Function(c)
+                                      If CStr(c("type")) <> "consecutive_required" Then Return True
+                                      Dim key = (JsonHelpers.GetString(c, "class"), JsonHelpers.GetString(c, "subject"))
+                                      Dim blockLength = JsonHelpers.GetInt(c, "block_length")
+                                      Dim maxPerDay As Integer
+                                      If blockLength.HasValue AndAlso maxPerDayByClassSubject.TryGetValue(key, maxPerDay) Then
+                                          Return blockLength.Value <= maxPerDay
+                                      End If
+                                      Return True
+                                  End Function).ToList()
+    End Function
+
     ''' <summary>Returns (available, reason) - reason explains why not,
     ''' if not available.</summary>
     Public Async Function IsOllamaAvailable(Optional model As String = Model, Optional baseUrl As String = OllamaUrl) As Task(Of (Available As Boolean, Reason As String))
@@ -453,7 +493,7 @@ Public Module LlmExtraction
             metaList.Add(meta)
         Next
 
-        Return (allConstraints, metaList)
+        Return (DropContradictoryConsecutiveRequired(allConstraints), metaList)
     End Function
 
 End Module
