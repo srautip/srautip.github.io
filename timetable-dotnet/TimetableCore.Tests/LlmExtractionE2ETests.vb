@@ -205,4 +205,76 @@ Public Class LlmExtractionE2ETests
         Assert.AreEqual(0, violations.Count, String.Join(vbLf, violations))
     End Function
 
+    ''' <summary>Shared body for the 3 new Phase-2 scenario tests below
+    ''' (extract -> validate -> score -> solve -> verify). The existing
+    ''' Gymnasium test above is deliberately left as its own, separately
+    ''' already-twice-live-verified implementation rather than refactored
+    ''' onto this helper too - that would need a third expensive live
+    ''' re-verification for no behavioral benefit.</summary>
+    Private Shared Async Function RunScenarioE2E(entities As JsonObject, prompt As String,
+                                                   scoreFn As Func(Of List(Of JsonObject), Dictionary(Of String, Double)),
+                                                   Optional timeLimitS As Double = 60) As Task
+        If Environment.GetEnvironmentVariable("RUN_LLM_TESTS") <> "1" Then
+            Assert.Inconclusive(
+                "LLM e2e test skipped by default (needs a running Ollama server with " &
+                "qwen3.5:4b, takes several minutes, and is not deterministic). " &
+                "Set RUN_LLM_TESTS=1 to run it.")
+        End If
+
+        Dim avail = Await LlmExtraction.IsOllamaAvailable()
+        If Not avail.Available Then Assert.Inconclusive(avail.Reason)
+
+        Dim result = Await LlmExtraction.ExtractAllConstraints(entities, prompt)
+
+        Console.WriteLine(vbLf & "=== Extraction meta ===")
+        For Each m In result.MetaList
+            Console.WriteLine($"  {JsonHelpers.GetString(m, "type"),-28} duration={CDbl(m("duration_s")),6:F1}s valid_json={m("valid_json")} n_items={m("n_items")}")
+        Next
+
+        For Each m In result.MetaList
+            Assert.IsTrue(CBool(m("valid_json")), $"{JsonHelpers.GetString(m, "type")}: kein valides JSON - {m("parse_error")}")
+        Next
+
+        Dim scenarioData As New JsonObject From {
+            {"entities", entities.DeepClone()},
+            {"constraints", New JsonArray(result.Constraints.Select(Function(c) CType(c, JsonNode)).ToArray())}
+        }
+
+        Dim errors = Validation.ValidateEntities(scenarioData)
+        Assert.AreEqual(0, errors.Count, "Ungueltige Entity-Referenzen im LLM-Output:" & vbLf & String.Join(vbLf, errors))
+
+        Dim scores = scoreFn(result.Constraints)
+        Console.WriteLine(vbLf & "=== Vollstaendigkeit vs. Ground Truth ===")
+        For Each kvp In scores
+            Console.WriteLine($"  {kvp.Key,-28} {kvp.Value:P0}")
+        Next
+
+        Assert.IsTrue(scores("overall") >= 0.5, $"Vollstaendigkeit nur {scores("overall"):P0}")
+
+        Dim solveResult = Solver.Solve(scenarioData, timeLimitS:=timeLimitS)
+        Console.WriteLine(vbLf & $"solve() status: {Solver.StatusName(solveResult.Status)}")
+        Assert.IsTrue(solveResult.Status = CpSolverStatus.Optimal OrElse solveResult.Status = CpSolverStatus.Feasible, Solver.StatusName(solveResult.Status))
+
+        Dim violations = Verifier.VerifySchedule(scenarioData, solveResult.Schedule)
+        Assert.AreEqual(0, violations.Count, String.Join(vbLf, violations))
+    End Function
+
+    <TestMethod>
+    Public Async Function LlmExtractionE2EGrundschule() As Task
+        Await RunScenarioE2E(JsonHelpers.Entities(GrundschuleFixture.BuildGrundschuleScenario()), GrundschuleFixture.Prompt,
+                              AddressOf GrundschuleFixture.CompletenessReport, timeLimitS:=20)
+    End Function
+
+    <TestMethod>
+    Public Async Function LlmExtractionE2EOberstufe() As Task
+        Await RunScenarioE2E(JsonHelpers.Entities(OberstufeFixture.BuildOberstufeScenario()), OberstufeFixture.Prompt,
+                              AddressOf OberstufeFixture.CompletenessReport, timeLimitS:=60)
+    End Function
+
+    <TestMethod>
+    Public Async Function LlmExtractionE2EEdgeCase() As Task
+        Await RunScenarioE2E(JsonHelpers.Entities(EdgeCaseFixture.BuildEdgeCaseScenario()), EdgeCaseFixture.Prompt,
+                              AddressOf EdgeCaseFixture.CompletenessReport, timeLimitS:=20)
+    End Function
+
 End Class

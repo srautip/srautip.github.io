@@ -134,6 +134,33 @@ Public Module EdgeCaseFixture
         Return result
     End Function
 
+    ''' <summary>Public (not tied to the MSTest class) so both
+    ''' LlmExtractionE2ETests.vb and RobustnessRunner can call it. No
+    ''' consecutive_required or shared_resource_conflict category here -
+    ''' this scenario's ground truth has none, unlike Grundschule/
+    ''' Oberstufe.</summary>
+    Public Function CompletenessReport(extracted As List(Of JsonObject)) As Dictionary(Of String, Double)
+        Dim ent = JsonHelpers.Entities(BuildEdgeCaseScenario())
+        Dim allDays = JsonHelpers.AsStringList(JsonHelpers.Timeslots(ent), "days")
+        Dim periodsPerDay = JsonHelpers.GetInt(JsonHelpers.Timeslots(ent), "periods_per_day").Value
+
+        Dim expectedUnavailabilityPairs As New HashSet(Of (String, String))
+        For Each kvp In ExpectedUnavailableDays
+            For Each d In kvp.Value : expectedUnavailabilityPairs.Add((kvp.Key, d)) : Next
+        Next
+
+        Dim scores As New Dictionary(Of String, Double) From {
+            {"teacher_subject_assignment", ScoreTeacherSubjectAssignment(ExpectedTeacherSubjectAssignments(), extracted)},
+            {"weekly_hours", ScoreWeeklyHours(ExpectedWeeklyHours(), extracted)},
+            {"no_overlap", ScoreNoOverlap(ExpectedNoOverlap(), extracted)},
+            {"room_requirement", ScoreRoomRequirement(ExpectedRoomRequirement(), extracted)},
+            {"teacher_availability", ScoreTeacherAvailability(expectedUnavailabilityPairs, extracted, allDays, periodsPerDay)},
+            {"forbidden_slot", ScoreForbiddenSlot(ExpectedForbiddenSlots(), extracted)}
+        }
+        scores("overall") = OverallScore(scores)
+        Return scores
+    End Function
+
     Public ReadOnly Prompt As String =
         "An unserer Realschule gibt es zwei Klassen: 6a und 6b. Der Unterricht" & vbLf &
         "findet montags bis freitags mit je 8 Stunden pro Tag statt." & vbLf & vbLf &

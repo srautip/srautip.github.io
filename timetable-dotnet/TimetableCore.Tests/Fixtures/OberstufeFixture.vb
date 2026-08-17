@@ -58,10 +58,13 @@ Public Module OberstufeFixture
         Return result
     End Function
 
+    ''' <summary>Class lists sorted+joined to match
+    ''' CompletenessScoring.ScoreSharedResourceConflict's own
+    ''' normalization.</summary>
     Public Function ExpectedSharedResourceConflicts() As HashSet(Of (Classes As String, Subject As String, Teacher As String))
         Return New HashSet(Of (String, String, String)) From {
-            (String.Join(",", New List(Of String) From {"E11", "E12", "M11", "M12"}), "Informatik", "Herr Vogt"),
-            (String.Join(",", New List(Of String) From {"E11", "M11"}), "Wirtschaftskunde", "Herr Krause")
+            (String.Join(",", New List(Of String) From {"E11", "E12", "M11", "M12"}.OrderBy(Function(s) s)), "Informatik", "Herr Vogt"),
+            (String.Join(",", New List(Of String) From {"E11", "M11"}.OrderBy(Function(s) s)), "Wirtschaftskunde", "Herr Krause")
         }
     End Function
 
@@ -94,6 +97,28 @@ Public Module OberstufeFixture
 
     Public Function BuildOberstufeScenario() As JsonObject
         Return AssignmentScenarioBuilder.BuildScenario(Classes, Days, PeriodsPerDay, OberstufeAssignments, ExtraConstraints())
+    End Function
+
+    ''' <summary>Public (not tied to the MSTest class) so both
+    ''' LlmExtractionE2ETests.vb and RobustnessRunner can call it.</summary>
+    Public Function CompletenessReport(extracted As List(Of JsonObject)) As Dictionary(Of String, Double)
+        Dim expectedUnavailabilityPairs As New HashSet(Of (String, String))
+        For Each kvp In ExpectedUnavailableDays
+            For Each d In kvp.Value : expectedUnavailabilityPairs.Add((kvp.Key, d)) : Next
+        Next
+
+        Dim scores As New Dictionary(Of String, Double) From {
+            {"teacher_subject_assignment", ScoreTeacherSubjectAssignment(AssignmentScenarioBuilder.ExpectedTeacherSubjectAssignments(OberstufeAssignments), extracted)},
+            {"weekly_hours", ScoreWeeklyHours(AssignmentScenarioBuilder.ExpectedWeeklyHours(OberstufeAssignments), extracted)},
+            {"no_overlap", ScoreNoOverlap(AssignmentScenarioBuilder.ExpectedNoOverlap(Classes, OberstufeAssignments), extracted)},
+            {"room_requirement", ScoreRoomRequirement(AssignmentScenarioBuilder.ExpectedRoomRequirement(OberstufeAssignments), extracted)},
+            {"consecutive_required", ScoreConsecutiveRequired(AssignmentScenarioBuilder.ExpectedConsecutiveRequired(OberstufeAssignments), extracted)},
+            {"teacher_availability", ScoreTeacherAvailability(expectedUnavailabilityPairs, extracted, Days, PeriodsPerDay)},
+            {"forbidden_slot", ScoreForbiddenSlot(ExpectedForbiddenSlots(), extracted)},
+            {"shared_resource_conflict", ScoreSharedResourceConflict(ExpectedSharedResourceConflicts(), extracted)}
+        }
+        scores("overall") = OverallScore(scores)
+        Return scores
     End Function
 
     Public ReadOnly Prompt As String =

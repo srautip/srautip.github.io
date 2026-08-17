@@ -61,6 +61,27 @@ Public Module GrundschuleFixture
         Return AssignmentScenarioBuilder.BuildScenario(Classes, Days, PeriodsPerDay, GrundschuleAssignments, ExtraConstraints())
     End Function
 
+    ''' <summary>Public (not tied to the MSTest class) so both
+    ''' LlmExtractionE2ETests.vb and RobustnessRunner can call it.</summary>
+    Public Function CompletenessReport(extracted As List(Of JsonObject)) As Dictionary(Of String, Double)
+        Dim expectedUnavailabilityPairs As New HashSet(Of (String, String))
+        For Each kvp In ExpectedUnavailableDays
+            For Each d In kvp.Value : expectedUnavailabilityPairs.Add((kvp.Key, d)) : Next
+        Next
+
+        Dim scores As New Dictionary(Of String, Double) From {
+            {"teacher_subject_assignment", ScoreTeacherSubjectAssignment(AssignmentScenarioBuilder.ExpectedTeacherSubjectAssignments(GrundschuleAssignments), extracted)},
+            {"weekly_hours", ScoreWeeklyHours(AssignmentScenarioBuilder.ExpectedWeeklyHours(GrundschuleAssignments), extracted)},
+            {"no_overlap", ScoreNoOverlap(AssignmentScenarioBuilder.ExpectedNoOverlap(Classes, GrundschuleAssignments), extracted)},
+            {"room_requirement", ScoreRoomRequirement(AssignmentScenarioBuilder.ExpectedRoomRequirement(GrundschuleAssignments), extracted)},
+            {"consecutive_required", ScoreConsecutiveRequired(AssignmentScenarioBuilder.ExpectedConsecutiveRequired(GrundschuleAssignments), extracted)},
+            {"teacher_availability", ScoreTeacherAvailability(expectedUnavailabilityPairs, extracted, Days, PeriodsPerDay)},
+            {"forbidden_slot", ScoreForbiddenSlot(ExpectedForbiddenSlots(), extracted)}
+        }
+        scores("overall") = OverallScore(scores)
+        Return scores
+    End Function
+
     Public ReadOnly Prompt As String =
         "Grundschule, 2 Klassen: 1a, 1b. Mo-Fr, 4 Stunden pro Tag." & vbLf &
         "Deutsch 6h/Woche, max 2/Tag, Frau Berger, beide Klassen." & vbLf &

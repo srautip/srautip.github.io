@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>RobustnessRunner</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TimetableCore\TimetableCore.vbproj" />
+  </ItemGroup>
+
+  <!-- TimetableCore.Tests's RootNamespace ("TimetableCore.Tests") is
+       lexically nested under "TimetableCore", so its files can reference
+       JsonHelpers etc. unqualified without an explicit Imports statement.
+       RobustnessRunner's RootNamespace isn't nested that way, so the
+       included Fixtures/CompletenessScoring.vb files (which rely on that
+       nesting and have no Imports TimetableCore of their own) need it
+       supplied as a project-level global import instead - avoids adding
+       an Imports line to those already-tested, shared files just for
+       this project's sake. -->
+  <ItemGroup>
+    <Import Include="TimetableCore" />
+  </ItemGroup>
+
+  <!-- Reuses the Phase 2 scenario fixtures + shared completeness scoring
+       from TimetableCore.Tests without a project reference to it (that
+       project pulls in MSTest, which this console app doesn't need) -
+       same <Compile Include> pattern used for the Phase 1 cross-validation
+       scratchpad harness. -->
+  <ItemGroup>
+    <Compile Include="..\TimetableCore.Tests\CompletenessScoring.vb" />
+    <Compile Include="..\TimetableCore.Tests\Fixtures\AssignmentScenarioBuilder.vb" />
+    <Compile Include="..\TimetableCore.Tests\Fixtures\GymnasiumKlasse5Fixture.vb" />
+    <Compile Include="..\TimetableCore.Tests\Fixtures\GrundschuleFixture.vb" />
+    <Compile Include="..\TimetableCore.Tests\Fixtures\OberstufeFixture.vb" />
+    <Compile Include="..\TimetableCore.Tests\Fixtures\EdgeCaseFixture.vb" />
+  </ItemGroup>
+
+</Project>

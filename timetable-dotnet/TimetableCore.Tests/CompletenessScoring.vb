@@ -125,4 +125,16 @@ Public Module CompletenessScoring
         Return RecallFraction(expected, Function(x) actual.Contains(x))
     End Function
 
+    ''' <summary>The `Classes` element is the sorted, comma-joined class
+    ''' list (see ScoreSharedResourceConflict's Select below) - callers
+    ''' must build their expected set the same way.</summary>
+    Public Function ScoreSharedResourceConflict(expected As HashSet(Of (Classes As String, Subject As String, Teacher As String)),
+                                                  extracted As List(Of JsonObject)) As Double
+        Dim actual As New HashSet(Of (String, String, String))(
+            extracted.Where(Function(c) JsonHelpers.GetString(c, "type") = "shared_resource_conflict").
+                Select(Function(c) (String.Join(",", JsonHelpers.AsStringList(c, "classes").OrderBy(Function(s) s)),
+                                     JsonHelpers.GetString(c, "subject"), JsonHelpers.GetString(c, "teacher"))))
+        Return RecallFraction(expected, Function(x) actual.Contains(x))
+    End Function
+
 End Module
