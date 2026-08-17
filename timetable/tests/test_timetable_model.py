@@ -23,15 +23,22 @@ Testing philosophy used here (see README.md in this folder for the write-up):
    contradictory requirement, expecting the status to flip to INFEASIBLE -
    this checks the constraints actually constrain something, in a model
    that's otherwise realistic-sized (not just the toy unit scenarios).
+7. A validation test proving build_model() now rejects constraints that
+   reference an unknown class/teacher/subject/room *before* ever calling
+   the solver, instead of silently dropping them (see validation.py).
 """
+import copy
 import pathlib
 import sys
+
+import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 from ortools.sat.python import cp_model
 
-from timetable_model import solve, status_name
+from timetable_model import build_model, solve, status_name
+from validation import coverage_warnings, validate_entities
 from verifier import verify_schedule
 
 from fixture_full_scenario import FULL_SCENARIO
@@ -201,8 +208,6 @@ def test_full_scenario_from_llm_extraction_is_solvable_and_clean():
 def test_full_scenario_becomes_infeasible_when_overconstrained():
     """Mutation test: block every single slot for Herr Meier while he still
     has 4h/week of Mathematik required -> must flip to INFEASIBLE."""
-    import copy
-
     broken = copy.deepcopy(FULL_SCENARIO)
     days = broken["entities"]["timeslots"]["days"]
     periods = range(1, broken["entities"]["timeslots"]["periods_per_day"] + 1)
@@ -226,3 +231,58 @@ def test_determinism_with_fixed_seed_and_single_worker():
         return sorted((l["class"], l["subject"], l["teacher"], l["day"], l["period"]) for l in schedule)
 
     assert signature(schedule1) == signature(schedule2)
+
+
+# ---------------------------------------------------------------------------
+# 3. Validation: build_model() must reject invalid entity references
+# ---------------------------------------------------------------------------
+
+def test_build_model_rejects_unknown_class_reference():
+    """Reproduces the exact bug found earlier: a consecutive_required entry
+    with a subject name ('Chemie') put into the 'class' field instead of a
+    real class. Before validation.py was wired in, build_model() silently
+    dropped this constraint and the solver returned OPTIMAL with Chemistry
+    missing entirely from the schedule - no error anywhere."""
+    ent = mini(["5a"], ["T1"], ["Chemie"], [], ["Mo"], 3)
+    data = scenario(ent, [
+        {"type": "teacher_subject_assignment", "teacher": "T1", "class": "5a", "subject": "Chemie"},
+        {"type": "consecutive_required", "class": "Chemie", "subject": "Chemie", "block_length": 2},
+    ])
+    with pytest.raises(ValueError, match="Chemie"):
+        build_model(data)
+
+
+def test_build_model_rejects_unknown_teacher_and_room():
+    ent = mini(["5a"], ["T1"], ["Mathe"], ["R1"], ["Mo"], 2)
+    data = scenario(ent, [
+        {"type": "teacher_subject_assignment", "teacher": "T1", "class": "5a", "subject": "Mathe"},
+        {"type": "no_overlap", "resource": "teacher", "entity": "Herr Unbekannt"},
+        {"type": "room_requirement", "subject": "Mathe", "allowed_rooms": ["R99"]},
+    ])
+    errors = validate_entities(data)
+    assert any("Herr Unbekannt" in e for e in errors)
+    assert any("R99" in e for e in errors)
+    with pytest.raises(ValueError):
+        build_model(data)
+
+
+def test_build_model_accepts_valid_scenario_without_raising():
+    build_model(FULL_SCENARIO)  # must not raise
+    assert validate_entities(FULL_SCENARIO) == []
+
+
+def test_coverage_warnings_are_advisory_not_blocking():
+    """A missing no_overlap entry for one teacher is a soft warning, not a
+    hard error: solving must still succeed."""
+    ent = mini(["5a"], ["T1", "T2"], ["Mathe", "Deutsch"], [], ["Mo"], 2)
+    data = scenario(ent, [
+        {"type": "teacher_subject_assignment", "teacher": "T1", "class": "5a", "subject": "Mathe"},
+        {"type": "teacher_subject_assignment", "teacher": "T2", "class": "5a", "subject": "Deutsch"},
+        {"type": "no_overlap", "resource": "teacher", "entity": "T1"},
+        # T2 intentionally has no no_overlap entry here.
+    ])
+    warnings = coverage_warnings(data)
+    assert any("T2" in w for w in warnings)
+    assert validate_entities(data) == []  # not a hard error
+    status, _, _ = solve(data)  # must still solve fine
+    assert status in (cp_model.OPTIMAL, cp_model.FEASIBLE), status_name(status)

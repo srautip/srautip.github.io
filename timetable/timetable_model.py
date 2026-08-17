@@ -25,6 +25,8 @@ from dataclasses import dataclass
 
 from ortools.sat.python import cp_model
 
+from validation import validate_entities
+
 
 @dataclass(frozen=True)
 class Session:
@@ -51,7 +53,21 @@ def build_model(data: dict):
     """Build the CP-SAT model.
 
     Returns (model, lesson_vars, room_vars, sessions, days, periods).
+
+    Raises ValueError if any constraint references a class/teacher/subject/
+    room that isn't listed in `entities` - such a constraint would
+    otherwise be silently dropped further down (there is no session/
+    variable to attach it to), which can make an incomplete schedule solve
+    as OPTIMAL without any error. See validation.py for details.
     """
+    errors = validate_entities(data)
+    if errors:
+        raise ValueError(
+            "Ungueltige Constraint-Referenzen - build_model() bricht ab, bevor "
+            "ein Solver-Aufruf mit falschen Daten stattfindet:\n"
+            + "\n".join(f"  - {e}" for e in errors)
+        )
+
     model = cp_model.CpModel()
     ent = data["entities"]
     days: list[str] = ent["timeslots"]["days"]
