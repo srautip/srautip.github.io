@@ -24,12 +24,17 @@ timetable/
 │                               # with timetable_model.py, on purpose)
 ├── requirements.txt
 └── tests/
-    ├── fixture_full_scenario.py   # curated example scenario (see file header
-    │                               # for the manual fixes applied on top of
-    │                               # raw LLM output)
-    ├── test_timetable_model.py    # 16 tests, see its docstring for the
-    │                               # testing philosophy
-    └── test_formatting.py         # 7 tests for the presentation layer
+    ├── fixture_full_scenario.py       # curated example scenario (see file
+    │                                   # header for the manual fixes applied
+    │                                   # on top of raw LLM output)
+    ├── fixture_gymnasium_klasse5.py    # larger, more realistic scenario: a
+    │                                   # 4-zuegiges Gymnasium, Klasse 5 (see
+    │                                   # file header for scope/caveats)
+    ├── test_timetable_model.py        # 16 tests, see its docstring for the
+    │                                   # testing philosophy
+    ├── test_formatting.py             # 7 tests for the presentation layer
+    └── test_gymnasium_klasse5.py      # 3 integration tests against the
+                                        # larger scenario
 ```
 
 ## Constraint JSON format
@@ -88,6 +93,35 @@ flags classes/teachers with no `no_overlap` entry as advisory warnings,
 since that omission may be intentional (e.g. a teacher who only ever
 teaches one class). Callers can log these without blocking a solve.
 
+## Larger test scenario: 4-zuegiges Gymnasium, Klasse 5
+
+`tests/fixture_gymnasium_klasse5.py` is a bigger, more realistic scenario
+than the 2-class example above: 4 parallel classes (5a-5d), 9 subjects, 15
+teachers, 5 shared specialist rooms (2 Sporthallen, Musiksaal, Kunstraum,
+NaWi-Raum), 30 weekly hours per class, loosely modeled on a typical
+Baden-Wuerttemberg Gymnasium Kontingentstundentafel (comparable in scale
+to a school like GSG Fellbach) — **not** a verified extract of any real
+school's actual curriculum, staff, or rooms.
+
+It also documents two concrete schema limitations hit while building it
+(see the file's docstring for details):
+
+- **No cross-class groups.** Real confessional Religion/Ethik teaching
+  (katholisch/evangelisch/Ethik groups mixed across all 4 parallel
+  classes, taught in a shared "Bandzeit") can't be expressed — the
+  current schema only knows per-class subjects. Simplified here to one
+  teacher per class.
+- **No mixed block/single periods.** `consecutive_required` forces *all*
+  weekly hours of a class+subject into equal-length blocks. Real BNT is
+  often 3h/week (one double + one single period), which isn't
+  representable — the fixture uses 4h/week (two double periods) instead
+  to stay within what the model can express.
+
+Despite the added scale (114 constraints, 4x the sessions of the small
+fixture), it solves to `OPTIMAL` in well under a second and passes the
+independent verifier with zero violations - see
+`tests/test_gymnasium_klasse5.py`.
+
 ## Output: rendering the solved schedule
 
 `solve()` on its own returns `schedule` as a **flat, unordered list** of
@@ -138,7 +172,7 @@ pip install -r requirements.txt
 python -m pytest tests/ -v
 ```
 
-All 23 tests currently pass in well under a second. Test categories:
+All 26 tests currently pass in well under a second. Test categories:
 
 - One isolated unit test per constraint type, using minimal scenarios.
 - "Pigeonhole" tests for `no_overlap`, `room_requirement`,
@@ -160,6 +194,9 @@ All 23 tests currently pass in well under a second. Test categories:
   lesson shows up, nothing extra), every slot is populated (including free
   periods as `None`), the ASCII tables contain every scheduled lesson, and
   the JSON export survives a `json.dumps`/`json.loads` round trip.
+- Gymnasium-Klasse-5 integration tests: the larger 4-class scenario
+  validates cleanly, solves to `OPTIMAL`/`FEASIBLE`, passes the
+  independent verifier, and renders without error.
 
 ## Example usage
 
