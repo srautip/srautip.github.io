@@ -62,7 +62,7 @@ Public Class RaumzuordnungTests
     Private Shared Function SolveThroughStageC(data As JsonObject) As SolveResult
         Dim kb = Kursblockung.SolveKursblockung(data, numWorkers:=1)
         Assert.IsTrue(kb.Status = CpSolverStatus.Optimal OrElse kb.Status = CpSolverStatus.Feasible)
-        Dim schienenResult = Solver.Solve(Schienenraster.BuildSchienenrasterScenario(data), numWorkers:=1)
+        Dim schienenResult = Solver.Solve(Schienenraster.BuildSchienenrasterScenario(data, kb.Assignment), numWorkers:=1)
         Assert.IsTrue(schienenResult.Status = CpSolverStatus.Optimal OrElse schienenResult.Status = CpSolverStatus.Feasible)
         Dim raumScenario = Raumzuordnung.BuildRaumzuordnungScenario(data, kb.Assignment, schienenResult.Schedule)
         Return Solver.Solve(raumScenario, numWorkers:=1)
@@ -81,9 +81,9 @@ Public Class RaumzuordnungTests
         Dim r = SolveThroughStageC(data)
         Assert.IsTrue(r.Status = CpSolverStatus.Optimal OrElse r.Status = CpSolverStatus.Feasible, Solver.StatusName(r.Status))
 
-        Dim raumScenario = Raumzuordnung.BuildRaumzuordnungScenario(data,
-            Kursblockung.SolveKursblockung(data, numWorkers:=1).Assignment,
-            Solver.Solve(Schienenraster.BuildSchienenrasterScenario(data), numWorkers:=1).Schedule)
+        Dim assignment = Kursblockung.SolveKursblockung(data, numWorkers:=1).Assignment
+        Dim raumScenario = Raumzuordnung.BuildRaumzuordnungScenario(data, assignment,
+            Solver.Solve(Schienenraster.BuildSchienenrasterScenario(data, assignment), numWorkers:=1).Schedule)
         Dim violations = Verifier.VerifySchedule(raumScenario, r.Schedule)
         Assert.AreEqual(0, violations.Count, String.Join(vbLf, violations))
 

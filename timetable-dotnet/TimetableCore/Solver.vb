@@ -714,7 +714,7 @@ Public Module Solver
             Return New KursstufeSolveResult With {.KursblockungStatus = kb.Status}
         End If
 
-        Dim schienenScenario = Schienenraster.BuildSchienenrasterScenario(data)
+        Dim schienenScenario = Schienenraster.BuildSchienenrasterScenario(data, kb.Assignment)
         Dim schienenResult = Solve(schienenScenario, timeLimitS, seed, numWorkers)
         If schienenResult.Status <> CpSolverStatus.Optimal AndAlso schienenResult.Status <> CpSolverStatus.Feasible Then
             Return New KursstufeSolveResult With {.KursblockungStatus = kb.Status, .SchienenrasterStatus = schienenResult.Status}

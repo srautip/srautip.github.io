@@ -130,7 +130,7 @@ Public Class VerifyKursblockungTests
         }
 
         Dim kb = Kursblockung.SolveKursblockung(data, numWorkers:=1)
-        Dim schienenResult = Solver.Solve(Schienenraster.BuildSchienenrasterScenario(data), numWorkers:=1)
+        Dim schienenResult = Solver.Solve(Schienenraster.BuildSchienenrasterScenario(data, kb.Assignment), numWorkers:=1)
         Dim raumScenario = Raumzuordnung.BuildRaumzuordnungScenario(data, kb.Assignment, schienenResult.Schedule)
         Dim raumResult = Solver.Solve(raumScenario, numWorkers:=1)
         Assert.IsTrue(raumResult.Status = CpSolverStatus.Optimal OrElse raumResult.Status = CpSolverStatus.Feasible)

@@ -76,7 +76,7 @@ Public Class SchienenrasterTests
         Dim kb = Kursblockung.SolveKursblockung(data, numWorkers:=1)
         Assert.IsTrue(kb.Status = CpSolverStatus.Optimal OrElse kb.Status = CpSolverStatus.Feasible)
 
-        Dim synthetic = Schienenraster.BuildSchienenrasterScenario(data)
+        Dim synthetic = Schienenraster.BuildSchienenrasterScenario(data, kb.Assignment)
         Dim r = Solver.Solve(synthetic, timeLimitS:=30, numWorkers:=1)
 
         Assert.IsTrue(r.Status = CpSolverStatus.Optimal OrElse r.Status = CpSolverStatus.Feasible, Solver.StatusName(r.Status))
@@ -104,7 +104,7 @@ Public Class SchienenrasterTests
         Dim kb = Kursblockung.SolveKursblockung(data, numWorkers:=1)
         Assert.IsTrue(kb.Status = CpSolverStatus.Optimal OrElse kb.Status = CpSolverStatus.Feasible)
 
-        Dim synthetic = Schienenraster.BuildSchienenrasterScenario(data)
+        Dim synthetic = Schienenraster.BuildSchienenrasterScenario(data, kb.Assignment)
         Dim r = Solver.Solve(synthetic, timeLimitS:=30, numWorkers:=1)
         Assert.IsTrue(r.Status = CpSolverStatus.Optimal OrElse r.Status = CpSolverStatus.Feasible)
 
