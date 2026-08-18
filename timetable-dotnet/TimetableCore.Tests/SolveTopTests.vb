@@ -131,4 +131,50 @@ Public Class SolveTopTests
         Next
     End Sub
 
+    ''' <summary>Phase 2.9: proves the objective integration, not just
+    ''' lucky enumeration order, drives quality. 1 class, 1 teacher,
+    ''' weekly_hours=2, 2 days x 4 periods, zero Kann constraints - every
+    ''' feasible placement has Kann=0, but secondary quality varies a lot
+    ''' depending on which periods/days are chosen. The joint optimum (1
+    ''' lesson each on Mo/Di, both at a non-edge period) has ClassGapCount=0,
+    ''' TeacherGapCount=0, EdgePeriodCount=0, and both ranges 0 - every term
+    ''' in QualityScore.Total is non-negative, so Total=0 is provably the
+    ''' floor, not merely "the best one seen so far". maxSolutions:=1 is
+    ''' the crucial part: only ONE CP-SAT solve happens, so if Total=0
+    ''' comes back, the in-model objective itself found it - no
+    ''' multi-iteration ranking could get "lucky" with a single solve.</summary>
+    <TestMethod>
+    Public Sub SolveTopSingleIterationFindsSecondaryOptimalSchedule()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10)
+        Assert.AreEqual(1, result.Solutions.Count)
+        Assert.AreEqual(0.0, result.Solutions(0).Quality.Total, 0.0000001)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Solutions(0).Schedule).Count)
+    End Sub
+
+    ''' <summary>Phase 2.9: proves the trickiest semantic (teacher
+    ''' working-days-only range, mirroring ScheduleQuality's
+    ''' TeacherLoadVarianceOnlyCountsWorkingDays) survives the move into
+    ''' the CP-SAT objective. T1 is only available Mo/Di (a declared
+    ''' 2-of-3-day part-timer); weekly_hours=2 on those 2 days -> the best
+    ''' schedule has 1 lesson each on Mo and Di (TeacherLoadVariance=0,
+    ''' since only 2 real working days, evenly split). A WRONG "range over
+    ''' all 3 days" implementation would instead treat Mi's forced-0 as
+    ''' part of the range and never reach a 0 variance schedule.</summary>
+    <TestMethod>
+    Public Sub SolveTopObjectiveIgnoresTeacherNonWorkingDaysForRange()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di", "Mi"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "teacher_availability"}, {"teacher", "T1"}, {"available_days", New JsonArray From {"Mo", "Di"}}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10)
+        Assert.AreEqual(1, result.Solutions.Count)
+        Assert.AreEqual(0.0, result.Solutions(0).Quality.TeacherLoadVariance, 0.0000001)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Solutions(0).Schedule).Count)
+    End Sub
+
 End Class

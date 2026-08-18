@@ -210,7 +210,14 @@ Public Module Solver
         Return sessions
     End Function
 
-    Public Function BuildModel(data As JsonObject) As BuiltModel
+    ''' <summary>Phase 2.9: everything BuildModel does EXCEPT the final
+    ''' Minimize call, factored out so SolveTop can build its own, richer
+    ''' quality-aware objective on top of the same core model instead of
+    ''' the Kann-only one BuildModel sets. Verbatim body (no reordering) -
+    ''' CP-SAT's random_seed behavior is sensitive to variable-creation
+    ''' order, so this must stay a pure cut-paste of BuildModel's former
+    ''' pre-Minimize logic.</summary>
+    Private Function BuildCoreModel(data As JsonObject) As BuiltModel
         Dim errors = Validation.ValidateEntities(data)
         If errors.Any() Then
             Throw New ArgumentException("Ungueltige Constraint-Referenzen:" & vbLf & String.Join(vbLf, errors))
@@ -288,14 +295,18 @@ Public Module Solver
 
         ApplyConstraints(model, data, sessions, lesson, room, days, periods, kannVars)
 
-        If kannVars.Count > 0 Then
-            model.Minimize(LinearExpr.Sum(kannVars.Values.Select(Function(kv) kv.Var)))
-        End If
-
         Return New BuiltModel With {
             .Model = model, .Lesson = lesson, .Room = room,
             .Sessions = sessions, .Days = days, .Periods = periods, .KannVars = kannVars
         }
+    End Function
+
+    Public Function BuildModel(data As JsonObject) As BuiltModel
+        Dim built = BuildCoreModel(data)
+        If built.KannVars.Count > 0 Then
+            built.Model.Minimize(LinearExpr.Sum(built.KannVars.Values.Select(Function(kv) kv.Var)))
+        End If
+        Return built
     End Function
 
     Private Sub AddBlockConstraint(model As CpModel, lesson As Dictionary(Of LessonKey, BoolVar),
@@ -626,7 +637,8 @@ Public Module Solver
                               Optional perSolveTimeLimitS As Double = 30.0,
                               Optional seed As Integer = 42,
                               Optional numWorkers As Integer = 1) As MultiSolveResult
-        Dim built = BuildModel(data)
+        Dim built = BuildCoreModel(data)
+        SolveTopObjective.ApplyQualityObjective(built, data)
         Dim solutions As New List(Of ScoredSolution)
         Dim sw = Stopwatch.StartNew()
         Dim iterations = 0

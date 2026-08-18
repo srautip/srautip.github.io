@@ -114,3 +114,117 @@ kleinen Zeitbudget. Der Test schlug wiederholt fehl: `StopReason` war
       unabhängige Abbruchkriterien.
 - [x] Alle 5 Bewertungskriterien einzeln durch handgerechnete Tests belegt.
 - [x] Dieser Bericht committet.
+
+# Phase 2.9: Bewertungskriterien in der CP-SAT-Zielfunktion
+
+Nutzerfrage nach einem Live-Test (Grundschule-Szenario): "Kann man die
+Bewertungskriterien auch in die Zielfunktion integrieren, so dass der
+Solver gezielt optimiert?" Bis hierhin optimierte `SolveTop`s CP-SAT-Modell
+ausschließlich Kann-Verstöße; die 4 Sekundärkriterien aus
+`ScheduleQuality.vb` wurden erst nach jedem Solve rein informativ berechnet
+und nur zum Sortieren benutzt. Ein Live-Test des Nutzers zeigte das
+konkret: bei `maxSolutions:=5` wurde ein Total-Score von 94,8 gefunden, bei
+`maxSolutions:=50` bereits 79,5 - die Suchreihenfolge war bzgl. der
+Sekundärkriterien praktisch beliebig.
+
+## Nutzerentscheidungen
+
+1. **Architektur:** `SolveTop` wird in seiner Kernlogik umgebaut (kein
+   separater Zusatzmodus) - jede Iteration baut jetzt die volle gewichtete
+   Zielfunktion. `Solve()`/`BuildModel()` bleiben byte-identisch
+   unverändert (`BuildModel`s Vorbau-Logik wurde 1:1 in ein privates
+   `BuildCoreModel` ausgelagert, das sowohl `BuildModel` als auch der neue
+   `SolveTop`-Pfad aufrufen).
+2. **Tagesausgewogenheit:** linearer Ersatz - Spannweite (Max-Min) statt
+   echter quadratischer Varianz in der Zielfunktion. `ScheduleQuality.vb`s
+   echte Varianz bleibt unverändert die maßgebliche, unabhängig
+   nachberechnete Anzeige-/Sortier-Metrik (gleiches Prinzip wie
+   Verifier.vb vs. Solver.vb).
+3. **Umfang:** alle 5 Kriterien wandern in die Zielfunktion.
+
+## Live-Verifikation der CP-SAT-Modellierung
+
+Ein Plan-Agent hat die Kernmechanik vorab **live gegen die tatsächlich
+installierte** `Google.OrTools` 9.15.6755 verifiziert (nicht nur aus
+Dokumentation angenommen): `CpModel.AddMinEquality`/`AddMaxEquality`
+existieren mit Signatur `(LinearExpr, IEnumerable(Of LinearExpr))`;
+`BoolVar : IntVar : LinearExpr` (ein `BoolVar` ist ueberall direkt als
+`LinearExpr` verwendbar); ein tatsächlich gelöstes Smoke-Modell mit der
+Sentinel-Min/Max-Lückenkodierung lieferte exakt die handgerechneten
+Erwartungswerte. Das Modell kompilierte und lief beim ersten Versuch ohne
+API-Ueberraschungen.
+
+## `SolveTopObjective.vb` (neues Modul)
+
+Baut pro (Klasse-oder-Lehrer, Tag) ein gemeinsames Geruest (`occupied`-
+und `hasAny`-BoolVars, wiederverwendet von Luecken- UND Ausgewogenheits-
+Kodierung), dann:
+- **Luecken:** Sentinel-Substitutions-Min/Max-Trick (`firstOccupied`/
+  `lastOccupied` ueber besetzte Perioden, `gapVar = Spanne - Anzahl`).
+- **Randstunden:** triviale Summe ueber bereits vorhandene `Lesson`-Vars,
+  keine neuen Variablen.
+- **Klassen-Ausgewogenheit:** `Max-Min` der taeglichen Stundenzahl ueber
+  ALLE Tage, kein Sentinel noetig.
+- **Lehrer-Ausgewogenheit:** `Max-Min`, aber nur die MIN-Seite braucht ein
+  Sentinel (arbeitsfreie Tage duerfen die Spannweite nicht aufblaehen) -
+  die heikelste Stelle, per dediziertem Test abgesichert.
+- **Finales `Minimize`:** gewichtete Summe aller Terme, mit denselben
+  ganzzahligen Gewichten wie `ScheduleQuality.vb` (`CLng(...)`-gewandelt).
+
+## Ergebnis: Qualität stark verbessert, Rechenzeit deutlich höher
+
+Direkter Vorher/Nachher-Vergleich auf demselben Grundschule-Szenario, das
+der Nutzer zuvor manuell getestet hatte:
+
+| Lauf | Vorher (Kann-only) | Nachher (volle Zielfunktion) |
+|---|---|---|
+| `maxSolutions:=5` | Total=94,8 in 0,14s | **Total=10,8** in 6,19s |
+| `maxSolutions:=50` | Total=79,5 in 0,85s | **Total=10,8** in 56,61s (kein weiterer Fortschritt gegenüber `:=5`) |
+
+Die Zielfunktions-Integration ist ein deutlicher Qualitätsgewinn (10,8 statt
+79,5/94,8) und konvergiert bereits bei den ersten 5 Loesungen auf denselben
+Bestwert wie bei 50 - die Suche findet das gute Gebiet jetzt gezielt, statt
+zufaellig darauf zu stossen. Das hat aber einen echten Preis: **~44x
+langsamer** bei `maxSolutions:=5` (0,14s -> 6,19s), **~66x langsamer** bei
+`maxSolutions:=50` (0,85s -> 56,61s) - erwartet, da jede Iteration jetzt
+~1900 zusaetzliche Variablen und ~3600 zusaetzliche Constraints mitloest
+(Groessenschaetzung aus der Planungsphase, bestaetigt durch diese Messung).
+
+**Fuer groessere Szenarien ist das spuerbar:** `GymnasiumKlasse5Fixture`
+(15 Entitaeten) und `OberstufeFixture` erreichten bei `maxSolutions:=5`
+und den bisherigen Standard-Zeitbudgets (`totalTimeLimitS:=120s`,
+`perSolveTimeLimitS:=30s`) **nicht** die volle Anzahl - beide stoppten
+nach 4 von 5 gewuenschten Loesungen mit `StopReason=TimeLimitReached`
+(120,0s bzw. 120,0s Gesamtdauer). Das ist kein Fehler, sondern die
+ehrliche Konsequenz aus Nutzerentscheidung 3 (alle 5 Kriterien, volle
+Konsequenz statt nur die guenstigen) - fuer realistische Schulgroessen
+sollten `totalTimeLimitS`/`perSolveTimeLimitS` bei Bedarf grosszuegiger
+gesetzt werden, oder mit weniger `maxSolutions` gearbeitet werden, wenn
+schnelle Antworten wichtiger sind als viele Alternativen.
+
+## Verifikation
+
+- Beide neuen Tests (`SolveTopSingleIterationFindsSecondaryOptimalSchedule`,
+  `SolveTopObjectiveIgnoresTeacherNonWorkingDaysForRange`) bestanden auf
+  Anhieb - beweisen, dass bereits die ERSTE Iteration (`maxSolutions:=1`)
+  das nachweisbare Sekundaer-Optimum (Total=0) findet, und dass die
+  Lehrer-Arbeitstage-Semantik in der Zielfunktion erhalten bleibt.
+- Alle 6 bestehenden `SolveTopTests.vb`-Tests bleiben gruen (Kann dominiert
+  weiterhin, `Solutions`-Sortierung unveraendert ueber das bestehende
+  `ScheduleQuality.Score`-basierte `OrderBy`).
+- Volle Regressionssuite nach dem `BuildCoreModel`-Refactor UND erneut
+  nach dem vollstaendigen Feature: 54 bestanden, 6 korrekt uebersprungen,
+  0 Regressionen. `Solve()`/`BuildModel()` byte-identisch bestaetigt.
+
+## Definition of Done — Status (Phase 2.9)
+
+- [x] `dotnet test TimetableCore.Tests` bleibt vollstaendig gruen, 0
+      Regressionen.
+- [x] `SolveTop` findet nachweislich bereits bei `maxSolutions:=1` eine
+      bzgl. der Sekundaerkriterien beweisbar optimale Loesung.
+- [x] Lehrer-Arbeitstage-Semantik in der Zielfunktion nachweislich erhalten.
+- [x] `Solve()`/`BuildModel()` bleiben byte-identisch unveraendert.
+- [x] Alt-vs-neu-Laufzeitvergleich dokumentiert (Grundschule direkt, plus
+      Gymnasium/Oberstufe als Skalierungs-Warnung fuer die Standard-
+      Zeitbudgets).
+- [x] Committet und gepusht.
