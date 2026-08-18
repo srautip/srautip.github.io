@@ -300,21 +300,30 @@ Public Module LlmExtraction
     ''' <summary>Deterministic safety net (same idea as ExpandPeriodException):
     ''' the consecutive_required extraction call sometimes hallucinates a
     ''' block_length purely from arithmetic (e.g. "2h/Woche, max 1/Tag") even
-    ''' when instructed not to - and a block of N periods on one day is
-    ''' mathematically impossible if that same class/subject's weekly_hours
-    ''' constraint caps max_per_day below N (a block needs all its periods on
-    ''' the SAME day). Rather than relying solely on prompting to prevent
-    ''' this, drop any consecutive_required item that is self-contradictory
-    ''' against the weekly_hours max_per_day already extracted for the same
-    ''' (class, subject) - this can only remove impossible combinations, never
-    ''' a legitimate one (a real block always has max_per_day &gt;= block_length).</summary>
+    ''' when instructed not to - sometimes even while its own "reason" field
+    ''' argues against extracting it. Solver.vb's AddBlockConstraint forces
+    ''' EVERY occurrence of that class/subject, on every day, to be covered by
+    ''' a full block of exactly block_length periods (lesson = sum of covering
+    ''' block-starts) - so the combination is mathematically impossible if
+    ''' EITHER (a) block_length exceeds that class/subject's weekly_hours
+    ''' max_per_day (a block needs all its periods on the SAME day), OR
+    ''' (b) hours_per_week is not an exact multiple of block_length (blocks
+    ''' can only ever tile the total in whole multiples of block_length, so a
+    ''' remainder period can never be scheduled at all). Rather than relying
+    ''' solely on prompting to prevent this, drop any consecutive_required
+    ''' item that is self-contradictory against the weekly_hours already
+    ''' extracted for the same (class, subject) - this can only remove
+    ''' impossible combinations, never a legitimate one (a real block always
+    ''' has max_per_day &gt;= block_length AND hours_per_week a multiple of
+    ''' block_length).</summary>
     Public Function DropContradictoryConsecutiveRequired(constraints As List(Of JsonObject)) As List(Of JsonObject)
-        Dim maxPerDayByClassSubject As New Dictionary(Of (String, String), Integer)
+        Dim weeklyHoursByClassSubject As New Dictionary(Of (String, String), (HoursPerWeek As Integer, MaxPerDay As Integer?))
         For Each c In constraints
             If CStr(c("type")) = "weekly_hours" Then
-                Dim maxPerDay = JsonHelpers.GetInt(c, "max_per_day")
-                If maxPerDay.HasValue Then
-                    maxPerDayByClassSubject((JsonHelpers.GetString(c, "class"), JsonHelpers.GetString(c, "subject"))) = maxPerDay.Value
+                Dim hoursPerWeek = JsonHelpers.GetInt(c, "hours_per_week")
+                If hoursPerWeek.HasValue Then
+                    weeklyHoursByClassSubject((JsonHelpers.GetString(c, "class"), JsonHelpers.GetString(c, "subject"))) =
+                        (hoursPerWeek.Value, JsonHelpers.GetInt(c, "max_per_day"))
                 End If
             End If
         Next
@@ -323,9 +332,15 @@ Public Module LlmExtraction
                                       If CStr(c("type")) <> "consecutive_required" Then Return True
                                       Dim key = (JsonHelpers.GetString(c, "class"), JsonHelpers.GetString(c, "subject"))
                                       Dim blockLength = JsonHelpers.GetInt(c, "block_length")
-                                      Dim maxPerDay As Integer
-                                      If blockLength.HasValue AndAlso maxPerDayByClassSubject.TryGetValue(key, maxPerDay) Then
-                                          Return blockLength.Value <= maxPerDay
+                                      Dim weeklyHours As (HoursPerWeek As Integer, MaxPerDay As Integer?)
+                                      If Not blockLength.HasValue OrElse Not weeklyHoursByClassSubject.TryGetValue(key, weeklyHours) Then
+                                          Return True
+                                      End If
+                                      If weeklyHours.MaxPerDay.HasValue AndAlso blockLength.Value > weeklyHours.MaxPerDay.Value Then
+                                          Return False
+                                      End If
+                                      If weeklyHours.HoursPerWeek Mod blockLength.Value <> 0 Then
+                                          Return False
                                       End If
                                       Return True
                                   End Function).ToList()
