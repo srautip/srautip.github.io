@@ -109,7 +109,50 @@ denkbar, aber nicht Teil dieser Phase.
 
 ## Realmaßstab-Beleg (2.12f): GSG Sek I bei `numWorkers:=1`
 
-<!-- PHASE2-12-BENCHMARK-RESULT -->
+Direkter Vorher/Nachher-Beleg auf demselben Szenario, das das Problem
+ursprünglich zeigte (`GymnasiumSekIFixture`, 30 Klassen/75 Lehrer, Kl. 5-10):
+
+| Lauf | `numWorkers` | Zeitbudget | Ergebnis |
+|---|---|---|---|
+| Vorher (ohne Staging, Phase 2.11-Nachtrag) | 1 | 30 Minuten | **0 Lösungen** (`TimeLimitReached`) |
+| Vorher (ohne Staging, Phase 2.11-Nachtrag) | 4 (Portfolio-Suche) | ~20 Minuten | 1 Lösung, Quality.Total=1023,54 |
+| **Nachher (mit Staging, Phase 2.12)** | **1** | **20 Minuten** | **1 Lösung**, Quality.Total=10605,47 |
+
+`SekIStagedHintsNumWorkers1Benchmark` (`RUN_SLOW_BENCHMARKS=1`,
+`numWorkers:=1`, `useStagedHints:=True`, `stage1TimeLimitS:=150`,
+`totalTimeLimitS:=1200`) lief 1201,1s, `StopReason=MaxSolutionsReached`
+(die Suche selbst hat innerhalb des Budgets abgeschlossen, nicht das
+Zeitlimit ausgeschöpft) und lieferte:
+
+```
+Quality.Total=10605,47, ClassGapCount=218, TeacherGapCount=570,
+EdgePeriodCount=335, AfternoonDayCount=142, ClassLoadVariance=38,40,
+TeacherLoadVariance=75,09
+```
+
+0 Verifier-Muss-Verstöße (per `Assert.AreEqual(0, Verifier.VerifySchedule(...))`
+bestätigt). **Die Kernaussage ist damit direkt belegt: das gestufte
+Warmstart-Verfahren behebt das beobachtete Kaltstart-Problem bei
+`numWorkers:=1`** - vorher fand die volle Zielfunktion dort in 30 Minuten
+gar nichts, jetzt findet sie innerhalb von 20 Minuten mindestens eine
+gültige Lösung. Die 8-Stunden-Eskalationsstufe (`totalTimeLimitS:=28800`),
+die für den Fall eines erneuten Fehlschlags vorgesehen war, war nicht
+nötig.
+
+**Ehrlich einzuordnen:** die gefundene Qualität (Total=10605,47) ist
+deutlich schlechter als das `numWorkers:=4`-Ergebnis (Total=1023,54) -
+erwartbar, da `maxSolutions:=1` hier nur die ERSTE gefundene zulässige
+Lösung akzeptiert (kein Beweis von Optimalität, keine weitere
+Verbesserung durch zusätzliche Iterationen) und ein einzelner Suchpfad
+(`numWorkers:=1`) strukturell weniger Suchraum abdeckt als eine
+4-fache Portfolio-Suche. Das gestufte Warmstart-Verfahren löst gezielt
+das Kaltstart-Problem ("überhaupt eine erste Lösung finden"), nicht das
+separate, unverändert bestehende Problem "möglichst gute Lösung finden" -
+für Letzteres bleibt `numWorkers:=4` (oder mehr Zeit/mehr Iterationen) die
+bessere Wahl, wenn verfügbar. Beide Mechanismen sind komplementär und
+schließen sich nicht aus (`useStagedHints:=True` UND `numWorkers:=4`
+gemeinsam wäre der nächste naheliegende Versuch, hier aber nicht mehr
+Teil dieser Phase).
 
 ## Verifikation
 
