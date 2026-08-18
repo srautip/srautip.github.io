@@ -174,4 +174,35 @@ Public Module CompletenessScoring
                                Function(e) actual.ContainsKey((e.ConstraintType, e.Key)) AndAlso actual((e.ConstraintType, e.Key)) = e.ExpectedPriority)
     End Function
 
+    ''' <summary>Phase 2.11: exact match of a Wahlprofil's chosen Kurs-ID
+    ''' SET (order-independent - callers pass `expected` pre-sorted the
+    ''' same way `actual` is built here, mirroring ScoreRoomRequirement's
+    ''' convention). A Wahlprofil the LLM didn't extract at all, or that
+    ''' got even one wrong/missing Kurs-ID, counts as a miss - Kurswahl has
+    ''' no meaningful "partially correct" notion (a Kursstufe schedule
+    ''' either does or doesn't have the right courses for a profile).</summary>
+    Public Function ScoreKurswahl(expected As Dictionary(Of String, List(Of String)),
+                                   extracted As List(Of JsonObject)) As Double
+        Dim actual As New Dictionary(Of String, List(Of String))
+        For Each item In extracted.Where(Function(c) JsonHelpers.GetString(c, "type") = "kurswahl")
+            actual(JsonHelpers.GetString(item, "wahlprofil_id")) = JsonHelpers.AsStringList(item, "kurse").OrderBy(Function(s) s).ToList()
+        Next
+        Return RecallFraction(expected.Keys.ToList(),
+                               Function(key) actual.ContainsKey(key) AndAlso actual(key).SequenceEqual(expected(key)))
+    End Function
+
+    ''' <summary>Phase 2.11: separate from ScoreKurswahl on purpose (same
+    ''' "separate the fact from the priority/attribute" principle as
+    ''' ScorePriorityAccuracy) - measures ONLY whether student_count came
+    ''' out right, independent of whether the Kurs-ID set itself did.</summary>
+    Public Function ScoreKurswahlStudentCount(expected As Dictionary(Of String, Integer),
+                                               extracted As List(Of JsonObject)) As Double
+        Dim actual As New Dictionary(Of String, Integer?)
+        For Each item In extracted.Where(Function(c) JsonHelpers.GetString(c, "type") = "kurswahl")
+            actual(JsonHelpers.GetString(item, "wahlprofil_id")) = JsonHelpers.GetInt(item, "student_count")
+        Next
+        Return RecallFraction(expected.Keys.ToList(),
+                               Function(key) actual.ContainsKey(key) AndAlso actual(key) = expected(key))
+    End Function
+
 End Module

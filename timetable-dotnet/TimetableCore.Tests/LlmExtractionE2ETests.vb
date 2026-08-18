@@ -344,4 +344,77 @@ Public Class LlmExtractionE2ETests
             $"Von {shouldConstraints.Count} 'should'-Constraints hatte keines ein 'reason'-Feld - Qwen begruendet seine Kann-Einstufungen in diesem Lauf gar nicht.")
     End Function
 
+    ''' <summary>Phase 2.11g: first live diagnostic for the brand-new
+    ''' "kurswahl" extraction type - the riskiest new field in this
+    ''' project so far (free text -> an OPAQUE Kurs-ID, unlike every one
+    ''' of the other 9 types' text -> known-entity-name mapping).
+    ''' Deliberately SOFT assertions only (structural sanity: every
+    ''' extracted object has the required fields and a non-empty Kurs
+    ''' list) - not a completeness/accuracy threshold. This is the
+    ''' "isolierter Live-Diagnose-Aufruf" step the phase-2.11 plan calls
+    ''' for BEFORE any strict scoring gets wired into the regular gated
+    ''' suite; invented Kurs-IDs (not present in ENTITIES.kurse) are
+    ''' logged, not failed on - if this run shows the model reliably
+    ''' invents IDs instead of picking from ENTITIES.kurse, the plan's
+    ''' documented Plan-B (extract {subject, kursart} pairs instead of
+    ''' raw IDs, resolved to an ID deterministically in code afterwards)
+    ''' is the next step, not a schema/instruction tweak.</summary>
+    <TestMethod>
+    Public Async Function LlmExtractionE2EKurswahlDiagnostic() As Task
+        If Environment.GetEnvironmentVariable("RUN_LLM_TESTS") <> "1" Then
+            Assert.Inconclusive(
+                "LLM e2e test skipped by default (needs a running Ollama server with " &
+                "qwen3.5:4b, takes several minutes, and is not deterministic). " &
+                "Set RUN_LLM_TESTS=1 to run it.")
+        End If
+
+        Dim avail = Await LlmExtraction.IsOllamaAvailable()
+        If Not avail.Available Then Assert.Inconclusive(avail.Reason)
+
+        Dim ent As New JsonObject From {
+            {"classes", New JsonArray()},
+            {"teachers", New JsonArray({"Frau Berger", "Herr Klein", "Frau Wolf", "Herr Otto", "Frau Fell"})},
+            {"subjects", New JsonArray({"Deutsch", "Mathematik", "Biologie", "Englisch", "Chemie", "Erdkunde"})},
+            {"rooms", New JsonArray()},
+            {"timeslots", New JsonObject From {
+                {"days", New JsonArray({"Mo", "Di", "Mi", "Do", "Fr"})}, {"periods_per_day", 8}
+            }},
+            {"kurse", New JsonArray({
+                CType(New JsonObject From {
+                    {"id", "D-LK1"}, {"subject", "Deutsch"}, {"teacher", "Frau Berger"}, {"kursart", "LK"}, {"hours_per_week", 5}
+                }, JsonNode),
+                New JsonObject From {{"id", "MA-LK1"}, {"subject", "Mathematik"}, {"teacher", "Herr Klein"}, {"kursart", "LK"}, {"hours_per_week", 5}},
+                New JsonObject From {{"id", "BIO-LK1"}, {"subject", "Biologie"}, {"teacher", "Frau Wolf"}, {"kursart", "LK"}, {"hours_per_week", 5}},
+                New JsonObject From {{"id", "EN-GK1"}, {"subject", "Englisch"}, {"teacher", "Herr Otto"}, {"kursart", "GK"}, {"hours_per_week", 3}},
+                New JsonObject From {{"id", "CH-GK1"}, {"subject", "Chemie"}, {"teacher", "Frau Fell"}, {"kursart", "GK"}, {"hours_per_week", 3}},
+                New JsonObject From {{"id", "GEO-GK1"}, {"subject", "Erdkunde"}, {"teacher", "Frau Fell"}, {"kursart", "GK"}, {"hours_per_week", 2}}
+            })}
+        }
+        Dim prompt =
+            "Wahlprofil A (24 Schueler) waehlt als Leistungskurse Deutsch, " &
+            "Mathematik und Biologie sowie als Grundkurse Englisch und Erdkunde." & vbLf &
+            "Wahlprofil B (18 Schueler) waehlt als Leistungskurse Deutsch, " &
+            "Mathematik und Biologie sowie als Grundkurse Chemie und Englisch." & vbLf
+
+        Dim result = Await LlmExtraction.ExtractAllConstraints(ent, prompt, types:=LlmExtraction.KursstufeTypes)
+
+        Console.WriteLine(vbLf & "=== kurswahl-Diagnose ===")
+        Dim knownKursIds = New HashSet(Of String)(JsonHelpers.GetKurse(ent).Select(Function(k) JsonHelpers.GetString(k, "id")))
+        For Each c In result.Constraints
+            Dim kurse = JsonHelpers.AsStringList(c, "kurse")
+            Dim invented = kurse.Where(Function(kid) Not knownKursIds.Contains(kid)).ToList()
+            Console.WriteLine(
+                $"  wahlprofil_id={JsonHelpers.GetString(c, "wahlprofil_id")} student_count={JsonHelpers.GetInt(c, "student_count")} " &
+                $"kurse={JsonHelpers.PyListRepr(kurse)} erfunden={JsonHelpers.PyListRepr(invented)}")
+        Next
+
+        Assert.IsTrue(result.Constraints.Count > 0, "Kein einziges kurswahl-Objekt extrahiert.")
+        For Each c In result.Constraints
+            Assert.IsFalse(String.IsNullOrEmpty(JsonHelpers.GetString(c, "wahlprofil_id")))
+            Assert.IsTrue(JsonHelpers.GetInt(c, "student_count").HasValue)
+            Assert.IsTrue(JsonHelpers.AsStringList(c, "kurse").Count > 0,
+                $"Wahlprofil '{JsonHelpers.GetString(c, "wahlprofil_id")}' hat eine leere kurse-Liste.")
+        Next
+    End Function
+
 End Class

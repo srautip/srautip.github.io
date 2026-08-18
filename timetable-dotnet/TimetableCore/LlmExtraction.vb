@@ -43,6 +43,14 @@ Public Module LlmExtraction
         "teacher_subject_assignment", "period_exception"
     }
 
+    ''' <summary>Phase 2.11: the Kursstufe/Kurssystem extraction type(s),
+    ''' deliberately kept OUT of AllTypes (the existing 9-type default is
+    ''' unchanged) - a caller passes this explicitly to ExtractAllConstraints'
+    ''' `types` parameter for a Kursstufe-scenario prompt (one carrying
+    ''' entities.kurse/schienen), never mixed into a class-based scenario's
+    ''' extraction run.</summary>
+    Public ReadOnly KursstufeTypes As New List(Of String) From {"kurswahl"}
+
     Private ReadOnly SharedHttpClient As New HttpClient() With {.Timeout = Timeout.InfiniteTimeSpan}
 
     Private ReadOnly Instructions As New Dictionary(Of String, String) From {
@@ -166,7 +174,19 @@ Public Module LlmExtraction
             "das Ergebnis ist dann eine Liste mit MEHREREN Objekten, nicht nur " &
             "einem. Ignoriere normale Sperrzeiten, die direkt einen gesperrten " &
             "Tag nennen (z.B. 'freitags 6. Stunde frei') - dafuer gibt es " &
-            "einen anderen Constraint-Typ."}
+            "einen anderen Constraint-Typ."},
+        {"kurswahl",
+            "Extrahiere die Kurswahl jedes im Text genannten Wahlprofils: wie " &
+            "viele Schueler folgen diesem Profil (student_count) und welche " &
+            "Kurse (als Kurs-ID aus ENTITIES.kurse) waehlen sie. Jedes " &
+            "Wahlprofil MUSS genau DREI Kurse mit kursart='LK' enthalten " &
+            "(Leistungskurse), alle uebrigen genannten Faecher sind " &
+            "Grundkurse (kursart='GK'). Ordne Fach-/Kursart-Nennungen im " &
+            "Text der PASSENDEN Kurs-ID aus ENTITIES.kurse zu (gleiches " &
+            "subject UND gleiches kursart) - erfinde NIEMALS eine Kurs-ID, " &
+            "die nicht in ENTITIES.kurse vorkommt. Ein Objekt PRO im Text " &
+            "genanntem Wahlprofil, keine Duplikate, keine erfundenen " &
+            "Wahlprofile ohne Textbeleg."}
     }
 
     ' --- JSON-Schema-Bausteine (mirrors _obj/_ITEM_SCHEMAS) ---
@@ -358,6 +378,27 @@ Public Module LlmExtraction
                 props("allowed_days") = ArraySchema(StringSchema())
                 props("reason") = StringSchema()
                 Return ObjSchema(props, {"type", "period", "allowed_days"})
+
+            Case "kurswahl"
+                ' Phase 2.11: NOT part of AllTypes (see KursstufeTypes below) -
+                ' this is the Kursstufe/Kurssystem extension, orthogonal to the
+                ' 9 class-based types above, and only meaningful for a
+                ' scenario whose entities carry "kurse"/"schienen".
+                Dim props As New JsonObject()
+                props("type") = ConstSchema("kurswahl")
+                props("wahlprofil_id") = StringSchema()
+                props("student_count") = IntegerSchema()
+                props("kurse") = ArraySchema(StringSchema())
+                ' "reason" left OPTIONAL, not required - same documented
+                ' "ehrliche Grenze" as weekly_hours/room_requirement/
+                ' consecutive_required above: this is already the riskiest
+                ' new extraction task in the project (free text -> an OPAQUE
+                ' Kurs-ID instead of a text -> known-entity-name mapping), so
+                ' a required "reason" isn't worth risking destabilizing the
+                ' other fields for - to be confirmed or revised by the live
+                ' diagnostic this phase's plan calls for.
+                props("reason") = StringSchema()
+                Return ObjSchema(props, {"type", "wahlprofil_id", "student_count", "kurse"})
 
             Case Else
                 Throw New ArgumentException($"Unbekannter Constraint-Typ: '{constraintType}'")
