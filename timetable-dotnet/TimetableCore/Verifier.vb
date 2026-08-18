@@ -270,4 +270,72 @@ Public Module Verifier
         Return New VerificationResult With {.MussViolations = mussViolations, .KannViolations = kannViolations}
     End Function
 
+    ''' <summary>Phase 2.11: independent re-check of a Kursblockung result
+    ''' (Kursblockung.SolveKursblockung's Kurs->Schiene assignment) against
+    ''' the raw entities/kurswahl JSON - deliberately does NOT call into
+    ''' Kursblockung.vb's CP-SAT code, same "no shared code with the
+    ''' solver" principle as the rest of this module (see header). Checks:
+    ''' every Kurs is assigned to a Schiene compatible with it (kursart AND
+    ''' hours_per_week), no Wahlprofil has two of its own Kurse in the same
+    ''' Schiene, and no teacher has two of their Kurse in the same Schiene -
+    ''' the latter two should already be structurally impossible by
+    ''' Kursblockung's own constraints, so a hit here is a canary revealing
+    ''' a bug in that CP-SAT model, not an expected real-world finding.</summary>
+    Public Function VerifyKursblockung(data As JsonObject, assignment As Dictionary(Of String, String)) As List(Of String)
+        Dim violations As New List(Of String)
+        Dim ent = JsonHelpers.Entities(data)
+        Dim schienenById = JsonHelpers.GetSchienen(ent).ToDictionary(Function(s) JsonHelpers.GetString(s, "id"))
+        Dim kursTeacher As New Dictionary(Of String, String)
+
+        For Each k In JsonHelpers.GetKurse(ent)
+            Dim id = JsonHelpers.GetString(k, "id")
+            Dim kursart = JsonHelpers.GetString(k, "kursart")
+            Dim hours = JsonHelpers.GetInt(k, "hours_per_week").GetValueOrDefault()
+            kursTeacher(id) = JsonHelpers.GetString(k, "teacher")
+
+            If Not assignment.ContainsKey(id) Then
+                violations.Add($"Kurs '{id}' hat keine Schienen-Zuordnung")
+                Continue For
+            End If
+
+            Dim schieneId = assignment(id)
+            If Not schienenById.ContainsKey(schieneId) Then
+                violations.Add($"Kurs '{id}' ist Schiene '{schieneId}' zugeordnet, die in entities.schienen nicht existiert")
+                Continue For
+            End If
+
+            Dim schiene = schienenById(schieneId)
+            Dim schieneKursart = JsonHelpers.GetString(schiene, "kursart")
+            Dim schieneHours = JsonHelpers.GetInt(schiene, "hours_per_week").GetValueOrDefault()
+            If schieneKursart <> kursart OrElse schieneHours <> hours Then
+                violations.Add(
+                    $"Kurs '{id}' (kursart={kursart}, hours_per_week={hours}) ist der inkompatiblen " &
+                    $"Schiene '{schieneId}' (kursart={schieneKursart}, hours_per_week={schieneHours}) zugeordnet")
+            End If
+        Next
+
+        For Each wahlprofil In JsonHelpers.Constraints(data).Where(Function(con) JsonHelpers.GetString(con, "type") = "kurswahl")
+            Dim wahlprofilId = JsonHelpers.GetString(wahlprofil, "wahlprofil_id")
+            Dim ownSchienen = JsonHelpers.AsStringList(wahlprofil, "kurse").
+                Where(Function(kid) assignment.ContainsKey(kid)).
+                GroupBy(Function(kid) assignment(kid))
+            For Each g In ownSchienen
+                If g.Count() > 1 Then
+                    violations.Add($"Wahlprofil '{wahlprofilId}': Kurse {JsonHelpers.PyListRepr(g)} liegen gemeinsam in Schiene '{g.Key}'")
+                End If
+            Next
+        Next
+
+        For Each teacherGroup In kursTeacher.GroupBy(Function(kvp) kvp.Value, Function(kvp) kvp.Key)
+            Dim bySchiene = teacherGroup.Where(Function(kid) assignment.ContainsKey(kid)).GroupBy(Function(kid) assignment(kid))
+            For Each g In bySchiene
+                If g.Count() > 1 Then
+                    violations.Add($"Lehrkraft '{teacherGroup.Key}': Kurse {JsonHelpers.PyListRepr(g)} liegen gemeinsam in Schiene '{g.Key}'")
+                End If
+            Next
+        Next
+
+        Return violations
+    End Function
+
 End Module
