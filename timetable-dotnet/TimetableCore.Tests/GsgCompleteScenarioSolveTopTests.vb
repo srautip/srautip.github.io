@@ -48,7 +48,18 @@ Public Class GsgCompleteScenarioSolveTopTests
     ''' maxSolutions:=1 means exactly one CP-SAT solve per stage, bounded
     ''' by these limits - whatever it finds within budget (Feasible or
     ''' Optimal) is reported, same "no promise of proven optimality"
-    ''' honesty as every other SolveTop use in this project.</summary>
+    ''' honesty as every other SolveTop use in this project.
+    '''
+    ''' numWorkers:=4 (this sandbox has 4 CPU cores) - a first attempt
+    ''' with the project's usual numWorkers:=1 (deterministic, used
+    ''' everywhere else for reproducibility) found ZERO feasible solutions
+    ''' for the 30-class Sek-I part even after 30 minutes; CP-SAT's
+    ''' parallel portfolio search (multiple differing strategies racing on
+    ''' separate cores) trades that determinism away in exchange for
+    ''' finding a first feasible solution faster on hard models - the
+    ''' right tradeoff for a one-off manual benchmark, wrong for an
+    ''' automated regression test (hence still numWorkers:=1 everywhere
+    ''' else in this project).</summary>
     <TestMethod>
     Public Sub CompleteGsgScenarioSolveTopBenchmark()
         If Environment.GetEnvironmentVariable("RUN_SLOW_BENCHMARKS") <> "1" Then
@@ -60,7 +71,7 @@ Public Class GsgCompleteScenarioSolveTopTests
         ' --- Sek I ueber SolveTop ---
         Dim sekI = GymnasiumSekIFixture.BuildGymnasiumSekIScenario()
         Dim sw = Stopwatch.StartNew()
-        Dim sekITop = Solver.SolveTop(sekI, maxSolutions:=1, totalTimeLimitS:=1800, perSolveTimeLimitS:=1800)
+        Dim sekITop = Solver.SolveTop(sekI, maxSolutions:=1, totalTimeLimitS:=1200, perSolveTimeLimitS:=1200, numWorkers:=4)
         sw.Stop()
         Assert.IsTrue(sekITop.Solutions.Count > 0, $"Sek I: kein Solve gefunden - StopReason={sekITop.StopReason}")
         Dim sekIBest = sekITop.Solutions(0)
@@ -93,12 +104,12 @@ Public Class GsgCompleteScenarioSolveTopTests
         Assert.IsTrue(kb.Status = CpSolverStatus.Optimal OrElse kb.Status = CpSolverStatus.Feasible)
 
         Dim schienenScenario = Schienenraster.BuildSchienenrasterScenario(kursstufe, kb.Assignment)
-        Dim schienenTop = Solver.SolveTop(schienenScenario, maxSolutions:=1, totalTimeLimitS:=300, perSolveTimeLimitS:=300)
+        Dim schienenTop = Solver.SolveTop(schienenScenario, maxSolutions:=1, totalTimeLimitS:=300, perSolveTimeLimitS:=300, numWorkers:=4)
         Assert.IsTrue(schienenTop.Solutions.Count > 0, $"Schienenraster: kein Solve gefunden - StopReason={schienenTop.StopReason}")
         Dim schienenBest = schienenTop.Solutions(0)
 
         Dim raumScenario = Raumzuordnung.BuildRaumzuordnungScenario(kursstufe, kb.Assignment, schienenBest.Schedule)
-        Dim raumTop = Solver.SolveTop(raumScenario, maxSolutions:=1, totalTimeLimitS:=300, perSolveTimeLimitS:=300)
+        Dim raumTop = Solver.SolveTop(raumScenario, maxSolutions:=1, totalTimeLimitS:=300, perSolveTimeLimitS:=300, numWorkers:=4)
         Assert.IsTrue(raumTop.Solutions.Count > 0, $"Raumzuordnung: kein Solve gefunden - StopReason={raumTop.StopReason}")
         Dim raumBest = raumTop.Solutions(0)
         Assert.AreEqual(0, Verifier.VerifySchedule(raumScenario, raumBest.Schedule).Count)
