@@ -35,6 +35,7 @@
     <Compile Include="..\TimetableCore.Tests\Fixtures\GrundschuleFixture.vb" />
     <Compile Include="..\TimetableCore.Tests\Fixtures\OberstufeFixture.vb" />
     <Compile Include="..\TimetableCore.Tests\Fixtures\EdgeCaseFixture.vb" />
+    <Compile Include="..\TimetableCore.Tests\Fixtures\MussKannFixture.vb" />
   </ItemGroup>
 
 </Project>

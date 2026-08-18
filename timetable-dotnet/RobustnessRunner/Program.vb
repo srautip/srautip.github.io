@@ -164,6 +164,10 @@ Module Program
             New ScenarioDef With {
                 .Name = "EdgeCase", .GetEntities = Function() JsonHelpers.Entities(EdgeCaseFixture.BuildEdgeCaseScenario()),
                 .Prompt = EdgeCaseFixture.Prompt, .ScoreFn = AddressOf EdgeCaseFixture.CompletenessReport, .TimeLimitS = 20
+            },
+            New ScenarioDef With {
+                .Name = "MussKann", .GetEntities = Function() JsonHelpers.Entities(MussKannFixture.BuildMussKannScenario()),
+                .Prompt = MussKannFixture.Prompt, .ScoreFn = AddressOf MussKannFixture.CompletenessReport, .TimeLimitS = 20
             }
         }
     End Function
