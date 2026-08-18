@@ -102,5 +102,28 @@ Public Module JsonHelpers
         Return GetString(c, "reason")
     End Function
 
+    ' Phase 2.11: Kursstufe/Kurssystem (Schienenmodell). "kurse" holds course
+    ' offerings ({id, subject, teacher, kursart, hours_per_week, halbjahr}),
+    ' "schienen" holds the parallel time-block slots courses get assigned to
+    ' ({id, kursart, hours_per_week}). Both are additive `entities` keys -
+    ' absent for every pre-Phase-2.11 fixture, so GetKurse/GetSchienen return
+    ' an empty list and every existing code path is unaffected.
+    Public Const KursartLK As String = "LK"
+    Public Const KursartGK As String = "GK"
+
+    Public Function GetKurse(ent As JsonObject) As List(Of JsonObject)
+        If ent Is Nothing OrElse Not ent.ContainsKey("kurse") OrElse ent("kurse") Is Nothing Then
+            Return New List(Of JsonObject)
+        End If
+        Return ent("kurse").AsArray().Select(Function(n) n.AsObject()).ToList()
+    End Function
+
+    Public Function GetSchienen(ent As JsonObject) As List(Of JsonObject)
+        If ent Is Nothing OrElse Not ent.ContainsKey("schienen") OrElse ent("schienen") Is Nothing Then
+            Return New List(Of JsonObject)
+        End If
+        Return ent("schienen").AsArray().Select(Function(n) n.AsObject()).ToList()
+    End Function
+
 End Module
 

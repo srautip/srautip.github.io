@@ -30,7 +30,8 @@ Public Module Validation
         {"teacher", "teachers"},
         {"subject", "subjects"},
         {"room", "rooms"},
-        {"allowed_rooms", "rooms"}
+        {"allowed_rooms", "rooms"},
+        {"kurse", "kurse"}
     }
 
     Private ReadOnly ResourceEntityKey As New Dictionary(Of String, String) From {
@@ -65,6 +66,10 @@ Public Module Validation
         For Each key In {"classes", "teachers", "subjects", "rooms"}
             known(key) = New HashSet(Of String)(JsonHelpers.AsStringList(ent, key))
         Next
+        ' Phase 2.11: entities.kurse holds objects (id/subject/teacher/...),
+        ' not plain strings, so it can't go through AsStringList like the
+        ' four lists above - built from each Kurs's "id" field instead.
+        known("kurse") = New HashSet(Of String)(JsonHelpers.GetKurse(ent).Select(Function(k) JsonHelpers.GetString(k, "id")))
 
         Dim errors As New List(Of String)
         Dim constraints = JsonHelpers.Constraints(data)
@@ -127,6 +132,83 @@ Public Module Validation
                         End If
                     End If
                 End If
+            End If
+        Next
+
+        Return errors
+    End Function
+
+    ''' <summary>Phase 2.11 (Kursstufe/Kurssystem): hard-error checks beyond
+    ''' the generic cross-reference checks in ValidateEntities (which already
+    ''' catches unknown "kurse" references via the new FieldEntityKey entry
+    ''' above). Checks entities.kurse/entities.schienen internal consistency
+    ''' and each "kurswahl" constraint's structural validity. Additive - has
+    ''' no effect on any fixture that doesn't use entities.kurse/kurswahl.</summary>
+    Public Function ValidateKursstufeEntities(data As JsonObject) As List(Of String)
+        Dim errors As New List(Of String)
+        errors.AddRange(ValidateEntities(data))
+
+        Dim ent = JsonHelpers.Entities(data)
+        Dim teachers = New HashSet(Of String)(JsonHelpers.AsStringList(ent, "teachers"))
+        Dim subjects = New HashSet(Of String)(JsonHelpers.AsStringList(ent, "subjects"))
+        Dim kurse = JsonHelpers.GetKurse(ent)
+        Dim schienen = JsonHelpers.GetSchienen(ent).Select(Function(s) New With {
+            .Kursart = JsonHelpers.GetString(s, "kursart"),
+            .HoursPerWeek = JsonHelpers.GetInt(s, "hours_per_week")
+        }).ToList()
+
+        ' KursId -> kursart, used below to check each kurswahl's LK count.
+        Dim kursKursart As New Dictionary(Of String, String)
+
+        For i = 0 To kurse.Count - 1
+            Dim k = kurse(i)
+            Dim id = JsonHelpers.GetString(k, "id")
+            Dim kursart = JsonHelpers.GetString(k, "kursart")
+            Dim hours = JsonHelpers.GetInt(k, "hours_per_week")
+            Dim teacher = JsonHelpers.GetString(k, "teacher")
+            Dim subject = JsonHelpers.GetString(k, "subject")
+            kursKursart(id) = kursart
+
+            If kursart <> JsonHelpers.KursartLK AndAlso kursart <> JsonHelpers.KursartGK Then
+                errors.Add($"entities.kurse[{i}] (id={JsonHelpers.PyRepr(id)}): kursart={JsonHelpers.PyRepr(kursart)} ungueltig (erlaubt: LK/GK)")
+            End If
+            If Not hours.HasValue OrElse hours.Value <= 0 Then
+                errors.Add($"entities.kurse[{i}] (id={JsonHelpers.PyRepr(id)}): hours_per_week muss > 0 sein")
+            End If
+            If Not teachers.Contains(teacher) Then
+                errors.Add($"entities.kurse[{i}] (id={JsonHelpers.PyRepr(id)}): teacher={JsonHelpers.PyRepr(teacher)} ist keine bekannte Entity")
+            End If
+            If Not subjects.Contains(subject) Then
+                errors.Add($"entities.kurse[{i}] (id={JsonHelpers.PyRepr(id)}): subject={JsonHelpers.PyRepr(subject)} ist keine bekannte Entity")
+            End If
+            If Not schienen.Any(Function(s) s.Kursart = kursart AndAlso s.HoursPerWeek = hours) Then
+                errors.Add($"entities.kurse[{i}] (id={JsonHelpers.PyRepr(id)}): keine Schiene mit kursart={JsonHelpers.PyRepr(kursart)} und hours_per_week={hours} vorhanden")
+            End If
+        Next
+
+        Dim seenWahlprofilIds As New HashSet(Of String)
+        Dim constraints = JsonHelpers.Constraints(data)
+        For i = 0 To constraints.Count - 1
+            Dim c = constraints(i)
+            If JsonHelpers.GetString(c, "type") <> "kurswahl" Then Continue For
+
+            Dim wahlprofilId = JsonHelpers.GetString(c, "wahlprofil_id")
+            Dim studentCount = JsonHelpers.GetInt(c, "student_count")
+            Dim kurseIds = JsonHelpers.AsStringList(c, "kurse")
+
+            If String.IsNullOrEmpty(wahlprofilId) Then
+                errors.Add(WithReason($"constraints[{i}] (type=kurswahl): wahlprofil_id fehlt", c))
+            ElseIf Not seenWahlprofilIds.Add(wahlprofilId) Then
+                errors.Add(WithReason($"constraints[{i}] (type=kurswahl): wahlprofil_id='{wahlprofilId}' ist nicht eindeutig (Duplikat)", c))
+            End If
+
+            If Not studentCount.HasValue OrElse studentCount.Value <= 0 Then
+                errors.Add(WithReason($"constraints[{i}] (type=kurswahl, wahlprofil_id={JsonHelpers.PyRepr(wahlprofilId)}): student_count muss > 0 sein", c))
+            End If
+
+            Dim lkCount = kurseIds.Where(Function(kid) kursKursart.ContainsKey(kid) AndAlso kursKursart(kid) = JsonHelpers.KursartLK).Count()
+            If lkCount <> 3 Then
+                errors.Add(WithReason($"constraints[{i}] (type=kurswahl, wahlprofil_id={JsonHelpers.PyRepr(wahlprofilId)}): genau 3 Leistungskurse (kursart=LK) erforderlich, gefunden: {lkCount}", c))
             End If
         Next
 
