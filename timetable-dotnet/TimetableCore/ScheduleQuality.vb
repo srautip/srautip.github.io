@@ -14,6 +14,7 @@ Public NotInheritable Class QualityScore
     Public Property ClassGapCount As Integer
     Public Property TeacherGapCount As Integer
     Public Property EdgePeriodCount As Integer
+    Public Property AfternoonDayCount As Integer
     Public Property ClassLoadVariance As Double
     Public Property TeacherLoadVariance As Double
     Public Property Total As Double
@@ -36,6 +37,23 @@ Public Module ScheduleQuality
 
     ' Randstunden-Vermeidung: mildly disruptive, weighted below gaps.
     Public Const WeightEdgePeriod As Double = 5.0
+
+    ' Nachmittags-TAGE (nicht -Stunden) minimieren: a distinct criterion
+    ' from WeightEdgePeriod above - EdgePeriodCount counts individual
+    ' afternoon LESSON OCCURRENCES (indifferent to whether they land on 1
+    ' day or spread across many), this counts DAYS that contain at least
+    ' one afternoon lesson (indifferent to how many). A schedule with 4
+    ' afternoon lessons bunched on 1 day scores the same EdgePeriodCount
+    ' as one with 1 afternoon lesson on each of 4 days, but very different
+    ' AfternoonDayCount (1 vs 4) - concentrating afternoon teaching onto
+    ' as few days as possible is a real, distinct scheduling preference
+    ' (fewer "long days" for a class) this project didn't previously have
+    ' a criterion for. Same tier as WeightEdgePeriod (a related, similarly
+    ' "mildly disruptive" concern) - class-scoped only, per the same
+    ' rationale ScheduleQuality's other class-only choices already follow
+    ' (this is a students'/parents' concern per class, not something a
+    ' teacher's OWN schedule needs a symmetric criterion for).
+    Public Const WeightAfternoonDayCount As Double = 5.0
 
     ' Even daily load: a nice-to-have smoothing preference, weakest weight.
     Public Const WeightClassLoadVariance As Double = 3.0
@@ -62,20 +80,38 @@ Public Module ScheduleQuality
         Dim teacherGaps = GapsOverEntities(schedule.GroupBy(Function(l) l.Teacher))
 
         Dim edgeCount = schedule.Where(Function(l) l.Period = 1 OrElse l.Period >= AfternoonThresholdPeriod).Count()
+        Dim afternoonDayCount = AfternoonDaysOverEntities(schedule.GroupBy(Function(l) l.ClassName))
 
         Dim classVariance = LoadVarianceOverAllDays(schedule.GroupBy(Function(l) l.ClassName), allDays)
         Dim teacherVariance = LoadVarianceOverWorkingDaysOnly(schedule.GroupBy(Function(l) l.Teacher))
 
         Dim total = WeightKann * kannViolationCount +
                     WeightClassGaps * classGaps + WeightTeacherGaps * teacherGaps +
-                    WeightEdgePeriod * edgeCount +
+                    WeightEdgePeriod * edgeCount + WeightAfternoonDayCount * afternoonDayCount +
                     WeightClassLoadVariance * classVariance + WeightTeacherLoadVariance * teacherVariance
 
         Return New QualityScore With {
             .KannViolationCount = kannViolationCount, .ClassGapCount = classGaps, .TeacherGapCount = teacherGaps,
-            .EdgePeriodCount = edgeCount, .ClassLoadVariance = classVariance, .TeacherLoadVariance = teacherVariance,
+            .EdgePeriodCount = edgeCount, .AfternoonDayCount = afternoonDayCount,
+            .ClassLoadVariance = classVariance, .TeacherLoadVariance = teacherVariance,
             .Total = total
         }
+    End Function
+
+    ''' <summary>Sum, over every entity (class), of the number of DISTINCT
+    ''' days containing at least one lesson in an afternoon period
+    ''' (Period &gt;= AfternoonThresholdPeriod) - see WeightAfternoonDayCount's
+    ''' comment for why this differs from EdgePeriodCount (occurrences,
+    ''' not days). Period=1 does NOT count here, unlike EdgePeriodCount -
+    ''' this metric is specifically about "Nachmittag" (afternoon) days,
+    ''' not "Randstunden" (edge periods) in general.</summary>
+    Private Function AfternoonDaysOverEntities(byEntity As IEnumerable(Of IGrouping(Of String, ScheduleEntry))) As Integer
+        Dim total = 0
+        For Each entityGroup In byEntity
+            total += entityGroup.Where(Function(l) l.Period >= AfternoonThresholdPeriod).
+                                  Select(Function(l) l.Day).Distinct().Count()
+        Next
+        Return total
     End Function
 
     ''' <summary>Sum, over every (entity, day) group with >=1 lesson, of

@@ -177,4 +177,70 @@ Public Class SolveTopTests
         Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Solutions(0).Schedule).Count)
     End Sub
 
+    ''' <summary>Phase 2.11 (Nachtrag): proves the new AfternoonDayCount
+    ''' criterion (WeightAfternoonDayCount) actually enters the objective
+    ''' and jointly co-optimizes with the other 5 criteria - it does NOT
+    ''' independently prove "fewer afternoon days always wins", because
+    ''' at these weights it usually doesn't once ClassLoadVariance/
+    ''' TeacherLoadVariance are also in play (see below).
+    '''
+    ''' 3 days x 8 periods, 20h/week for a single class/teacher pair -
+    ''' periods 2-6 give only 15 "safe" slots, so exactly 5 lessons are
+    ''' unavoidably forced into edge periods (period 1 or &gt;=7); that
+    ''' floor is identical (EdgePeriodCount=5) for every valid
+    ''' arrangement, so it cannot discriminate between them, and neither
+    ''' can ClassGapCount/TeacherGapCount (every valid arrangement fills a
+    ''' contiguous 1..N or 2..N block each day - hand-checked, always
+    ''' gap=0). The only two REMAINING discriminators are AfternoonDayCount
+    ''' (weight 5) and Range (weight 3+3=6, NOT just 3 - since this
+    ''' scenario's one teacher's own schedule exactly mirrors the class's,
+    ''' ClassLoadVariance's and TeacherLoadVariance's range proxies are
+    ''' numerically identical in every arrangement here, doubling the
+    ''' effective range weight - an easy trap to fall into by hand, this
+    ''' test's first version missed exactly this and asserted the wrong
+    ''' expected value). Exhaustively enumerating the only 3 possible
+    ''' per-day load distributions summing to 5 across 3 days (each day's
+    ''' load capped at 3 = 1 period-1 slot + 2 afternoon slots) gives:
+    ''' loads (1,1,3): 1*5 + 2*6=17; (1,2,2): 2*5 + 1*6=16; (0,2,3): 2*5 +
+    ''' 3*6=28. (1,2,2) - i.e. 2 days WITH an afternoon lesson, not 1 - is
+    ''' the unique minimum, confirming SPREADING wins over bunching once
+    ''' the mirrored teacher range is correctly accounted for.</summary>
+    <TestMethod>
+    Public Sub SolveTopObjectiveWeighsAfternoonDaysAgainstLoadRange()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di", "Mi"}, 8), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 20}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=60, perSolveTimeLimitS:=60, numWorkers:=1)
+        Assert.AreEqual(1, result.Solutions.Count)
+        Dim quality = result.Solutions(0).Quality
+        Assert.AreEqual(5, quality.EdgePeriodCount)
+        Assert.AreEqual(2, quality.AfternoonDayCount)
+        Assert.IsTrue(quality.ClassLoadVariance > 0.0)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Solutions(0).Schedule).Count)
+    End Sub
+
+    ''' <summary>Isolates AfternoonDayCount from the Range confound the
+    ''' test above documents: 2 INDEPENDENT classes/teachers (no shared
+    ''' resource), each needing exactly 1 unavoidable afternoon lesson
+    ''' (1 day, 8 periods; weekly_hours=7 leaves only 6 "safe" periods
+    ''' 1-6, forcing exactly 1 lesson into an afternoon period). With only
+    ''' 1 day total, "which day" has only one possible answer per class -
+    ''' this does not test steering, but DOES prove the new term doesn't
+    ''' break anything when every class is forced afternoon-day-count=1
+    ''' by pigeonhole, independent of the class-count involved.</summary>
+    <TestMethod>
+    Public Sub AfternoonDayCountIsOnePerClassWhenForcedByPigeonhole()
+        Dim data = Scenario(Mini({"5a", "5b"}, {"T1", "T2"}, {"Mathe"}, {}, {"Mo"}, 8), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 7}},
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5b"}, {"subject", "Mathe"}, {"hours_per_week", 7}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T2"}, {"class", "5b"}, {"subject", "Mathe"}}
+        })
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=30, numWorkers:=1)
+        Assert.AreEqual(1, result.Solutions.Count)
+        Assert.AreEqual(2, result.Solutions(0).Quality.AfternoonDayCount)   ' 1 (5a) + 1 (5b)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Solutions(0).Schedule).Count)
+    End Sub
+
 End Class

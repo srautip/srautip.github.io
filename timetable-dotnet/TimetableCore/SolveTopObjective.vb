@@ -109,6 +109,31 @@ Friend Module SolveTopObjective
         Next
     End Sub
 
+    ''' <summary>Per entity, per day: a `hasAfternoon` BoolVar reified
+    ''' against the sum of `occupied` vars for periods &gt;=
+    ''' AfternoonThresholdPeriod that day, being &gt;= 1. Reuses the SAME
+    ''' `occupied` scaffolding BuildScaffolding already built (no new
+    ''' per-period variables) - just a different sum over a subset of
+    ''' periods, same reification pattern as `hasAny` in BuildScaffolding
+    ''' itself. Called class-scoped only (see ScheduleQuality.
+    ''' WeightAfternoonDayCount's comment on why this has no teacher
+    ''' counterpart, unlike gaps/range above).</summary>
+    Private Sub BuildAfternoonDayVars(model As CpModel, entities As List(Of String), days As List(Of String), periods As List(Of Integer),
+                                       occupied As Dictionary(Of (Entity As String, Day As String, Period As Integer), BoolVar),
+                                       afternoonDayVars As List(Of BoolVar))
+        Dim afternoonPeriods = periods.Where(Function(p) p >= ScheduleQuality.AfternoonThresholdPeriod).ToList()
+        If afternoonPeriods.Count = 0 Then Return
+        For Each entity In entities
+            For Each d In days
+                Dim afternoonSum As LinearExpr = LinearExpr.Sum(afternoonPeriods.Select(Function(p) occupied((entity, d, p))))
+                Dim hasAfternoon = model.NewBoolVar($"hasAfternoon[{entity},{d}]")
+                model.Add(afternoonSum >= 1).OnlyEnforceIf(hasAfternoon)
+                model.Add(afternoonSum = 0).OnlyEnforceIf(hasAfternoon.Not())
+                afternoonDayVars.Add(hasAfternoon)
+            Next
+        Next
+    End Sub
+
     ''' <summary>Per class: Max-Min of the daily lesson count over ALL
     ''' days (0 is a legitimate value on every day for a class - no
     ''' unavailability concept - so no sentinel is needed).</summary>
@@ -175,9 +200,9 @@ Friend Module SolveTopObjective
         Next
     End Sub
 
-    ''' <summary>Adds a Minimize objective to `built.Model` combining all 5
+    ''' <summary>Adds a Minimize objective to `built.Model` combining all 6
     ''' ScheduleQuality criteria (Kann-violations dominant, then gaps, edge
-    ''' periods, and class/teacher load balance), using the same weight
+    ''' periods, afternoon-day count, and class/teacher load balance), using the same weight
     ''' constants ScheduleQuality.vb uses to score candidates afterward -
     ''' so the search itself is now steered toward what SolveTop's final
     ''' ranking already valued. Called once by SolveTop, on a BuiltModel
@@ -206,6 +231,9 @@ Friend Module SolveTopObjective
         Dim teacherGapVars As New List(Of IntVar)
         BuildGapVars(model, teacherNames, built.Days, built.Periods, "T", occupiedTeacher, hasAnyTeacher, teacherGapVars)
 
+        Dim classAfternoonDayVars As New List(Of BoolVar)
+        BuildAfternoonDayVars(model, classNames, built.Days, built.Periods, occupiedClass, classAfternoonDayVars)
+
         Dim classRangeVars As New List(Of IntVar)
         BuildClassRangeVars(model, classNames, built.Days, built.Periods, dailyCountClass, classRangeVars)
 
@@ -223,6 +251,7 @@ Friend Module SolveTopObjective
         If classGapVars.Count > 0 Then terms.Add(CLng(ScheduleQuality.WeightClassGaps) * LinearExpr.Sum(classGapVars))
         If teacherGapVars.Count > 0 Then terms.Add(CLng(ScheduleQuality.WeightTeacherGaps) * LinearExpr.Sum(teacherGapVars))
         terms.Add(CLng(ScheduleQuality.WeightEdgePeriod) * edgeTerm)
+        If classAfternoonDayVars.Count > 0 Then terms.Add(CLng(ScheduleQuality.WeightAfternoonDayCount) * LinearExpr.Sum(classAfternoonDayVars))
         If classRangeVars.Count > 0 Then terms.Add(CLng(ScheduleQuality.WeightClassLoadVariance) * LinearExpr.Sum(classRangeVars))
         If teacherRangeVars.Count > 0 Then terms.Add(CLng(ScheduleQuality.WeightTeacherLoadVariance) * LinearExpr.Sum(teacherRangeVars))
 

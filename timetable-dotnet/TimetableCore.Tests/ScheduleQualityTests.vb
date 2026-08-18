@@ -58,6 +58,28 @@ Public Class ScheduleQualityTests
         Assert.AreEqual(3, result.EdgePeriodCount)
     End Sub
 
+    ''' <summary>Distinguishes AfternoonDayCount from EdgePeriodCount: 5a
+    ''' has 3 afternoon-period LESSONS (same raw count as 5b), but they
+    ''' land on only 1 DAY (Mo) - 5b's 2 afternoon lessons land on 2
+    ''' DIFFERENT days. AfternoonDayCount must reflect that difference
+    ''' (1 + 2 = 3) even though EdgePeriodCount alone (3 + 2 = 5, not
+    ''' asserted here) cannot tell the two arrangements apart. Period=1
+    ''' entries (5a/Mo/1) deliberately do NOT count here, unlike
+    ''' EdgePeriodCount.</summary>
+    <TestMethod>
+    Public Sub AfternoonDayCountCountsDistinctDaysNotOccurrences()
+        Dim data = BuildData({"Mo", "Di"}, 8)
+        Dim schedule As New List(Of ScheduleEntry) From {
+            Entry("5a", "Deutsch", "T1", "Mo", 1),    ' period 1 - not "Nachmittag"
+            Entry("5a", "Mathe", "T1", "Mo", 7),
+            Entry("5a", "Sport", "T1", "Mo", 8),      ' 5a: periods {7,8} both on Mo -> 1 Nachmittags-Tag
+            Entry("5b", "Musik", "T2", "Mo", 7),
+            Entry("5b", "Kunst", "T2", "Di", 7)       ' 5b: Mo and Di -> 2 Nachmittags-Tage
+        }
+        Dim result = ScheduleQuality.Score(data, schedule, 0)
+        Assert.AreEqual(3, result.AfternoonDayCount)   ' 1 (5a) + 2 (5b)
+    End Sub
+
     <TestMethod>
     Public Sub ClassLoadVarianceMatchesHandComputedValue()
         Dim data = BuildData({"Mo", "Di", "Mi"}, 5)
