@@ -55,4 +55,47 @@ Public Class RealSchoolFixtureTests
         Assert.AreEqual(0, violations.Count, String.Join(vbLf, violations))
     End Sub
 
+    ''' <summary>Phase 2.11h: same LLM-free sanity pattern as the two
+    ''' Sek-I fixtures above, but through the full 3-stage
+    ''' Solver.SolveKursstufe pipeline (Kursblockung -> Schienenraster ->
+    ''' Raumzuordnung) instead of the class-based Solve().</summary>
+    <TestMethod>
+    Public Sub KursstufeEntitiesAreValid()
+        Dim data = KursstufeFixture.BuildKursstufeScenario()
+        Assert.AreEqual(0, Validation.ValidateKursstufeEntities(data).Count)
+    End Sub
+
+    <TestMethod>
+    Public Sub KursstufeKursblockungFeasible()
+        Dim data = KursstufeFixture.BuildKursstufeScenario()
+        Dim r = Kursblockung.SolveKursblockung(data, timeLimitS:=60)
+        Assert.IsTrue(r.Status = CpSolverStatus.Optimal OrElse r.Status = CpSolverStatus.Feasible, Solver.StatusName(r.Status))
+        Assert.AreEqual(0, Verifier.VerifyKursblockung(data, r.Assignment).Count)
+    End Sub
+
+    ''' <summary>End-to-end through all 3 stages. Note: `data` itself
+    ''' only carries "kurswahl" constraints (no class-based types), so
+    ''' Verifier.VerifySchedule(data, ...) would misinterpret them as
+    ''' unknown constraint types - the meaningful independent re-check
+    ''' here is VerifyKursblockung (stage A) plus re-deriving stage C's
+    ''' own synthetic scenario (which DOES carry class-based constraints)
+    ''' to verify the final room/teacher assignment, mirroring
+    ''' VerifyKursblockungTests.ExistingVerifyScheduleDetectsRealViolationOnKursLevelData's pattern.</summary>
+    <TestMethod>
+    Public Sub KursstufeSolvesAndVerifiesClean()
+        Dim data = KursstufeFixture.BuildKursstufeScenario()
+        Dim r = Solver.SolveKursstufe(data, timeLimitS:=60)
+        Assert.IsTrue(r.RaumzuordnungStatus = CpSolverStatus.Optimal OrElse r.RaumzuordnungStatus = CpSolverStatus.Feasible,
+            $"Kursblockung={r.KursblockungStatus}, Schienenraster={r.SchienenrasterStatus}, Raumzuordnung={r.RaumzuordnungStatus}")
+        Assert.IsNotNull(r.Schedule)
+
+        Dim kb = Kursblockung.SolveKursblockung(data, timeLimitS:=60)
+        Assert.AreEqual(0, Verifier.VerifyKursblockung(data, kb.Assignment).Count)
+
+        Dim schienenResult = Solver.Solve(Schienenraster.BuildSchienenrasterScenario(data, kb.Assignment), timeLimitS:=60)
+        Dim raumScenario = Raumzuordnung.BuildRaumzuordnungScenario(data, kb.Assignment, schienenResult.Schedule)
+        Dim violations = Verifier.VerifySchedule(raumScenario, r.Schedule)
+        Assert.AreEqual(0, violations.Count, String.Join(vbLf, violations))
+    End Sub
+
 End Class

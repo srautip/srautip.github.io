@@ -88,6 +88,14 @@ Public Class KursstufeValidationTests
     End Sub
 
     <TestMethod>
+    Public Sub NonPositiveSchieneCapacityIsRejected()
+        Dim data = BaselineData()
+        CType(JsonHelpers.GetSchienen(JsonHelpers.Entities(data))(0), JsonObject)("capacity") = 0
+        Dim errors = Validation.ValidateKursstufeEntities(data)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("capacity")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
     Public Sub InvalidKursartIsRejected()
         Dim data = BaselineData()
         CType(JsonHelpers.GetKurse(JsonHelpers.Entities(data))(0), JsonObject)("kursart") = "XY"

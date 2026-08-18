@@ -21,10 +21,12 @@ Public Class KursblockungTests
         }
     End Function
 
-    Private Shared Function Schiene(id As String, kursart As String, hoursPerWeek As Integer) As JsonObject
-        Return New JsonObject From {
+    Private Shared Function Schiene(id As String, kursart As String, hoursPerWeek As Integer, Optional capacity As Integer? = Nothing) As JsonObject
+        Dim o As New JsonObject From {
             {"id", id}, {"kursart", kursart}, {"hours_per_week", hoursPerWeek}
         }
+        If capacity.HasValue Then o("capacity") = capacity.Value
+        Return o
     End Function
 
     Private Shared Function Kurswahl(wahlprofilId As String, kurse As IEnumerable(Of String)) As JsonObject
@@ -143,6 +145,65 @@ Public Class KursblockungTests
 
         Assert.AreEqual(CpSolverStatus.Infeasible, result.Status)
         Assert.IsNull(result.Assignment)
+    End Sub
+
+    ''' <summary>Phase 2.11h: pigeonhole for the new "capacity" field
+    ''' (max simultaneous Kurse per Schiene, e.g. a room-count limit).
+    ''' Two GK-Kurse, different subjects/teachers/Wahlprofile (so nothing
+    ''' ELSE would block them sharing a Schiene), but the only compatible
+    ''' Schiene has capacity=1 - must be Infeasible on capacity alone.</summary>
+    <TestMethod>
+    Public Sub InfeasibleWhenSchieneCapacityIsExceededWithNoAlternative()
+        Dim data = BuildData(
+            {Kurs("A-GK1", "Fach A", "T-A", "GK", 3),
+             Kurs("B-GK1", "Fach B", "T-B", "GK", 3)},
+            {Schiene("S1", "GK", 3, capacity:=1)},
+            {"T-A", "T-B"}, {"Fach A", "Fach B"},
+            {Kurswahl("WP1", {"A-GK1"}), Kurswahl("WP2", {"B-GK1"})})
+
+        Dim result = Kursblockung.SolveKursblockung(data, numWorkers:=1)
+
+        Assert.AreEqual(CpSolverStatus.Infeasible, result.Status)
+        Assert.IsNull(result.Assignment)
+    End Sub
+
+    ''' <summary>Same two Kurse as above, but now 2 Schienen each with
+    ''' capacity=1 - nothing else forces them apart (different
+    ''' Wahlprofile, different teachers), so capacity alone must force
+    ''' each Kurs onto a DIFFERENT Schiene.</summary>
+    <TestMethod>
+    Public Sub CapacityForcesDistinctSchienenWithNoOtherConstraintDoingSo()
+        Dim data = BuildData(
+            {Kurs("A-GK1", "Fach A", "T-A", "GK", 3),
+             Kurs("B-GK1", "Fach B", "T-B", "GK", 3)},
+            {Schiene("S1", "GK", 3, capacity:=1), Schiene("S2", "GK", 3, capacity:=1)},
+            {"T-A", "T-B"}, {"Fach A", "Fach B"},
+            {Kurswahl("WP1", {"A-GK1"}), Kurswahl("WP2", {"B-GK1"})})
+
+        Dim result = Kursblockung.SolveKursblockung(data, numWorkers:=1)
+
+        Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible)
+        Assert.AreNotEqual(result.Assignment("A-GK1"), result.Assignment("B-GK1"))
+    End Sub
+
+    ''' <summary>A Schiene without "capacity" set stays uncapped - byte-
+    ''' identical to every capacity-unaware test above/before this
+    ''' feature existed. Piles 5 mutually-compatible Kurse (no Wahlprofil/
+    ''' teacher conflicts) onto the one available Schiene and expects that
+    ''' to succeed without any capacity field present.</summary>
+    <TestMethod>
+    Public Sub SchieneWithoutCapacityFieldStaysUncapped()
+        Dim kurse = Enumerable.Range(1, 5).Select(Function(i) Kurs($"K{i}", $"Fach{i}", $"T{i}", "GK", 2)).ToList()
+        Dim data = BuildData(
+            kurse, {Schiene("S1", "GK", 2)},
+            kurse.Select(Function(k) JsonHelpers.GetString(k, "teacher")),
+            kurse.Select(Function(k) JsonHelpers.GetString(k, "subject")),
+            {})
+
+        Dim result = Kursblockung.SolveKursblockung(data, numWorkers:=1)
+
+        Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible)
+        Assert.IsTrue(kurse.All(Function(k) result.Assignment(JsonHelpers.GetString(k, "id")) = "S1"))
     End Sub
 
 End Class

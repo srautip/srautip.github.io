@@ -40,6 +40,7 @@ Public Module Kursblockung
         Public Property Id As String
         Public Property Kursart As String
         Public Property HoursPerWeek As Integer
+        Public Property Capacity As Integer?
     End Class
 
     Private Function KurseFrom(ent As JsonObject) As List(Of KursInfo)
@@ -55,7 +56,8 @@ Public Module Kursblockung
         Return JsonHelpers.GetSchienen(ent).Select(Function(s) New SchieneInfo With {
             .Id = JsonHelpers.GetString(s, "id"),
             .Kursart = JsonHelpers.GetString(s, "kursart"),
-            .HoursPerWeek = JsonHelpers.GetInt(s, "hours_per_week").GetValueOrDefault()
+            .HoursPerWeek = JsonHelpers.GetInt(s, "hours_per_week").GetValueOrDefault(),
+            .Capacity = JsonHelpers.GetInt(s, "capacity")
         }).ToList()
     End Function
 
@@ -74,14 +76,30 @@ Public Module Kursblockung
     ''' <summary>Solves the Kursblockung sub-problem: assign every Kurs to
     ''' exactly one compatible Schiene (same kursart AND hours_per_week),
     ''' such that (1) no Wahlprofil has two of its own courses in the same
-    ''' Schiene, and (2) no teacher has two of their courses in the same
-    ''' Schiene (a teacher can't teach two simultaneous courses). Purely a
-    ''' feasibility problem - no objective function (see plan's rationale:
-    ''' finding ANY valid Kursblockung is already the hard part in real
-    ''' school scheduling; a secondary objective, e.g. balancing Schiene
-    ''' load, is an explicitly deferred future extension, same as how
-    ''' Kann-constraints/SolveTop's quality objective were added only after
-    ''' the deterministic core existed in Phase 2.5/2.8/2.9).</summary>
+    ''' Schiene, (2) no teacher has two of their courses in the same
+    ''' Schiene (a teacher can't teach two simultaneous courses), and (3)
+    ''' if a Schiene's JSON carries an optional "capacity" (max simultaneous
+    ''' Kurse - a real room-count limit, since every Kurs on one Schiene
+    ''' runs at the identical time and each needs its own room), no more
+    ''' than that many Kurse land on it. Capacity is OPTIONAL and additive -
+    ''' a Schiene without it has no cap at all (byte-identical to every
+    ''' Kursblockung test written before this was added). Otherwise purely
+    ''' a feasibility problem - no objective function (see plan's
+    ''' rationale: finding ANY valid Kursblockung is already the hard part
+    ''' in real school scheduling; a secondary objective, e.g. balancing
+    ''' Schiene load beyond the hard capacity cap, is an explicitly
+    ''' deferred future extension, same as how Kann-constraints/SolveTop's
+    ''' quality objective were added only after the deterministic core
+    ''' existed in Phase 2.5/2.8/2.9).
+    '''
+    ''' Phase 2.11h finding: without SOME capacity notion, nothing stops
+    ''' this feasibility-only model from piling arbitrarily many Kurse
+    ''' onto one popular Schiene (there is no cost to doing so) - which
+    ''' then made the downstream Raumzuordnung stage (room assignment)
+    ''' Infeasible once tried against a realistic-scale fixture (11 Kurse
+    ''' landed on one Schiene against only 8 available rooms). Capacity
+    ''' closes that gap directly at its source instead of leaving stage C
+    ''' to discover it indirectly.</summary>
     Public Function SolveKursblockung(data As JsonObject,
                                        Optional timeLimitS As Double = 30.0,
                                        Optional seed As Integer = 42,
@@ -139,6 +157,18 @@ Public Module Kursblockung
                     model.Add(LinearExpr.Sum(vars) <= 1)
                 End If
             Next
+        Next
+
+        ' Pro Schiene mit gesetzter capacity: hoechstens so viele Kurse
+        ' gleichzeitig, wie Raeume verfuegbar sind (siehe Doku-Kommentar
+        ' oben - ohne das haeuft das Modell beliebig viele Kurse auf einer
+        ' beliebten Schiene, was Stufe C spaeter unloesbar machen kann).
+        For Each s In schienen
+            If Not s.Capacity.HasValue Then Continue For
+            Dim vars = kurse.
+                Where(Function(k) assign.ContainsKey((k.Id, s.Id))).
+                Select(Function(k) assign((k.Id, s.Id))).ToList()
+            model.Add(LinearExpr.Sum(vars) <= s.Capacity.Value)
         Next
 
         Dim solver As New CpSolver()

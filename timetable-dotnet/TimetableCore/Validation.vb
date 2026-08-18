@@ -186,6 +186,14 @@ Public Module Validation
             End If
         Next
 
+        Dim rawSchienen = JsonHelpers.GetSchienen(ent)
+        For i = 0 To rawSchienen.Count - 1
+            Dim capacity = JsonHelpers.GetInt(rawSchienen(i), "capacity")
+            If capacity.HasValue AndAlso capacity.Value <= 0 Then
+                errors.Add($"entities.schienen[{i}] (id={JsonHelpers.PyRepr(JsonHelpers.GetString(rawSchienen(i), "id"))}): capacity muss > 0 sein, falls gesetzt")
+            End If
+        Next
+
         Dim seenWahlprofilIds As New HashSet(Of String)
         Dim constraints = JsonHelpers.Constraints(data)
         For i = 0 To constraints.Count - 1
