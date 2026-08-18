@@ -366,17 +366,23 @@ Public Class SolverTests
         Assert.AreEqual(reasonText, r.KannConstraintFlags(0).Reason)
     End Sub
 
-    ''' <summary>Test 4: two Kann forbidden_slot constraints that cannot
-    ''' both be satisfied at once (only 2 periods exist, each forbidden by
-    ''' one of them, exactly 1 lesson must land somewhere) -> Optimal with
-    ''' exactly 1 Kann violation, proving the objective actually minimizes
-    ''' rather than giving up on everything.</summary>
+    ''' <summary>Test 4 (+9, traceability): two Kann forbidden_slot
+    ''' constraints that cannot both be satisfied at once (only 2 periods
+    ''' exist, each forbidden by one of them, exactly 1 lesson must land
+    ''' somewhere) -> Optimal with exactly 1 Kann violation, proving the
+    ''' objective actually minimizes rather than giving up on everything.
+    ''' Each constraint carries its own distinct "reason" - the violated
+    ''' one's must show up in the Kann message/Reason, and both must show up
+    ''' in KannConstraintFlags (proving reason threading isn't limited to
+    ''' the constraint that happens to lose).</summary>
     <TestMethod>
     Public Sub KannConflictingForbiddenSlotsMinimizesViolationCount()
+        Dim reason1 = "Periode 1 laut Prompt bevorzugt frei"
+        Dim reason2 = "Periode 2 laut Prompt bevorzugt frei"
         Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 2), {
             New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
-            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}, {"priority", "should"}},
-            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 2}, {"priority", "should"}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}, {"priority", "should"}, {"reason", reason1}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 2}, {"priority", "should"}, {"reason", reason2}},
             New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
         })
         Dim r = Solver.Solve(data)
@@ -384,21 +390,34 @@ Public Class SolverTests
         Dim detail = Verifier.VerifyScheduleDetailed(data, r.Schedule)
         Assert.AreEqual(0, detail.MussViolations.Count, String.Join(vbLf, detail.MussViolations))
         Assert.AreEqual(1, detail.KannViolations.Count)
+        Dim violatedReason = detail.KannViolations(0).Reason
+        Assert.IsTrue(violatedReason = reason1 OrElse violatedReason = reason2)
+        StringAssert.Contains(detail.KannViolations(0).Message, "Regel-Herkunft")
+        StringAssert.Contains(detail.KannViolations(0).Message, violatedReason)
+
+        Assert.AreEqual(2, r.KannConstraintFlags.Count)
+        Assert.AreEqual(1, r.KannConstraintFlags.Where(Function(f) f.Relaxed).Count())
+        Assert.AreEqual(violatedReason, r.KannConstraintFlags.Single(Function(f) f.Relaxed).Reason)
+        Assert.IsTrue(r.KannConstraintFlags.Any(Function(f) f.Reason = reason1))
+        Assert.IsTrue(r.KannConstraintFlags.Any(Function(f) f.Reason = reason2))
     End Sub
 
-    ''' <summary>Test 5: room_requirement as Kann (analog to
-    ''' RoomRequirementPigeonhole) - the shared "Lab" can only fit one
+    ''' <summary>Test 5 (+9, traceability): room_requirement as Kann (analog
+    ''' to RoomRequirementPigeonhole) - the shared "Lab" can only fit one
     ''' subject's 2h, so relaxing the second subject's room_requirement
     ''' turns Infeasible into Optimal, with that subject's lessons landing
     ''' without an allowed room (correctly caught by the existing,
-    ''' unmodified room_requirement detection in Verifier.vb).</summary>
+    ''' unmodified room_requirement detection in Verifier.vb). Its "reason"
+    ''' must thread into the Kann violation message/Reason and into
+    ''' KannConstraintFlags.</summary>
     <TestMethod>
     Public Sub KannRoomRequirementRelaxesPigeonhole()
+        Dim reasonText = "Physik bevorzugt im Lab laut Prompt"
         Dim data = Scenario(Mini({"5a", "5b"}, {"T1", "T2"}, {"Chemie", "Physik"}, {"Lab"}, {"Mo"}, 2), {
             New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Chemie"}, {"hours_per_week", 2}},
             New JsonObject From {{"type", "weekly_hours"}, {"class", "5b"}, {"subject", "Physik"}, {"hours_per_week", 2}},
             New JsonObject From {{"type", "room_requirement"}, {"subject", "Chemie"}, {"allowed_rooms", New JsonArray From {"Lab"}}},
-            New JsonObject From {{"type", "room_requirement"}, {"subject", "Physik"}, {"allowed_rooms", New JsonArray From {"Lab"}}, {"priority", "should"}},
+            New JsonObject From {{"type", "room_requirement"}, {"subject", "Physik"}, {"allowed_rooms", New JsonArray From {"Lab"}}, {"priority", "should"}, {"reason", reasonText}},
             New JsonObject From {{"type", "no_overlap"}, {"resource", "room"}, {"entity", "Lab"}},
             New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Chemie"}},
             New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T2"}, {"class", "5b"}, {"subject", "Physik"}}
@@ -407,18 +426,32 @@ Public Class SolverTests
         Assert.IsTrue(IsFeasibleOrOptimal(r.Status), Solver.StatusName(r.Status))
         Dim detail = Verifier.VerifyScheduleDetailed(data, r.Schedule)
         Assert.AreEqual(0, detail.MussViolations.Count, String.Join(vbLf, detail.MussViolations))
-        Assert.IsTrue(detail.KannViolations.Any(Function(v) v.ConstraintType = "room_requirement"))
+        Dim roomViolations = detail.KannViolations.Where(Function(v) v.ConstraintType = "room_requirement").ToList()
+        Assert.IsTrue(roomViolations.Count > 0, String.Join(vbLf, detail.KannViolations.Select(Function(v) v.Message)))
+        For Each violation In roomViolations
+            Assert.AreEqual(reasonText, violation.Reason)
+            StringAssert.Contains(violation.Message, "Regel-Herkunft")
+            StringAssert.Contains(violation.Message, reasonText)
+        Next
+
+        Assert.AreEqual(1, r.KannConstraintFlags.Count)
+        Assert.AreEqual("room_requirement", r.KannConstraintFlags(0).ConstraintType)
+        Assert.AreEqual(reasonText, r.KannConstraintFlags(0).Reason)
+        Assert.IsTrue(r.KannConstraintFlags(0).Relaxed)
     End Sub
 
-    ''' <summary>Test 6: consecutive_required as Kann (analog to
-    ''' ConsecutiveRequiredRejectsNonMultipleOfBlockLength - 3h demanded
-    ''' with block_length=2, 3 is not a multiple of 2) -> Optimal instead
-    ''' of Infeasible, hours_per_week still fully scheduled.</summary>
+    ''' <summary>Test 6 (+9, traceability): consecutive_required as Kann
+    ''' (analog to ConsecutiveRequiredRejectsNonMultipleOfBlockLength - 3h
+    ''' demanded with block_length=2, 3 is not a multiple of 2) -> Optimal
+    ''' instead of Infeasible, hours_per_week still fully scheduled. Its
+    ''' "reason" must thread into the Kann violation message/Reason and
+    ''' into KannConstraintFlags.</summary>
     <TestMethod>
     Public Sub KannConsecutiveRequiredRelaxesNonMultipleOfBlockLength()
+        Dim reasonText = "Chemie wenn moeglich als Doppelstunde laut Prompt"
         Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Chemie"}, {}, {"Mo", "Di"}, 3), {
             New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Chemie"}, {"hours_per_week", 3}},
-            New JsonObject From {{"type", "consecutive_required"}, {"class", "5a"}, {"subject", "Chemie"}, {"block_length", 2}, {"priority", "should"}},
+            New JsonObject From {{"type", "consecutive_required"}, {"class", "5a"}, {"subject", "Chemie"}, {"block_length", 2}, {"priority", "should"}, {"reason", reasonText}},
             New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Chemie"}}
         })
         Dim r = Solver.Solve(data)
@@ -428,17 +461,27 @@ Public Class SolverTests
         Assert.AreEqual(0, detail.MussViolations.Count, String.Join(vbLf, detail.MussViolations))
         Assert.AreEqual(1, detail.KannViolations.Count)
         Assert.AreEqual("consecutive_required", detail.KannViolations(0).ConstraintType)
+        Assert.AreEqual(reasonText, detail.KannViolations(0).Reason)
+        StringAssert.Contains(detail.KannViolations(0).Message, "Regel-Herkunft")
+        StringAssert.Contains(detail.KannViolations(0).Message, reasonText)
+
+        Assert.AreEqual(1, r.KannConstraintFlags.Count)
+        Assert.AreEqual("consecutive_required", r.KannConstraintFlags(0).ConstraintType)
+        Assert.AreEqual(reasonText, r.KannConstraintFlags(0).Reason)
+        Assert.IsTrue(r.KannConstraintFlags(0).Relaxed)
     End Sub
 
-    ''' <summary>Test 7: weekly_hours' max_per_day as Kann - only 1 day
-    ''' exists, so the 3 demanded hours can only be scheduled by exceeding
-    ''' max_per_day=1 on that day. hours_per_week stays exact (always must,
-    ''' untouched by priority); only the max_per_day violation is
-    ''' relaxed.</summary>
+    ''' <summary>Test 7 (+9, traceability): weekly_hours' max_per_day as
+    ''' Kann - only 1 day exists, so the 3 demanded hours can only be
+    ''' scheduled by exceeding max_per_day=1 on that day. hours_per_week
+    ''' stays exact (always must, untouched by priority); only the
+    ''' max_per_day violation is relaxed. Its "reason" must thread into the
+    ''' Kann violation message/Reason and into KannConstraintFlags.</summary>
     <TestMethod>
     Public Sub KannWeeklyHoursMaxPerDayRelaxesWhileHoursPerWeekStaysExact()
+        Dim reasonText = "Mathe wenn moeglich hoechstens 1x pro Tag laut Prompt"
         Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 3), {
-            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 3}, {"max_per_day", 1}, {"priority", "should"}},
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 3}, {"max_per_day", 1}, {"priority", "should"}, {"reason", reasonText}},
             New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
         })
         Dim r = Solver.Solve(data)
@@ -448,6 +491,14 @@ Public Class SolverTests
         Assert.AreEqual(0, detail.MussViolations.Count, String.Join(vbLf, detail.MussViolations))
         Assert.AreEqual(1, detail.KannViolations.Count)
         Assert.AreEqual("weekly_hours", detail.KannViolations(0).ConstraintType)
+        Assert.AreEqual(reasonText, detail.KannViolations(0).Reason)
+        StringAssert.Contains(detail.KannViolations(0).Message, "Regel-Herkunft")
+        StringAssert.Contains(detail.KannViolations(0).Message, reasonText)
+
+        Assert.AreEqual(1, r.KannConstraintFlags.Count)
+        Assert.AreEqual("weekly_hours", r.KannConstraintFlags(0).ConstraintType)
+        Assert.AreEqual(reasonText, r.KannConstraintFlags(0).Reason)
+        Assert.IsTrue(r.KannConstraintFlags(0).Relaxed)
     End Sub
 
     ''' <summary>Test 8 (+9, traceability): Validation rejects every
@@ -483,6 +534,55 @@ Public Class SolverTests
         Dim errorsC = Validation.ValidateEntities(badWeeklyHours)
         Assert.IsTrue(errorsC.Any(Function(e) e.Contains("priority") OrElse e.Contains("max_per_day")))
         Assert.ThrowsException(Of ArgumentException)(Sub() Solver.BuildModel(badWeeklyHours))
+    End Sub
+
+    ''' <summary>Test 9a (traceability, Muss/Validation-side): a malformed
+    ''' "priority" value with an explicit "reason" set produces a
+    ''' Validation error that carries that reason - complementing Test 8,
+    ''' which only proves the absence case (no reason -> no empty
+    ''' "(Regel-Herkunft: '')" suffix).</summary>
+    <TestMethod>
+    Public Sub ValidationErrorIncludesReasonWhenSet()
+        Dim reasonText = "Prompt sagt 'vielleicht ginge das'"
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}, {"max_per_day", 1}, {"priority", "vielleicht"}, {"reason", reasonText}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim errors = Validation.ValidateEntities(data)
+        Dim priorityErrors = errors.Where(Function(e) e.Contains("priority")).ToList()
+        Assert.IsTrue(priorityErrors.Count > 0, String.Join(vbLf, errors))
+        Assert.IsTrue(priorityErrors.Any(Function(e) e.Contains("Regel-Herkunft") AndAlso e.Contains(reasonText)))
+    End Sub
+
+    ''' <summary>Test 9b (traceability, Muss/Verifier-side): Verifier.vb is
+    ''' independent of Solver.vb (see module header) - a schedule solved
+    ''' WITHOUT a forbidden_slot constraint is checked afterward against a
+    ''' data copy that adds a Muss forbidden_slot for exactly the slot the
+    ''' schedule landed on. The resulting violation message must carry the
+    ''' constraint's "reason" through to VerifySchedule's plain-string
+    ''' output (the same output shape callers have always used with the
+    ''' "assert 0" pattern).</summary>
+    <TestMethod>
+    Public Sub VerifierMussViolationIncludesReasonWhenSet()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 1), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim r = Solver.Solve(data)
+        Assert.IsTrue(IsFeasibleOrOptimal(r.Status), Solver.StatusName(r.Status))
+        Assert.AreEqual(1, r.Schedule.Count)
+        Assert.AreEqual("Mo", r.Schedule(0).Day)
+        Assert.AreEqual(1, r.Schedule(0).Period)
+
+        Dim reasonText = "Prompt sagt Montag 1. Stunde muss frei bleiben"
+        Dim dataChecked = DirectCast(data.DeepClone(), JsonObject)
+        dataChecked("constraints").AsArray().Add(
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}, {"reason", reasonText}})
+
+        Dim violations = Verifier.VerifySchedule(dataChecked, r.Schedule)
+        Assert.AreEqual(1, violations.Count, String.Join(vbLf, violations))
+        StringAssert.Contains(violations(0), "Regel-Herkunft")
+        StringAssert.Contains(violations(0), reasonText)
     End Sub
 
     Private Shared Function AllSlots(days As IEnumerable(Of String), periods As IEnumerable(Of Integer)) As JsonArray

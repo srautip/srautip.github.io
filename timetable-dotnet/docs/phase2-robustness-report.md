@@ -428,3 +428,108 @@ dieser Phase.
       `consecutive_required` mit ehrlich dokumentierter, reproduzierbarer
       Grenze wegen der fehlenden Sozialkunde-Extraktion).
 - [x] Dieser Abschnitt in `docs/phase2-robustness-report.md` committet.
+
+# Phase 2.7: Testabdeckung für Rückverfolgbarkeit — Ergebnisbericht
+
+Ausgangspunkt war die Nutzerfrage, ob es einen Testfall gibt, der die
+Rückverfolgbarkeit von Solver-Fehlern/-Warnungen auf die ursprünglichen
+Prompts prüft. Eine Bestandsaufnahme zeigte: der in Phase 2.5c gebaute
+`reason`-Mechanismus war korrekt und einheitlich verdrahtet, aber nur 1 von 5
+Kann-fähigen Typen hatte einen Test, der das per Assertion bewies; die
+Muss-Seite (`Validation.vb`, `Verifier.vb`) hatte gar keinen Test mit
+gesetztem `reason`; und es gab keinen Live-Test, der prüfte, ob Qwen in der
+Praxis überhaupt `reason` neben `priority: "should"` befüllt.
+
+## Deterministische Testabdeckung geschlossen (2.7a/b)
+
+- `SolverTests.vb`: die 4 verbleibenden Kann-Tests
+  (`KannConflictingForbiddenSlotsMinimizesViolationCount`,
+  `KannRoomRequirementRelaxesPigeonhole`,
+  `KannConsecutiveRequiredRelaxesNonMultipleOfBlockLength`,
+  `KannWeeklyHoursMaxPerDayRelaxesWhileHoursPerWeekStaysExact`) prüfen jetzt
+  wie Test 3 (`teacher_availability`), dass ein gesetztes `reason` in
+  `KannViolationDetail.Message`/`.Reason` und `KannConstraintFlag.Reason`
+  landet.
+- Zwei neue Tests schließen die Muss-Seite: `ValidationErrorIncludesReasonWhenSet`
+  (komplementär zum bestehenden Abwesenheits-Test) und
+  `VerifierMussViolationIncludesReasonWhenSet` (nutzt `Verifier.vb`s
+  Unabhängigkeit vom Solver: ein ohne Constraint gelöster Schedule wird gegen
+  eine nachträglich um einen Muss-`forbidden_slot` mit `reason` erweiterte
+  Datenkopie geprüft).
+- Alle 40 Tests grün, 0 Regressionen (`dotnet test` ohne `RUN_LLM_TESTS`).
+
+## Live-Test deckt einen echten, bisher unentdeckten Fehlermodus auf (2.7c)
+
+Der neue gated Test `LlmExtractionE2EReasonTraceability` (nutzt
+`MussKannFixture`) prüft, ob mindestens ein von Qwen live extrahiertes
+`"should"`-Constraint ein nicht-leeres `reason`-Feld hat. **Erster Lauf:
+0 von 16 `"should"`-Constraints hatten ein `reason`.** Root Cause: das
+`reason`-Feld existiert seit Phase 2.5c im JSON-Schema aller 9 Typen, wurde
+aber in KEINER Instruktion je erwähnt - ein reines Schema-Feld ohne
+Prompt-Anleitung.
+
+**Fix-Versuch 1 (Instruktion schärfen):** ein Satz "Gib zusaetzlich in reason
+IMMER die kurze Textstelle wieder..." zu allen 5 Kann-fähigen Typen ergänzt.
+**Ergebnis: 0 Effekt** - erneut 0 von 38 Constraints (alle 5 Typen isoliert
+getestet) hatten ein `reason`. Eine unconditionale Instruktion allein
+genügt nicht.
+
+**Fix-Versuch 2 (Schema verschärfen):** `reason` für alle 5 Typen von
+optional auf PFLICHTFELD (`required`) gesetzt, nach demselben Muster, mit
+dem `available_days` bei `teacher_availability` in Phase 1/2 schon einmal
+erzwungen wurde. **Ergebnis: gemischt.**
+- `teacher_availability` und `forbidden_slot`: sauberer Erfolg - `reason`
+  UND `priority` beide korrekt in jedem der getesteten Items (4/4 bzw. 8/8),
+  reproduziert in zwei unabhängigen Läufen.
+- `weekly_hours`, `room_requirement`, `consecutive_required`: Verdrängungs-
+  effekt - `priority` verschwand zuverlässig aus jedem Item, sobald `reason`
+  Pflicht wurde (bei `room_requirement`/`consecutive_required`
+  reproduziert), und bei `weekly_hours` sogar schlimmer: die Antwort lief
+  in einem Lauf mangels Tokenbudget mitten im Array ab (`done_reason:
+  "length"`), das JSON wurde ungültig, 0 verwertbare Items.
+
+**Fix-Versuch 3 (kombinierte Instruktion + Pflichtfeld fuer die 3
+betroffenen Typen):** ein zusätzlicher Satz "JEDES Objekt MUSS SOWOHL
+priority ALS AUCH reason enthalten" ergänzt. **Ergebnis: kein Fortschritt**
+- `priority` blieb bei `room_requirement`/`consecutive_required` weiterhin
+  abwesend, `weekly_hours` blieb instabil.
+
+**Entscheidung (ehrliche Grenze, wie im Plan vorgesehen):** `reason` als
+Pflichtfeld nur für `teacher_availability` und `forbidden_slot` behalten (dort
+ein sauberer, zweifach reproduzierter Gewinn ohne Nebenwirkung).
+`weekly_hours`, `room_requirement` und `consecutive_required` wurden auf
+ihren Phase-2.6-Stand zurückgesetzt (Instruktion UND Schema) - ein bereits
+verifiziertes, funktionierendes Feld (`priority`, bei `weekly_hours`
+zusätzlich `max_per_day`) gegen ein neues, noch unzuverlässiges Feld zu
+tauschen, wäre ein schlechter Tausch gewesen. Für diese 3 Typen bleibt
+`reason` weiterhin unbefüllt - dokumentierte, bewusst nicht behobene Grenze
+dieser Phase.
+
+## Verifikation nach der Konsolidierung
+
+- Isolierter Diagnose-Lauf (nur die 3 zurückgesetzten Typen): bestätigt
+  Rückkehr zum bekannten Phase-2.6-Verhalten für `room_requirement`
+  (4/4 mit korrekter `priority`) und `consecutive_required` (Kunst/Chemie/
+  Geschichte korrekt, Sozialkunde weiterhin die bereits in Phase 2.6
+  dokumentierte Lücke).
+- Voller gated Test `LlmExtractionE2EReasonTraceability`: **bestanden**
+  (9m47s) - mindestens ein `"should"`-Constraint mit `reason` gefunden.
+- Regressionscheck: `LlmExtractionE2EMussKann` erneut komplett durchlaufen
+  lassen (die Schema-Änderung an `teacher_availability`/`forbidden_slot`
+  betrifft alle 5 Szenarien, nicht nur MussKann) - **bestanden** (9m5s),
+  keine Verschlechterung gegenüber dem in Phase 2.6 dokumentierten Ergebnis.
+- `dotnet test` ohne `RUN_LLM_TESTS`: weiterhin 40 bestanden, 6 korrekt
+  übersprungen (0 Regressionen).
+
+## Definition of Done — Status (Phase 2.7)
+
+- [x] Alle 5 Kann-fähigen Typen haben einen Test, der reason-Weiterleitung
+      in `KannViolationDetail`/`KannConstraintFlags` beweist.
+- [x] Die Muss-Seite hat für `Validation.vb` UND `Verifier.vb` je einen Test
+      mit gesetztem `reason`.
+- [x] Ein gated Live-Test belegt, dass Qwen in der Praxis `reason` neben
+      `priority: "should"` befüllt - mit ehrlich dokumentierter Grenze (nur
+      2 von 5 Typen zuverlässig, 3 auf den vorherigen Stand zurückgesetzt).
+- [x] `dotnet test TimetableCore.Tests` bleibt ohne `RUN_LLM_TESTS`
+      vollständig grün (0 Regressionen); Ergebnis dokumentiert, committet
+      und gepusht.

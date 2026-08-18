@@ -66,7 +66,9 @@ Public Module LlmExtraction
             "'nach Moeglichkeit'). Enthaelt der Satz KEIN solches Wunsch-Wort " &
             "oder ein verstaerkendes Wort wie 'muss', 'unbedingt', 'zwingend', " &
             "setze priority: 'must'. Im Zweifel IMMER 'must' waehlen, niemals " &
-            "'should' raten."},
+            "'should' raten. Gib zusaetzlich in reason IMMER die kurze " &
+            "Textstelle wieder, die zu dieser Einschraenkung gefuehrt hat " &
+            "(z.B. 'arbeitet Teilzeit, nur Mo-Mi verfuegbar')."},
         {"weekly_hours",
             "Extrahiere fuer JEDE im Text genannte Klasse+Fach-Kombination die " &
             "Wochenstunden (hours_per_week) UND, falls genannt, das " &
@@ -113,7 +115,9 @@ Public Module LlmExtraction
             "als Wunsch formuliert ist (z.B. 'soll wenn moeglich frei " &
             "bleiben'). Eine direkt und ohne Einschraenkung benannte Sperrzeit " &
             "(z.B. 'freitags 6. Stunde frei', 'muss zwingend frei bleiben') " &
-            "ist IMMER priority: 'must'."},
+            "ist IMMER priority: 'must'. Gib zusaetzlich in reason IMMER " &
+            "die kurze Textstelle wieder, die zu dieser Sperrzeit gefuehrt " &
+            "hat."},
         {"consecutive_required",
             "Extrahiere Faecher, die als zusammenhaengender Block (Doppelstunde " &
             "o.ae.) unterrichtet werden muessen - NUR wenn der Text das EXPLIZIT " &
@@ -239,7 +243,14 @@ Public Module LlmExtraction
                 ' {type, teacher} object with no available_days/
                 ' unavailable_periods at all whenever the input text didn't
                 ' use the literal word "verfuegbar".
-                Return ObjSchema(props, {"type", "teacher", "available_days"})
+                ' Phase 2.7: "reason" is required (not just optional-in-schema)
+                ' for the same reason "available_days" is - an isolated live
+                ' diagnostic showed a purely-optional "reason" field is never
+                ' populated by Ollama's schema-constrained decoding, no
+                ' matter how the instruction text phrases it. Forcing it
+                ' required makes the constrained decoder itself guarantee a
+                ' value.
+                Return ObjSchema(props, {"type", "teacher", "available_days", "reason"})
 
             Case "weekly_hours"
                 Dim props As New JsonObject()
@@ -255,6 +266,14 @@ Public Module LlmExtraction
                 ' Phase 2.6: priority governs ONLY max_per_day (see the
                 ' Instructions text above) - hours_per_week is never soft.
                 props("priority") = EnumSchema({JsonHelpers.PriorityMust, JsonHelpers.PriorityShould})
+                ' Phase 2.7: "reason" deliberately left OPTIONAL here (unlike
+                ' teacher_availability/forbidden_slot above) - an isolated
+                ' live diagnostic showed making it required destabilizes
+                ' this type specifically (max_per_day/priority silently
+                ' dropped, or - worse - the whole response ran out of
+                ' tokens mid-array and failed JSON validity entirely).
+                ' Documented "ehrliche Grenze": reason support isn't
+                ' extended to weekly_hours in this phase.
                 Return ObjSchema(props, {"type", "class", "subject", "hours_per_week"})
 
             Case "room_requirement"
@@ -264,6 +283,11 @@ Public Module LlmExtraction
                 props("allowed_rooms") = ArraySchema(StringSchema())
                 props("reason") = StringSchema()
                 props("priority") = EnumSchema({JsonHelpers.PriorityMust, JsonHelpers.PriorityShould})
+                ' Phase 2.7: "reason" left OPTIONAL - see the weekly_hours
+                ' comment above. Here making it required reliably produced
+                ' good reason text but consistently dropped "priority"
+                ' instead - not worth trading a working, already-verified
+                ' field for a new one. Documented "ehrliche Grenze".
                 Return ObjSchema(props, {"type", "subject", "allowed_rooms"})
 
             Case "no_overlap"
@@ -292,7 +316,9 @@ Public Module LlmExtraction
                 props("period") = IntegerSchema()
                 props("reason") = StringSchema()
                 props("priority") = EnumSchema({JsonHelpers.PriorityMust, JsonHelpers.PriorityShould})
-                Return ObjSchema(props, {"type", "scope", "entity", "day", "period"})
+                ' Phase 2.7: required, see the "reason" comment on
+                ' teacher_availability above.
+                Return ObjSchema(props, {"type", "scope", "entity", "day", "period", "reason"})
 
             Case "consecutive_required"
                 Dim props As New JsonObject()
@@ -302,6 +328,10 @@ Public Module LlmExtraction
                 props("block_length") = IntegerSchema()
                 props("reason") = StringSchema()
                 props("priority") = EnumSchema({JsonHelpers.PriorityMust, JsonHelpers.PriorityShould})
+                ' Phase 2.7: "reason" left OPTIONAL - see the weekly_hours/
+                ' room_requirement comments above. Making it required here
+                ' reliably produced good reason text but consistently
+                ' dropped "priority" instead. Documented "ehrliche Grenze".
                 Return ObjSchema(props, {"type", "class", "subject", "block_length"})
 
             Case "teacher_subject_assignment"

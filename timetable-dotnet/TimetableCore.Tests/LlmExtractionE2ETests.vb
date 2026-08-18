@@ -289,4 +289,59 @@ Public Class LlmExtractionE2ETests
                               AddressOf MussKannFixture.CompletenessReport, timeLimitS:=20)
     End Function
 
+    ''' <summary>Phase 2.7: does Qwen, in practice, actually fill in a
+    ''' "reason" alongside a "should" priority it infers - not just when a
+    ''' reason is hand-set in a fixture (that mechanical threading is
+    ''' already proven deterministically in SolverTests.vb)? Reuses
+    ''' MussKannFixture rather than a new scenario, since it already
+    ''' contains multiple deliberate Wunsch-formulations per Kann-capable
+    ''' type. Deliberately weak assertion (see plan's "Ehrliche Grenze"):
+    ''' proves the combination occurs at least once in real model output,
+    ''' not that it's reliable for every single "should" find.
+    '''
+    ''' Live diagnostics during this phase found "reason" only reliably
+    ''' populates for teacher_availability/forbidden_slot once made a
+    ''' REQUIRED schema field (an unconditional instruction alone had zero
+    ''' effect - Ollama's schema-constrained decoding apparently never
+    ''' emits a purely-optional property). Making it required for
+    ''' weekly_hours/room_requirement/consecutive_required was tried too,
+    ''' but reliably crowded out "priority" (or, for weekly_hours, even
+    ''' broke JSON validity by running out of tokens) - reverted for those
+    ''' 3 types rather than trading a working, already-verified field for a
+    ''' new one. See LlmExtraction.vb's ItemSchema comments on those 3
+    ''' cases and the Phase 2.7 report addendum for the live evidence.</summary>
+    <TestMethod>
+    Public Async Function LlmExtractionE2EReasonTraceability() As Task
+        If Environment.GetEnvironmentVariable("RUN_LLM_TESTS") <> "1" Then
+            Assert.Inconclusive(
+                "LLM e2e test skipped by default (needs a running Ollama server with " &
+                "qwen3.5:4b, takes several minutes, and is not deterministic). " &
+                "Set RUN_LLM_TESTS=1 to run it.")
+        End If
+
+        Dim avail = Await LlmExtraction.IsOllamaAvailable()
+        If Not avail.Available Then Assert.Inconclusive(avail.Reason)
+
+        Dim kannCapableTypes As New HashSet(Of String) From {
+            "teacher_availability", "forbidden_slot", "room_requirement", "consecutive_required", "weekly_hours"
+        }
+        Dim entities = JsonHelpers.Entities(MussKannFixture.BuildMussKannScenario())
+        Dim result = Await LlmExtraction.ExtractAllConstraints(entities, MussKannFixture.Prompt)
+
+        Dim shouldConstraints = result.Constraints.
+            Where(Function(c) kannCapableTypes.Contains(JsonHelpers.GetString(c, "type")) AndAlso JsonHelpers.GetPriority(c) = JsonHelpers.PriorityShould).
+            ToList()
+        Dim withReason = shouldConstraints.Where(Function(c) Not String.IsNullOrEmpty(JsonHelpers.GetReason(c))).ToList()
+
+        Console.WriteLine(vbLf & "=== Reason-Traceability (should-Constraints) ===")
+        Console.WriteLine($"  should-Constraints gesamt: {shouldConstraints.Count}, davon mit reason: {withReason.Count}")
+        For Each c In shouldConstraints
+            Console.WriteLine($"  {JsonHelpers.GetString(c, "type"),-22} reason={If(JsonHelpers.GetReason(c), "(keins)")}")
+        Next
+
+        Assert.IsTrue(shouldConstraints.Count > 0, "Kein einziges 'should'-Constraint extrahiert - Test kann Reason-Traceability nicht pruefen.")
+        Assert.IsTrue(withReason.Count > 0,
+            $"Von {shouldConstraints.Count} 'should'-Constraints hatte keines ein 'reason'-Feld - Qwen begruendet seine Kann-Einstufungen in diesem Lauf gar nicht.")
+    End Function
+
 End Class
