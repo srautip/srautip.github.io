@@ -90,6 +90,12 @@ Public Structure RoomKey
     End Function
 End Structure
 
+''' <summary>Phase 2.5: one shared CP-SAT violation BoolVar per Kann
+''' ("should"-priority) constraint JSON object - keyed by the constraint's
+''' index in JsonHelpers.Constraints(data), so a single flag covers every
+''' slot/session that constraint touches (counting violated CONSTRAINTS,
+''' not violated slot-occurrences, per the "simple binary" weighting
+''' decision).</summary>
 Public NotInheritable Class BuiltModel
     Public Property Model As CpModel
     Public Property Lesson As Dictionary(Of LessonKey, BoolVar)
@@ -97,6 +103,7 @@ Public NotInheritable Class BuiltModel
     Public Property Sessions As List(Of Session)
     Public Property Days As List(Of String)
     Public Property Periods As List(Of Integer)
+    Public Property KannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String))
 End Class
 
 Public NotInheritable Class ScheduleEntry
@@ -108,13 +115,57 @@ Public NotInheritable Class ScheduleEntry
     Public Property Room As String
 End Class
 
+''' <summary>Whether one specific Kann-constraint ended up violated in the
+''' returned (optimal) solution, plus its type/reason for reporting -
+''' see Verifier.VerifyScheduleDetailed for the schedule-derived
+''' equivalent (independently re-checked, not read from these flags).</summary>
+Public NotInheritable Class KannConstraintFlag
+    Public Property ConstraintIndex As Integer
+    Public Property ConstraintType As String
+    Public Property Reason As String
+    Public Property Relaxed As Boolean
+End Class
+
 Public NotInheritable Class SolveResult
     Public Property Status As CpSolverStatus
     Public Property Solver As CpSolver
     Public Property Schedule As List(Of ScheduleEntry)
+    Public Property KannConstraintFlags As List(Of KannConstraintFlag)
+End Class
+
+''' <summary>Replaces the plain Dictionary(Of String, List(Of String)) that
+''' room_requirement used to collect into - now also carries the
+''' constraint's priority/index/reason so BuildModel's room-variable
+''' construction loop can decide must vs should per subject.</summary>
+Friend NotInheritable Class RoomRequirementInfo
+    Public ReadOnly AllowedRooms As List(Of String)
+    Public ReadOnly Priority As String
+    Public ReadOnly ConstraintIndex As Integer
+    Public ReadOnly Reason As String
+
+    Public Sub New(allowedRooms As List(Of String), priority As String, constraintIndex As Integer, reason As String)
+        Me.AllowedRooms = allowedRooms
+        Me.Priority = priority
+        Me.ConstraintIndex = constraintIndex
+        Me.Reason = reason
+    End Sub
 End Class
 
 Public Module Solver
+
+    ''' <summary>Phase 2.5: lazily creates (or returns the already-created)
+    ''' shared violation BoolVar for the Kann-constraint at `index` - one
+    ''' flag per JSON constraint object, reused across every slot/session it
+    ''' touches, so the objective counts violated CONSTRAINTS not violated
+    ''' occurrences.</summary>
+    Private Function GetOrCreateKannVar(model As CpModel, kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)),
+                                         index As Integer, constraintType As String, reason As String) As BoolVar
+        If Not kannVars.ContainsKey(index) Then
+            Dim v = model.NewBoolVar($"kann_violated[{index}]")
+            kannVars(index) = (constraintType, v, reason)
+        End If
+        Return kannVars(index).Var
+    End Function
 
     Private Function SessionsFromAssignments(data As JsonObject) As List(Of Session)
         Dim sessions = JsonHelpers.Constraints(data).
@@ -155,18 +206,38 @@ Public Module Solver
             Next
         Next
 
-        Dim roomReq As New Dictionary(Of String, List(Of String))
-        For Each c In JsonHelpers.Constraints(data)
+        Dim kannVars As New Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String))
+
+        Dim allConstraints = JsonHelpers.Constraints(data)
+        Dim roomReq As New Dictionary(Of String, RoomRequirementInfo)
+        For ri = 0 To allConstraints.Count - 1
+            Dim c = allConstraints(ri)
             If JsonHelpers.GetString(c, "type") = "room_requirement" Then
-                roomReq(JsonHelpers.GetString(c, "subject")) = JsonHelpers.AsStringList(c, "allowed_rooms")
+                roomReq(JsonHelpers.GetString(c, "subject")) = New RoomRequirementInfo(
+                    JsonHelpers.AsStringList(c, "allowed_rooms"), JsonHelpers.GetPriority(c), ri, JsonHelpers.GetReason(c))
             End If
         Next
 
         Dim room As New Dictionary(Of RoomKey, BoolVar)
         For Each s In sessions
             If Not roomReq.ContainsKey(s.Subject) Then Continue For
-            Dim allowedRooms = roomReq(s.Subject)
+            Dim info = roomReq(s.Subject)
+            Dim allowedRooms = info.AllowedRooms
             If allowedRooms.Count = 0 Then Continue For
+
+            ' Phase 2.5: "should" splits the original equality
+            ' (Sum(choices) = lesson) into an always-true upper bound (never
+            ' assign an allowed room without the lesson, never more than
+            ' one) plus a reified lower bound (the lesson MUST get one of
+            ' the allowed rooms) - relaxing only the lower bound is what
+            ' lets the lesson happen with no allowed room assigned instead
+            ' of forcing Infeasible, without ever allowing more than one
+            ' room to be assigned at once.
+            Dim rrViolated As BoolVar = Nothing
+            If info.Priority = JsonHelpers.PriorityShould Then
+                rrViolated = GetOrCreateKannVar(model, kannVars, info.ConstraintIndex, "room_requirement", info.Reason)
+            End If
+
             For Each d In days
                 For Each p In periods
                     Dim choices As New List(Of BoolVar)
@@ -176,22 +247,31 @@ Public Module Solver
                         choices.Add(v)
                     Next
                     Dim lessonKey As New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)
-                    model.Add(LinearExpr.Sum(choices) = lesson(lessonKey))
+                    If rrViolated Is Nothing Then
+                        model.Add(LinearExpr.Sum(choices) = lesson(lessonKey))
+                    Else
+                        model.Add(LinearExpr.Sum(choices) <= lesson(lessonKey))
+                        model.Add(LinearExpr.Sum(choices) >= lesson(lessonKey)).OnlyEnforceIf(rrViolated.Not())
+                    End If
                 Next
             Next
         Next
 
-        ApplyConstraints(model, data, sessions, lesson, room, days, periods)
+        ApplyConstraints(model, data, sessions, lesson, room, days, periods, kannVars)
+
+        If kannVars.Count > 0 Then
+            model.Minimize(LinearExpr.Sum(kannVars.Values.Select(Function(kv) kv.Var)))
+        End If
 
         Return New BuiltModel With {
             .Model = model, .Lesson = lesson, .Room = room,
-            .Sessions = sessions, .Days = days, .Periods = periods
+            .Sessions = sessions, .Days = days, .Periods = periods, .KannVars = kannVars
         }
     End Function
 
     Private Sub AddBlockConstraint(model As CpModel, lesson As Dictionary(Of LessonKey, BoolVar),
                                     session As Session, days As List(Of String), periods As List(Of Integer),
-                                    blockLen As Integer)
+                                    blockLen As Integer, Optional violated As BoolVar = Nothing)
         Dim lastPeriod = periods(periods.Count - 1)
         For Each d In days
             Dim validStarts = periods.Where(Function(p) p + blockLen - 1 <= lastPeriod).ToList()
@@ -205,22 +285,37 @@ Public Module Solver
                     Select(Function(p0) blockStart(p0)).
                     ToList()
                 Dim key As New LessonKey(session.ClassName, session.Subject, session.Teacher, d, p)
-                model.Add(lesson(key) = LinearExpr.Sum(covering))
+                If violated Is Nothing Then
+                    model.Add(lesson(key) = LinearExpr.Sum(covering))
+                Else
+                    ' Phase 2.5 "should": a chosen block-start still forces
+                    ' its covered periods to be scheduled (structural, not a
+                    ' preference - keep unconditional). Only the OTHER
+                    ' direction - every scheduled period must belong to a
+                    ' chosen block - is the actual "prefer blocks" ask, so
+                    ' only that half is gated.
+                    model.Add(lesson(key) >= LinearExpr.Sum(covering))
+                    model.Add(lesson(key) <= LinearExpr.Sum(covering)).OnlyEnforceIf(violated.Not())
+                End If
             Next
         Next
     End Sub
 
     Private Sub ApplyConstraints(model As CpModel, data As JsonObject, sessions As List(Of Session),
                                   lesson As Dictionary(Of LessonKey, BoolVar), room As Dictionary(Of RoomKey, BoolVar),
-                                  days As List(Of String), periods As List(Of Integer))
+                                  days As List(Of String), periods As List(Of Integer),
+                                  kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)))
 
         Dim sessionsOfClass = Function(className As String) sessions.Where(Function(s) s.ClassName = className).ToList()
         Dim sessionsOfTeacher = Function(teacher As String) sessions.Where(Function(s) s.Teacher = teacher).ToList()
         Dim sessionsOfSubjectClass = Function(subject As String, className As String) _
             sessions.Where(Function(s) s.Subject = subject AndAlso s.ClassName = className).ToList()
 
-        For Each c In JsonHelpers.Constraints(data)
+        Dim constraintsList = JsonHelpers.Constraints(data)
+        For ci = 0 To constraintsList.Count - 1
+            Dim c = constraintsList(ci)
             Dim constraintType = JsonHelpers.GetString(c, "type")
+            Dim priority = JsonHelpers.GetPriority(c)
 
             Select Case constraintType
 
@@ -235,11 +330,16 @@ Public Module Solver
                             blocked.Add((JsonHelpers.GetString(entryObj, "day"), JsonHelpers.GetInt(entryObj, "period").Value))
                         Next
                     End If
+                    Dim taViolated As BoolVar = Nothing
+                    If priority = JsonHelpers.PriorityShould Then
+                        taViolated = GetOrCreateKannVar(model, kannVars, ci, constraintType, JsonHelpers.GetReason(c))
+                    End If
                     For Each s In sessionsOfTeacher(teacher)
                         For Each d In days
                             For Each p In periods
                                 If Not availDays.Contains(d) OrElse blocked.Contains((d, p)) Then
-                                    model.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)) = 0)
+                                    Dim con = model.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)) = 0)
+                                    If taViolated IsNot Nothing Then con.OnlyEnforceIf(taViolated.Not())
                                 End If
                             Next
                         Next
@@ -250,6 +350,13 @@ Public Module Solver
                     Dim subject = JsonHelpers.GetString(c, "subject")
                     Dim hoursPerWeek = JsonHelpers.GetInt(c, "hours_per_week").Value
                     Dim maxPerDay = JsonHelpers.GetInt(c, "max_per_day")
+                    ' priority only ever governs the max_per_day cap below -
+                    ' hours_per_week's exact-count stays always-must
+                    ' (Validation.vb rejects "should" without max_per_day).
+                    Dim whViolated As BoolVar = Nothing
+                    If priority = JsonHelpers.PriorityShould Then
+                        whViolated = GetOrCreateKannVar(model, kannVars, ci, constraintType, JsonHelpers.GetReason(c))
+                    End If
                     For Each s In sessionsOfSubjectClass(subject, className)
                         Dim terms As New List(Of BoolVar)
                         For Each d In days
@@ -264,7 +371,8 @@ Public Module Solver
                                 Dim dayTerms = periods.
                                     Select(Function(p) lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p))).
                                     ToList()
-                                model.Add(LinearExpr.Sum(dayTerms) <= maxPerDay.Value)
+                                Dim con = model.Add(LinearExpr.Sum(dayTerms) <= maxPerDay.Value)
+                                If whViolated IsNot Nothing Then con.OnlyEnforceIf(whViolated.Not())
                             Next
                         End If
                     Next
@@ -340,18 +448,25 @@ Public Module Solver
                             relevantSessions = New List(Of Session)
                     End Select
 
+                    Dim fsViolated As BoolVar = Nothing
+                    If priority = JsonHelpers.PriorityShould Then
+                        fsViolated = GetOrCreateKannVar(model, kannVars, ci, constraintType, JsonHelpers.GetReason(c))
+                    End If
+
                     If scope = "room" Then
                         For Each s In relevantSessions
                             Dim key As New RoomKey(s.ClassName, s.Subject, s.Teacher, day, period, entityVal)
                             If room.ContainsKey(key) Then
-                                model.Add(room(key) = 0)
+                                Dim con = model.Add(room(key) = 0)
+                                If fsViolated IsNot Nothing Then con.OnlyEnforceIf(fsViolated.Not())
                             End If
                         Next
                     Else
                         For Each s In relevantSessions
                             Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, day, period)
                             If lesson.ContainsKey(key) Then
-                                model.Add(lesson(key) = 0)
+                                Dim con = model.Add(lesson(key) = 0)
+                                If fsViolated IsNot Nothing Then con.OnlyEnforceIf(fsViolated.Not())
                             End If
                         Next
                     End If
@@ -360,8 +475,12 @@ Public Module Solver
                     Dim className = JsonHelpers.GetString(c, "class")
                     Dim subject = JsonHelpers.GetString(c, "subject")
                     Dim blockLen = JsonHelpers.GetInt(c, "block_length").Value
+                    Dim crViolated As BoolVar = Nothing
+                    If priority = JsonHelpers.PriorityShould Then
+                        crViolated = GetOrCreateKannVar(model, kannVars, ci, constraintType, JsonHelpers.GetReason(c))
+                    End If
                     For Each s In sessionsOfSubjectClass(subject, className)
-                        AddBlockConstraint(model, lesson, s, days, periods, blockLen)
+                        AddBlockConstraint(model, lesson, s, days, periods, blockLen, crViolated)
                     Next
 
                 Case "teacher_subject_assignment", "room_requirement"
@@ -407,7 +526,18 @@ Public Module Solver
             Next
         End If
 
-        Return New SolveResult With {.Status = status, .Solver = solver, .Schedule = schedule}
+        Dim kannFlags As List(Of KannConstraintFlag) = Nothing
+        If status = CpSolverStatus.Optimal OrElse status = CpSolverStatus.Feasible Then
+            kannFlags = New List(Of KannConstraintFlag)
+            For Each kvp In built.KannVars
+                kannFlags.Add(New KannConstraintFlag With {
+                    .ConstraintIndex = kvp.Key, .ConstraintType = kvp.Value.Type,
+                    .Reason = kvp.Value.Reason, .Relaxed = solver.BooleanValue(kvp.Value.Var)
+                })
+            Next
+        End If
+
+        Return New SolveResult With {.Status = status, .Solver = solver, .Schedule = schedule, .KannConstraintFlags = kannFlags}
     End Function
 
     Public Function StatusName(status As CpSolverStatus) As String

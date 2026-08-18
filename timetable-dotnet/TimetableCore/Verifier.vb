@@ -11,6 +11,23 @@
 ' verifier is the only way to catch bugs in the CP-SAT builder itself.
 Imports System.Text.Json.Nodes
 
+''' <summary>Phase 2.5: one Kann ("should"-priority) violation found while
+''' re-checking a schedule - independently re-derived from the JSON here,
+''' not read from Solver.vb's internal BoolVars (see the module header).</summary>
+Public NotInheritable Class KannViolationDetail
+    Public Property ConstraintIndex As Integer
+    Public Property ConstraintType As String
+    Public Property Message As String
+    Public Property Reason As String
+End Class
+
+''' <summary>Muss violations as plain strings (same shape VerifySchedule
+''' has always returned - callers keep using the "assert 0" pattern), plus
+''' Kann violations as richer records for informational display.</summary>
+Public NotInheritable Class VerificationResult
+    Public Property MussViolations As List(Of String)
+    Public Property KannViolations As List(Of KannViolationDetail)
+End Class
 
 Public Module Verifier
 
@@ -28,16 +45,31 @@ Public Module Verifier
                                End Function).ToList()
     End Function
 
-    ''' <summary>Returns a list of human-readable violation strings
-    ''' (empty = OK).</summary>
-    Public Function VerifySchedule(data As JsonObject, schedule As List(Of ScheduleEntry)) As List(Of String)
-        Dim violations As New List(Of String)
+    ''' <summary>Appends the constraint's "reason" (if any) to a violation
+    ''' message, so it can be traced back to the rule that produced it.
+    ''' Duplicated (not shared) from Validation.vb's WithReason, matching
+    ''' this module's deliberate no-shared-code design (see header).</summary>
+    Private Function WithReason(message As String, c As JsonObject) As String
+        Dim reason = JsonHelpers.GetReason(c)
+        If String.IsNullOrEmpty(reason) Then Return message
+        Return $"{message} (Regel-Herkunft: '{reason}')"
+    End Function
+
+    ''' <summary>Runs every detection check exactly once and returns each
+    ''' finding tagged with its originating constraint's index/type - the
+    ''' detection logic itself (every branch below) is unchanged from
+    ''' before Phase 2.5; only the sink (tagged list instead of a flat
+    ''' List(Of String)) is new.</summary>
+    Private Function CollectViolations(data As JsonObject, schedule As List(Of ScheduleEntry)) As List(Of (Index As Integer, ConstraintType As String, Message As String))
+        Dim violations As New List(Of (Index As Integer, ConstraintType As String, Message As String))
         Dim ent = JsonHelpers.Entities(data)
         Dim timeslots = JsonHelpers.Timeslots(ent)
         Dim allDays = JsonHelpers.AsStringList(timeslots, "days")
         Dim allPeriods = Enumerable.Range(1, JsonHelpers.GetInt(timeslots, "periods_per_day").Value).ToList()
 
-        For Each c In JsonHelpers.Constraints(data)
+        Dim constraints = JsonHelpers.Constraints(data)
+        For i = 0 To constraints.Count - 1
+            Dim c = constraints(i)
             Dim t = JsonHelpers.GetString(c, "type")
 
             Select Case t
@@ -55,10 +87,10 @@ Public Module Verifier
                     End If
                     For Each l In Find(schedule, teacher:=teacher)
                         If Not avail.Contains(l.Day) Then
-                            violations.Add($"{teacher} unterrichtet an {l.Day}, ist dort aber nicht verfuegbar")
+                            violations.Add((i, t, WithReason($"{teacher} unterrichtet an {l.Day}, ist dort aber nicht verfuegbar", c)))
                         End If
                         If blocked.Contains((l.Day, l.Period)) Then
-                            violations.Add($"{teacher} unterrichtet {l.Day}/{l.Period}, obwohl explizit gesperrt")
+                            violations.Add((i, t, WithReason($"{teacher} unterrichtet {l.Day}/{l.Period}, obwohl explizit gesperrt", c)))
                         End If
                     Next
 
@@ -68,7 +100,7 @@ Public Module Verifier
                     Dim hoursPerWeek = JsonHelpers.GetInt(c, "hours_per_week").Value
                     Dim cnt = Find(schedule, cls:=className, subject:=subject).Count
                     If cnt <> hoursPerWeek Then
-                        violations.Add($"{className}/{subject}: {cnt}h geplant, {hoursPerWeek}h gefordert")
+                        violations.Add((i, t, WithReason($"{className}/{subject}: {cnt}h geplant, {hoursPerWeek}h gefordert", c)))
                     End If
                     Dim maxPerDay = JsonHelpers.GetInt(c, "max_per_day")
                     If maxPerDay.HasValue AndAlso maxPerDay.Value <> 0 Then
@@ -78,7 +110,7 @@ Public Module Verifier
                         Next
                         For Each kvp In byDay
                             If kvp.Value > maxPerDay.Value Then
-                                violations.Add($"{className}/{subject} am {kvp.Key}: {kvp.Value}h > erlaubtes Maximum {maxPerDay.Value}h/Tag")
+                                violations.Add((i, t, WithReason($"{className}/{subject} am {kvp.Key}: {kvp.Value}h > erlaubtes Maximum {maxPerDay.Value}h/Tag", c)))
                             End If
                         Next
                     End If
@@ -88,9 +120,9 @@ Public Module Verifier
                     Dim allowedRooms = JsonHelpers.AsStringList(c, "allowed_rooms")
                     For Each l In Find(schedule, subject:=subject)
                         If Not allowedRooms.Contains(l.Room) Then
-                            violations.Add(
+                            violations.Add((i, t, WithReason(
                                 $"{subject} ({l.ClassName}, {l.Day}/{l.Period}) in Raum {l.Room}, " &
-                                $"erlaubt sind nur {JsonHelpers.PyListRepr(allowedRooms)}")
+                                $"erlaubt sind nur {JsonHelpers.PyListRepr(allowedRooms)}", c)))
                         End If
                     Next
 
@@ -113,7 +145,7 @@ Public Module Verifier
                     Next
                     For Each kvp In seen
                         If kvp.Value.Count > 1 Then
-                            violations.Add($"{resource} {entityVal} doppelt belegt am {kvp.Key}: {kvp.Value.Count} Eintraege")
+                            violations.Add((i, t, WithReason($"{resource} {entityVal} doppelt belegt am {kvp.Key}: {kvp.Value.Count} Eintraege", c)))
                         End If
                     Next
 
@@ -127,8 +159,8 @@ Public Module Verifier
                                                            classesInvolved.Contains(l.ClassName) AndAlso
                                                            l.Day = d AndAlso l.Period = p).ToList()
                             If hits.Count > 1 Then
-                                violations.Add(
-                                    $"{teacher} gleichzeitig in {JsonHelpers.PyListRepr(hits.Select(Function(h) h.ClassName))} am {d}/{p} ({subject})")
+                                violations.Add((i, t, WithReason(
+                                    $"{teacher} gleichzeitig in {JsonHelpers.PyListRepr(hits.Select(Function(h) h.ClassName))} am {d}/{p} ({subject})", c)))
                             End If
                         Next
                     Next
@@ -147,7 +179,7 @@ Public Module Verifier
                             Case Else : matches = False
                         End Select
                         If matches Then
-                            violations.Add($"{entityVal} ({scope}) hat Unterricht im gesperrten Slot {day}/{period}")
+                            violations.Add((i, t, WithReason($"{entityVal} ({scope}) hat Unterricht im gesperrten Slot {day}/{period}", c)))
                         End If
                     Next
 
@@ -163,19 +195,19 @@ Public Module Verifier
                     For Each kvp In byDay
                         Dim d = kvp.Key
                         Dim ps = kvp.Value.OrderBy(Function(x) x).ToList()
-                        Dim i = 0
-                        While i < ps.Count
-                            Dim run As New List(Of Integer) From {ps(i)}
-                            While i + 1 < ps.Count AndAlso ps(i + 1) = ps(i) + 1
-                                i += 1
-                                run.Add(ps(i))
+                        Dim idx = 0
+                        While idx < ps.Count
+                            Dim run As New List(Of Integer) From {ps(idx)}
+                            While idx + 1 < ps.Count AndAlso ps(idx + 1) = ps(idx) + 1
+                                idx += 1
+                                run.Add(ps(idx))
                             End While
                             If run.Count <> blockLength Then
-                                violations.Add(
+                                violations.Add((i, t, WithReason(
                                     $"{className}/{subject} am {d}: Block der Laenge {run.Count} statt geforderter " &
-                                    $"{blockLength} ({String.Join(", ", run)})")
+                                    $"{blockLength} ({String.Join(", ", run)})", c)))
                             End If
-                            i += 1
+                            idx += 1
                         End While
                     Next
 
@@ -185,13 +217,13 @@ Public Module Verifier
                     Dim teacher = JsonHelpers.GetString(c, "teacher")
                     For Each l In Find(schedule, cls:=className, subject:=subject)
                         If l.Teacher <> teacher Then
-                            violations.Add(
-                                $"{className}/{subject} wird von {l.Teacher} statt vorgeschriebener Lehrkraft {teacher} unterrichtet")
+                            violations.Add((i, t, WithReason(
+                                $"{className}/{subject} wird von {l.Teacher} statt vorgeschriebener Lehrkraft {teacher} unterrichtet", c)))
                         End If
                     Next
 
                 Case Else
-                    violations.Add($"Unbekannter Constraint-Typ im Verifier: '{t}'")
+                    violations.Add((i, t, $"Unbekannter Constraint-Typ im Verifier: '{t}'"))
 
             End Select
         Next
@@ -199,5 +231,43 @@ Public Module Verifier
         Return violations
     End Function
 
-End Module
+    ''' <summary>Returns a list of human-readable Muss (hard) violation
+    ''' strings (empty = OK) - signature and output unchanged from before
+    ''' Phase 2.5: every existing fixture has no "priority" field, so
+    ''' JsonHelpers.GetPriority defaults every constraint to "must" and
+    ''' this is byte-identical to the pre-Phase-2.5 behavior. Kann
+    ''' ("should") violations are silently excluded here - see
+    ''' VerifyScheduleDetailed for those.</summary>
+    Public Function VerifySchedule(data As JsonObject, schedule As List(Of ScheduleEntry)) As List(Of String)
+        Dim constraints = JsonHelpers.Constraints(data)
+        Return CollectViolations(data, schedule).
+            Where(Function(v) JsonHelpers.GetPriority(constraints(v.Index)) = JsonHelpers.PriorityMust).
+            Select(Function(v) v.Message).
+            ToList()
+    End Function
 
+    ''' <summary>Phase 2.5: same checks as VerifySchedule, but partitioned
+    ''' into Muss (for the same "assert 0" pattern) and Kann (informational
+    ''' - which preferences ended up violated, with type/reason for
+    ''' reporting).</summary>
+    Public Function VerifyScheduleDetailed(data As JsonObject, schedule As List(Of ScheduleEntry)) As VerificationResult
+        Dim constraints = JsonHelpers.Constraints(data)
+        Dim all = CollectViolations(data, schedule)
+
+        Dim mussViolations = all.
+            Where(Function(v) JsonHelpers.GetPriority(constraints(v.Index)) = JsonHelpers.PriorityMust).
+            Select(Function(v) v.Message).
+            ToList()
+
+        Dim kannViolations = all.
+            Where(Function(v) JsonHelpers.GetPriority(constraints(v.Index)) = JsonHelpers.PriorityShould).
+            Select(Function(v) New KannViolationDetail With {
+                .ConstraintIndex = v.Index, .ConstraintType = v.ConstraintType,
+                .Message = v.Message, .Reason = JsonHelpers.GetReason(constraints(v.Index))
+            }).
+            ToList()
+
+        Return New VerificationResult With {.MussViolations = mussViolations, .KannViolations = kannViolations}
+    End Function
+
+End Module

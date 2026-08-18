@@ -72,5 +72,35 @@ Public Module JsonHelpers
         Return entities("timeslots").AsObject()
     End Function
 
+    ' Phase 2.5: Muss/Kann priority. "must" (default when absent) keeps every
+    ' existing constraint's behavior byte-identical; "should" marks a
+    ' constraint as a soft preference the solver may violate (see Solver.vb's
+    ' KannVars/model.Minimize and Verifier.vb's VerifyScheduleDetailed).
+    Public Const PriorityMust As String = "must"
+    Public Const PriorityShould As String = "should"
+
+    ''' <summary>Defaults to PriorityMust when the "priority" field is
+    ''' absent - this default is what makes every pre-Phase-2.5 fixture
+    ''' behave unchanged. Does NOT validate the value; Validation.vb is
+    ''' responsible for rejecting anything other than must/should.
+    ''' NOTE: LlmExtraction.vb does NOT yet ask Qwen to set this field from
+    ''' wording like "wenn moeglich"/"idealerweise" - that is an explicit,
+    ''' separately live-tested follow-up phase, not part of Phase 2.5's
+    ''' deterministic core (Models/Solver/Verifier + hand-written
+    ''' fixtures).</summary>
+    Public Function GetPriority(c As JsonObject) As String
+        Dim p = GetString(c, "priority")
+        Return If(String.IsNullOrEmpty(p), PriorityMust, p)
+    End Function
+
+    ''' <summary>Optional human-readable provenance for a constraint (e.g.
+    ''' an LLM-authored paraphrase of the prompt text that produced it, see
+    ''' LlmExtraction.vb's per-type "reason" schema field). Nothing when
+    ''' absent - used to enrich Validation/Verifier messages, not required
+    ''' by any constraint type.</summary>
+    Public Function GetReason(c As JsonObject) As String
+        Return GetString(c, "reason")
+    End Function
+
 End Module
 

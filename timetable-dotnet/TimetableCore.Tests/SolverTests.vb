@@ -290,6 +290,211 @@ Public Class SolverTests
         Assert.IsTrue(IsFeasibleOrOptimal(r.Status), Solver.StatusName(r.Status))
     End Sub
 
+    ' --- 4. Phase 2.5: Muss/Kann constraint priority ---
+    ' Test 1 (backward compatibility) is implicit: every test above this
+    ' section sets no "priority" field and must keep passing unmodified -
+    ' that IS the backward-compatibility proof, no separate test needed.
+
+    ''' <summary>Test 2: GetPriority defaults to "must", and an explicit
+    ''' "priority": "must" behaves identically to omitting the field
+    ''' entirely (same solve status, same schedule shape, same
+    ''' VerifySchedule output).</summary>
+    <TestMethod>
+    Public Sub PriorityDefaultsToMustAndIsBackwardCompatible()
+        Dim withoutPriority As New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}}
+        Assert.AreEqual(JsonHelpers.PriorityMust, JsonHelpers.GetPriority(withoutPriority))
+        Dim withExplicitMust As New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}, {"priority", "must"}}
+        Assert.AreEqual(JsonHelpers.PriorityMust, JsonHelpers.GetPriority(withExplicitMust))
+
+        Dim dataWithout = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim dataWithMust = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}, {"priority", "must"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+
+        Dim r1 = Solver.Solve(dataWithout)
+        Dim r2 = Solver.Solve(dataWithMust)
+        Assert.AreEqual(r1.Status, r2.Status)
+        Assert.AreEqual(2, r1.Schedule(0).Period) ' period 1 forbidden -> must land on period 2
+        Assert.AreEqual(2, r2.Schedule(0).Period)
+        Assert.AreEqual(0, Verifier.VerifySchedule(dataWithout, r1.Schedule).Count)
+        Assert.AreEqual(0, Verifier.VerifySchedule(dataWithMust, r2.Schedule).Count)
+    End Sub
+
+    ''' <summary>Test 3 (+9, traceability): an otherwise-Infeasible scenario
+    ''' (every slot blocked for the only teacher who still needs hours/week)
+    ''' becomes Optimal once that teacher_availability constraint is marked
+    ''' "should" - 0 Muss violations, exactly 1 Kann violation carrying the
+    ''' constraint's "reason" through to both VerifyScheduleDetailed and
+    ''' SolveResult.KannConstraintFlags.</summary>
+    <TestMethod>
+    Public Sub KannTeacherAvailabilityRelaxesInfeasibleScenario()
+        Dim mustData = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_availability"}, {"teacher", "T1"}, {"unavailable_periods", AllSlots({"Mo", "Di"}, {1, 2})}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim rMust = Solver.Solve(mustData)
+        Assert.AreEqual(CpSolverStatus.Infeasible, rMust.Status, Solver.StatusName(rMust.Status))
+
+        Dim reasonText = "T1 hat laut Prompt keine Zeit"
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_availability"}, {"teacher", "T1"}, {"unavailable_periods", AllSlots({"Mo", "Di"}, {1, 2})},
+                {"priority", "should"}, {"reason", reasonText}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim r = Solver.Solve(data)
+        Assert.IsTrue(IsFeasibleOrOptimal(r.Status), Solver.StatusName(r.Status))
+
+        Dim detail = Verifier.VerifyScheduleDetailed(data, r.Schedule)
+        Assert.AreEqual(0, detail.MussViolations.Count, String.Join(vbLf, detail.MussViolations))
+        Assert.AreEqual(1, detail.KannViolations.Count)
+        Assert.AreEqual("teacher_availability", detail.KannViolations(0).ConstraintType)
+        Assert.AreEqual(reasonText, detail.KannViolations(0).Reason)
+        StringAssert.Contains(detail.KannViolations(0).Message, "Regel-Herkunft")
+        StringAssert.Contains(detail.KannViolations(0).Message, reasonText)
+
+        Assert.IsNotNull(r.KannConstraintFlags)
+        Assert.AreEqual(1, r.KannConstraintFlags.Count)
+        Assert.IsTrue(r.KannConstraintFlags(0).Relaxed)
+        Assert.AreEqual(reasonText, r.KannConstraintFlags(0).Reason)
+    End Sub
+
+    ''' <summary>Test 4: two Kann forbidden_slot constraints that cannot
+    ''' both be satisfied at once (only 2 periods exist, each forbidden by
+    ''' one of them, exactly 1 lesson must land somewhere) -> Optimal with
+    ''' exactly 1 Kann violation, proving the objective actually minimizes
+    ''' rather than giving up on everything.</summary>
+    <TestMethod>
+    Public Sub KannConflictingForbiddenSlotsMinimizesViolationCount()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}, {"priority", "should"}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 2}, {"priority", "should"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim r = Solver.Solve(data)
+        Assert.IsTrue(IsFeasibleOrOptimal(r.Status), Solver.StatusName(r.Status))
+        Dim detail = Verifier.VerifyScheduleDetailed(data, r.Schedule)
+        Assert.AreEqual(0, detail.MussViolations.Count, String.Join(vbLf, detail.MussViolations))
+        Assert.AreEqual(1, detail.KannViolations.Count)
+    End Sub
+
+    ''' <summary>Test 5: room_requirement as Kann (analog to
+    ''' RoomRequirementPigeonhole) - the shared "Lab" can only fit one
+    ''' subject's 2h, so relaxing the second subject's room_requirement
+    ''' turns Infeasible into Optimal, with that subject's lessons landing
+    ''' without an allowed room (correctly caught by the existing,
+    ''' unmodified room_requirement detection in Verifier.vb).</summary>
+    <TestMethod>
+    Public Sub KannRoomRequirementRelaxesPigeonhole()
+        Dim data = Scenario(Mini({"5a", "5b"}, {"T1", "T2"}, {"Chemie", "Physik"}, {"Lab"}, {"Mo"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Chemie"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5b"}, {"subject", "Physik"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "room_requirement"}, {"subject", "Chemie"}, {"allowed_rooms", New JsonArray From {"Lab"}}},
+            New JsonObject From {{"type", "room_requirement"}, {"subject", "Physik"}, {"allowed_rooms", New JsonArray From {"Lab"}}, {"priority", "should"}},
+            New JsonObject From {{"type", "no_overlap"}, {"resource", "room"}, {"entity", "Lab"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Chemie"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T2"}, {"class", "5b"}, {"subject", "Physik"}}
+        })
+        Dim r = Solver.Solve(data)
+        Assert.IsTrue(IsFeasibleOrOptimal(r.Status), Solver.StatusName(r.Status))
+        Dim detail = Verifier.VerifyScheduleDetailed(data, r.Schedule)
+        Assert.AreEqual(0, detail.MussViolations.Count, String.Join(vbLf, detail.MussViolations))
+        Assert.IsTrue(detail.KannViolations.Any(Function(v) v.ConstraintType = "room_requirement"))
+    End Sub
+
+    ''' <summary>Test 6: consecutive_required as Kann (analog to
+    ''' ConsecutiveRequiredRejectsNonMultipleOfBlockLength - 3h demanded
+    ''' with block_length=2, 3 is not a multiple of 2) -> Optimal instead
+    ''' of Infeasible, hours_per_week still fully scheduled.</summary>
+    <TestMethod>
+    Public Sub KannConsecutiveRequiredRelaxesNonMultipleOfBlockLength()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Chemie"}, {}, {"Mo", "Di"}, 3), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Chemie"}, {"hours_per_week", 3}},
+            New JsonObject From {{"type", "consecutive_required"}, {"class", "5a"}, {"subject", "Chemie"}, {"block_length", 2}, {"priority", "should"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Chemie"}}
+        })
+        Dim r = Solver.Solve(data)
+        Assert.IsTrue(IsFeasibleOrOptimal(r.Status), Solver.StatusName(r.Status))
+        Assert.AreEqual(3, r.Schedule.Count)
+        Dim detail = Verifier.VerifyScheduleDetailed(data, r.Schedule)
+        Assert.AreEqual(0, detail.MussViolations.Count, String.Join(vbLf, detail.MussViolations))
+        Assert.AreEqual(1, detail.KannViolations.Count)
+        Assert.AreEqual("consecutive_required", detail.KannViolations(0).ConstraintType)
+    End Sub
+
+    ''' <summary>Test 7: weekly_hours' max_per_day as Kann - only 1 day
+    ''' exists, so the 3 demanded hours can only be scheduled by exceeding
+    ''' max_per_day=1 on that day. hours_per_week stays exact (always must,
+    ''' untouched by priority); only the max_per_day violation is
+    ''' relaxed.</summary>
+    <TestMethod>
+    Public Sub KannWeeklyHoursMaxPerDayRelaxesWhileHoursPerWeekStaysExact()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 3), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 3}, {"max_per_day", 1}, {"priority", "should"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim r = Solver.Solve(data)
+        Assert.IsTrue(IsFeasibleOrOptimal(r.Status), Solver.StatusName(r.Status))
+        Assert.AreEqual(3, r.Schedule.Count)
+        Dim detail = Verifier.VerifyScheduleDetailed(data, r.Schedule)
+        Assert.AreEqual(0, detail.MussViolations.Count, String.Join(vbLf, detail.MussViolations))
+        Assert.AreEqual(1, detail.KannViolations.Count)
+        Assert.AreEqual("weekly_hours", detail.KannViolations(0).ConstraintType)
+    End Sub
+
+    ''' <summary>Test 8 (+9, traceability): Validation rejects every
+    ''' malformed use of "priority" - an unknown value, "should" on an
+    ''' always-must type, and "should" on weekly_hours without max_per_day -
+    ''' and Solver.BuildModel throws in every case. Also: a message with no
+    ''' "reason" set must NOT grow an empty "(Regel-Herkunft: '')"
+    ''' suffix.</summary>
+    <TestMethod>
+    Public Sub ValidationRejectsInvalidPriorityUsage()
+        Dim badValue = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}, {"max_per_day", 1}, {"priority", "vielleicht"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim errorsA = Validation.ValidateEntities(badValue)
+        Assert.IsTrue(errorsA.Any(Function(e) e.Contains("priority")))
+        Assert.IsFalse(errorsA.Any(Function(e) e.Contains("Regel-Herkunft")))
+        Assert.ThrowsException(Of ArgumentException)(Sub() Solver.BuildModel(badValue))
+
+        Dim badType = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "no_overlap"}, {"resource", "class"}, {"entity", "5a"}, {"priority", "should"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim errorsB = Validation.ValidateEntities(badType)
+        Assert.IsTrue(errorsB.Any(Function(e) e.Contains("priority")))
+        Assert.ThrowsException(Of ArgumentException)(Sub() Solver.BuildModel(badType))
+
+        Dim badWeeklyHours = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}, {"priority", "should"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim errorsC = Validation.ValidateEntities(badWeeklyHours)
+        Assert.IsTrue(errorsC.Any(Function(e) e.Contains("priority") OrElse e.Contains("max_per_day")))
+        Assert.ThrowsException(Of ArgumentException)(Sub() Solver.BuildModel(badWeeklyHours))
+    End Sub
+
+    Private Shared Function AllSlots(days As IEnumerable(Of String), periods As IEnumerable(Of Integer)) As JsonArray
+        Dim arr As New JsonArray()
+        For Each d In days
+            For Each p In periods
+                arr.Add(New JsonObject From {{"day", d}, {"period", p}})
+            Next
+        Next
+        Return arr
+    End Function
+
     ' --- shared helpers ---
 
     Private Shared Function IsFeasibleOrOptimal(status As CpSolverStatus) As Boolean

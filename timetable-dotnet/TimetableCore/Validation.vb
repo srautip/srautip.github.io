@@ -39,6 +39,23 @@ Public Module Validation
         {"room", "rooms"}
     }
 
+    ' Phase 2.5: constraint types that may be marked "priority": "should"
+    ' (Kann). Everything else (no_overlap, shared_resource_conflict,
+    ' teacher_subject_assignment, and weekly_hours' own hours_per_week) is
+    ' physically/structurally necessary and must always stay "must".
+    Private ReadOnly KannCapableTypes As New HashSet(Of String) From {
+        "teacher_availability", "forbidden_slot", "room_requirement", "consecutive_required", "weekly_hours"
+    }
+
+    ''' <summary>Appends the constraint's "reason" (if any) to an error/
+    ''' warning message, so it can be traced back to the rule that produced
+    ''' it. Returns the message unchanged when no reason is set.</summary>
+    Private Function WithReason(message As String, c As JsonObject) As String
+        Dim reason = JsonHelpers.GetReason(c)
+        If String.IsNullOrEmpty(reason) Then Return message
+        Return $"{message} (Regel-Herkunft: '{reason}')"
+    End Function
+
     ''' <summary>Cross-references every class/teacher/subject/room value
     ''' used in `constraints` against `entities`. Returns a list of
     ''' error strings (empty = all references are valid).</summary>
@@ -62,9 +79,9 @@ Public Module Validation
                 If Not c.ContainsKey(field) OrElse c(field) Is Nothing Then Continue For
                 For Each v In JsonHelpers.AsStringList(c(field))
                     If Not known(entityKey).Contains(v) Then
-                        errors.Add(
+                        errors.Add(WithReason(
                             $"constraints[{i}] (type={constraintType}): Feld '{field}'='{v}' " &
-                            $"ist keine bekannte Entity (erlaubt: {JsonHelpers.PyListRepr(known(entityKey).OrderBy(Function(s) s))})")
+                            $"ist keine bekannte Entity (erlaubt: {JsonHelpers.PyListRepr(known(entityKey).OrderBy(Function(s) s))})", c))
                     End If
                 Next
             Next
@@ -72,12 +89,12 @@ Public Module Validation
             If constraintType = "no_overlap" Then
                 Dim resource = JsonHelpers.GetString(c, "resource")
                 If Not ResourceEntityKey.ContainsKey(resource) Then
-                    errors.Add($"constraints[{i}]: no_overlap.resource={JsonHelpers.PyRepr(resource)} ungueltig (erlaubt: teacher/class/room)")
+                    errors.Add(WithReason($"constraints[{i}]: no_overlap.resource={JsonHelpers.PyRepr(resource)} ungueltig (erlaubt: teacher/class/room)", c))
                 Else
                     Dim entityKey = ResourceEntityKey(resource)
                     Dim entityVal = JsonHelpers.GetString(c, "entity")
                     If Not known(entityKey).Contains(entityVal) Then
-                        errors.Add($"constraints[{i}]: no_overlap.entity='{entityVal}' nicht in {entityKey}")
+                        errors.Add(WithReason($"constraints[{i}]: no_overlap.entity='{entityVal}' nicht in {entityKey}", c))
                     End If
                 End If
             End If
@@ -85,12 +102,29 @@ Public Module Validation
             If constraintType = "forbidden_slot" Then
                 Dim scope = JsonHelpers.GetString(c, "scope")
                 If Not ResourceEntityKey.ContainsKey(scope) Then
-                    errors.Add($"constraints[{i}]: forbidden_slot.scope={JsonHelpers.PyRepr(scope)} ungueltig (erlaubt: teacher/class/room)")
+                    errors.Add(WithReason($"constraints[{i}]: forbidden_slot.scope={JsonHelpers.PyRepr(scope)} ungueltig (erlaubt: teacher/class/room)", c))
                 Else
                     Dim entityKey = ResourceEntityKey(scope)
                     Dim entityVal = JsonHelpers.GetString(c, "entity")
                     If Not known(entityKey).Contains(entityVal) Then
-                        errors.Add($"constraints[{i}]: forbidden_slot.entity='{entityVal}' nicht in {entityKey}")
+                        errors.Add(WithReason($"constraints[{i}]: forbidden_slot.entity='{entityVal}' nicht in {entityKey}", c))
+                    End If
+                End If
+            End If
+
+            ' Phase 2.5: Muss/Kann priority validation.
+            If c.ContainsKey("priority") AndAlso c("priority") IsNot Nothing Then
+                Dim priority = JsonHelpers.GetString(c, "priority")
+                If priority <> JsonHelpers.PriorityMust AndAlso priority <> JsonHelpers.PriorityShould Then
+                    errors.Add(WithReason($"constraints[{i}] (type={constraintType}): priority='{priority}' ungueltig (erlaubt: must/should)", c))
+                ElseIf priority = JsonHelpers.PriorityShould Then
+                    If Not KannCapableTypes.Contains(constraintType) Then
+                        errors.Add(WithReason($"constraints[{i}] (type={constraintType}): priority='should' ist fuer diesen Constraint-Typ nicht erlaubt (immer Muss)", c))
+                    ElseIf constraintType = "weekly_hours" Then
+                        Dim maxPerDay = JsonHelpers.GetInt(c, "max_per_day")
+                        If Not maxPerDay.HasValue OrElse maxPerDay.Value = 0 Then
+                            errors.Add(WithReason($"constraints[{i}] (type=weekly_hours): priority='should' ohne gesetztes max_per_day ergibt nichts, das gelockert werden koennte", c))
+                        End If
                     End If
                 End If
             End If

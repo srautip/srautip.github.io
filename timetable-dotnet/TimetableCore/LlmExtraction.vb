@@ -210,6 +210,10 @@ Public Module LlmExtraction
                 props("subject") = StringSchema()
                 props("hours_per_week") = IntegerSchema()
                 props("max_per_day") = IntegerSchema()
+                ' Phase 2.5: optional, purely additive - same "reason"
+                ' provenance field 7 of the 9 types already have (see
+                ' Solver.vb/Verifier.vb's Kann-violation traceability).
+                props("reason") = StringSchema()
                 Return ObjSchema(props, {"type", "class", "subject", "hours_per_week"})
 
             Case "room_requirement"
@@ -262,6 +266,7 @@ Public Module LlmExtraction
                 props("teacher") = StringSchema()
                 props("class") = StringSchema()
                 props("subject") = StringSchema()
+                props("reason") = StringSchema()
                 Return ObjSchema(props, {"type", "teacher", "class", "subject"})
 
             Case "period_exception"
