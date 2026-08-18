@@ -98,4 +98,29 @@ Public Class RealSchoolFixtureTests
         Assert.AreEqual(0, violations.Count, String.Join(vbLf, violations))
     End Sub
 
+    ''' <summary>Phase 2.11h: LLM-free sanity check for
+    ''' KursstufePromptFixture.vb's own ground truth (same "catch an
+    ''' internally contradictory fixture cheaply, before any live Ollama
+    ''' time is spent on it" rationale as MussKannFixtureTests.vb) - this
+    ''' is the SMALL, prompt-carrying fixture for Phase 2.11g's "kurswahl"
+    ''' LLM extraction, not KursstufeFixture.vb's large Solve-only
+    ''' benchmark above.</summary>
+    <TestMethod>
+    Public Sub KursstufePromptEntitiesAreValid()
+        Dim data = KursstufePromptFixture.BuildKursstufePromptScenario()
+        Assert.AreEqual(0, Validation.ValidateKursstufeEntities(data).Count)
+    End Sub
+
+    <TestMethod>
+    Public Sub KursstufePromptSolvesAndVerifiesClean()
+        Dim data = KursstufePromptFixture.BuildKursstufePromptScenario()
+        Dim r = Solver.SolveKursstufe(data, timeLimitS:=30)
+        Assert.IsTrue(r.RaumzuordnungStatus = CpSolverStatus.Optimal OrElse r.RaumzuordnungStatus = CpSolverStatus.Feasible,
+            $"Kursblockung={r.KursblockungStatus}, Schienenraster={r.SchienenrasterStatus}, Raumzuordnung={r.RaumzuordnungStatus}")
+        Assert.IsNotNull(r.Schedule)
+
+        Dim kb = Kursblockung.SolveKursblockung(data, timeLimitS:=30)
+        Assert.AreEqual(0, Verifier.VerifyKursblockung(data, kb.Assignment).Count)
+    End Sub
+
 End Class

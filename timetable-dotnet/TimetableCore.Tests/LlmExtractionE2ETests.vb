@@ -371,30 +371,8 @@ Public Class LlmExtractionE2ETests
         Dim avail = Await LlmExtraction.IsOllamaAvailable()
         If Not avail.Available Then Assert.Inconclusive(avail.Reason)
 
-        Dim ent As New JsonObject From {
-            {"classes", New JsonArray()},
-            {"teachers", New JsonArray({"Frau Berger", "Herr Klein", "Frau Wolf", "Herr Otto", "Frau Fell"})},
-            {"subjects", New JsonArray({"Deutsch", "Mathematik", "Biologie", "Englisch", "Chemie", "Erdkunde"})},
-            {"rooms", New JsonArray()},
-            {"timeslots", New JsonObject From {
-                {"days", New JsonArray({"Mo", "Di", "Mi", "Do", "Fr"})}, {"periods_per_day", 8}
-            }},
-            {"kurse", New JsonArray({
-                CType(New JsonObject From {
-                    {"id", "D-LK1"}, {"subject", "Deutsch"}, {"teacher", "Frau Berger"}, {"kursart", "LK"}, {"hours_per_week", 5}
-                }, JsonNode),
-                New JsonObject From {{"id", "MA-LK1"}, {"subject", "Mathematik"}, {"teacher", "Herr Klein"}, {"kursart", "LK"}, {"hours_per_week", 5}},
-                New JsonObject From {{"id", "BIO-LK1"}, {"subject", "Biologie"}, {"teacher", "Frau Wolf"}, {"kursart", "LK"}, {"hours_per_week", 5}},
-                New JsonObject From {{"id", "EN-GK1"}, {"subject", "Englisch"}, {"teacher", "Herr Otto"}, {"kursart", "GK"}, {"hours_per_week", 3}},
-                New JsonObject From {{"id", "CH-GK1"}, {"subject", "Chemie"}, {"teacher", "Frau Fell"}, {"kursart", "GK"}, {"hours_per_week", 3}},
-                New JsonObject From {{"id", "GEO-GK1"}, {"subject", "Erdkunde"}, {"teacher", "Frau Fell"}, {"kursart", "GK"}, {"hours_per_week", 2}}
-            })}
-        }
-        Dim prompt =
-            "Wahlprofil A (24 Schueler) waehlt als Leistungskurse Deutsch, " &
-            "Mathematik und Biologie sowie als Grundkurse Englisch und Erdkunde." & vbLf &
-            "Wahlprofil B (18 Schueler) waehlt als Leistungskurse Deutsch, " &
-            "Mathematik und Biologie sowie als Grundkurse Chemie und Englisch." & vbLf
+        Dim ent = JsonHelpers.Entities(KursstufePromptFixture.BuildKursstufePromptScenario())
+        Dim prompt = KursstufePromptFixture.Prompt
 
         Dim result = Await LlmExtraction.ExtractAllConstraints(ent, prompt, types:=LlmExtraction.KursstufeTypes)
 
@@ -406,6 +384,11 @@ Public Class LlmExtractionE2ETests
             Console.WriteLine(
                 $"  wahlprofil_id={JsonHelpers.GetString(c, "wahlprofil_id")} student_count={JsonHelpers.GetInt(c, "student_count")} " &
                 $"kurse={JsonHelpers.PyListRepr(kurse)} erfunden={JsonHelpers.PyListRepr(invented)}")
+        Next
+        Dim scores = KursstufePromptFixture.CompletenessReport(result.Constraints)
+        Console.WriteLine("  Scores (informativ, kein harter Schwellenwert - siehe Doku-Kommentar):")
+        For Each kvp In scores
+            Console.WriteLine($"    {kvp.Key,-24} {kvp.Value:P0}")
         Next
 
         Assert.IsTrue(result.Constraints.Count > 0, "Kein einziges kurswahl-Objekt extrahiert.")
