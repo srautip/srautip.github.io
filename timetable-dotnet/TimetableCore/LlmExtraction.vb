@@ -113,13 +113,19 @@ Public Module LlmExtraction
         {"period_exception",
             "Extrahiere Regeln der Form 'Stunde X findet hoechstens an einem " &
             "Tag pro Woche statt, idealerweise Tag Y' bzw. 'Stunde X nur an " &
-            "bestimmten Tagen'. Erzeuge EIN Objekt mit der Stundennummer und " &
-            "der Liste der ERLAUBTEN Tage (NICHT der gesperrten!). Beispiel: " &
+            "bestimmten Tagen' bzw. 'Stunde X findet nur montags/dienstags/... " &
+            "statt' (auch mit nur EINEM erlaubten Tag). Erzeuge PRO SOLCHER " &
+            "REGEL ein Objekt mit der Stundennummer und der Liste der " &
+            "ERLAUBTEN Tage (NICHT der gesperrten!). Beispiel: " &
             "'7. Stunde nur dienstags, idealerweise' -> " &
-            "{""period"": 7, ""allowed_days"": [""Di""]}. Ignoriere normale " &
-            "Sperrzeiten, die direkt einen gesperrten Tag nennen (z.B. " &
-            "'freitags 6. Stunde frei') - dafuer gibt es einen anderen " &
-            "Constraint-Typ."}
+            "{""period"": 7, ""allowed_days"": [""Di""]}. WICHTIG: enthaelt der " &
+            "Text MEHRERE UNABHAENGIGE Regeln dieser Form fuer VERSCHIEDENE " &
+            "Stundennummern (z.B. eine Regel fuer die 6. Stunde UND eine " &
+            "andere fuer die 8. Stunde), erzeuge fuer JEDE ein eigenes Objekt - " &
+            "das Ergebnis ist dann eine Liste mit MEHREREN Objekten, nicht nur " &
+            "einem. Ignoriere normale Sperrzeiten, die direkt einen gesperrten " &
+            "Tag nennen (z.B. 'freitags 6. Stunde frei') - dafuer gibt es " &
+            "einen anderen Constraint-Typ."}
     }
 
     ' --- JSON-Schema-Bausteine (mirrors _obj/_ITEM_SCHEMAS) ---
