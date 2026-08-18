@@ -121,4 +121,48 @@ Public Class GsgCompleteScenarioSolveTopTests
         Console.WriteLine(vbLf & Formatting.FormatGrid("WP3 (SolveTop)", wpGrids("WP3"), kDays, kPeriods, AddressOf WahlprofilText))
     End Sub
 
+    ''' <summary>Phase 2.12: the direct before/after proof for the staged-
+    ''' hint warm-start (see docs/phase2-12-staged-hints.md). Restricted to
+    ''' the Sek I part only (the piece that exhibited the original problem)
+    ''' at numWorkers:=1 - the project's normal, deterministic setting,
+    ''' NOT the numWorkers:=4 portfolio-search workaround
+    ''' CompleteGsgScenarioSolveTopBenchmark above needed. A first attempt
+    ''' at numWorkers:=1 (before Phase 2.12) found ZERO feasible solutions
+    ''' for this exact 30-class/75-teacher scenario even after 30 minutes;
+    ''' useStagedHints:=True (the SolveTop default since Phase 2.12) warm-
+    ''' starts the hard full-objective search with a complete Lesson
+    ''' assignment from the already-proven-fast Kann-only Stage 1 solve
+    ''' (~93s for this exact scenario per the Phase 2.10 report, hence
+    ''' stage1TimeLimitS:=150 as a generous cap on that stage alone). This
+    ''' test reports whatever it finds within budget - Feasible or Optimal,
+    ''' any solutions or none - as the honest before/after data point, not
+    ''' a hard pass/fail assertion on elapsed time (matches this project's
+    ''' "report reality" discipline for one-off manual benchmarks).</summary>
+    <TestMethod>
+    Public Sub SekIStagedHintsNumWorkers1Benchmark()
+        If Environment.GetEnvironmentVariable("RUN_SLOW_BENCHMARKS") <> "1" Then
+            Assert.Inconclusive(
+                "Manueller SolveTop-Benchmark uebersprungen (kann mehrere Minuten dauern, " &
+                "kein fester Bestandteil der Standard-Suite). Set RUN_SLOW_BENCHMARKS=1 to run it.")
+        End If
+
+        Dim sekI = GymnasiumSekIFixture.BuildGymnasiumSekIScenario()
+        Dim sw = Stopwatch.StartNew()
+        Dim result = Solver.SolveTop(sekI, maxSolutions:=1, totalTimeLimitS:=1200, perSolveTimeLimitS:=1200,
+                                      numWorkers:=1, useStagedHints:=True, stage1TimeLimitS:=150)
+        sw.Stop()
+        Console.WriteLine(
+            $"Sek I SolveTop (numWorkers:=1, useStagedHints:=True): {sw.Elapsed.TotalSeconds:F1}s, " &
+            $"StopReason={result.StopReason}, Solutions.Count={result.Solutions.Count}")
+        If result.Solutions.Count > 0 Then
+            Dim best = result.Solutions(0)
+            Console.WriteLine(
+                $"Quality.Total={best.Quality.Total}, ClassGapCount={best.Quality.ClassGapCount}, " &
+                $"TeacherGapCount={best.Quality.TeacherGapCount}, EdgePeriodCount={best.Quality.EdgePeriodCount}, " &
+                $"AfternoonDayCount={best.Quality.AfternoonDayCount}, ClassLoadVariance={best.Quality.ClassLoadVariance:F2}, " &
+                $"TeacherLoadVariance={best.Quality.TeacherLoadVariance:F2}")
+            Assert.AreEqual(0, Verifier.VerifySchedule(sekI, best.Schedule).Count)
+        End If
+    End Sub
+
 End Class

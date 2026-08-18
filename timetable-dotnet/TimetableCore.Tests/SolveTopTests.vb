@@ -243,4 +243,41 @@ Public Class SolveTopTests
         Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Solutions(0).Schedule).Count)
     End Sub
 
+    ''' <summary>Phase 2.12: proves the staged-hint warm-start (default
+    ''' useStagedHints:=True) still returns valid, verifier-clean solutions
+    ''' on both branches of Stage 1's conditional - with a "should"
+    ''' constraint present (Stage 1 sets Minimize(Kann) before handing a
+    ''' hint to Stage 2) and without one (Stage 1 is a pure feasibility
+    ''' solve, no Minimize call at all, per KannOnlyObjectiveExpr's guard).
+    ''' Hints only bias search order, never the feasible-solution set - see
+    ''' SolveTop's own doc comment - so this is a correctness/no-regression
+    ''' check, not a speed claim (that's 2.12e/2.12f's job).</summary>
+    <TestMethod>
+    Public Sub StagedHintSolveTopStillReturnsValidSolutions()
+        ' Kann-branch: a "should" forbidden_slot -> Stage 1 solves Kann-only first.
+        Dim withKann = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di"}, 1), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}, {"priority", "should"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim r1 = Solver.SolveTop(withKann, maxSolutions:=5, totalTimeLimitS:=30, perSolveTimeLimitS:=10, useStagedHints:=True)
+        Assert.IsTrue(r1.Solutions.Count > 0)
+        For Each s In r1.Solutions
+            Assert.AreEqual(0, Verifier.VerifySchedule(withKann, s.Schedule).Count)
+        Next
+
+        ' No-Kann branch: no "should" constraints -> KannVars is empty, Stage
+        ' 1 is a pure feasibility solve (no Minimize call, per the guard in
+        ' KannOnlyObjectiveExpr's caller).
+        Dim noKann = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di", "Mi"}, 1), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim r2 = Solver.SolveTop(noKann, maxSolutions:=5, totalTimeLimitS:=30, perSolveTimeLimitS:=10, useStagedHints:=True)
+        Assert.IsTrue(r2.Solutions.Count > 0)
+        For Each s In r2.Solutions
+            Assert.AreEqual(0, Verifier.VerifySchedule(noKann, s.Schedule).Count)
+        Next
+    End Sub
+
 End Class

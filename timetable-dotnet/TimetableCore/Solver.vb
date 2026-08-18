@@ -301,13 +301,47 @@ Public Module Solver
         }
     End Function
 
+    ''' <summary>Phase 2.12: the exact one-line Kann-only objective BuildModel
+    ''' already sets - factored out so SolveTop's Stage 1 warm-start solve
+    ''' can reuse the identical, already-proven-fast objective without
+    ''' duplicating BuildModel's logic. BuildModel's own behavior is
+    ''' unchanged (same computation, same object identity of the resulting
+    ''' LinearExpr construction).</summary>
+    Private Function KannOnlyObjectiveExpr(kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String))) As LinearExpr
+        Return LinearExpr.Sum(kannVars.Values.Select(Function(kv) kv.Var))
+    End Function
+
     Public Function BuildModel(data As JsonObject) As BuiltModel
         Dim built = BuildCoreModel(data)
         If built.KannVars.Count > 0 Then
-            built.Model.Minimize(LinearExpr.Sum(built.KannVars.Values.Select(Function(kv) kv.Var)))
+            built.Model.Minimize(KannOnlyObjectiveExpr(built.KannVars))
         End If
         Return built
     End Function
+
+    ''' <summary>Phase 2.12: replaces any previously-set hints on `model`
+    ''' with `solver`'s just-found Boolean values for every `lesson` var -
+    ''' shared by the Stage 1 -&gt; Stage 2 warm-start handoff and by
+    ''' SolveTop's own iteration-to-iteration carryover. Deliberately
+    ''' Lesson-only (not the auxiliary occupied/hasAny/gapVar/rangeVar vars
+    ''' SolveTopObjective adds) - same "Lesson defines the schedule" scoping
+    ''' BlockSolution already uses; those auxiliary vars are pure reified
+    ''' functions of Lesson, and a live smoke test against the installed
+    ''' OrTools build (Phase 2.12a) confirmed CP-SAT's search log explicitly
+    ''' reports such a partial hint as "complete and feasible" - i.e. it
+    ''' derives the rest via propagation rather than requiring full
+    ''' coverage. ClearHints() first: the live smoke test confirmed this
+    ''' sequence (ClearHints then AddHint again) raises no exception and the
+    ''' model keeps solving correctly, the expected way to replace a
+    ''' previously-set hint between successive Solve() calls on the same
+    ''' mutated CpModel (same "one CpModel, many Solve() calls" pattern
+    ''' BlockSolution already established).</summary>
+    Private Sub ApplyLessonHints(model As CpModel, lesson As Dictionary(Of LessonKey, BoolVar), solver As CpSolver)
+        model.ClearHints()
+        For Each kvp In lesson
+            model.AddHint(kvp.Value, solver.BooleanValue(kvp.Value))
+        Next
+    End Sub
 
     Private Sub AddBlockConstraint(model As CpModel, lesson As Dictionary(Of LessonKey, BoolVar),
                                     session As Session, days As List(Of String), periods As List(Of Integer),
@@ -630,17 +664,57 @@ Public Module Solver
     ''' optimality within the shrinking remaining search space; this is
     ''' still a usable candidate, and correctness of the final ranking
     ''' never depends on iteration order since Solutions is always
-    ''' re-sorted by Quality.Total before returning.</summary>
+    ''' re-sorted by Quality.Total before returning.
+    '''
+    ''' Phase 2.12: `useStagedHints` (default True) fixes a real, observed
+    ''' cold-start weakness - the full quality objective's many auxiliary
+    ''' reified variables (see SolveTopObjective) make the search itself,
+    ''' not just optimality-proving, dramatically harder than the plain
+    ''' Kann-only model at large scale (a 30-class/75-teacher scenario found
+    ''' ZERO feasible solutions in 30 minutes at numWorkers:=1 without this,
+    ''' despite the Kann-only model solving the same scenario's constraints
+    ''' in ~93s). When enabled, a warm-start Stage 1 solve first finds a
+    ''' Kann-only-optimal complete schedule (reusing KannOnlyObjectiveExpr,
+    ''' the exact objective BuildModel already uses) within `stage1TimeLimitS`,
+    ''' then hints Stage 2's full-objective solve with that complete Lesson
+    ''' assignment via ApplyLessonHints - CP-SAT starts from a known-valid
+    ''' point instead of searching for one from nothing (a live smoke test,
+    ''' Phase 2.12a, confirmed CP-SAT completes such a partial hint - only
+    ''' Lesson vars, not the auxiliary ones - via propagation rather than
+    ''' requiring full coverage). The same helper then re-hints each
+    ''' subsequent iteration with its own just-found (now no-good-blocked,
+    ''' but still a useful "near miss" search bias) solution, instead of
+    ''' every iteration after the first starting cold. Hints only bias
+    ''' search order; they never change the feasible-solution set or any
+    ''' correctness guarantee.</summary>
     Public Function SolveTop(data As JsonObject,
                               Optional maxSolutions As Integer = 10,
                               Optional totalTimeLimitS As Double = 120.0,
                               Optional perSolveTimeLimitS As Double = 30.0,
                               Optional seed As Integer = 42,
-                              Optional numWorkers As Integer = 1) As MultiSolveResult
+                              Optional numWorkers As Integer = 1,
+                              Optional stage1TimeLimitS As Double = 60.0,
+                              Optional useStagedHints As Boolean = True) As MultiSolveResult
         Dim built = BuildCoreModel(data)
+        Dim sw = Stopwatch.StartNew()
+
+        If useStagedHints Then
+            Dim stage1Limit = Math.Min(stage1TimeLimitS, Math.Max(totalTimeLimitS - sw.Elapsed.TotalSeconds, 0.0))
+            If stage1Limit > 0 Then
+                If built.KannVars.Count > 0 Then
+                    built.Model.Minimize(KannOnlyObjectiveExpr(built.KannVars))
+                End If
+                Dim stage1Solver As New CpSolver()
+                stage1Solver.StringParameters = $"max_time_in_seconds:{stage1Limit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
+                Dim stage1Status = stage1Solver.Solve(built.Model)
+                If stage1Status = CpSolverStatus.Optimal OrElse stage1Status = CpSolverStatus.Feasible Then
+                    ApplyLessonHints(built.Model, built.Lesson, stage1Solver)
+                End If
+            End If
+        End If
+
         SolveTopObjective.ApplyQualityObjective(built, data)
         Dim solutions As New List(Of ScoredSolution)
-        Dim sw = Stopwatch.StartNew()
         Dim iterations = 0
         Dim stopReason As MultiSolveStopReason
 
@@ -681,6 +755,7 @@ Public Module Solver
             solutions.Add(New ScoredSolution With {.Schedule = schedule, .KannConstraintFlags = kannFlags, .Quality = quality})
 
             BlockSolution(built.Model, built.Lesson, solver)
+            If useStagedHints Then ApplyLessonHints(built.Model, built.Lesson, solver)
         Loop
 
         Return New MultiSolveResult With {
