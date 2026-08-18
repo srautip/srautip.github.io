@@ -137,4 +137,41 @@ Public Module CompletenessScoring
         Return RecallFraction(expected, Function(x) actual.Contains(x))
     End Function
 
+    ''' <summary>Phase 2.6: identifying key for a "priority"-carrying
+    ''' constraint instance, one shape per Kann-capable type - reuses
+    ''' exactly the fields the corresponding Score* function above already
+    ''' keys on, so a caller's expected-priorities list lines up with the
+    ''' same identity the recall scoring uses.</summary>
+    Private Function PriorityKey(constraintType As String, c As JsonObject) As Object
+        Select Case constraintType
+            Case "teacher_availability" : Return JsonHelpers.GetString(c, "teacher")
+            Case "room_requirement" : Return JsonHelpers.GetString(c, "subject")
+            Case "consecutive_required", "weekly_hours" : Return (JsonHelpers.GetString(c, "class"), JsonHelpers.GetString(c, "subject"))
+            Case "forbidden_slot" : Return (JsonHelpers.GetString(c, "scope"), JsonHelpers.GetString(c, "entity"),
+                                             JsonHelpers.GetString(c, "day"), JsonHelpers.GetInt(c, "period"))
+            Case Else : Return Nothing
+        End Select
+    End Function
+
+    ''' <summary>Phase 2.6: separate from every Score* function above on
+    ''' purpose (per the plan's decision) - this measures ONLY whether the
+    ''' "priority" the LLM set matches expectation, not whether the
+    ''' constraint's substantive fields are correct (that's what the
+    ''' existing per-category recall already checks). A constraint instance
+    ''' the ground truth expected but that wasn't extracted at all counts as
+    ''' a miss here too - there is nothing to check the priority of - rather
+    ''' than being scored separately, keeping this a pure additive extension
+    ''' of the existing RecallFraction pattern.</summary>
+    Public Function ScorePriorityAccuracy(expected As List(Of (ConstraintType As String, Key As Object, ExpectedPriority As String)),
+                                           extracted As List(Of JsonObject)) As Double
+        Dim actual As New Dictionary(Of (String, Object), String)
+        For Each c In extracted
+            Dim t = JsonHelpers.GetString(c, "type")
+            Dim key = PriorityKey(t, c)
+            If key IsNot Nothing Then actual((t, key)) = JsonHelpers.GetPriority(c)
+        Next
+        Return RecallFraction(expected,
+                               Function(e) actual.ContainsKey((e.ConstraintType, e.Key)) AndAlso actual((e.ConstraintType, e.Key)) = e.ExpectedPriority)
+    End Function
+
 End Module

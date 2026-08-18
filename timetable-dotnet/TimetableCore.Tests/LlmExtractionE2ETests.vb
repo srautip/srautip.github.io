@@ -277,4 +277,16 @@ Public Class LlmExtractionE2ETests
                               AddressOf EdgeCaseFixture.CompletenessReport, timeLimitS:=20)
     End Function
 
+    ''' <summary>Phase 2.6: does Qwen correctly infer "priority" (must vs.
+    ''' should) from Muss/Kann phrasing? See MussKannFixture.vb for the 20
+    ''' test patterns (4 per Kann-capable type). "priority_accuracy" is one
+    ''' more key in the scores dictionary CompletenessReport returns, so it
+    ''' flows into RunScenarioE2E's existing overall >= 50% threshold
+    ''' unchanged.</summary>
+    <TestMethod>
+    Public Async Function LlmExtractionE2EMussKann() As Task
+        Await RunScenarioE2E(JsonHelpers.Entities(MussKannFixture.BuildMussKannScenario()), MussKannFixture.Prompt,
+                              AddressOf MussKannFixture.CompletenessReport, timeLimitS:=20)
+    End Function
+
 End Class

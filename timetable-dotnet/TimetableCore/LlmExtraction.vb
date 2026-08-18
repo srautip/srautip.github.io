@@ -58,14 +58,36 @@ Public Module LlmExtraction
             "an denen die Lehrkraft unterrichten kann) oder unavailable_periods " &
             "gesetzt haben - niemals nur Typ und Lehrername ohne diese Angabe. " &
             "Ein Objekt pro betroffener Lehrkraft, keine Duplikate. Keine " &
-            "Lehrkraft ohne im Text genannte Einschraenkung erwaehnen."},
+            "Lehrkraft ohne im Text genannte Einschraenkung erwaehnen. Setze " &
+            "zusaetzlich priority: 'should', wenn die Verfuegbarkeit " &
+            "ausdruecklich als Wunsch statt als feste Vorgabe formuliert ist " &
+            "(z.B. 'ist wenn moeglich montags verfuegbar', 'idealerweise nur " &
+            "dienstags und donnerstags im Haus', 'bevorzugt am Vormittag', " &
+            "'nach Moeglichkeit'). Enthaelt der Satz KEIN solches Wunsch-Wort " &
+            "oder ein verstaerkendes Wort wie 'muss', 'unbedingt', 'zwingend', " &
+            "setze priority: 'must'. Im Zweifel IMMER 'must' waehlen, niemals " &
+            "'should' raten."},
         {"weekly_hours",
             "Extrahiere fuer JEDE im Text genannte Klasse+Fach-Kombination die " &
-            "Wochenstunden (und, falls genannt, das Tagesmaximum). Erfinde keine " &
-            "Werte fuer nicht genannte Kombinationen."},
+            "Wochenstunden (hours_per_week) UND, falls genannt, das " &
+            "Tagesmaximum (max_per_day) - IMMER BEIDE Werte ausgeben, wenn " &
+            "beide im Text stehen, das Tagesmaximum niemals weglassen. " &
+            "Erfinde keine Werte fuer nicht genannte Kombinationen. " &
+            "priority: 'should' NUR, wenn das genannte Tagesmaximum selbst " &
+            "als Wunsch formuliert ist (z.B. 'wenn moeglich hoechstens 2 pro " &
+            "Tag', 'nach Moeglichkeit hoechstens 1 pro Tag'). In JEDEM " &
+            "anderen Fall (kein Tagesmaximum genannt, oder Tagesmaximum ohne " &
+            "Wunsch-Wort wie z.B. 'hoechstens 2 Stunden pro Tag', oder ein " &
+            "Wort wie 'muss') ist priority: 'must'. Die Wochenstundenzahl " &
+            "selbst ist NIE eine Kann-Angabe."},
         {"room_requirement",
             "Extrahiere Faecher, die laut Text nur in bestimmten Raeumen " &
-            "stattfinden duerfen."},
+            "stattfinden duerfen. Setze zusaetzlich priority: 'should' NUR, " &
+            "wenn die Raumbindung ausdruecklich als Wunsch formuliert ist " &
+            "(z.B. 'wenn moeglich im NaWi-Raum', 'bevorzugt in der " &
+            "Turnhalle'). Formulierungen ohne solches Wort (z.B. 'findet " &
+            "immer im NaWi-Raum statt', 'muss im Kunstraum stattfinden') sind " &
+            "priority: 'must'."},
         {"no_overlap",
             "Extrahiere die generelle Ueberschneidungsfreiheit-Regel. Falls der " &
             "Text eine solche allgemeine Regel nennt, erzeuge JE EIN Objekt fuer " &
@@ -82,7 +104,16 @@ Public Module LlmExtraction
             "Sperrzeit schulweit fuer alle Klassen gilt, erzeuge JE EIN Objekt " &
             "PRO Klasse aus entities.classes. Ignoriere Ausnahme-Formulierungen " &
             "der Form 'nur an Tag X erlaubt' / 'hoechstens an einem Tag' - " &
-            "dafuer gibt es einen anderen, spezialisierten Constraint-Typ."},
+            "dafuer gibt es einen anderen, spezialisierten Constraint-Typ. " &
+            "WICHTIG: enthaelt der Text MEHRERE unabhaengige Sperrzeit-Regeln " &
+            "dieser Art (auch wenn sie sich aehneln, z.B. mehrere Regeln fuer " &
+            "dieselbe oder verschiedene Stundennummern an verschiedenen " &
+            "Tagen), extrahiere JEDE davon separat - keine auslassen. Setze " &
+            "zusaetzlich priority: 'should' NUR, wenn die Sperrzeit selbst " &
+            "als Wunsch formuliert ist (z.B. 'soll wenn moeglich frei " &
+            "bleiben'). Eine direkt und ohne Einschraenkung benannte Sperrzeit " &
+            "(z.B. 'freitags 6. Stunde frei', 'muss zwingend frei bleiben') " &
+            "ist IMMER priority: 'must'."},
         {"consecutive_required",
             "Extrahiere Faecher, die als zusammenhaengender Block (Doppelstunde " &
             "o.ae.) unterrichtet werden muessen - NUR wenn der Text das EXPLIZIT " &
@@ -97,7 +128,13 @@ Public Module LlmExtraction
             "(z.B. 'Herr X unterrichtet Klasse A und B'), MUESSEN ALLE genannten " &
             "Klassen je ein eigenes Objekt bekommen, nicht nur eine davon. " &
             "Pruefe am Ende: fehlt eine der genannten Klassen fuer ein " &
-            "Block-Fach, ergaenze sie."},
+            "Block-Fach, ergaenze sie. Setze zusaetzlich priority: 'should' " &
+            "NUR, wenn die Block-Pflicht selbst als Wunsch formuliert ist " &
+            "(z.B. 'wenn moeglich als Doppelstunde', 'nach Moeglichkeit als " &
+            "Doppelstunde, ansonsten auch einzeln' - das Fach wird TROTZDEM " &
+            "extrahiert, auch wenn der Text eine Alternative erlaubt, NICHT " &
+            "auslassen). Woerter wie 'muss', 'unbedingt' beim Block sowie das " &
+            "Fehlen jeglichen Wunsch-Worts bedeuten priority: 'must'."},
         {"teacher_subject_assignment",
             "Extrahiere, welche Lehrkraft welches Fach in welcher Klasse " &
             "unterrichtet. Ein Objekt PRO genannter Klasse, auch wenn eine " &
@@ -195,6 +232,7 @@ Public Module LlmExtraction
                 periodItemProps("period") = IntegerSchema()
                 props("unavailable_periods") = ArraySchema(ObjSchema(periodItemProps, {"day", "period"}))
                 props("reason") = StringSchema()
+                props("priority") = EnumSchema({JsonHelpers.PriorityMust, JsonHelpers.PriorityShould})
                 ' available_days is required (not just type/teacher) to force
                 ' the model to actually populate the constraint content -
                 ' Phase 2 found it would otherwise sometimes emit a bare
@@ -214,6 +252,9 @@ Public Module LlmExtraction
                 ' provenance field 7 of the 9 types already have (see
                 ' Solver.vb/Verifier.vb's Kann-violation traceability).
                 props("reason") = StringSchema()
+                ' Phase 2.6: priority governs ONLY max_per_day (see the
+                ' Instructions text above) - hours_per_week is never soft.
+                props("priority") = EnumSchema({JsonHelpers.PriorityMust, JsonHelpers.PriorityShould})
                 Return ObjSchema(props, {"type", "class", "subject", "hours_per_week"})
 
             Case "room_requirement"
@@ -222,6 +263,7 @@ Public Module LlmExtraction
                 props("subject") = StringSchema()
                 props("allowed_rooms") = ArraySchema(StringSchema())
                 props("reason") = StringSchema()
+                props("priority") = EnumSchema({JsonHelpers.PriorityMust, JsonHelpers.PriorityShould})
                 Return ObjSchema(props, {"type", "subject", "allowed_rooms"})
 
             Case "no_overlap"
@@ -249,6 +291,7 @@ Public Module LlmExtraction
                 props("day") = StringSchema()
                 props("period") = IntegerSchema()
                 props("reason") = StringSchema()
+                props("priority") = EnumSchema({JsonHelpers.PriorityMust, JsonHelpers.PriorityShould})
                 Return ObjSchema(props, {"type", "scope", "entity", "day", "period"})
 
             Case "consecutive_required"
@@ -258,6 +301,7 @@ Public Module LlmExtraction
                 props("subject") = StringSchema()
                 props("block_length") = IntegerSchema()
                 props("reason") = StringSchema()
+                props("priority") = EnumSchema({JsonHelpers.PriorityMust, JsonHelpers.PriorityShould})
                 Return ObjSchema(props, {"type", "class", "subject", "block_length"})
 
             Case "teacher_subject_assignment"
