@@ -1,0 +1,130 @@
+' Phase 2.8: post-hoc quality scoring for candidate schedules returned by
+' Solver.SolveTop. Deliberately separate from Verifier.vb - Verifier detects
+' violations of explicit constraints (a pass/fail concern), while this
+' module ranks otherwise-valid schedules against soft aesthetic criteria
+' that are never fed into the CP-SAT model itself. Lower Total = better.
+Imports System.Text.Json.Nodes
+
+''' <summary>One schedule's quality breakdown - every sub-score is exposed
+''' individually (not just the weighted Total) so a caller can show why one
+''' candidate outranks another, matching this codebase's general
+''' traceability preference (see KannViolationDetail/KannConstraintFlag).</summary>
+Public NotInheritable Class QualityScore
+    Public Property KannViolationCount As Integer
+    Public Property ClassGapCount As Integer
+    Public Property TeacherGapCount As Integer
+    Public Property EdgePeriodCount As Integer
+    Public Property ClassLoadVariance As Double
+    Public Property TeacherLoadVariance As Double
+    Public Property Total As Double
+End Class
+
+Public Module ScheduleQuality
+
+    ' Kann-Verstoesse must dominate the ranking - chosen large enough that
+    ' even a pathologically bad secondary-criteria score (bounded by total
+    ' lesson count, which stays orders of magnitude below this constant for
+    ' realistic school sizes) can never outweigh a single additional Kann
+    ' violation. Static, documented heuristic - not a scenario-derived proof.
+    Public Const WeightKann As Double = 100000.0
+
+    ' Springstunden (mid-day gaps) are the most disruptive secondary factor
+    ' in practice (unusable dead time for classes/teachers alike), so they
+    ' get the highest secondary weight.
+    Public Const WeightClassGaps As Double = 10.0
+    Public Const WeightTeacherGaps As Double = 10.0
+
+    ' Randstunden-Vermeidung: mildly disruptive, weighted below gaps.
+    Public Const WeightEdgePeriod As Double = 5.0
+
+    ' Even daily load: a nice-to-have smoothing preference, weakest weight.
+    Public Const WeightClassLoadVariance As Double = 3.0
+    Public Const WeightTeacherLoadVariance As Double = 3.0
+
+    ''' <summary>Periods &gt;= this count as "Nachmittag" for the
+    ''' Randstunden metric - matches the convention already used in this
+    ''' project's own fixture prompts (Gymnasium/MussKann explicitly call
+    ''' period 7 "Nachmittagsunterricht"). Period 1 always counts too.</summary>
+    Public Const AfternoonThresholdPeriod As Integer = 7
+
+    ''' <summary>Scores one candidate schedule. `kannViolationCount` is
+    ''' supplied by the caller rather than computed here (SolveTop sources
+    ''' it from Verifier.VerifyScheduleDetailed, independently re-derived
+    ''' from the schedule rather than trusted off the solver's own
+    ''' KannConstraintFlags - same "don't trust the solver" philosophy as
+    ''' Verifier.vb's header comment).</summary>
+    Public Function Score(data As JsonObject, schedule As List(Of ScheduleEntry), kannViolationCount As Integer) As QualityScore
+        Dim ent = JsonHelpers.Entities(data)
+        Dim timeslots = JsonHelpers.Timeslots(ent)
+        Dim allDays = JsonHelpers.AsStringList(timeslots, "days")
+
+        Dim classGaps = GapsOverEntities(schedule.GroupBy(Function(l) l.ClassName))
+        Dim teacherGaps = GapsOverEntities(schedule.GroupBy(Function(l) l.Teacher))
+
+        Dim edgeCount = schedule.Where(Function(l) l.Period = 1 OrElse l.Period >= AfternoonThresholdPeriod).Count()
+
+        Dim classVariance = LoadVarianceOverAllDays(schedule.GroupBy(Function(l) l.ClassName), allDays)
+        Dim teacherVariance = LoadVarianceOverWorkingDaysOnly(schedule.GroupBy(Function(l) l.Teacher))
+
+        Dim total = WeightKann * kannViolationCount +
+                    WeightClassGaps * classGaps + WeightTeacherGaps * teacherGaps +
+                    WeightEdgePeriod * edgeCount +
+                    WeightClassLoadVariance * classVariance + WeightTeacherLoadVariance * teacherVariance
+
+        Return New QualityScore With {
+            .KannViolationCount = kannViolationCount, .ClassGapCount = classGaps, .TeacherGapCount = teacherGaps,
+            .EdgePeriodCount = edgeCount, .ClassLoadVariance = classVariance, .TeacherLoadVariance = teacherVariance,
+            .Total = total
+        }
+    End Function
+
+    ''' <summary>Sum, over every (entity, day) group with >=1 lesson, of
+    ''' the free periods trapped between the first and last occupied period
+    ''' that day ("Springstunden"). A day with no lessons contributes
+    ''' nothing - there's no first/last occupied period to speak of.</summary>
+    Private Function GapsOverEntities(byEntity As IEnumerable(Of IGrouping(Of String, ScheduleEntry))) As Integer
+        Dim total = 0
+        For Each entityGroup In byEntity
+            For Each dayGroup In entityGroup.GroupBy(Function(l) l.Day)
+                Dim periods = dayGroup.Select(Function(l) l.Period).ToList()
+                Dim span = periods.Max() - periods.Min() + 1
+                total += span - periods.Count
+            Next
+        Next
+        Return total
+    End Function
+
+    ''' <summary>Population variance of periods-per-day, summed over every
+    ''' entity, counting EVERY day in `allDays` (including zero-lesson
+    ''' days) - a class's full week is fixed, there's no "unavailability"
+    ''' concept for classes the way there is for teachers.</summary>
+    Private Function LoadVarianceOverAllDays(byEntity As IEnumerable(Of IGrouping(Of String, ScheduleEntry)), allDays As List(Of String)) As Double
+        Dim total = 0.0
+        For Each entityGroup In byEntity
+            Dim counts = allDays.Select(Function(d) entityGroup.Count(Function(l) l.Day = d)).ToList()
+            total += PopulationVariance(counts)
+        Next
+        Return total
+    End Function
+
+    ''' <summary>Population variance of periods-per-day, summed over every
+    ''' entity, counting ONLY the days that entity actually appears on in
+    ''' the schedule ("working days") - so a teacher's declared part-time
+    ''' unavailability is never miscounted as "imbalance". A teacher with
+    ''' exactly 1 working day yields variance 0 by construction.</summary>
+    Private Function LoadVarianceOverWorkingDaysOnly(byEntity As IEnumerable(Of IGrouping(Of String, ScheduleEntry))) As Double
+        Dim total = 0.0
+        For Each entityGroup In byEntity
+            Dim counts = entityGroup.GroupBy(Function(l) l.Day).Select(Function(g) g.Count()).ToList()
+            total += PopulationVariance(counts)
+        Next
+        Return total
+    End Function
+
+    Private Function PopulationVariance(counts As List(Of Integer)) As Double
+        If counts.Count = 0 Then Return 0.0
+        Dim mean = counts.Average()
+        Return counts.Select(Function(c) (c - mean) * (c - mean)).Sum() / counts.Count
+    End Function
+
+End Module

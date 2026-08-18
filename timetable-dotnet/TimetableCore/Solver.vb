@@ -6,6 +6,7 @@
 ' variable to attach it to), which can make an incomplete schedule solve as
 ' OPTIMAL. See Validation.vb's header comment for the concrete incident that
 ' motivated this ordering.
+Imports System.Diagnostics
 Imports System.Text.Json.Nodes
 Imports Google.OrTools.Sat
 
@@ -131,6 +132,34 @@ Public NotInheritable Class SolveResult
     Public Property Solver As CpSolver
     Public Property Schedule As List(Of ScheduleEntry)
     Public Property KannConstraintFlags As List(Of KannConstraintFlag)
+End Class
+
+''' <summary>Phase 2.8: why Solver.SolveTop's search loop stopped.</summary>
+Public Enum MultiSolveStopReason
+    MaxSolutionsReached
+    TimeLimitReached
+    ''' <summary>The solver returned Infeasible/ModelInvalid on a later
+    ''' iteration - no schedule distinct from the ones already found
+    ''' exists. If Solutions is empty, this means the scenario had no
+    ''' feasible solution at all.</summary>
+    SearchSpaceExhausted
+End Enum
+
+''' <summary>One candidate schedule from Solver.SolveTop, bundled with
+''' everything a caller needs to render/rank it - same bundling philosophy
+''' as KannViolationDetail (index/type/message/reason together).</summary>
+Public NotInheritable Class ScoredSolution
+    Public Property Schedule As List(Of ScheduleEntry)
+    Public Property KannConstraintFlags As List(Of KannConstraintFlag)
+    Public Property Quality As QualityScore
+End Class
+
+Public NotInheritable Class MultiSolveResult
+    ''' <summary>Sorted ascending by Quality.Total - best candidate first.</summary>
+    Public Property Solutions As List(Of ScoredSolution)
+    Public Property StopReason As MultiSolveStopReason
+    Public Property IterationsRun As Integer
+    Public Property ElapsedS As Double
 End Class
 
 ''' <summary>Replaces the plain Dictionary(Of String, List(Of String)) that
@@ -493,6 +522,48 @@ Public Module Solver
         Next
     End Sub
 
+    ''' <summary>Phase 2.8: factored out of Solve() (verbatim body, no logic
+    ''' change) so SolveTop can reuse the same extraction on every iteration
+    ''' of its multi-solution loop without duplicating it.</summary>
+    Private Function ExtractSchedule(built As BuiltModel, solver As CpSolver, status As CpSolverStatus) As List(Of ScheduleEntry)
+        If status <> CpSolverStatus.Optimal AndAlso status <> CpSolverStatus.Feasible Then Return Nothing
+        Dim schedule As New List(Of ScheduleEntry)
+        For Each kvp In built.Lesson
+            If solver.BooleanValue(kvp.Value) Then
+                Dim key = kvp.Key
+                Dim assignedRoom As String = Nothing
+                For Each rkvp In built.Room
+                    Dim rk = rkvp.Key
+                    If rk.ClassName = key.ClassName AndAlso rk.Subject = key.Subject AndAlso
+                       rk.Teacher = key.Teacher AndAlso rk.Day = key.Day AndAlso rk.Period = key.Period AndAlso
+                       solver.BooleanValue(rkvp.Value) Then
+                        assignedRoom = rk.Room
+                        Exit For
+                    End If
+                Next
+                schedule.Add(New ScheduleEntry With {
+                    .ClassName = key.ClassName, .Subject = key.Subject, .Teacher = key.Teacher,
+                    .Day = key.Day, .Period = key.Period, .Room = assignedRoom
+                })
+            End If
+        Next
+        Return schedule
+    End Function
+
+    ''' <summary>Phase 2.8: factored out of Solve() (verbatim body, no logic
+    ''' change) - see ExtractSchedule.</summary>
+    Private Function ExtractKannFlags(built As BuiltModel, solver As CpSolver, status As CpSolverStatus) As List(Of KannConstraintFlag)
+        If status <> CpSolverStatus.Optimal AndAlso status <> CpSolverStatus.Feasible Then Return Nothing
+        Dim kannFlags As New List(Of KannConstraintFlag)
+        For Each kvp In built.KannVars
+            kannFlags.Add(New KannConstraintFlag With {
+                .ConstraintIndex = kvp.Key, .ConstraintType = kvp.Value.Type,
+                .Reason = kvp.Value.Reason, .Relaxed = solver.BooleanValue(kvp.Value.Var)
+            })
+        Next
+        Return kannFlags
+    End Function
+
     Public Function Solve(data As JsonObject,
                            Optional timeLimitS As Double = 30.0,
                            Optional seed As Integer = 42,
@@ -502,42 +573,108 @@ Public Module Solver
         solver.StringParameters = $"max_time_in_seconds:{timeLimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
         Dim status = solver.Solve(built.Model)
 
-        Dim schedule As List(Of ScheduleEntry) = Nothing
-        If status = CpSolverStatus.Optimal OrElse status = CpSolverStatus.Feasible Then
-            schedule = New List(Of ScheduleEntry)
-            For Each kvp In built.Lesson
-                If solver.BooleanValue(kvp.Value) Then
-                    Dim key = kvp.Key
-                    Dim assignedRoom As String = Nothing
-                    For Each rkvp In built.Room
-                        Dim rk = rkvp.Key
-                        If rk.ClassName = key.ClassName AndAlso rk.Subject = key.Subject AndAlso
-                           rk.Teacher = key.Teacher AndAlso rk.Day = key.Day AndAlso rk.Period = key.Period AndAlso
-                           solver.BooleanValue(rkvp.Value) Then
-                            assignedRoom = rk.Room
-                            Exit For
-                        End If
-                    Next
-                    schedule.Add(New ScheduleEntry With {
-                        .ClassName = key.ClassName, .Subject = key.Subject, .Teacher = key.Teacher,
-                        .Day = key.Day, .Period = key.Period, .Room = assignedRoom
-                    })
-                End If
-            Next
-        End If
-
-        Dim kannFlags As List(Of KannConstraintFlag) = Nothing
-        If status = CpSolverStatus.Optimal OrElse status = CpSolverStatus.Feasible Then
-            kannFlags = New List(Of KannConstraintFlag)
-            For Each kvp In built.KannVars
-                kannFlags.Add(New KannConstraintFlag With {
-                    .ConstraintIndex = kvp.Key, .ConstraintType = kvp.Value.Type,
-                    .Reason = kvp.Value.Reason, .Relaxed = solver.BooleanValue(kvp.Value.Var)
-                })
-            Next
-        End If
+        Dim schedule = ExtractSchedule(built, solver, status)
+        Dim kannFlags = ExtractKannFlags(built, solver, status)
 
         Return New SolveResult With {.Status = status, .Solver = solver, .Schedule = schedule, .KannConstraintFlags = kannFlags}
+    End Function
+
+    ''' <summary>Phase 2.8: adds a hard "no-good" cut to `model` forbidding
+    ''' the exact `Lesson`-variable assignment `solver` just found from ever
+    ''' recurring. Deliberately scoped to `Lesson` only (not `Room`) - that
+    ''' is what most naturally defines "a different schedule"; alternate
+    ''' Room-only variants of an already-returned Lesson assignment are not
+    ''' separately enumerated (documented, deliberate scope, not a bug).
+    ''' Verified against the actual installed OrTools build: BoolVar
+    ''' implements ILiteral directly (no cast needed) and this exact
+    ''' true-Not()/false-as-is split enumerates a small model's full
+    ''' distinct-assignment space with zero duplicates/omissions.</summary>
+    Private Sub BlockSolution(model As CpModel, lesson As Dictionary(Of LessonKey, BoolVar), solver As CpSolver)
+        Dim literals As New List(Of ILiteral)
+        For Each kvp In lesson
+            If solver.BooleanValue(kvp.Value) Then
+                literals.Add(kvp.Value.Not())
+            Else
+                literals.Add(kvp.Value)
+            End If
+        Next
+        model.AddBoolOr(literals)
+    End Sub
+
+    ''' <summary>Phase 2.8: returns up to `maxSolutions` distinct candidate
+    ''' schedules, ranked by ScheduleQuality.Score (ascending Total, best
+    ''' first), instead of Solve()'s single result. Builds the model once,
+    ''' then repeatedly solves the SAME CpModel with a fresh CpSolver each
+    ''' iteration - BlockSolution accumulates a no-good constraint after
+    ''' each find, so later iterations can never reproduce an earlier
+    ''' schedule. Stops on whichever of maxSolutions/totalTimeLimitS is hit
+    ''' first, or when the solver reports Infeasible (the distinct-solution
+    ''' search space is exhausted).
+    '''
+    ''' Because BuildModel still sets model.Minimize(...) whenever Kann
+    ''' constraints exist, every iteration keeps optimizing against that
+    ''' same objective - early iterations tend to surface the lowest-Kann-
+    ''' violation schedules first. Later iterations may return Feasible
+    ''' rather than Optimal if perSolveTimeLimitS is too tight to prove
+    ''' optimality within the shrinking remaining search space; this is
+    ''' still a usable candidate, and correctness of the final ranking
+    ''' never depends on iteration order since Solutions is always
+    ''' re-sorted by Quality.Total before returning.</summary>
+    Public Function SolveTop(data As JsonObject,
+                              Optional maxSolutions As Integer = 10,
+                              Optional totalTimeLimitS As Double = 120.0,
+                              Optional perSolveTimeLimitS As Double = 30.0,
+                              Optional seed As Integer = 42,
+                              Optional numWorkers As Integer = 1) As MultiSolveResult
+        Dim built = BuildModel(data)
+        Dim solutions As New List(Of ScoredSolution)
+        Dim sw = Stopwatch.StartNew()
+        Dim iterations = 0
+        Dim stopReason As MultiSolveStopReason
+
+        Do
+            Dim remaining = totalTimeLimitS - sw.Elapsed.TotalSeconds
+            If solutions.Count >= maxSolutions Then
+                stopReason = MultiSolveStopReason.MaxSolutionsReached
+                Exit Do
+            End If
+            If remaining <= 0 Then
+                stopReason = MultiSolveStopReason.TimeLimitReached
+                Exit Do
+            End If
+            Dim thisLimit = Math.Min(perSolveTimeLimitS, remaining)
+
+            Dim solver As New CpSolver()
+            solver.StringParameters = $"max_time_in_seconds:{thisLimit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
+            Dim status = solver.Solve(built.Model)
+            iterations += 1
+
+            If status = CpSolverStatus.Infeasible OrElse status = CpSolverStatus.ModelInvalid Then
+                ' A genuine proof that no further distinct solution exists.
+                stopReason = MultiSolveStopReason.SearchSpaceExhausted
+                Exit Do
+            ElseIf status <> CpSolverStatus.Optimal AndAlso status <> CpSolverStatus.Feasible Then
+                ' CpSolverStatus.Unknown: this solve's own time budget ran
+                ' out without a conclusive answer either way - that is a
+                ' time-budget exhaustion, not a proof the search space is
+                ' exhausted, so it must not be mislabeled as such.
+                stopReason = MultiSolveStopReason.TimeLimitReached
+                Exit Do
+            End If
+
+            Dim schedule = ExtractSchedule(built, solver, status)
+            Dim kannFlags = ExtractKannFlags(built, solver, status)
+            Dim kannCount = Verifier.VerifyScheduleDetailed(data, schedule).KannViolations.Count
+            Dim quality = ScheduleQuality.Score(data, schedule, kannCount)
+            solutions.Add(New ScoredSolution With {.Schedule = schedule, .KannConstraintFlags = kannFlags, .Quality = quality})
+
+            BlockSolution(built.Model, built.Lesson, solver)
+        Loop
+
+        Return New MultiSolveResult With {
+            .Solutions = solutions.OrderBy(Function(s) s.Quality.Total).ToList(),
+            .StopReason = stopReason, .IterationsRun = iterations, .ElapsedS = sw.Elapsed.TotalSeconds
+        }
     End Function
 
     Public Function StatusName(status As CpSolverStatus) As String
