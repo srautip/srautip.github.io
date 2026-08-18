@@ -292,3 +292,24 @@
     overall                      100 %
   Solve status: Optimal   Verifier violations: 0   Extraction: 320.3s   Total: 320.3s
 
+=== [Grundschule] Run 3/3 === 2026-08-18T01:14:44.3948287Z
+  teacher_availability         duration=  10.0s valid_json=true n_items=1
+  weekly_hours                 duration=  73.0s valid_json=true n_items=8
+  room_requirement             duration=   9.2s valid_json=true n_items=1
+  no_overlap                   duration=  41.6s valid_json=true n_items=7
+  shared_resource_conflict     duration=  53.8s valid_json=true n_items=4
+  forbidden_slot               duration=  26.9s valid_json=true n_items=2
+  consecutive_required         duration=  28.2s valid_json=true n_items=2
+  teacher_subject_assignment   duration=  60.2s valid_json=true n_items=8
+  period_exception             duration=   9.6s valid_json=true n_items=1
+  Scores:
+    teacher_subject_assignment   100 %
+    weekly_hours                 100 %
+    no_overlap                   100 %
+    room_requirement             100 %
+    consecutive_required         100 %
+    teacher_availability         100 %
+    forbidden_slot               100 %
+    overall                      100 %
+  Solve status: Optimal   Verifier violations: 0   Extraction: 312.5s   Total: 312.6s
+
