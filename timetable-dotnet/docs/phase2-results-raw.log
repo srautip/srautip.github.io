@@ -210,3 +210,23 @@
     overall                      87 %
   Solve status: Optimal   Verifier violations: 0   Extraction: 478.0s   Total: 478.0s
 
+=== [EdgeCase] Run 2/3 === 2026-08-17T23:59:08.4150511Z
+  teacher_availability         duration=  10.6s valid_json=true n_items=1
+  weekly_hours                 duration=  57.3s valid_json=true n_items=6
+  room_requirement             duration=   9.7s valid_json=true n_items=1
+  no_overlap                   duration=  35.8s valid_json=true n_items=6
+  shared_resource_conflict     duration=  39.2s valid_json=true n_items=3
+  forbidden_slot               duration=  99.1s valid_json=true n_items=8
+  consecutive_required         duration=  41.2s valid_json=true n_items=2
+  teacher_subject_assignment   duration=  47.2s valid_json=true n_items=6
+  period_exception             duration=   2.6s valid_json=true n_items=0
+  Scores:
+    teacher_subject_assignment   100 %
+    weekly_hours                 100 %
+    no_overlap                   100 %
+    room_requirement             100 %
+    teacher_availability         100 %
+    forbidden_slot               20 %
+    overall                      87 %
+  Solve status: Optimal   Verifier violations: 0   Extraction: 342.9s   Total: 342.9s
+
