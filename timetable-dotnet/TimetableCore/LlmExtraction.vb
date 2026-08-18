@@ -92,11 +92,24 @@ Public Module LlmExtraction
             "bedeutet NICHT automatisch eine Doppelstunde - das waere ein " &
             "Widerspruch zu 'max 1/Tag', da ein Block 2 Stunden am selben Tag " &
             "braucht). Steht kein solches Wort im Text, KEIN Objekt fuer dieses " &
-            "Fach erzeugen. Erzeuge JE EIN Objekt PRO betroffener Klasse."},
+            "Fach erzeugen. WICHTIG: erzeuge JE EIN Objekt PRO betroffener Klasse " &
+            "- wenn ein Fach mit Block-Pflicht von MEHREREN Klassen genannt wird " &
+            "(z.B. 'Herr X unterrichtet Klasse A und B'), MUESSEN ALLE genannten " &
+            "Klassen je ein eigenes Objekt bekommen, nicht nur eine davon. " &
+            "Pruefe am Ende: fehlt eine der genannten Klassen fuer ein " &
+            "Block-Fach, ergaenze sie."},
         {"teacher_subject_assignment",
             "Extrahiere, welche Lehrkraft welches Fach in welcher Klasse " &
             "unterrichtet. Ein Objekt PRO genannter Klasse, auch wenn eine " &
-            "Lehrkraft mehrere Klassen unterrichtet."},
+            "Lehrkraft mehrere Klassen unterrichtet. VORSICHT bei mehreren " &
+            "Faechern mit AEHNLICHER Lehrkraft/Klassen-Aufteilung: wenn fuer " &
+            "ein Fach steht 'Lehrkraft X unterrichtet ZUSAETZLICH/ebenfalls " &
+            "Klasse A und B' (bezogen auf ein zuvor im Text genanntes Fach), " &
+            "gelten fuer DIESES Fach GENAU DIESELBEN Klassen A und B fuer " &
+            "Lehrkraft X wie beim referenzierten Fach - uebernimm die exakte " &
+            "Klassen-Zuordnung, errate sie NICHT neu und uebertrage sie NICHT " &
+            "von einem anderen, aehnlich klingenden Fach mit anderer " &
+            "Klassen-Gruppierung."},
         {"period_exception",
             "Extrahiere Regeln der Form 'Stunde X findet hoechstens an einem " &
             "Tag pro Woche statt, idealerweise Tag Y' bzw. 'Stunde X nur an " &
