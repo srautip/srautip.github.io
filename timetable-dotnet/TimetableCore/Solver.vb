@@ -693,5 +693,58 @@ Public Module Solver
         Return status.ToString()
     End Function
 
+    ''' <summary>Phase 2.11: orchestrates the three Kursstufe CP-SAT stages
+    ''' (Kursblockung.vb -> Schienenraster.vb -> Raumzuordnung.vb)
+    ''' end-to-end. Each of stages B/C is solved via THIS SAME Solve()
+    ''' function operating on a synthetic scenario - not one line of
+    ''' BuildModel/BuildCoreModel/ApplyConstraints/AddBlockConstraint above
+    ''' changes for this feature; only this new function and the three new
+    ''' modules exist. Stops at the first stage that doesn't solve
+    ''' Optimal/Feasible, so a caller can tell WHICH stage failed (see
+    ''' KursstufeSolveResult) instead of only "it didn't work".
+    ''' Precondition: Validation.ValidateKursstufeEntities(data) returned
+    ''' no errors (same "validate before solving" discipline as
+    ''' BuildCoreModel/Validation.ValidateEntities).</summary>
+    Public Function SolveKursstufe(data As JsonObject,
+                                    Optional timeLimitS As Double = 30.0,
+                                    Optional seed As Integer = 42,
+                                    Optional numWorkers As Integer = 1) As KursstufeSolveResult
+        Dim kb = Kursblockung.SolveKursblockung(data, timeLimitS, seed, numWorkers)
+        If kb.Status <> CpSolverStatus.Optimal AndAlso kb.Status <> CpSolverStatus.Feasible Then
+            Return New KursstufeSolveResult With {.KursblockungStatus = kb.Status}
+        End If
+
+        Dim schienenScenario = Schienenraster.BuildSchienenrasterScenario(data)
+        Dim schienenResult = Solve(schienenScenario, timeLimitS, seed, numWorkers)
+        If schienenResult.Status <> CpSolverStatus.Optimal AndAlso schienenResult.Status <> CpSolverStatus.Feasible Then
+            Return New KursstufeSolveResult With {.KursblockungStatus = kb.Status, .SchienenrasterStatus = schienenResult.Status}
+        End If
+
+        Dim raumScenario = Raumzuordnung.BuildRaumzuordnungScenario(data, kb.Assignment, schienenResult.Schedule)
+        Dim raumResult = Solve(raumScenario, timeLimitS, seed, numWorkers)
+        If raumResult.Status <> CpSolverStatus.Optimal AndAlso raumResult.Status <> CpSolverStatus.Feasible Then
+            Return New KursstufeSolveResult With {
+                .KursblockungStatus = kb.Status, .SchienenrasterStatus = schienenResult.Status, .RaumzuordnungStatus = raumResult.Status}
+        End If
+
+        Return New KursstufeSolveResult With {
+            .KursblockungStatus = kb.Status, .SchienenrasterStatus = schienenResult.Status,
+            .RaumzuordnungStatus = raumResult.Status, .Schedule = raumResult.Schedule
+        }
+    End Function
+
 End Module
+
+''' <summary>Phase 2.11: per-stage diagnostics for Solver.SolveKursstufe -
+''' which of the three CP-SAT stages succeeded, and the final per-Kurs
+''' schedule (each entry's .ClassName is the real Kurs id, not a Schiene
+''' or class name - see Raumzuordnung.vb) once all three have. A stage's
+''' Status property stays Nothing if an earlier stage already failed, so
+''' a caller can tell exactly where the pipeline stopped.</summary>
+Public NotInheritable Class KursstufeSolveResult
+    Public Property KursblockungStatus As CpSolverStatus
+    Public Property SchienenrasterStatus As CpSolverStatus?
+    Public Property RaumzuordnungStatus As CpSolverStatus?
+    Public Property Schedule As List(Of ScheduleEntry)
+End Class
 

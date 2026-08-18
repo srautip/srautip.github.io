@@ -81,27 +81,41 @@ Public Module Schienenraster
         }
     End Function
 
+    ''' <summary>The (day,period) slots the Kurs identified by `kursId`
+    ''' ends up at: looked up via its assigned Schiene (stage A's result)
+    ''' and that Schiene's own solved slots (stage B's result). Every Kurs
+    ''' assigned to the same Schiene shares exactly this same slot set -
+    ''' that IS what a Schiene is, a shared, synchronized time block.
+    ''' Reused by DeriveKursSchedule below and by Raumzuordnung.vb's stage
+    ''' C scenario builder (which needs the same per-Kurs slots to pin
+    ''' them via forbidden_slot).</summary>
+    Public Function SlotsForKurs(kursId As String, kursblockungAssignment As Dictionary(Of String, String),
+                                  schienenSchedule As List(Of ScheduleEntry)) As List(Of ScheduleEntry)
+        Dim schieneId = kursblockungAssignment(kursId)
+        Return schienenSchedule.Where(Function(e) e.Subject = schieneId).ToList()
+    End Function
+
     ''' <summary>Pure derivation, no CP-SAT: replaces each Schiene's generic
     ''' day/period slots (from solving BuildSchienenrasterScenario via the
     ''' UNCHANGED Solver.Solve()) with one ScheduleEntry per real Kurs
     ''' assigned to that Schiene (stage A's result) - carrying the Kurs's
     ''' real Subject/Teacher, and the Schiene's id as .ClassName (see
     ''' module doc: internal-only stand-in, never exposed further). Room is
-    ''' intentionally left Nothing - room assignment is stage C.</summary>
+    ''' intentionally left Nothing - room assignment is stage C
+    ''' (Raumzuordnung.vb), whose own output uses the Kurs's real id as
+    ''' .ClassName instead and is the more useful caller-facing shape;
+    ''' this function mainly exists to let stage-B-only tests verify
+    ''' Wahlprofil non-collision before stage C runs.</summary>
     Public Function DeriveKursSchedule(ent As JsonObject, kursblockungAssignment As Dictionary(Of String, String),
                                         schienenSchedule As List(Of ScheduleEntry)) As List(Of ScheduleEntry)
-        Dim slotsBySchiene = schienenSchedule.GroupBy(Function(e) e.Subject).
-            ToDictionary(Function(g) g.Key, Function(g) g.ToList())
-
         Dim result As New List(Of ScheduleEntry)
         For Each k In JsonHelpers.GetKurse(ent)
             Dim id = JsonHelpers.GetString(k, "id")
-            Dim schieneId = kursblockungAssignment(id)
             Dim subject = JsonHelpers.GetString(k, "subject")
             Dim teacher = JsonHelpers.GetString(k, "teacher")
-            For Each slot In slotsBySchiene(schieneId)
+            For Each slot In SlotsForKurs(id, kursblockungAssignment, schienenSchedule)
                 result.Add(New ScheduleEntry With {
-                    .ClassName = schieneId, .Subject = subject, .Teacher = teacher,
+                    .ClassName = kursblockungAssignment(id), .Subject = subject, .Teacher = teacher,
                     .Day = slot.Day, .Period = slot.Period, .Room = Nothing
                 })
             Next
