@@ -58,8 +58,18 @@ Public Module StammdatenValidation
             End If
             If l.Anrechnungsstunden < 0 Then
                 errors.Add($"lehrkraefte[{i}] (name={JsonHelpers.PyRepr(l.Name)}): Anrechnungsstunden darf nicht negativ sein")
-            ElseIf l.Anrechnungsstunden >= l.DeputatSollstunden AndAlso l.DeputatSollstunden > 0 Then
-                errors.Add($"lehrkraefte[{i}] (name={JsonHelpers.PyRepr(l.Name)}): Anrechnungsstunden ({l.Anrechnungsstunden}) darf nicht das gesamte Deputat ({l.DeputatSollstunden}) aufzehren")
+            End If
+            If l.SpringerReserveStunden < 0 Then
+                errors.Add($"lehrkraefte[{i}] (name={JsonHelpers.PyRepr(l.Name)}): SpringerReserveStunden darf nicht negativ sein")
+            End If
+            If l.DeputatSollstunden > 0 AndAlso (l.Anrechnungsstunden + l.SpringerReserveStunden) >= l.DeputatSollstunden Then
+                errors.Add($"lehrkraefte[{i}] (name={JsonHelpers.PyRepr(l.Name)}): Anrechnungsstunden ({l.Anrechnungsstunden}) + SpringerReserveStunden ({l.SpringerReserveStunden}) darf nicht das gesamte Deputat ({l.DeputatSollstunden}) aufzehren")
+            End If
+            If l.MaxKlassen.HasValue AndAlso l.MaxKlassen.Value <= 0 Then
+                errors.Add($"lehrkraefte[{i}] (name={JsonHelpers.PyRepr(l.Name)}): MaxKlassen muss > 0 sein, wenn gesetzt")
+            End If
+            If l.MaxFaecher.HasValue AndAlso l.MaxFaecher.Value <= 0 Then
+                errors.Add($"lehrkraefte[{i}] (name={JsonHelpers.PyRepr(l.Name)}): MaxFaecher muss > 0 sein, wenn gesetzt")
             End If
         Next
 
@@ -80,6 +90,27 @@ Public Module StammdatenValidation
             If inGenutzterKlassenstufeGefuehrt AndAlso Stammdaten.LehrerFuerFach(bestand, fach.Name).Count = 0 Then
                 errors.Add($"fach {JsonHelpers.PyRepr(fach.Name)}: keine qualifizierte Lehrkraft in fach_lehrer_zuordnungen gefunden, wird aber in einer genutzten Klassenstufe gefuehrt")
             End If
+        Next
+
+        ' Phase 2.17: Teilzeit-Tage-Kohaerenz - fuer jede (Klassenstufe,Fach)-
+        ' Kombination, die tatsaechlich genutzt wird, muss mindestens EIN
+        ' fachlich qualifizierter Kandidat auch teilzeit-tage-kohaerent sein
+        ' (siehe Stammdaten.IstTeilzeitKohaerent). Sonst wuerde
+        ' Lehrereinsatzplanung.SolveLehrereinsatz diesen Kandidaten beim
+        ' harten Vorfilter komplett ausschliessen und die "genau 1
+        ' Lehrkraft"-Vollstaendigkeitssumme koennte leer bleiben (0 = 1,
+        ' garantiert Infeasible) - dieselbe strukturelle Luecke, die die
+        ' bereits bestehende "Fach ohne qualifizierte Lehrkraft"-Pruefung
+        ' oben fuer den einfacheren Fall (gar keine Qualifikation) abfaengt.
+        For Each fach In bestand.Faecher
+            For Each fk In fach.Klassenstufen
+                If Not genutzteKlassenstufen.Contains(fk.Klassenstufe) Then Continue For
+                Dim qualifiziert = Stammdaten.LehrerFuerFach(bestand, fach.Name)
+                If qualifiziert.Count = 0 Then Continue For ' bereits oben gemeldet
+                If Not qualifiziert.Any(Function(l) Stammdaten.IstTeilzeitKohaerent(l, bestand, fk)) Then
+                    errors.Add($"fach {JsonHelpers.PyRepr(fach.Name)}, klassenstufe {fk.Klassenstufe}: kein teilzeit-tage-kohaerenter Kandidat gefunden (WochenstundenSoll={fk.WochenstundenSoll} passt bei keiner qualifizierten Lehrkraft in deren VerfuegbareTage)")
+                End If
+            Next
         Next
 
         Return errors

@@ -322,4 +322,320 @@ Public Class LehrereinsatzplanungTests
         Next
     End Sub
 
+    ' ===== Phase 2.17: die 7 zurueckgestellten Erweiterungen aus 2.15g =====
+
+    ''' <summary>Kontinuitaet ueber Jahre, gilt fuer ALLE Faecher einer
+    ''' Klasse (Nutzerentscheidung). Zwei Klassen (2a/2b), je zwei Faecher
+    ''' (Deutsch+Mathematik, 4h je Fach), zwei gleichermassen qualifizierte
+    ''' Kandidaten mit riesiger Deputat-Toleranz (isoliert den Effekt,
+    ''' gleiche Technik wie SameTeacherIsNotBundledAsKlassenlehrerOfTwoClasses...).
+    ''' Von Hand nachgerechnet: Vorjahres-Zuordnung zeigt fuer 2a auf
+    ''' Lehrer A (beide Faecher). Waehlt der Solver A fuer BEIDE Faecher von
+    ''' 2a, zaehlen beide assign-Variablen als "kontinuitaetErhalten" ->
+    ''' Bonus -2*WeightKontinuitaetVerletzt = -40, sonst 0 fuer 2a. Eine
+    ''' Aufspaltung von 2a auf A+B waere zusaetzlich noch eine
+    ''' Buendelungsverletzung (+20) und braechte nur einen der beiden Boni
+    ''' (-20) - per Konstruktion also strikt schlechter als -40. Das
+    ''' beweisbare Gesamtoptimum ist deshalb exakt -40 (2b bleibt
+    ''' undifferenziert, egal welcher Kandidat sie uebernimmt).</summary>
+    <TestMethod>
+    Public Sub ContinuityAcrossYearsRewardsReassigningAllSubjectsToSameTeacher()
+        Dim b As New Stammdatenbestand With {.SchulName = "Test", .Schulart = "Grundschule"}
+        b.Klassenstufen.Add(New Klassenstufe With {.Nummer = 2, .Bezeichnung = "Klasse 2"})
+        Dim deutsch As New Fach With {.Name = "Deutsch"}
+        deutsch.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 2, .WochenstundenSoll = 4})
+        b.Faecher.Add(deutsch)
+        Dim mathematik As New Fach With {.Name = "Mathematik"}
+        mathematik.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 2, .WochenstundenSoll = 4})
+        b.Faecher.Add(mathematik)
+        b.Klassen.Add(New Klasse With {.Name = "2a", .Klassenstufe = 2})
+        b.Klassen.Add(New Klasse With {.Name = "2b", .Klassenstufe = 2})
+
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 20, .KlassenlehrerFaehig = True})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer B", .DeputatSollstunden = 20, .KlassenlehrerFaehig = True})
+        For Each fach In New List(Of String) From {"Deutsch", "Mathematik"}
+            b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = fach})
+            b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer B", .FachName = fach})
+        Next
+
+        Dim vorjahr As New Dictionary(Of (Klasse As String, Fach As String), String) From {
+            {("2a", "Deutsch"), "Lehrer A"},
+            {("2a", "Mathematik"), "Lehrer A"}
+        }
+        Dim result = Lehrereinsatzplanung.SolveLehrereinsatz(b, deputatToleranzStunden:=1000.0, vorjahresZuordnung:=vorjahr, timeLimitS:=10)
+        Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible, result.Status.ToString())
+        Assert.AreEqual(-2.0 * Lehrereinsatzplanung.WeightKontinuitaetVerletzt, result.Solver.ObjectiveValue, 0.001)
+
+        Dim lehrerVon2a = result.Zuweisungen.Where(Function(z) z.Klasse = "2a").Select(Function(z) z.Lehrer).Distinct().ToList()
+        Assert.AreEqual(1, lehrerVon2a.Count, "2a sollte bei EINER Lehrkraft gebuendelt sein.")
+        Assert.AreEqual("Lehrer A", lehrerVon2a(0), "Kontinuitaet haette 2a wieder Lehrer A zuweisen muessen.")
+    End Sub
+
+    ''' <summary>Kontinuitaet: ein Eintrag ohne existierende assign-Variable
+    ''' (Lehrer diese Runde nicht qualifiziert) wird stillschweigend
+    ''' uebersprungen, kein Fehler/keine Ausnahme - ehrlich keine
+    ''' Kontinuitaet moeglich, exakt wie in Phase 2.14 fuer neue Faecher
+    ''' etabliert.</summary>
+    <TestMethod>
+    Public Sub ContinuityEntryForUnqualifiedTeacherIsSkippedWithoutError()
+        Dim b = Bestand(zweiteKlasse:=False)
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 4, .KlassenlehrerFaehig = True})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = "Deutsch"})
+
+        Dim vorjahr As New Dictionary(Of (Klasse As String, Fach As String), String) From {
+            {("1a", "Deutsch"), "Ehemaliger Lehrer (existiert nicht mehr)"}
+        }
+        Dim result = Lehrereinsatzplanung.SolveLehrereinsatz(b, vorjahresZuordnung:=vorjahr, timeLimitS:=10)
+        Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible, result.Status.ToString())
+        Assert.AreEqual(1, result.Zuweisungen.Count)
+        Assert.AreEqual("Lehrer A", result.Zuweisungen(0).Lehrer)
+    End Sub
+
+    ''' <summary>Fachfremder Einsatz: eine Klasse mit zwei Faechern, je nur
+    ''' EIN Kandidat qualifiziert - fuer "F1" nur Lehrer B (fachfremd
+    ''' markiert), fuer "F2" nur Lehrer A (regulaer). Beide nicht
+    ''' klassenlehrerfaehig - das macht "1a" zu einer Klasse ganz OHNE
+    ''' klassenlehrerfaehigen Kandidaten, was (unabhaengig von dieser
+    ''' Erweiterung, bereits seit Phase 2.15 bestehendes Verhalten)
+    ''' unconditional WeightKlassenlehrerFehlt beitraegt - im erwarteten
+    ''' Wert mit eingerechnet. Von Hand nachgerechnet: Vollstaendigkeit
+    ''' erzwingt beide Zuweisungen (je einziger Kandidat), F1/B ist die
+    ''' einzige fachfremde aktive Zuweisung -&gt; Objective =
+    ''' WeightFachfremdEinsatz + WeightKlassenlehrerFehlt.</summary>
+    <TestMethod>
+    Public Sub FachfremdAssignmentIsPenalizedWhenForcedBySoleCandidate()
+        Dim b As New Stammdatenbestand With {.SchulName = "Test", .Schulart = "Grundschule"}
+        b.Klassenstufen.Add(New Klassenstufe With {.Nummer = 1, .Bezeichnung = "Klasse 1"})
+        Dim f1 As New Fach With {.Name = "F1"}
+        f1.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 2})
+        b.Faecher.Add(f1)
+        Dim f2 As New Fach With {.Name = "F2"}
+        f2.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 2})
+        b.Faecher.Add(f2)
+        b.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1})
+
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 20, .KlassenlehrerFaehig = False})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer B", .DeputatSollstunden = 20, .KlassenlehrerFaehig = False})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = "F2"})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer B", .FachName = "F1", .Fachfremd = True})
+
+        Dim result = Lehrereinsatzplanung.SolveLehrereinsatz(b, deputatToleranzStunden:=1000.0, timeLimitS:=10)
+        Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible, result.Status.ToString())
+        Assert.AreEqual(CDbl(Lehrereinsatzplanung.WeightFachfremdEinsatz + Lehrereinsatzplanung.WeightKlassenlehrerFehlt), result.Solver.ObjectiveValue, 0.001)
+        Assert.AreEqual(2, result.Zuweisungen.Count)
+        Assert.IsTrue(result.Zuweisungen.Any(Function(z) z.Lehrer = "Lehrer A" AndAlso z.Fach = "F2"))
+        Assert.IsTrue(result.Zuweisungen.Any(Function(z) z.Lehrer = "Lehrer B" AndAlso z.Fach = "F1"))
+    End Sub
+
+    ''' <summary>Max. Klassen/Faecher pro Lehrer: zwei Klassenstufen, damit
+    ''' Fach "F" ausschliesslich Klassenstufe 1 (Klassen 1a/1b) und Fach
+    ''' "G" ausschliesslich Klassenstufe 2 (Klasse 2a) betrifft (bewusst
+    ''' getrennte Klassenstufen - sonst wuerde "G" automatisch auch in 1b
+    ''' gefuehrt, da FaecherOfKlassenstufe alle Faecher EINER
+    ''' Klassenstufe liefert). Lehrer A ist ueberall der einzige Kandidat
+    ''' UND klassenlehrerfaehig, dadurch aber (unabhaengig von dieser
+    ''' Erweiterung, bereits seit Nachtrag 3 bestehendes Verhalten) selbst
+    ''' Klassenlehrer aller 3 Klassen zugleich - das loest zusaetzlich zu
+    ''' den beiden neuen Hinge-Loss-Termen die bereits bestehende
+    ''' Pro-Lehrkraft-Buendelungsregel aus ("hoechstens 1 Klasse als
+    ''' Klassenlehrer"), im erwarteten Wert mit eingerechnet.
+    ''' Vollstaendigkeit erzwingt alle 3 Zuweisungen (1a/F, 1b/F, 2a/G) -
+    ''' 3 distinkte Klassen, 2 distinkte Faecher. Von Hand nachgerechnet:
+    ''' MaxKlassen:=1 -&gt; Ueberschreitung 3-1=2 -&gt; 2*WeightMaxKlassenVerletzt;
+    ''' MaxFaecher:=1 -&gt; Ueberschreitung 2-1=1 -&gt; 1*WeightMaxFaecherVerletzt;
+    ''' plus 1*WeightBuendelungVerletzt fuer die erzwungene
+    ''' Mehrfach-Klassenlehrerrolle.</summary>
+    <TestMethod>
+    Public Sub MaxKlassenAndMaxFaecherOverschreitungArePenalizedAsHingeLoss()
+        Dim b As New Stammdatenbestand With {.SchulName = "Test", .Schulart = "Grundschule"}
+        b.Klassenstufen.Add(New Klassenstufe With {.Nummer = 1, .Bezeichnung = "Klasse 1"})
+        b.Klassenstufen.Add(New Klassenstufe With {.Nummer = 2, .Bezeichnung = "Klasse 2"})
+        Dim f As New Fach With {.Name = "F"}
+        f.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 2})
+        b.Faecher.Add(f)
+        Dim g As New Fach With {.Name = "G"}
+        g.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 2, .WochenstundenSoll = 2})
+        b.Faecher.Add(g)
+        b.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1})
+        b.Klassen.Add(New Klasse With {.Name = "1b", .Klassenstufe = 1})
+        b.Klassen.Add(New Klasse With {.Name = "2a", .Klassenstufe = 2})
+
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 20, .KlassenlehrerFaehig = True, .MaxKlassen = 1, .MaxFaecher = 1})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = "F"})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = "G"})
+
+        Dim result = Lehrereinsatzplanung.SolveLehrereinsatz(b, deputatToleranzStunden:=1000.0, timeLimitS:=10)
+        Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible, result.Status.ToString())
+        Assert.AreEqual(3, result.Zuweisungen.Count)
+        Assert.AreEqual(
+            CDbl(2 * Lehrereinsatzplanung.WeightMaxKlassenVerletzt + Lehrereinsatzplanung.WeightMaxFaecherVerletzt + Lehrereinsatzplanung.WeightBuendelungVerletzt),
+            result.Solver.ObjectiveValue, 0.001)
+    End Sub
+
+    ''' <summary>Teilzeit-Tage-Kohaerenz: Lehrer A hat nur 2 Praesenztage
+    ''' (Mo/Di), Fach "F" verlangt 5h/Woche bei MaxProTag=2 -&gt; maximal
+    ''' 2*2=4h moeglich, 5h &gt; 4h also inkohaerent - A wird beim Bau der
+    ''' Kandidaten HART ausgeschlossen. Lehrer B (Vollzeit) bleibt der
+    ''' einzige Kandidat und MUSS gewaehlt werden.</summary>
+    <TestMethod>
+    Public Sub TeilzeitInkohaerenterKandidatWirdHartAusgeschlossen()
+        Dim b As New Stammdatenbestand With {.SchulName = "Test", .Schulart = "Grundschule"}
+        b.Klassenstufen.Add(New Klassenstufe With {.Nummer = 1, .Bezeichnung = "Klasse 1"})
+        Dim f As New Fach With {.Name = "F"}
+        f.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 5, .MaxProTag = 2})
+        b.Faecher.Add(f)
+        b.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1})
+
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 10, .KlassenlehrerFaehig = False, .VerfuegbareTage = New List(Of String) From {"Mo", "Di"}})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer B", .DeputatSollstunden = 20, .KlassenlehrerFaehig = False})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = "F"})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer B", .FachName = "F"})
+
+        Dim result = Lehrereinsatzplanung.SolveLehrereinsatz(b, deputatToleranzStunden:=1000.0, timeLimitS:=10)
+        Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible, result.Status.ToString())
+        Assert.AreEqual(1, result.Zuweisungen.Count)
+        Assert.AreEqual("Lehrer B", result.Zuweisungen(0).Lehrer)
+    End Sub
+
+    ''' <summary>Gegenprobe zu obigem Test auf StammdatenValidation-Ebene:
+    ''' ist der teilzeit-inkohaerente Kandidat der EINZIGE Kandidat, wuerde
+    ''' Lehrereinsatzplanung diesen beim harten Vorfilter komplett
+    ''' ausschliessen und "genau 1 Lehrkraft"-Vollstaendigkeit ueber eine
+    ''' leere Variablenliste bilden (0=1, Infeasible) - StammdatenValidation
+    ''' muss das VORHER als klaren Fehler melden.</summary>
+    <TestMethod>
+    Public Sub StammdatenValidationDetectsSoleTeilzeitInkohaerenterKandidat()
+        Dim b As New Stammdatenbestand With {.SchulName = "Test", .Schulart = "Grundschule"}
+        b.Klassenstufen.Add(New Klassenstufe With {.Nummer = 1, .Bezeichnung = "Klasse 1"})
+        Dim f As New Fach With {.Name = "F"}
+        f.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 5, .MaxProTag = 2})
+        b.Faecher.Add(f)
+        b.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 10, .VerfuegbareTage = New List(Of String) From {"Mo", "Di"}})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = "F"})
+
+        Dim errors = StammdatenValidation.ValidateStammdaten(b)
+        Assert.AreEqual(1, errors.Count)
+        StringAssert.Contains(errors(0), "teilzeit-tage-kohaerenter Kandidat")
+    End Sub
+
+    ''' <summary>Klassenlehrer-Tandem-Balance: Klasse "1a" mit
+    ''' ErlaubtKlassenlehrerTandem, vier Faecher F1(4h, nur A qualifiziert),
+    ''' F2(4h, nur B qualifiziert), F3/F4 (je 2h, beide qualifiziert).
+    ''' Vollstaendigkeit erzwingt A UND B gleichzeitig aktiv (je ihr
+    ''' Alleinstellungs-Fach) - ein echter, erzwungener Tandem-Fall, kein
+    ''' Zufallsprodukt der Deputat-Zielfunktion (riesige Toleranz schaltet
+    ''' die aus). Von Hand nachgerechnet: F3/F4 je zur Haelfte auf A/B
+    ''' verteilt ergibt A=B=6h -&gt; Bereich 0 -&gt; Objective 0 (Buendelung
+    ''' erlaubt bei Tandem bis zu 2 aktive Kandidaten, hier keine
+    ''' Verletzung). Jede andere Verteilung von F3/F4 waere unausgewogener
+    ''' und teurer (z.B. beide an A: 8 vs. 4 -&gt; Bereich 4 -&gt;
+    ''' Objective 20) - das beweisbare Optimum 0 zwingt den Solver zur
+    ''' ausgewogenen Aufteilung.</summary>
+    <TestMethod>
+    Public Sub TandemBalanceAchievesEvenSplitBetweenTwoForcedActiveKlassenlehrer()
+        Dim b As New Stammdatenbestand With {.SchulName = "Test", .Schulart = "Grundschule"}
+        b.Klassenstufen.Add(New Klassenstufe With {.Nummer = 1, .Bezeichnung = "Klasse 1"})
+        Dim f1 As New Fach With {.Name = "F1"}
+        f1.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 4})
+        b.Faecher.Add(f1)
+        Dim f2 As New Fach With {.Name = "F2"}
+        f2.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 4})
+        b.Faecher.Add(f2)
+        Dim f3 As New Fach With {.Name = "F3"}
+        f3.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 2})
+        b.Faecher.Add(f3)
+        Dim f4 As New Fach With {.Name = "F4"}
+        f4.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 2})
+        b.Faecher.Add(f4)
+        b.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1, .ErlaubtKlassenlehrerTandem = True})
+
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 20, .KlassenlehrerFaehig = True})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer B", .DeputatSollstunden = 20, .KlassenlehrerFaehig = True})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = "F1"})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer B", .FachName = "F2"})
+        For Each fach In New List(Of String) From {"F3", "F4"}
+            b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = fach})
+            b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer B", .FachName = fach})
+        Next
+
+        Dim result = Lehrereinsatzplanung.SolveLehrereinsatz(b, deputatToleranzStunden:=1000.0, timeLimitS:=10)
+        Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible, result.Status.ToString())
+        Assert.AreEqual(0.0, result.Solver.ObjectiveValue, 0.001)
+
+        Dim stundenA = result.Zuweisungen.Where(Function(z) z.Lehrer = "Lehrer A").Sum(Function(z) Stammdaten.WochenstundenFuer(b.Faecher.Single(Function(fa) fa.Name = z.Fach), 1).WochenstundenSoll)
+        Dim stundenB = result.Zuweisungen.Where(Function(z) z.Lehrer = "Lehrer B").Sum(Function(z) Stammdaten.WochenstundenFuer(b.Faecher.Single(Function(fa) fa.Name = z.Fach), 1).WochenstundenSoll)
+        Assert.AreEqual(6, stundenA, "Ausgewogener Tandem-Split erwartet 6h fuer Lehrer A.")
+        Assert.AreEqual(6, stundenB, "Ausgewogener Tandem-Split erwartet 6h fuer Lehrer B.")
+    End Sub
+
+    ''' <summary>Springerreserve: Lehrer A ist der einzige Kandidat fuer
+    ''' Fach "F" (6h), Deputat=10h, klassenlehrerfaehig (haelt
+    ''' fehltKlassenlehrer bei 0, da A ohnehin der einzige aktive
+    ''' Kandidat ist - keine Verzerrung durch die Klassenlehrer-Logik).
+    ''' MIT SpringerReserveStunden=4 ist der Zielkorridor 10-4=6h = exakt
+    ''' die zugewiesenen 6h -&gt; Objective 0. OHNE die Reserve
+    ''' (identisches Szenario sonst) ist der Korridor 10h, Abweichung 4h
+    ''' &gt; Toleranz 2h -&gt; Ueberschuss 2h -&gt; Objective
+    ''' 2*WeightDeputatAbweichung=200. Direkter Vorher/Nachher-Beweis, dass
+    ''' die Reserve die Nicht-Ausschoepfung NICHT bestraft.</summary>
+    <TestMethod>
+    Public Sub SpringerReserveLowersDeputatCorridorWithoutPenalty()
+        Dim BuildBestand = Function(springerReserve As Double) As Stammdatenbestand
+                                Dim bb As New Stammdatenbestand With {.SchulName = "Test", .Schulart = "Grundschule"}
+                                bb.Klassenstufen.Add(New Klassenstufe With {.Nummer = 1, .Bezeichnung = "Klasse 1"})
+                                Dim f As New Fach With {.Name = "F"}
+                                f.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 6})
+                                bb.Faecher.Add(f)
+                                bb.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1})
+                                bb.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 10, .KlassenlehrerFaehig = True, .SpringerReserveStunden = springerReserve})
+                                bb.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = "F"})
+                                Return bb
+                            End Function
+
+        Dim mitReserve = Lehrereinsatzplanung.SolveLehrereinsatz(BuildBestand(4.0), deputatToleranzStunden:=2.0, timeLimitS:=10)
+        Assert.IsTrue(mitReserve.Status = CpSolverStatus.Optimal OrElse mitReserve.Status = CpSolverStatus.Feasible, mitReserve.Status.ToString())
+        Assert.AreEqual(0.0, mitReserve.Solver.ObjectiveValue, 0.001)
+
+        Dim ohneReserve = Lehrereinsatzplanung.SolveLehrereinsatz(BuildBestand(0.0), deputatToleranzStunden:=2.0, timeLimitS:=10)
+        Assert.IsTrue(ohneReserve.Status = CpSolverStatus.Optimal OrElse ohneReserve.Status = CpSolverStatus.Feasible, ohneReserve.Status.ToString())
+        Assert.AreEqual(200.0, ohneReserve.Solver.ObjectiveValue, 0.001)
+    End Sub
+
+    ''' <summary>Faire Verteilung unbeliebter Faecher (niedrigste
+    ''' Prioritaet): zwei Klassen (1a/1b) brauchen je 1x das als Unbeliebt
+    ''' markierte Fach "F" (2h), zwei gleichermassen qualifizierte,
+    ''' klassenlehrerfaehige Kandidaten (haelt die Klassenlehrer-Logik bei
+    ''' 0, solange - wie hier erwartet - jede Klasse nur einen einzigen
+    ''' aktiven Kandidaten bekommt: eine 1:1-Aufteilung waere zusaetzlich
+    ''' durch die bereits bestehende Pro-Lehrkraft-Buendelungsregel
+    ''' geschuetzt, "eine Lehrkraft uebernimmt beide Klassen" wuerde also
+    ''' zusaetzlich noch WeightBuendelungVerletzt kosten). Von Hand
+    ''' nachgerechnet: eine 1:1-Aufteilung (je 1 unbeliebte Zuweisung pro
+    ''' Lehrkraft) ergibt Fairness-Bereich 0 -&gt; Objective 0; das
+    ''' beweisbare Optimum erzwingt deshalb die Aufteilung.</summary>
+    <TestMethod>
+    Public Sub UnbeliebtesFachWirdGleichmaessigVerteilt()
+        Dim b As New Stammdatenbestand With {.SchulName = "Test", .Schulart = "Grundschule"}
+        b.Klassenstufen.Add(New Klassenstufe With {.Nummer = 1, .Bezeichnung = "Klasse 1"})
+        Dim f As New Fach With {.Name = "F", .Unbeliebt = True}
+        f.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 2})
+        b.Faecher.Add(f)
+        b.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1})
+        b.Klassen.Add(New Klasse With {.Name = "1b", .Klassenstufe = 1})
+
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 20, .KlassenlehrerFaehig = True})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer B", .DeputatSollstunden = 20, .KlassenlehrerFaehig = True})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = "F"})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer B", .FachName = "F"})
+
+        Dim result = Lehrereinsatzplanung.SolveLehrereinsatz(b, deputatToleranzStunden:=1000.0, timeLimitS:=10)
+        Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible, result.Status.ToString())
+        Assert.AreEqual(0.0, result.Solver.ObjectiveValue, 0.001)
+
+        Dim lehrer1a = result.Zuweisungen.Single(Function(z) z.Klasse = "1a").Lehrer
+        Dim lehrer1b = result.Zuweisungen.Single(Function(z) z.Klasse = "1b").Lehrer
+        Assert.AreNotEqual(lehrer1a, lehrer1b, "Faire Verteilung sollte das unbeliebte Fach auf beide Lehrkraefte aufteilen.")
+    End Sub
+
 End Class

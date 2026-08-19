@@ -353,6 +353,8 @@ Public Module Verifier
         If result.Zuweisungen Is Nothing Then Return violations
 
         Dim lehrerByName = bestand.Lehrkraefte.ToDictionary(Function(l) l.Name)
+        Dim klasseByName = bestand.Klassen.ToDictionary(Function(k) k.Name)
+        Dim fachByName = bestand.Faecher.ToDictionary(Function(f) f.Name)
 
         For Each klasse In bestand.Klassen
             For Each fach In Stammdaten.FaecherOfKlassenstufe(bestand, klasse.Klassenstufe)
@@ -367,6 +369,21 @@ Public Module Verifier
             Dim qualifiziert = bestand.FachLehrerZuordnungen.Any(Function(fz) fz.LehrerName = z.Lehrer AndAlso fz.FachName = z.Fach)
             If Not qualifiziert Then
                 violations.Add($"{z.Lehrer} unterrichtet {z.Klasse}/{z.Fach}, ist dafuer aber laut fach_lehrer_zuordnungen nicht qualifiziert")
+            End If
+        Next
+
+        ' Phase 2.17: Kanarienvogel-Pruefung fuer den harten Teilzeit-Tage-
+        ' Kohaerenz-Vorfilter in Lehrereinsatzplanung.SolveLehrereinsatz -
+        ' unabhaengig aus den rohen Stammdaten re-derivert (kein geteilter
+        ' Code mit dem CP-SAT-Vorfilter, siehe Modul-Kopfkommentar). Sollte
+        ' bei korrektem Vorfilter NIE feuern; ein Treffer hier waere ein
+        ' Beweis fuer einen Bug im Vorfilter selbst, nicht in den
+        ' Stammdaten.
+        For Each z In result.Zuweisungen
+            If Not lehrerByName.ContainsKey(z.Lehrer) OrElse Not klasseByName.ContainsKey(z.Klasse) OrElse Not fachByName.ContainsKey(z.Fach) Then Continue For
+            Dim fk = Stammdaten.WochenstundenFuer(fachByName(z.Fach), klasseByName(z.Klasse).Klassenstufe)
+            If fk IsNot Nothing AndAlso Not Stammdaten.IstTeilzeitKohaerent(lehrerByName(z.Lehrer), bestand, fk) Then
+                violations.Add($"{z.Lehrer} unterrichtet {z.Klasse}/{z.Fach} ({fk.WochenstundenSoll}h/Woche), ist aber laut VerfuegbareTage teilzeit-tage-inkohaerent")
             End If
         Next
 

@@ -195,29 +195,21 @@ Kern zuerst" bewusst nicht implementiert:
 
 - ~~**Fächer-Bündelung pro Klassenlehrer**~~ - **umgesetzt**, siehe
   "Nachtrag 2 (Phase 2.16-Folgeauftrag)" unten.
-- **Kontinuität über Jahre als aktive Solver-Präferenz** (nicht wie in
-  Phase 2.14 nur aus einem bereits gelösten Vorjahr abgeleitet): ein
-  Lehrer, der Kl. 1a unterrichtet hat, wird in der Zielfunktion bevorzugt
-  wieder Kl. 2a zugewiesen - an der Grundschule besonders relevant
-  (Klassenlehrerprinzip über alle 4 Jahre häufig gewünscht).
-- **Fachfremder Einsatz minimieren**: falls `FachLehrerZuordnung` um eine
-  Qualifikationsstufe ("Hauptfach" vs. "fachfremd möglich") erweitert
-  wird, ein weiches Ziel, fachfremden Einsatz zu vermeiden statt ihn nur
-  überhaupt zuzulassen.
-- **Maximale Anzahl Klassen/Fächer pro Lehrer**: Zersplitterung vermeiden
-  (Beziehungsqualität/Präsenz).
-- **Teilzeit-Tage-Kohärenz-Vorprüfung**: ein Lehrer mit nur 2
-  Präsenztagen bekommt keine Fachzuordnung, deren Wochenstunden
-  strukturell nicht in 2 Tagen unterbringbar sind - Brücke zum
-  bestehenden `teacher_availability`-Constraint der zweiten
-  Solver-Stufe.
-- **Klassenlehrer-Tandem-Balance**: bei zwei Klassenlehrern pro Klasse
-  (siehe die GSG-Fellbach-Recherche aus Phase 2.14: häufig ein gemischtes
-  Tandem) eine weiche Ausgewogenheits-Präferenz.
-- **Springerreserve/Vertretungspool**: Lehrkräfte bewusst ohne volle
-  Deputatsausschöpfung für kurzfristige Vertretung freihalten.
-- **Gleichmäßige Verteilung unbeliebter Fächer/Randbedingungen** im
-  Kollegium (Fairness-Ziel, niedrigste Priorität).
+- ~~**Kontinuität über Jahre als aktive Solver-Präferenz**~~ (nicht wie in
+  Phase 2.14 nur aus einem bereits gelösten Vorjahr abgeleitet) -
+  **umgesetzt**, siehe "Nachtrag 5" unten.
+- ~~**Fachfremder Einsatz minimieren**~~ - **umgesetzt**, siehe
+  "Nachtrag 5" unten.
+- ~~**Maximale Anzahl Klassen/Fächer pro Lehrer**~~ - **umgesetzt**, siehe
+  "Nachtrag 5" unten.
+- ~~**Teilzeit-Tage-Kohärenz-Vorprüfung**~~ - **umgesetzt**, siehe
+  "Nachtrag 5" unten.
+- ~~**Klassenlehrer-Tandem-Balance**~~ - **umgesetzt (vereinfachte
+  Variante)**, siehe "Nachtrag 5" unten.
+- ~~**Springerreserve/Vertretungspool**~~ - **umgesetzt**, siehe
+  "Nachtrag 5" unten.
+- ~~**Gleichmäßige Verteilung unbeliebter Fächer/Randbedingungen**~~ -
+  **umgesetzt**, siehe "Nachtrag 5" unten.
 
 ## Verifikation
 
@@ -422,6 +414,115 @@ Beide Läufe bleiben `Optimal` mit 0 `VerifyLehrereinsatz`-Verstößen und 0
 selbst (genau 1 Klassenlehrer pro Klasse, siehe Nachtrag 2/3) ist
 unverändert intakt, nur die Deputat-Komponente des Objectives ist jetzt
 größer, was erwartungsgemäß und ehrlich dokumentiert ist.
+
+## Nachtrag 5: die 7 zurückgestellten Constraints aus Abschnitt "Zurückgestellte Erweiterungen"
+
+Direkte Nutzeranweisung, die oben dokumentierte Liste jetzt umzusetzen.
+Alle 7 erweitern ausschließlich `Stammdaten.vb`/`StammdatenValidation.vb`/
+`Lehrereinsatzplanung.vb`/`Verifier.vb` - `Solver.vb`/`Validation.vb`/
+`Verifier.VerifySchedule` bleiben unangetastet (gleiches Grundprinzip wie
+die gesamte Phase 2.15/2.16: neue Fähigkeit lebt in der vorgeschalteten
+Planungsstufe). Alle neuen Stammdaten-Felder sind additiv mit
+rückwärtskompatiblem Default (`Nothing`/`False`/`0`) - die bestehenden
+`StammdatenBWFixture.vb`/`AFSFellbachStammdatenFixture.vb`-Fixtures und
+ihre Tests bleiben byte-identisch unverändert grün, kein
+Regressionsrisiko für die dort dokumentierten Objective-Werte.
+
+**Nutzerentscheidungen aus der Rückfragerunde:**
+1. **Kontinuität über Jahre:** gilt für ALLE Fächer der Klasse (nicht nur
+   die Klassenlehrer-Rolle).
+2. **Teilzeit-Tage-Kohärenz:** HART ausgeschlossen (Kandidat wird gar
+   nicht als Variable erzeugt).
+3. **Klassenlehrer-Tandem-Balance:** vereinfachte Variante (Bündelungs-
+   grenze von <=1 auf <=2 anheben plus ein weiches Ausgewogenheitsziel).
+4. **Max. Klassen/Fächer pro Lehrer:** weich, per Lehrer konfigurierbar.
+
+**Erweiterte Gewichtstabelle** (bestehende Reihenfolge unverändert,
+neue Zwischenstufen ergänzt):
+
+| Gewicht | Wert | Bedeutung |
+|---|---|---|
+| `WeightDeputatAbweichung` | 100 | unverändert |
+| `WeightKlassenlehrerFehlt` | 20 | unverändert |
+| `WeightBuendelungVerletzt` | 20 | unverändert |
+| `WeightKontinuitaetVerletzt` | 20 | NEU - gleiche Stufe: "bleibt die Zuordnung stabil?" |
+| `WeightFachfremdEinsatz` | 10 | NEU |
+| `WeightMaxKlassenVerletzt` | 5 | NEU |
+| `WeightMaxFaecherVerletzt` | 5 | NEU |
+| `WeightTandemBalance` | 5 | NEU |
+| `WeightPraeferenzVerletzt` | 1 | unverändert |
+| `WeightUnbeliebteFaecherUngleichheit` | 1 | NEU - niedrigste Priorität |
+
+Springerreserve braucht kein eigenes Gewicht - realisiert als Erweiterung
+der bestehenden Deputat-Korridor-Berechnung (`sollNetto -=
+SpringerReserveStunden`, analog zu `Anrechnungsstunden`).
+
+**Mechanik je Ziel** (alle in `Lehrereinsatzplanung.SolveLehrereinsatz`,
+sofern nicht anders angegeben):
+
+1. **Kontinuität (alle Fächer):** neuer optionaler Parameter
+   `vorjahresZuordnung As Dictionary(Of (Klasse, Fach), Lehrername)`.
+   Statt der ursprünglich geplanten "Sum(1-assign)"-Formulierung wurde
+   während der Umsetzung eine mathematisch äquivalente, aber sicherere
+   Variante gewählt: die tatsächliche Wiederverwendung (`assign(key)`
+   selbst) fließt direkt als NEGATIV gewichteter Bonus-Term in die
+   Zielfunktion ein (`Sum(kontinuitaetErhalten) * -WeightKontinuitaetVerletzt`)
+   - unterscheidet sich vom ursprünglichen Ansatz nur um eine von den
+   Entscheidungsvariablen unabhängige additive Konstante (dieselbe Lösung
+   minimiert beides), vermeidet aber eine `Integer minus LinearExpr`-
+   Subtraktion, deren Operator-Richtung in diesem Projekt bislang nirgends
+   verifiziert war (nur `LinearExpr minus Integer` wird bereits im
+   Deputat-Korridor genutzt).
+2. **Fachfremder Einsatz:** `FachLehrerZuordnung.Fachfremd`-Flag, aktive
+   Zuweisung eines so markierten Kandidaten fließt direkt (die
+   `assign`-Variable selbst, kein neuer BoolVar) in die Zielfunktion ein.
+3. **Max. Klassen/Fächer:** neue `unterrichtetKlasseAlle[l,k]`/
+   `unterrichtetFach[l,f]`-BoolVars (gleiche Reifikationstechnik wie das
+   bestehende `unterrichtet[l,k]` der Bündelungslogik, hier für ALLE statt
+   nur klassenlehrerfähige Lehrkräfte), Hinge-Loss-Überschreitung wie beim
+   Deputat-Korridor.
+4. **Teilzeit-Tage-Kohärenz:** harter Filter direkt bei der
+   `assign()`-Variablenerzeugung, neue geteilte Funktion
+   `Stammdaten.IstTeilzeitKohaerent` (wiederverwendet von
+   `StammdatenValidation` UND `Lehrereinsatzplanung`).
+5. **Klassenlehrer-Tandem-Balance:** `Klasse.ErlaubtKlassenlehrerTandem`
+   hebt die Bündelungsgrenze auf 2; Ausgewogenheit über den bereits in
+   `SolveTopObjective.vb` live verifizierten Sentinel-Min/Max-Trick (nur
+   AKTIVE Kandidaten zählen für das Minimum, ein Sentinel-Wert
+   `bigStunden` für inaktive verhindert eine Verzerrung). Live entdeckte
+   Feinheit während der Umsetzung: bei GENAU EINEM (oder null) aktiven
+   Kandidaten kann `tandemMax - tandemMin` rechnerisch negativ werden
+   (Sentinel-Min bleibt bei `bigStunden`, Rohwert-Max bei 0) - eine
+   erzwungene Gleichheit wäre dort unlösbar gewesen. Behoben durch eine
+   Ungleichung (`tandemRange >= tandemMax - tandemMin`, `>= 0`, derselbe
+   Hinge-Trick wie beim Deputat-Korridor) statt einer Gleichheit - die
+   Zielfunktion drückt `tandemRange` ohnehin auf 0, sobald das zulässig
+   ist.
+6. **Springerreserve:** `Lehrer.SpringerReserveStunden` erweitert die
+   bestehende `sollNetto`-Berechnung, kein neuer Zielfunktions-Term.
+7. **Faire Verteilung unbeliebter Fächer:** `Fach.Unbeliebt`-Flag, Bereich
+   (Max-Min, kein Sentinel nötig) der Anzahl unbeliebter-Fach-Zuweisungen
+   über alle dafür qualifizierten Lehrkräfte.
+
+**`Verifier.VerifyLehrereinsatz`** bekam eine additive
+Kanarienvogel-Prüfung für die Teilzeit-Tage-Kohärenz (unabhängig aus den
+rohen Stammdaten re-derivert) - die übrigen 6 weichen Ziele werden bewusst
+NICHT im Verifier geprüft (Präferenzen, keine harten Invarianten, gleiches
+Muster wie bisher).
+
+**Live-Verifikation (7 neue Hand-Smoke-Tests in
+`LehrereinsatzplanungTests.vb`, alle grün, Erwartungswerte von Hand
+nachgerechnet):** beim Entwerfen mehrerer Tests wurde wiederholt eine
+bereits bestehende, unabhängige Nebenwirkung übersehen und musste
+nachträglich in den erwarteten Wert eingerechnet werden - ein Lehrer ohne
+`KlassenlehrerFaehig` in einer Klasse ganz ohne klassenlehrerfähigen
+Kandidaten löst unconditional `WeightKlassenlehrerFehlt` aus (bereits seit
+Phase 2.15 bestehendes Verhalten), und ein als alleiniger Kandidat über
+mehrere Klassen hinweg zwangsläufig aktiver klassenlehrerfähiger Lehrer
+löst zusätzlich die bereits bestehende Pro-Lehrkraft-Bündelungsregel aus
+(Nachtrag 3) - beide Effekte sind in den finalen Testkommentaren korrekt
+dokumentiert, kein Hinweis auf einen Fehler in der neuen Logik selbst,
+sondern auf eine anfänglich unvollständige Testisolation.
 
 ## Definition of Done — Status
 

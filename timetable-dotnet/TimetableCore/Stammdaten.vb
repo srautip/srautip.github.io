@@ -42,6 +42,13 @@ Public NotInheritable Class Fach
     ''' bestehenden Constraint-Format, siehe BuildAssignmentConstraints in
     ''' Lehrereinsatzplanung.vb.</summary>
     Public Property BlockLength As Integer?
+    ''' <summary>Phase 2.17: markiert ein im Kollegium unbeliebtes Fach -
+    ''' fliesst als weiches Fairness-Ziel (niedrigste Prioritaet) in
+    ''' Lehrereinsatzplanung.SolveLehrereinsatz ein: die Zuweisungen
+    ''' unbeliebter Faecher sollen sich moeglichst gleichmaessig auf die
+    ''' dafuer qualifizierten Lehrkraefte verteilen. Default False = keine
+    ''' Auswirkung (heutiges Verhalten).</summary>
+    Public Property Unbeliebt As Boolean = False
     Public Property Klassenstufen As New List(Of FachKlassenstufe)
 End Class
 
@@ -49,6 +56,13 @@ Public NotInheritable Class Klasse
     Public Property Name As String
     Public Property Klassenstufe As Integer
     Public Property Schuelerzahl As Integer?
+    ''' <summary>Phase 2.17: hebt die Klassenlehrer-Buendelungsgrenze
+    ''' (siehe Lehrereinsatzplanung.vb, Nachtrag 2/3) fuer diese Klasse von
+    ''' hoechstens 1 auf hoechstens 2 gleichzeitig aktive klassenlehrer-
+    ''' faehige Kandidaten an - reales "Klassenlehrer-Tandem" (siehe
+    ''' Phase-2.14-Recherche zum GSG-Fellbach-Modell). Default False =
+    ''' heutiges Verhalten (genau 1).</summary>
+    Public Property ErlaubtKlassenlehrerTandem As Boolean = False
 End Class
 
 Public NotInheritable Class Raum
@@ -66,12 +80,29 @@ Public NotInheritable Class Lehrer
     ''' wird vom nominalen Deputat abgezogen, bevor der Lehrereinsatz-
     ''' Solver den tatsaechlichen Soll-Korridor bildet.</summary>
     Public Property Anrechnungsstunden As Double = 0
+    ''' <summary>Phase 2.17: Springerreserve/Vertretungspool - Stunden, die
+    ''' bewusst NICHT durch Fachunterricht ausgeschoepft werden sollen
+    ''' (Bereitschaft fuer kurzfristige Vertretung). Wird wie
+    ''' Anrechnungsstunden vom nominalen Deputat abgezogen, BEVOR der
+    ''' Deputat-Korridor gebildet wird - eine bewusst freigehaltene
+    ''' Lehrkraft wird dadurch nicht fuer die Nicht-Ausschoepfung
+    ''' bestraft. Default 0 = heutiges Verhalten.</summary>
+    Public Property SpringerReserveStunden As Double = 0
     ''' <summary>Nothing = an allen Schultagen verfuegbar (Default fuer
     ''' Vollzeit-Lehrkraefte). Gesetzt = Teilzeit, nur an diesen Tagen im
     ''' Haus.</summary>
     Public Property VerfuegbareTage As List(Of String) = Nothing
     Public Property BevorzugteKlassenstufen As New List(Of Integer)
     Public Property KlassenlehrerFaehig As Boolean = True
+    ''' <summary>Phase 2.17: weiches Ziel gegen Zersplitterung - Nothing =
+    ''' kein Limit (heutiges Verhalten). Gesetzt: Ueberschreitung der
+    ''' Anzahl unterschiedlicher Klassen, in denen diese Lehrkraft aktiv
+    ''' unterrichtet, fliesst als Hinge-Loss-Malus in die
+    ''' Lehrereinsatzplanung-Zielfunktion ein.</summary>
+    Public Property MaxKlassen As Integer?
+    ''' <summary>Wie MaxKlassen, aber fuer die Anzahl unterschiedlicher
+    ''' Faecher.</summary>
+    Public Property MaxFaecher As Integer?
 End Class
 
 ''' <summary>Die "Zuordnung Faecher zu Lehrer" aus der Nutzeranfrage - die
@@ -81,6 +112,13 @@ End Class
 Public NotInheritable Class FachLehrerZuordnung
     Public Property LehrerName As String
     Public Property FachName As String
+    ''' <summary>Phase 2.17: markiert diese Zuordnung als fachfremden
+    ''' Einsatz (Lehrkraft ist formal einsetzbar, aber nicht in ihrer
+    ''' Hauptqualifikation) - bleibt weiterhin ein zulaessiger Kandidat
+    ''' fuer Lehrereinsatzplanung.SolveLehrereinsatz, eine tatsaechliche
+    ''' Zuweisung fliesst aber als weicher Malus in die Zielfunktion ein.
+    ''' Default False = regulaer qualifiziert (heutiges Verhalten).</summary>
+    Public Property Fachfremd As Boolean = False
 End Class
 
 Public NotInheritable Class Stammdatenbestand
@@ -139,6 +177,23 @@ Public Module Stammdaten
         Dim qualifiziert = New HashSet(Of String)(
             bestand.FachLehrerZuordnungen.Where(Function(z) z.FachName = fachName).Select(Function(z) z.LehrerName))
         Return bestand.Lehrkraefte.Where(Function(l) qualifiziert.Contains(l.Name)).ToList()
+    End Function
+
+    ''' <summary>Phase 2.17: prueft, ob eine Lehrkraft mit eingeschraenkten
+    ''' Praesenztagen (VerfuegbareTage) das Wochenpensum eines Fachs in
+    ''' einer Klassenstufe strukturell unterbringen kann - eine Lehrkraft
+    ''' ohne VerfuegbareTage-Einschraenkung (Vollzeit, Default) ist immer
+    ''' kohaerent. Ohne gesetztes MaxProTag wird die Klassenobergrenze
+    ''' `PeriodsPerDay` als effektive Tagesgrenze verwendet (mehr Stunden
+    ''' als Perioden pro Tag kann keine Klasse an einem einzigen Tag
+    ''' fassen, unabhaengig vom Fach). Wiederverwendet von
+    ''' StammdatenValidation (Strukturpruefung) UND Lehrereinsatzplanung
+    ''' (harter Kandidaten-Vorfilter) - dieselbe Formel an beiden
+    ''' Stellen.</summary>
+    Public Function IstTeilzeitKohaerent(lehrer As Lehrer, bestand As Stammdatenbestand, fk As FachKlassenstufe) As Boolean
+        If lehrer.VerfuegbareTage Is Nothing Then Return True
+        Dim effectiveMaxProTag = If(fk.MaxProTag.HasValue, fk.MaxProTag.Value, bestand.PeriodsPerDay)
+        Return fk.WochenstundenSoll <= lehrer.VerfuegbareTage.Count * effectiveMaxProTag
     End Function
 
     ''' <summary>Projiziert einen Stammdatenbestand in das
