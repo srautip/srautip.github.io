@@ -25,8 +25,34 @@ Imports System.Text.Json.Nodes
 
 Public Module Raumzuordnung
 
+    ''' <summary>Phase 2.13: `specialRoomsBySubject` (Nothing by default,
+    ''' reproducing today's exact behavior for every existing caller) lets
+    ''' a subject with real room needs (e.g. Sport -&gt; Turnhallen,
+    ''' Biologie/Chemie/Physik -&gt; NaWi-Raeume) use that specific room
+    ''' list as `allowed_rooms` instead of the full generic pool - so a
+    ''' Kursstufe Sport-Kurs actually competes for a Turnhalle rather than
+    ''' any of the 10 interchangeable Kursraum-N rooms. A subject absent
+    ''' from this map keeps using the full `rooms` list exactly as
+    ''' before.
+    '''
+    ''' `externalRoomBusySlots` (also Nothing by default): a map of a
+    ''' shared room name -&gt; the (day,period) slots that room is already
+    ''' occupied elsewhere (e.g. by an already-solved Sek-I schedule).
+    ''' Emits a `forbidden_slot(scope:="room", ...)` per such slot -
+    ''' already-existing, unchanged Solver.vb machinery that prevents ANY
+    ''' Kurs here from being assigned that room during that slot. Day/
+    ''' period is already PINNED per Kurs at this stage (from stage B), so
+    ''' if a Kurs's ENTIRE `allowed_rooms` set happens to be externally
+    ''' busy at exactly its one pinned slot, this stage goes genuinely
+    ''' Infeasible with no recourse - day/period cannot renegotiate here.
+    ''' This is a documented, accepted residual risk of the Sek-I-first
+    ''' solve order (see docs/phase2-13-combined-school.md), not a bug -
+    ''' avoiding it structurally would require making stage B itself
+    ''' room-aware, out of scope for this phase.</summary>
     Public Function BuildRaumzuordnungScenario(data As JsonObject, kursblockungAssignment As Dictionary(Of String, String),
-                                                schienenSchedule As List(Of ScheduleEntry)) As JsonObject
+                                                schienenSchedule As List(Of ScheduleEntry),
+                                                Optional specialRoomsBySubject As Dictionary(Of String, List(Of String)) = Nothing,
+                                                Optional externalRoomBusySlots As Dictionary(Of String, HashSet(Of (Day As String, Period As Integer))) = Nothing) As JsonObject
         Dim ent = JsonHelpers.Entities(data)
         Dim timeslots = JsonHelpers.Timeslots(ent)
         Dim days = JsonHelpers.AsStringList(timeslots, "days")
@@ -71,9 +97,11 @@ Public Module Raumzuordnung
             Next
 
             If rooms.Count > 0 AndAlso roomReqSubjectsAdded.Add(subject) Then
+                Dim allowedRooms = If(specialRoomsBySubject IsNot Nothing AndAlso specialRoomsBySubject.ContainsKey(subject),
+                                       specialRoomsBySubject(subject), rooms)
                 constraints.Add(New JsonObject From {
                     {"type", "room_requirement"}, {"subject", subject},
-                    {"allowed_rooms", New JsonArray(rooms.Select(Function(r) CType(r, JsonNode)).ToArray())}
+                    {"allowed_rooms", New JsonArray(allowedRooms.Select(Function(r) CType(r, JsonNode)).ToArray())}
                 })
             End If
         Next
@@ -81,6 +109,18 @@ Public Module Raumzuordnung
         For Each room In rooms
             constraints.Add(New JsonObject From {{"type", "no_overlap"}, {"resource", "room"}, {"entity", room}})
         Next
+
+        If externalRoomBusySlots IsNot Nothing Then
+            For Each room In rooms
+                If externalRoomBusySlots.ContainsKey(room) Then
+                    For Each slot In externalRoomBusySlots(room)
+                        constraints.Add(New JsonObject From {
+                            {"type", "forbidden_slot"}, {"scope", "room"}, {"entity", room}, {"day", slot.Day}, {"period", slot.Period}
+                        })
+                    Next
+                End If
+            Next
+        End If
         For Each teacher In teacherNames
             constraints.Add(New JsonObject From {{"type", "no_overlap"}, {"resource", "teacher"}, {"entity", teacher}})
         Next

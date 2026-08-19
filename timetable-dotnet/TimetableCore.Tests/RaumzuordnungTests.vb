@@ -68,6 +68,75 @@ Public Class RaumzuordnungTests
         Return Solver.Solve(raumScenario, numWorkers:=1)
     End Function
 
+    ''' <summary>Phase 2.13b: a single "Sport" Kurs, generic rooms R1-R3
+    ''' PLUS a special room "Turnhalle1" all present in entities.rooms -
+    ''' `specialRoomsBySubject:={"Sport" -&gt; {"Turnhalle1"}}` must restrict
+    ''' Sport's allowed_rooms to just that special room, not the full pool
+    ''' (proves the mechanism actually narrows the choice, not just adds
+    ''' the special room as one more option among the generic ones).</summary>
+    Private Shared Function OneSportKursScenario() As JsonObject
+        Dim ent As New JsonObject From {
+            {"classes", New JsonArray()},
+            {"teachers", New JsonArray({"T-Sport"})},
+            {"subjects", New JsonArray({"Sport"})},
+            {"rooms", New JsonArray({"R1", "R2", "R3", "Turnhalle1"})},
+            {"timeslots", New JsonObject From {
+                {"days", New JsonArray({"Mo", "Di", "Mi", "Do", "Fr"})}, {"periods_per_day", 4}
+            }},
+            {"kurse", New JsonArray({CType(Kurs("Sport-GK1", "Sport", "T-Sport", "GK", 2), JsonNode)})},
+            {"schienen", New JsonArray({CType(Schiene("S1", "GK", 2), JsonNode)})}
+        }
+        Return New JsonObject From {
+            {"entities", ent},
+            {"constraints", New JsonArray({CType(Kurswahl("WP1", {"Sport-GK1"}), JsonNode)})}
+        }
+    End Function
+
+    <TestMethod>
+    Public Sub SpecialRoomsBySubjectRestrictsAllowedRoomsForThatSubject()
+        Dim data = OneSportKursScenario()
+        Dim assignment = Kursblockung.SolveKursblockung(data, numWorkers:=1).Assignment
+        Dim schienenSchedule = Solver.Solve(Schienenraster.BuildSchienenrasterScenario(data, assignment), numWorkers:=1).Schedule
+        Dim specialRooms As New Dictionary(Of String, List(Of String)) From {
+            {"Sport", New List(Of String) From {"Turnhalle1"}}
+        }
+        Dim raumScenario = Raumzuordnung.BuildRaumzuordnungScenario(data, assignment, schienenSchedule, specialRooms)
+        Dim r = Solver.Solve(raumScenario, numWorkers:=1)
+        Assert.IsTrue(r.Status = CpSolverStatus.Optimal OrElse r.Status = CpSolverStatus.Feasible, Solver.StatusName(r.Status))
+        Assert.IsTrue(r.Schedule.Count > 0)
+        Assert.IsTrue(r.Schedule.All(Function(e) e.Room = "Turnhalle1"),
+            "Erwartete alle Sport-Slots in Turnhalle1, tatsaechlich: " & String.Join(", ", r.Schedule.Select(Function(e) e.Room)))
+        Assert.AreEqual(0, Verifier.VerifySchedule(raumScenario, r.Schedule).Count)
+    End Sub
+
+    ''' <summary>Phase 2.13d: `externalRoomBusySlots` excludes a specific
+    ''' room at a specific already-pinned slot - proven here by giving a
+    ''' single Kurs exactly 2 candidate rooms and marking one of them
+    ''' externally busy at every slot that Kurs could possibly land on
+    ''' (its own pinned Schiene slots), forcing the solver onto the other
+    ''' room.</summary>
+    <TestMethod>
+    Public Sub ExternalRoomBusySlotsExcludesThatRoomAtThePinnedSlot()
+        Dim data = OneSportKursScenario()
+        Dim assignment = Kursblockung.SolveKursblockung(data, numWorkers:=1).Assignment
+        Dim schienenSchedule = Solver.Solve(Schienenraster.BuildSchienenrasterScenario(data, assignment), numWorkers:=1).Schedule
+        Dim specialRooms As New Dictionary(Of String, List(Of String)) From {
+            {"Sport", New List(Of String) From {"Turnhalle1", "R1"}}
+        }
+        Dim busySlots As New HashSet(Of (Day As String, Period As Integer))(
+            schienenSchedule.Select(Function(e) (Day:=e.Day, Period:=e.Period)))
+        Dim externalBusy As New Dictionary(Of String, HashSet(Of (Day As String, Period As Integer))) From {
+            {"Turnhalle1", busySlots}
+        }
+        Dim raumScenario = Raumzuordnung.BuildRaumzuordnungScenario(data, assignment, schienenSchedule, specialRooms, externalBusy)
+        Dim r = Solver.Solve(raumScenario, numWorkers:=1)
+        Assert.IsTrue(r.Status = CpSolverStatus.Optimal OrElse r.Status = CpSolverStatus.Feasible, Solver.StatusName(r.Status))
+        Assert.IsTrue(r.Schedule.Count > 0)
+        Assert.IsTrue(r.Schedule.All(Function(e) e.Room = "R1"),
+            "Erwartete alle Sport-Slots in R1 (Turnhalle1 ist extern belegt), tatsaechlich: " & String.Join(", ", r.Schedule.Select(Function(e) e.Room)))
+        Assert.AreEqual(0, Verifier.VerifySchedule(raumScenario, r.Schedule).Count)
+    End Sub
+
     <TestMethod>
     Public Sub InfeasibleWhenFewerRoomsThanSimultaneousKurse()
         Dim data = TwoCoursesOneSchieneScenario(roomCount:=1)

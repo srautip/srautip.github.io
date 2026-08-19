@@ -83,16 +83,25 @@ Public Module GymnasiumSekIFixture
     ''' SAME no_overlap(teacher) constraint, double-booking that teacher
     ''' across both bands' classes at once. This is exactly the bug an
     ''' earlier version of this fixture had (root-caused via bisection:
-    ''' Solve() was Infeasible only with no_overlap(teacher) present).</summary>
+    ''' Solve() was Infeasible only with no_overlap(teacher) present).
+    '''
+    ''' Phase 2.13: for a subject in SharedSchoolPool.SharedTeacherPool,
+    ''' teacher names come from that shared pool instead of being freshly
+    ''' synthesized - pool sizes were derived to exactly match this
+    ''' fixture's own group counts per subject, so this produces the
+    ''' IDENTICAL names as before (net-zero effect on Sek I), but now lets
+    ''' KursstufeFixture.vb's own teachers reuse the same identities.</summary>
     Private Sub AddUniformSubject(result As List(Of SubjectAssignment), teacherCounters As Dictionary(Of String, Integer),
                                    subject As String, classes As List(Of String),
                                    hours As Integer, maxPerDay As Integer, classesPerTeacher As Integer,
                                    Optional blockLength As Integer? = Nothing, Optional rooms As List(Of String) = Nothing)
         Dim groups = SplitInto(classes, classesPerTeacher)
         Dim nextIndex = teacherCounters.GetValueOrDefault(subject, 0)
+        Dim pool = SharedSchoolPool.SharedTeacherPool.GetValueOrDefault(subject, Nothing)
         For i = 0 To groups.Count - 1
             nextIndex += 1
-            result.Add(New SubjectAssignment(subject, $"{subject}-{nextIndex}", groups(i), hours, maxPerDay, blockLength, rooms))
+            Dim teacherName = If(pool IsNot Nothing, pool(nextIndex - 1), $"{subject}-{nextIndex}")
+            result.Add(New SubjectAssignment(subject, teacherName, groups(i), hours, maxPerDay, blockLength, rooms))
         Next
         teacherCounters(subject) = nextIndex
     End Sub

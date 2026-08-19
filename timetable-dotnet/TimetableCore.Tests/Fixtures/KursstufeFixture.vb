@@ -116,20 +116,43 @@ Public Module KursstufeFixture
     ''' never collides, mirroring the teacherCounters discipline
     ''' GymnasiumSekIFixture.vb's AddUniformSubject already established
     ''' (there: banduebergreifend per subject; here: kursart-uebergreifend
-    ''' per subject).</summary>
-    Private Sub AddSections(result As List(Of JsonObject), teacherCounters As Dictionary(Of String, Integer),
+    ''' per subject) - this remains the FALLBACK naming path for subjects
+    ''' with no Sek-I counterpart.
+    '''
+    ''' Phase 2.13: for a subject in SharedSchoolPool.SharedTeacherPool
+    ''' (via PoolKeyFor's Geographie->Erdkunde alias), the teacher instead
+    ''' comes from that shared pool, round-robin via `poolCounters` - kept
+    ''' as a SEPARATE counter keyed by subject ALONE (not subject-kursart),
+    ''' deliberately spanning LK+GK Kurse of the same subject together, so
+    ''' each shared pool member gets AT MOST ONE Kursstufe Kurs even when a
+    ''' subject offers both LK and GK sections - never two simultaneous
+    ''' Kursstufe assignments stacked on the same shared teacher on top of
+    ''' their existing Sek-I load. Every pool size was chosen so this
+    ''' round-robin never needs to wrap (verified live, see
+    ''' RealSchoolFixtureTests.vb).</summary>
+    Private Sub AddSections(result As List(Of JsonObject), teacherCounters As Dictionary(Of String, Integer), poolCounters As Dictionary(Of String, Integer),
                              subjects As List(Of (Subject As String, Sections As Integer)),
                              kursart As String, hours As Integer, idPrefix As String,
                              idFn As Func(Of String, Integer, String))
         For Each entry In subjects
             For i = 1 To entry.Sections
-                Dim counterKey = $"{entry.Subject}-{kursart}"
-                Dim nextIndex = teacherCounters.GetValueOrDefault(counterKey, 0) + 1
-                teacherCounters(counterKey) = nextIndex
+                Dim poolKey = SharedSchoolPool.PoolKeyFor(entry.Subject)
+                Dim pool = SharedSchoolPool.SharedTeacherPool.GetValueOrDefault(poolKey, Nothing)
+                Dim teacherName As String
+                If pool IsNot Nothing Then
+                    Dim poolIndex = poolCounters.GetValueOrDefault(poolKey, 0)
+                    teacherName = pool(poolIndex Mod pool.Count)
+                    poolCounters(poolKey) = poolIndex + 1
+                Else
+                    Dim counterKey = $"{entry.Subject}-{kursart}"
+                    Dim nextIndex = teacherCounters.GetValueOrDefault(counterKey, 0) + 1
+                    teacherCounters(counterKey) = nextIndex
+                    teacherName = $"T-{entry.Subject}-{kursart}-{nextIndex}"
+                End If
                 result.Add(New JsonObject From {
                     {"id", idFn(entry.Subject, i)},
                     {"subject", entry.Subject},
-                    {"teacher", $"T-{entry.Subject}-{kursart}-{nextIndex}"},
+                    {"teacher", teacherName},
                     {"kursart", kursart},
                     {"hours_per_week", hours}
                 })
@@ -140,9 +163,10 @@ Public Module KursstufeFixture
     Private Function BuildKurse() As List(Of JsonObject)
         Dim result As New List(Of JsonObject)
         Dim teacherCounters As New Dictionary(Of String, Integer)
-        AddSections(result, teacherCounters, LkSubjects, "LK", 5, "LK", AddressOf LkId)
-        AddSections(result, teacherCounters, Gk3hSubjects, "GK", 3, "GK3", AddressOf Gk3Id)
-        AddSections(result, teacherCounters, Gk2hSubjects, "GK", 2, "GK2", AddressOf Gk2Id)
+        Dim poolCounters As New Dictionary(Of String, Integer)
+        AddSections(result, teacherCounters, poolCounters, LkSubjects, "LK", 5, "LK", AddressOf LkId)
+        AddSections(result, teacherCounters, poolCounters, Gk3hSubjects, "GK", 3, "GK3", AddressOf Gk3Id)
+        AddSections(result, teacherCounters, poolCounters, Gk2hSubjects, "GK", 2, "GK2", AddressOf Gk2Id)
         Return result
     End Function
 
@@ -233,7 +257,15 @@ Public Module KursstufeFixture
 
         Dim teachers = kurse.Select(Function(k) JsonHelpers.GetString(k, "teacher")).Distinct().OrderBy(Function(s) s).ToList()
         Dim subjects = kurse.Select(Function(k) JsonHelpers.GetString(k, "subject")).Distinct().OrderBy(Function(s) s).ToList()
+        ' Phase 2.13: the generic Kursraum pool stays as the fallback for
+        ' subjects with no real room need, PLUS Sek I's own special rooms
+        ' (Turnhallen/NaWi/Musik/Kunst/PC) - listed here so
+        ' Validation.ValidateEntities accepts them as known rooms when a
+        ' caller (e.g. Raumzuordnung.BuildRaumzuordnungScenario's new
+        ' specialRoomsBySubject parameter) actually assigns a subject like
+        ' Sport or Biologie to one of them instead of a generic Kursraum.
         Dim rooms = Enumerable.Range(1, RoomCount).Select(Function(i) $"Kursraum{i}").ToList()
+        rooms.AddRange({"Turnhalle1", "Turnhalle2", "Turnhalle3", "NaWi1", "NaWi2", "NaWi3", "Musikraum", "Kunstraum", "PC-Raum"})
 
         Dim ent As New JsonObject From {
             {"classes", New JsonArray()},

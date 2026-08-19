@@ -70,6 +70,61 @@ Public Class SchienenrasterTests
         }
     End Function
 
+    ''' <summary>Phase 2.13c: proves `externalTeacherBusySlots` correctly
+    ''' scopes its exclusion to the ONE Schiene whose real Kurs-teacher is
+    ''' busy, not to every Schiene in the conflict group (the exact bug the
+    ''' old single shared "_schiene" placeholder would have caused).
+    ''' 1 day x 2 periods, two GK-Schienen forced into the SAME conflict
+    ''' group by one Wahlprofil choosing both their Kurse; each Schiene
+    ''' needs exactly 1 slot, so between them they must occupy BOTH
+    ''' available slots. Only Kurs A's teacher (T-A) is externally busy at
+    ''' Mo/1. A CORRECT per-Schiene exclusion still succeeds (A's Schiene
+    ''' moves to Mo/2, B's Schiene takes the now-only-remaining Mo/1) - an
+    ''' over-broad exclusion blocking BOTH Schienen from Mo/1 would make
+    ''' this genuinely Infeasible (2 Schienen need 2 slots, only 1 would be
+    ''' usable), so Feasible/Optimal here is itself already a correctness
+    ''' proof, sharpened by the explicit per-Schiene slot assertions
+    ''' below.</summary>
+    <TestMethod>
+    Public Sub ExternalTeacherBusySlotsOnlyBlocksTheAffectedSchiene()
+        Dim ent As New JsonObject From {
+            {"classes", New JsonArray()},
+            {"teachers", New JsonArray({"T-A", "T-B"})},
+            {"subjects", New JsonArray({"Fach A", "Fach B"})},
+            {"rooms", New JsonArray()},
+            {"timeslots", New JsonObject From {
+                {"days", New JsonArray({"Mo"})}, {"periods_per_day", 2}
+            }},
+            {"kurse", New JsonArray({
+                CType(Kurs("A-GK1", "Fach A", "T-A", "GK", 1), JsonNode),
+                Kurs("B-GK1", "Fach B", "T-B", "GK", 1)
+            })},
+            {"schienen", New JsonArray({CType(Schiene("S1", "GK", 1), JsonNode), Schiene("S2", "GK", 1)})}
+        }
+        Dim data = New JsonObject From {
+            {"entities", ent},
+            {"constraints", New JsonArray({CType(Kurswahl("WP1", {"A-GK1", "B-GK1"}), JsonNode)})}
+        }
+
+        Dim kb = Kursblockung.SolveKursblockung(data, numWorkers:=1)
+        Assert.IsTrue(kb.Status = CpSolverStatus.Optimal OrElse kb.Status = CpSolverStatus.Feasible)
+        Dim schieneOfA = kb.Assignment("A-GK1")
+        Dim schieneOfB = kb.Assignment("B-GK1")
+
+        Dim externalBusy As New Dictionary(Of String, HashSet(Of (Day As String, Period As Integer))) From {
+            {"T-A", New HashSet(Of (Day As String, Period As Integer)) From {("Mo", 1)}}
+        }
+        Dim synthetic = Schienenraster.BuildSchienenrasterScenario(data, kb.Assignment, externalBusy)
+        Dim r = Solver.Solve(synthetic, timeLimitS:=30, numWorkers:=1)
+        Assert.IsTrue(r.Status = CpSolverStatus.Optimal OrElse r.Status = CpSolverStatus.Feasible, Solver.StatusName(r.Status))
+        Assert.AreEqual(0, Verifier.VerifySchedule(synthetic, r.Schedule).Count)
+
+        Dim slotOfA = r.Schedule.Single(Function(e) e.Subject = schieneOfA)
+        Dim slotOfB = r.Schedule.Single(Function(e) e.Subject = schieneOfB)
+        Assert.AreEqual(2, slotOfA.Period, "A's Schiene sollte auf Mo/2 ausweichen (T-A ist Mo/1 extern belegt).")
+        Assert.AreEqual(1, slotOfB.Period, "B's Schiene sollte Mo/1 nutzen koennen (T-B ist nicht belegt) - waere bei einer zu breiten Sperre unmoeglich.")
+    End Sub
+
     <TestMethod>
     Public Sub SchienenrasterScenarioSolvesCleanlyViaUnchangedSolver()
         Dim data = ToyScenario()

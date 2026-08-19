@@ -32,11 +32,12 @@
 ' pseudo-class idea itself. Not one line of Solver.vb changes for this
 ' stage - only this module's synthetic-scenario construction.
 '
-' The pseudo-classes ("Kursstufe-1", "Kursstufe-2", ...) and pseudo-
-' teacher "_schiene" are purely internal to this stage and must never
-' leak into a caller-visible schedule/constraint list - DeriveKursSchedule
-' below replaces them with the real Kurs/Lehrkraft identities before
-' returning anything.
+' The pseudo-classes ("Kursstufe-1", "Kursstufe-2", ...) and the pseudo-
+' teachers ("_schiene_{SchieneId}", one PER Schiene since Phase 2.13 - see
+' BuildSchienenrasterScenario's own doc comment for why) are purely
+' internal to this stage and must never leak into a caller-visible
+' schedule/constraint list - DeriveKursSchedule below replaces them with
+' the real Kurs/Lehrkraft identities before returning anything.
 Imports System.Text.Json.Nodes
 
 Public Module Schienenraster
@@ -89,21 +90,53 @@ Public Module Schienenraster
         Return groupOf
     End Function
 
+    ''' <summary>Phase 2.13: for a given Schiene id, the real teachers of
+    ''' every Kurs assigned to it (inverts `kursblockungAssignment`,
+    ''' KursId-&gt;SchieneId, then looks up each matching Kurs's own
+    ''' `teacher` field in `entities.kurse`). Needed to derive which
+    ''' external [Sek-I] busy-slots are actually relevant to THIS Schiene,
+    ''' not the whole Kursstufe.</summary>
+    Private Function TeachersOfSchiene(ent As JsonObject, schieneId As String, kursblockungAssignment As Dictionary(Of String, String)) As List(Of String)
+        Dim kursIds = kursblockungAssignment.Where(Function(kvp) kvp.Value = schieneId).Select(Function(kvp) kvp.Key).ToHashSet()
+        Return JsonHelpers.GetKurse(ent).
+            Where(Function(k) kursIds.Contains(JsonHelpers.GetString(k, "id"))).
+            Select(Function(k) JsonHelpers.GetString(k, "teacher")).Distinct().ToList()
+    End Function
+
     ''' <summary>Builds the synthetic Solver.Solve() input for stage B.
-    ''' Every Schiene becomes one "subject" taught by the pseudo-teacher
-    ''' "_schiene" to its conflict group's pseudo-class (see
-    ''' GroupSchienenByConflict and the module header), with its
-    ''' weekly_hours set from `hours_per_week`. If the Schiene JSON
-    ''' carries an optional "block_length" (e.g. for LK-Doppelstunden -
-    ''' only meaningful when hours_per_week is an exact multiple of it,
-    ''' same precondition as every other block_length use in this
-    ''' project, e.g. GymnasiumSekIFixture's Physik/Chemie double
+    ''' Every Schiene becomes one "subject" taught by its OWN distinct
+    ''' pseudo-teacher "_schiene_{SchieneId}" (Phase 2.13: was a single
+    ''' shared "_schiene" for every Schiene before - the rename itself
+    ''' changes nothing about no_overlap(class:=groupName) semantics,
+    ''' which is indexed by .ClassName not .Teacher, but a DISTINCT
+    ''' identity per Schiene is required for `externalTeacherBusySlots`
+    ''' below to target one specific Schiene instead of blocking every
+    ''' Schiene in every conflict group at once) to its conflict group's
+    ''' pseudo-class (see GroupSchienenByConflict and the module header),
+    ''' with its weekly_hours set from `hours_per_week`. If the Schiene
+    ''' JSON carries an optional "block_length" (e.g. for LK-
+    ''' Doppelstunden - only meaningful when hours_per_week is an exact
+    ''' multiple of it, same precondition as every other block_length use
+    ''' in this project, e.g. GymnasiumSekIFixture's Physik/Chemie double
     ''' lessons), a matching consecutive_required + max_per_day pair is
-    ''' added too. `kursblockungAssignment` is stage A's result -
-    ''' needed here only to compute the conflict grouping, not to place
-    ''' any Kurs (that is DeriveKursSchedule's job, after this stage
-    ''' solves).</summary>
-    Public Function BuildSchienenrasterScenario(data As JsonObject, kursblockungAssignment As Dictionary(Of String, String)) As JsonObject
+    ''' added too. `kursblockungAssignment` is stage A's result - used
+    ''' here to compute the conflict grouping AND (if
+    ''' `externalTeacherBusySlots` is given) to look up which real
+    ''' teachers a Schiene's Kurse have; placing any Kurs is still
+    ''' DeriveKursSchedule's job, after this stage solves.
+    '''
+    ''' `externalTeacherBusySlots` (Nothing by default, reproducing
+    ''' today's exact behavior for every existing caller): a map of real
+    ''' teacher name -&gt; the (day,period) slots that teacher is already
+    ''' busy elsewhere (e.g. in an already-solved Sek-I schedule). For
+    ''' each Schiene, the union of busy slots across whichever of its
+    ''' Kurse's teachers appear in this map becomes a `teacher_availability`
+    ''' constraint on that Schiene's own placeholder identity - so stage B
+    ''' avoids scheduling a Schiene at a time one of its real teachers is
+    ''' already committed elsewhere, instead of only discovering the
+    ''' conflict too late in stage C.</summary>
+    Public Function BuildSchienenrasterScenario(data As JsonObject, kursblockungAssignment As Dictionary(Of String, String),
+                                                 Optional externalTeacherBusySlots As Dictionary(Of String, HashSet(Of (Day As String, Period As Integer))) = Nothing) As JsonObject
         Dim ent = JsonHelpers.Entities(data)
         Dim timeslots = JsonHelpers.Timeslots(ent)
         Dim days = JsonHelpers.AsStringList(timeslots, "days")
@@ -114,14 +147,17 @@ Public Module Schienenraster
         Dim groupNames = groupOf.Values.Distinct().OrderBy(Function(g) g).ToList()
 
         Dim constraints As New List(Of JsonObject)
+        Dim placeholderTeachers As New List(Of String)
         For Each s In schienen
             Dim id = JsonHelpers.GetString(s, "id")
             Dim groupName = groupOf(id)
             Dim hours = JsonHelpers.GetInt(s, "hours_per_week").Value
             Dim blockLength = JsonHelpers.GetInt(s, "block_length")
+            Dim placeholderTeacher = $"_schiene_{id}"
+            placeholderTeachers.Add(placeholderTeacher)
 
             constraints.Add(New JsonObject From {
-                {"type", "teacher_subject_assignment"}, {"class", groupName}, {"subject", id}, {"teacher", "_schiene"}
+                {"type", "teacher_subject_assignment"}, {"class", groupName}, {"subject", id}, {"teacher", placeholderTeacher}
             })
 
             Dim wh As New JsonObject From {
@@ -135,6 +171,22 @@ Public Module Schienenraster
                     {"type", "consecutive_required"}, {"class", groupName}, {"subject", id}, {"block_length", blockLength.Value}
                 })
             End If
+
+            If externalTeacherBusySlots IsNot Nothing Then
+                Dim busy As New HashSet(Of (Day As String, Period As Integer))
+                For Each realTeacher In TeachersOfSchiene(ent, id, kursblockungAssignment)
+                    If externalTeacherBusySlots.ContainsKey(realTeacher) Then
+                        busy.UnionWith(externalTeacherBusySlots(realTeacher))
+                    End If
+                Next
+                If busy.Count > 0 Then
+                    constraints.Add(New JsonObject From {
+                        {"type", "teacher_availability"}, {"teacher", placeholderTeacher},
+                        {"unavailable_periods", New JsonArray(busy.Select(Function(slot) CType(
+                            New JsonObject From {{"day", slot.Day}, {"period", slot.Period}}, JsonNode)).ToArray())}
+                    })
+                End If
+            End If
         Next
         For Each g In groupNames
             constraints.Add(New JsonObject From {{"type", "no_overlap"}, {"resource", "class"}, {"entity", g}})
@@ -142,7 +194,7 @@ Public Module Schienenraster
 
         Dim schienenEnt As New JsonObject From {
             {"classes", New JsonArray(groupNames.Select(Function(g) CType(g, JsonNode)).ToArray())},
-            {"teachers", New JsonArray({CType("_schiene", JsonNode)})},
+            {"teachers", New JsonArray(placeholderTeachers.Select(Function(t) CType(t, JsonNode)).ToArray())},
             {"subjects", New JsonArray(schienen.Select(Function(s) CType(JsonHelpers.GetString(s, "id"), JsonNode)).ToArray())},
             {"rooms", New JsonArray()},
             {"timeslots", New JsonObject From {
