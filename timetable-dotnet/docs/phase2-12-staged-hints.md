@@ -154,6 +154,65 @@ schließen sich nicht aus (`useStagedHints:=True` UND `numWorkers:=4`
 gemeinsam wäre der nächste naheliegende Versuch, hier aber nicht mehr
 Teil dieser Phase).
 
+## Nachtrag: `numWorkers:=4` + `useStagedHints:=True` kombiniert
+
+Der oben als "nächster naheliegender Versuch" angekündigte Test wurde
+nachgeholt: `SekIStagedHintsNumWorkers4Benchmark` kombiniert beide
+Mechanismen. Da sie bereits unabhängig identisch in Stufe 1 und jede
+Stufe-2-Iteration verdrahtet sind und nie gleichzeitig laufen, war dafür
+kein neuer Code nötig - nur ein bisher nie gefahrener Testlauf.
+
+| Lauf | `numWorkers` | Staging | Ergebnis |
+|---|---|---|---|
+| Phase 2.11-Nachtrag | 4 | Nein | Total=1023,54 (aber: alte 5-Kriterien-Zielfunktion, noch ohne `AfternoonDayCount`) |
+| Phase 2.12 | 1 | Ja | Total=10605,47 |
+| **Nachtrag** | **4** | **Ja** | **Total=1219,96** (1201,7s, `StopReason=MaxSolutionsReached`) |
+
+```
+Quality.Total=1219,96, ClassGapCount=0, TeacherGapCount=16,
+EdgePeriodCount=142, AfternoonDayCount=37, ClassLoadVariance=10,00,
+TeacherLoadVariance=44,99
+```
+
+0 Verifier-Muss-Verstöße. **Ehrliche Einordnung:** die Kombination liegt
+nahe am `numWorkers:=4`-alleine-Ergebnis, nicht klar besser - das
+entspricht am ehesten dem in der Planung vorgesehenen Ausgang (b) ("kaum
+ein Unterschied ... die Portfolio-Suche allein startet schon gut genug").
+Ein exakter Vergleich mit der `numWorkers:=4`-ohne-Staging-Zeile ist
+allerdings nicht ganz sauber möglich: jener Lauf stammt aus Phase
+2.11-Nachtrag, **bevor** `AfternoonDayCount` als 6. Kriterium zur
+Zielfunktion hinzukam - die beiden Läufe optimieren also nicht exakt
+dieselbe Zielfunktion. Innerhalb der jetzt vergleichbaren Kennzahlen zeigt
+sich ein gemischtes Bild: `ClassGapCount` bleibt bei 0 (beide optimal),
+`TeacherGapCount` ist leicht schlechter (16 vs. 9), `TeacherLoadVariance`
+dagegen deutlich besser (44,99 vs. 64,45). Insgesamt: Staging bringt bei
+bereits vorhandenem Portfolio-Threading keinen klaren Zusatznutzen mehr -
+die beiden Mechanismen adressieren überlappende, nicht rein additive
+Aspekte des Kaltstart-Problems.
+
+**Stundenplan 5d** (mit `numWorkers:=4` + `useStagedHints:=True`) - zum
+Vergleich: beim ursprünglichen reinen `Solve()` hatte 5d auffällig viele
+Lücken (u.a. Mo 2. Stunde frei), hier ist der Plan durchgehend dicht
+(`ClassGapCount=0`):
+
+```
+Std. | Mo                        | Di                        | Mi                        | Do                    | Fr
+----------------------------------------------------------------------------------------------------------------------------------------
+1    | Deutsch (Deutsch-1)       | -                         | Mathematik (Mathematik-1) | -                     | -
+2    | Deutsch (Deutsch-1)       | Religion (Religion-1)     | Biologie (Biologie-1)     | -                     | -
+3    | Musik (Musik-1)           | Deutsch (Deutsch-1)       | Mathematik (Mathematik-1) | Deutsch (Deutsch-1)   | Kunst (Kunst-1)
+4    | Englisch (Englisch-1)     | Mathematik (Mathematik-1) | Englisch (Englisch-1)     | Englisch (Englisch-1) | Erdkunde (Erdkunde-1)
+5    | Mathematik (Mathematik-1) | Musik (Musik-1)           | Religion (Religion-1)     | Kunst (Kunst-1)       | Sport (Sport-1)
+6    | Englisch (Englisch-1)     | Erdkunde (Erdkunde-1)     | Sport (Sport-1)           | Sport (Sport-1)       | Biologie (Biologie-1)
+7    | -                         | -                         | -                         | -                     | -
+8    | -                         | -                         | -                         | -                     | -
+```
+
+Jede Präsenzstunde ist im vorderen Block (1.-6. Stunde) zusammengefasst,
+keine Randstunden/Nachmittagsunterricht nötig - ein direktes, sichtbares
+Ergebnis der vollen Zielfunktion gegenüber dem lückenhaften reinen
+`Solve()`-Plan.
+
 ## Verifikation
 
 - Alle 9 bestehenden `SolveTopTests.vb`-Tests unverändert grün nach jedem
