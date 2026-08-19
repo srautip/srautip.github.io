@@ -770,7 +770,7 @@ schueler:
 - id: S-4b-22
   klasse: 4b
 gruppen:
-- name: Religion-ev-Kl1a
+- name: Religion-ev-Kl1
   typ: Fachgruppe
   mitglieder_schueler_ids:
   - S-1a-01
@@ -784,26 +784,6 @@ gruppen:
   - S-1a-09
   - S-1a-10
   - S-1a-11
-- name: Religion-kath-Kl1a
-  typ: Fachgruppe
-  mitglieder_schueler_ids:
-  - S-1a-12
-  - S-1a-13
-  - S-1a-14
-  - S-1a-15
-  - S-1a-16
-  - S-1a-17
-- name: Ethik-Kl1a
-  typ: Fachgruppe
-  mitglieder_schueler_ids:
-  - S-1a-18
-  - S-1a-19
-  - S-1a-20
-  - S-1a-21
-  - S-1a-22
-- name: Religion-ev-Kl1b
-  typ: Fachgruppe
-  mitglieder_schueler_ids:
   - S-1b-01
   - S-1b-02
   - S-1b-03
@@ -815,24 +795,35 @@ gruppen:
   - S-1b-09
   - S-1b-10
   - S-1b-11
-- name: Religion-kath-Kl1b
+- name: Religion-kath-Kl1
   typ: Fachgruppe
   mitglieder_schueler_ids:
+  - S-1a-12
+  - S-1a-13
+  - S-1a-14
+  - S-1a-15
+  - S-1a-16
+  - S-1a-17
   - S-1b-12
   - S-1b-13
   - S-1b-14
   - S-1b-15
   - S-1b-16
-  - S-1b-17
-- name: Ethik-Kl1b
+- name: Ethik-Kl1
   typ: Fachgruppe
   mitglieder_schueler_ids:
+  - S-1a-18
+  - S-1a-19
+  - S-1a-20
+  - S-1a-21
+  - S-1a-22
+  - S-1b-17
   - S-1b-18
   - S-1b-19
   - S-1b-20
   - S-1b-21
   - S-1b-22
-- name: Religion-ev-Kl2a
+- name: Religion-ev-Kl2
   typ: Fachgruppe
   mitglieder_schueler_ids:
   - S-2a-01
@@ -846,26 +837,6 @@ gruppen:
   - S-2a-09
   - S-2a-10
   - S-2a-11
-- name: Religion-kath-Kl2a
-  typ: Fachgruppe
-  mitglieder_schueler_ids:
-  - S-2a-12
-  - S-2a-13
-  - S-2a-14
-  - S-2a-15
-  - S-2a-16
-  - S-2a-17
-- name: Ethik-Kl2a
-  typ: Fachgruppe
-  mitglieder_schueler_ids:
-  - S-2a-18
-  - S-2a-19
-  - S-2a-20
-  - S-2a-21
-  - S-2a-22
-- name: Religion-ev-Kl2b
-  typ: Fachgruppe
-  mitglieder_schueler_ids:
   - S-2b-01
   - S-2b-02
   - S-2b-03
@@ -877,24 +848,35 @@ gruppen:
   - S-2b-09
   - S-2b-10
   - S-2b-11
-- name: Religion-kath-Kl2b
+- name: Religion-kath-Kl2
   typ: Fachgruppe
   mitglieder_schueler_ids:
+  - S-2a-12
+  - S-2a-13
+  - S-2a-14
+  - S-2a-15
+  - S-2a-16
+  - S-2a-17
   - S-2b-12
   - S-2b-13
   - S-2b-14
   - S-2b-15
   - S-2b-16
-  - S-2b-17
-- name: Ethik-Kl2b
+- name: Ethik-Kl2
   typ: Fachgruppe
   mitglieder_schueler_ids:
+  - S-2a-18
+  - S-2a-19
+  - S-2a-20
+  - S-2a-21
+  - S-2a-22
+  - S-2b-17
   - S-2b-18
   - S-2b-19
   - S-2b-20
   - S-2b-21
   - S-2b-22
-- name: Religion-ev-Kl3a
+- name: Religion-ev-Kl3
   typ: Fachgruppe
   mitglieder_schueler_ids:
   - S-3a-01
@@ -908,26 +890,6 @@ gruppen:
   - S-3a-09
   - S-3a-10
   - S-3a-11
-- name: Religion-kath-Kl3a
-  typ: Fachgruppe
-  mitglieder_schueler_ids:
-  - S-3a-12
-  - S-3a-13
-  - S-3a-14
-  - S-3a-15
-  - S-3a-16
-  - S-3a-17
-- name: Ethik-Kl3a
-  typ: Fachgruppe
-  mitglieder_schueler_ids:
-  - S-3a-18
-  - S-3a-19
-  - S-3a-20
-  - S-3a-21
-  - S-3a-22
-- name: Religion-ev-Kl3b
-  typ: Fachgruppe
-  mitglieder_schueler_ids:
   - S-3b-01
   - S-3b-02
   - S-3b-03
@@ -939,24 +901,35 @@ gruppen:
   - S-3b-09
   - S-3b-10
   - S-3b-11
-- name: Religion-kath-Kl3b
+- name: Religion-kath-Kl3
   typ: Fachgruppe
   mitglieder_schueler_ids:
+  - S-3a-12
+  - S-3a-13
+  - S-3a-14
+  - S-3a-15
+  - S-3a-16
+  - S-3a-17
   - S-3b-12
   - S-3b-13
   - S-3b-14
   - S-3b-15
   - S-3b-16
-  - S-3b-17
-- name: Ethik-Kl3b
+- name: Ethik-Kl3
   typ: Fachgruppe
   mitglieder_schueler_ids:
+  - S-3a-18
+  - S-3a-19
+  - S-3a-20
+  - S-3a-21
+  - S-3a-22
+  - S-3b-17
   - S-3b-18
   - S-3b-19
   - S-3b-20
   - S-3b-21
   - S-3b-22
-- name: Religion-ev-Kl4a
+- name: Religion-ev-Kl4
   typ: Fachgruppe
   mitglieder_schueler_ids:
   - S-4a-01
@@ -970,26 +943,6 @@ gruppen:
   - S-4a-09
   - S-4a-10
   - S-4a-11
-- name: Religion-kath-Kl4a
-  typ: Fachgruppe
-  mitglieder_schueler_ids:
-  - S-4a-12
-  - S-4a-13
-  - S-4a-14
-  - S-4a-15
-  - S-4a-16
-  - S-4a-17
-- name: Ethik-Kl4a
-  typ: Fachgruppe
-  mitglieder_schueler_ids:
-  - S-4a-18
-  - S-4a-19
-  - S-4a-20
-  - S-4a-21
-  - S-4a-22
-- name: Religion-ev-Kl4b
-  typ: Fachgruppe
-  mitglieder_schueler_ids:
   - S-4b-01
   - S-4b-02
   - S-4b-03
@@ -1001,18 +954,29 @@ gruppen:
   - S-4b-09
   - S-4b-10
   - S-4b-11
-- name: Religion-kath-Kl4b
+- name: Religion-kath-Kl4
   typ: Fachgruppe
   mitglieder_schueler_ids:
+  - S-4a-12
+  - S-4a-13
+  - S-4a-14
+  - S-4a-15
+  - S-4a-16
+  - S-4a-17
   - S-4b-12
   - S-4b-13
   - S-4b-14
   - S-4b-15
   - S-4b-16
-  - S-4b-17
-- name: Ethik-Kl4b
+- name: Ethik-Kl4
   typ: Fachgruppe
   mitglieder_schueler_ids:
+  - S-4a-18
+  - S-4a-19
+  - S-4a-20
+  - S-4a-21
+  - S-4a-22
+  - S-4b-17
   - S-4b-18
   - S-4b-19
   - S-4b-20
