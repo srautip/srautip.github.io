@@ -1,0 +1,7 @@
+# Steuert Solver.SolveTop (siehe tests/README.md, Abschnitt
+# "config.yaml (optional)"): wie lange darf der Solver nach dem
+# Stundenplan suchen, bevor er abbricht? Ein hoeherer Wert gibt CP-SAT
+# mehr Zeit, den gefundenen Plan als OPTIMAL zu beweisen statt nur
+# FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
+# "CP-SAT-Status"-Feld in output/stundenplan.md.
+solve_time_limit_s: 60.0

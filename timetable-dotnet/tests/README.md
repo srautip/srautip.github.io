@@ -242,6 +242,17 @@ Fehlt die Datei komplett, gelten diese Defaults unverändert. `solve_time_limit_
 begrenzt sowohl `Solver.SolveTop`s Gesamt- als auch dessen Einzel-Solve-
 Zeitbudget (siehe unten).
 
+**Für eine möglichst optimale Lösung** ist NICHT `maxSolutions` (intern
+fest auf 1) der relevante Hebel - jede weitere Solve-Iteration optimiert
+ohnehin gegen dieselbe Zielfunktion und kann daher nur eine gleich gute,
+nie eine bessere Alternative finden. Entscheidend ist stattdessen ein
+ausreichend hohes `solve_time_limit_s`: nur mit genug Zeit kann CP-SAT den
+gefundenen Plan tatsächlich als `Optimal` BEWEISEN statt ihn nach
+Zeitablauf nur als `Feasible` zurückzugeben. Das tatsächlich erreichte
+Ergebnis steht im neuen `CP-SAT-Status`-Feld der `**Status:**`-Zeile in
+`output/stundenplan.md` - bei `Feasible` erscheint dort zusätzlich ein
+Hinweis, `solve_time_limit_s` zu erhöhen.
+
 ## CLI: Grundgerüst per Template erzeugen
 
 ```bash
@@ -302,7 +313,10 @@ Alternativen-Vergleich.
 ## Referenzbeispiele
 
 Zwei tatsächlich per CLI erzeugte UND ausgeführte Testfälle als
-lauffähige Vorbilder zum Kopieren:
+lauffähige Vorbilder zum Kopieren. Beide haben zusätzlich eine eigene
+`input/config.yaml` mit explizit gesetztem `solve_time_limit_s: 60.0`
+(siehe Abschnitt oben) - ein direktes Vorbild dafür, wie man dieses Feld
+für die eigene Schule anpasst:
 
 - **`tests/bw-grundschule-beispiel/`** (4 Klassenstufen, 8 Klassenlehrer,
   BW-Grundschule):

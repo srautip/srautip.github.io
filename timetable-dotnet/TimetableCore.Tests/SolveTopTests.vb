@@ -22,6 +22,25 @@ Public Class SolveTopTests
         Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Solutions(0).Schedule).Count)
     End Sub
 
+    ''' <summary>Phase 2.18-Nachtrag: ScoredSolution.Status must carry the
+    ''' per-solve CpSolverStatus through so a caller can tell a proven-
+    ''' optimal result apart from a merely time-limited Feasible one. This
+    ''' scenario has a single possible Lesson assignment (1 day/period),
+    ''' so CP-SAT proves Optimal almost instantly given a generous time
+    ''' budget - the most direct possible check that the new field is
+    ''' actually wired to the real per-solve status, not left at its
+    ''' Nothing/zero-value default.</summary>
+    <TestMethod>
+    Public Sub SolveTopScoredSolutionCarriesSolverStatus()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 1), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=30)
+        Assert.AreEqual(1, result.Solutions.Count)
+        Assert.AreEqual(CpSolverStatus.Optimal, result.Solutions(0).Status)
+    End Sub
+
     ''' <summary>2 days x 1 period, 1 hour/week -> exactly 2 distinct
     ''' Lesson assignments (Mo or Di). A "should" forbidden_slot on Mo
     ''' means the Di placement has 0 Kann violations, the Mo placement 1 -

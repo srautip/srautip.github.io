@@ -152,6 +152,15 @@ Public NotInheritable Class ScoredSolution
     Public Property Schedule As List(Of ScheduleEntry)
     Public Property KannConstraintFlags As List(Of KannConstraintFlag)
     Public Property Quality As QualityScore
+    ''' <summary>Phase 2.18-Nachtrag: Optimal means CP-SAT proved no better
+    ''' solution exists within this solve's model; Feasible means the
+    ''' per-solve time limit ran out before optimality could be proven - a
+    ''' caller that wants a stronger optimality guarantee should raise
+    ''' perSolveTimeLimitS/totalTimeLimitS rather than maxSolutions (later
+    ''' iterations can only find equally-good alternatives, never a better
+    ''' Quality.Total, since they all optimize the same objective and only
+    ''' exclude already-found exact Lesson assignments).</summary>
+    Public Property Status As CpSolverStatus
 End Class
 
 Public NotInheritable Class MultiSolveResult
@@ -752,7 +761,7 @@ Public Module Solver
             Dim kannFlags = ExtractKannFlags(built, solver, status)
             Dim kannCount = Verifier.VerifyScheduleDetailed(data, schedule).KannViolations.Count
             Dim quality = ScheduleQuality.Score(data, schedule, kannCount)
-            solutions.Add(New ScoredSolution With {.Schedule = schedule, .KannConstraintFlags = kannFlags, .Quality = quality})
+            solutions.Add(New ScoredSolution With {.Schedule = schedule, .KannConstraintFlags = kannFlags, .Quality = quality, .Status = status})
 
             BlockSolution(built.Model, built.Lesson, solver)
             If useStagedHints Then ApplyLessonHints(built.Model, built.Lesson, solver)
