@@ -49,9 +49,9 @@ Die Pipeline hat zwei Stufen (siehe `docs/arc42-architecture.md` Abschnitt
 
 ## `stammdaten.yaml`
 
-YAML-Pendant zu `Stammdatenbestand` in `TimetableCore/Stammdaten.vb` -
-dieselben Felder, in snake_case (`deputat_sollstunden` statt
-`DeputatSollstunden`). Ausschnitt:
+Beschreibt die feste Grundausstattung der Schule: Klassenstufen, Klassen,
+Räume, Lehrkräfte, Fächer je Klassenstufe und wer welches Fach
+unterrichten darf. Beispiel:
 
 ```yaml
 schul_name: Beispiel-Grundschule
@@ -62,12 +62,11 @@ periods_per_day: 6
 klassenstufen:
   - {nummer: 1, bezeichnung: "Klasse 1"}
 klassen:
-  - {name: 1a, klassenstufe: 1, schuelerzahl: 22}
-    # erlaubt_klassenlehrer_tandem: true   # optional, siehe Phase 2.17
+  - {name: 1a, klassenstufe: 1, schuelerzahl: 22, erlaubt_klassenlehrer_tandem: false}
 faecher:
   - name: Deutsch
-    # block_length: 2                      # optional (Doppelstunde)
-    # unbeliebt: true                      # optional, siehe Phase 2.17
+    block_length: 2
+    unbeliebt: false
     klassenstufen:
       - {klassenstufe: 1, wochenstunden_soll: 6, max_pro_tag: 2}
 raeume:
@@ -75,25 +74,120 @@ raeume:
 lehrkraefte:
   - name: Klassenlehrer-1
     deputat_sollstunden: 28
-    # anrechnungsstunden: 2                # optional
-    # springer_reserve_stunden: 2          # optional, siehe Phase 2.17
-    # verfuegbare_tage: [Mo, Di]           # optional, Nothing=Vollzeit
-    # bevorzugte_klassenstufen: [1, 2]     # optional
+    anrechnungsstunden: 2
+    springer_reserve_stunden: 0
+    verfuegbare_tage: [Mo, Di, Mi]
+    bevorzugte_klassenstufen: [1, 2]
     klassenlehrer_faehig: true
-    # max_klassen: 1                       # optional, siehe Phase 2.17
-    # max_faecher: 3                       # optional
+    max_klassen: 1
+    max_faecher: 3
 fach_lehrer_zuordnungen:
-  - lehrer_name: Klassenlehrer-1
-    fach_name: Deutsch
-    # fachfremd: true                      # optional, siehe Phase 2.17
+  - {lehrer_name: Klassenlehrer-1, fach_name: Deutsch, fachfremd: false}
 ```
 
-Alle mit `#` markierten Felder sind optional und defaulten auf ein
-neutrales Verhalten (kein Limit / kein Effekt), wenn sie weggelassen
-werden - siehe `docs/phase2-15-lehrereinsatzplanung.md` (Nachtrag 4/5) für
-die genaue Bedeutung jedes Phase-2.17-Feldes. Ein leer gelassener Wert
-(`block_length:` ohne Text) bedeutet in YAML "nicht gesetzt" - identisch zu
-komplettem Weglassen des Feldes.
+Ein leer gelassener Wert (`block_length:` ohne Text) bedeutet in YAML
+"nicht gesetzt" - identisch zu komplettem Weglassen des Feldes. Alle unten
+als "optional" markierten Felder dürfen weggelassen werden und wirken sich
+dann nicht auf die Planung aus.
+
+### Attribute auf oberster Ebene
+
+- `schul_name` - Name der Schule, rein informativ, taucht so in den
+  Reports auf.
+- `bundesland` - Bundesland-Kürzel (z.B. `BW`), rein informativ für die
+  Stammdaten selbst; für die `new`-CLI entscheidet es, welches Curriculum-
+  Template greift.
+- `schulart` - Schulart als Freitext (z.B. `Grundschule`), rein
+  informativ.
+- `tage` - Liste der Wochentage, an denen überhaupt Unterricht stattfindet
+  (z.B. `[Mo, Di, Mi, Do, Fr]`).
+- `periods_per_day` - Anzahl der Unterrichtsperioden (Stunden) pro Tag.
+- `klassenstufen` - Liste aller Klassenstufen der Schule (siehe unten).
+- `klassen` - Liste aller Klassen der Schule (siehe unten).
+- `faecher` - Liste aller Fächer der Schule (siehe unten).
+- `raeume` - Liste aller Räume der Schule (siehe unten), optional (eine
+  Schule ohne besondere Raumbindung braucht keine Räume).
+- `lehrkraefte` - Liste aller Lehrkräfte der Schule (siehe unten).
+- `fach_lehrer_zuordnungen` - Liste, welche Lehrkraft welches Fach
+  unterrichten darf (siehe unten).
+
+### `klassenstufen[]`
+
+- `nummer` - Nummer der Klassenstufe (z.B. `1` für "Klasse 1").
+- `bezeichnung` - Anzeigename der Klassenstufe, rein informativ.
+
+### `klassen[]`
+
+- `name` - Name der Klasse (z.B. `1a`), muss eindeutig sein.
+- `klassenstufe` - zu welcher Klassenstufen-Nummer die Klasse gehört.
+- `schuelerzahl` - optional, Schülerzahl der Klasse, rein informativ.
+- `erlaubt_klassenlehrer_tandem` - optional, Default `false`. Wenn `true`,
+  dürfen für diese Klasse zwei Lehrkräfte gleichzeitig als Klassenlehrer
+  aktiv sein (Tandem) statt wie sonst üblich nur eine einzige.
+
+### `faecher[]`
+
+- `name` - Fachname (z.B. `Deutsch`), muss eindeutig sein und wird von
+  `fach_lehrer_zuordnungen` referenziert.
+- `block_length` - optional. Wenn gesetzt, müssen die Wochenstunden dieses
+  Fachs als zusammenhängender Block dieser Länge unterrichtet werden (z.B.
+  `2` für eine Doppelstunde).
+- `unbeliebt` - optional, Default `false`. Markiert ein im Kollegium
+  unbeliebtes Fach, dessen Zuweisungen möglichst gleichmäßig auf alle
+  dafür qualifizierten Lehrkräfte verteilt werden sollen.
+- `klassenstufen` - Liste, in welchen Klassenstufen das Fach mit welchem
+  Wochenstundenumfang geführt wird (siehe unten). Ein Fach ohne Eintrag
+  für eine Klassenstufe wird dort nicht unterrichtet.
+
+#### `faecher[].klassenstufen[]`
+
+- `klassenstufe` - für welche Klassenstufen-Nummer dieser Eintrag gilt.
+- `wochenstunden_soll` - wie viele Wochenstunden dieses Fach in dieser
+  Klassenstufe hat.
+- `max_pro_tag` - optional, Obergrenze, wie viele Stunden dieses Fachs an
+  einem einzigen Tag für dieselbe Klasse stattfinden dürfen.
+
+### `raeume[]`
+
+- `name` - Raumname (z.B. `Turnhalle1`), referenzierbar in
+  `room_requirement`-Regeln der `constraints.yaml`.
+- `typ` - optional, Freitext-Kategorie des Raums (z.B. `Turnhalle`,
+  `NaWi`), rein informativ/zur eigenen Orientierung.
+
+### `lehrkraefte[]`
+
+- `name` - Name der Lehrkraft, muss eindeutig sein.
+- `deputat_sollstunden` - vertragliches Wochendeputat in Stunden.
+- `anrechnungsstunden` - optional, Default `0`. Stunden, die für andere
+  Aufgaben (z.B. eine Funktionsstelle) vom Deputat abgezogen werden, bevor
+  der tatsächliche Unterrichts-Sollwert berechnet wird.
+- `springer_reserve_stunden` - optional, Default `0`. Wie
+  `anrechnungsstunden`, aber für bewusst freigehaltene Vertretungsreserve
+  - senkt ebenfalls den Unterrichts-Sollwert, ohne dass die
+  Nicht-Ausschöpfung als Problem gewertet wird.
+- `verfuegbare_tage` - optional, Default alle Schultage (Vollzeit). Liste
+  der Wochentage, an denen die Lehrkraft überhaupt im Haus ist (Teilzeit).
+- `bevorzugte_klassenstufen` - optional, Default leer (keine Präferenz).
+  Liste von Klassenstufen-Nummern, die die Lehrkraft bevorzugt
+  unterrichten möchte.
+- `klassenlehrer_faehig` - optional, Default `true`. Ob die Lehrkraft
+  grundsätzlich als Klassenlehrer:in einer Klasse infrage kommt.
+- `max_klassen` - optional, keine Grenze wenn weggelassen. Obergrenze, in
+  wie vielen unterschiedlichen Klassen diese Lehrkraft eingesetzt werden
+  soll.
+- `max_faecher` - optional, keine Grenze wenn weggelassen. Wie
+  `max_klassen`, aber für die Anzahl unterschiedlicher Fächer.
+
+### `fach_lehrer_zuordnungen[]`
+
+- `lehrer_name` - Name der Lehrkraft (muss in `lehrkraefte[]` existieren).
+- `fach_name` - Name des Fachs (muss in `faecher[]` existieren). Nur hier
+  gelistete (Lehrkraft, Fach)-Paare kommen für eine Zuweisung überhaupt in
+  Frage.
+- `fachfremd` - optional, Default `false`. Markiert diese Zuordnung als
+  fachfremden Einsatz - die Lehrkraft bleibt einsetzbar, eine tatsächliche
+  Zuweisung wird aber gegenüber einer regulär qualifizierten Lehrkraft
+  benachteiligt.
 
 Vor jedem Lauf prüft `StammdatenValidation.ValidateStammdaten` die Datei
 auf Konsistenz (unbekannte Klassenstufen-Referenzen, Fach ohne
