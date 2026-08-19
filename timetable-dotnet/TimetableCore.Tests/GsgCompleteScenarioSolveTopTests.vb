@@ -165,4 +165,54 @@ Public Class GsgCompleteScenarioSolveTopTests
         End If
     End Sub
 
+    ''' <summary>Phase 2.12 (Nachtrag): combines the two previously-tested
+    ''' mechanisms - CP-SAT's own portfolio-search threading
+    ''' (numWorkers:=4, which alone already turned "0 feasible solutions in
+    ''' 30 minutes" into a Feasible/Optimal find, but with mediocre quality
+    ''' Total=1023,54) and the Stage-1 warm-start hint (useStagedHints:=
+    ''' True, which alone fixed the same cold-start problem at
+    ''' numWorkers:=1 but landed at a much worse Total=10605,47) - to see
+    ''' whether combining them gets both the speed benefit and something
+    ''' closer to the numWorkers:=4-alone quality. Both mechanisms were
+    ''' already independently confirmed (Phase 2.12's own live check) to be
+    ''' wired identically into every Stage 1/Stage 2 CpSolver.StringParameters
+    ''' call and to never overlap in time, so this combination needed no
+    ''' new code - only running it, which had never been done before.
+    ''' Reports whatever it finds within budget, same "report reality"
+    ''' honesty as every other manual benchmark in this file - not a
+    ''' hard pass/fail assertion on which outcome (better/worse/similar
+    ''' than either mechanism alone) occurs.</summary>
+    <TestMethod>
+    Public Sub SekIStagedHintsNumWorkers4Benchmark()
+        If Environment.GetEnvironmentVariable("RUN_SLOW_BENCHMARKS") <> "1" Then
+            Assert.Inconclusive(
+                "Manueller SolveTop-Benchmark uebersprungen (kann mehrere Minuten dauern, " &
+                "kein fester Bestandteil der Standard-Suite). Set RUN_SLOW_BENCHMARKS=1 to run it.")
+        End If
+
+        Dim sekI = GymnasiumSekIFixture.BuildGymnasiumSekIScenario()
+        Dim sw = Stopwatch.StartNew()
+        Dim result = Solver.SolveTop(sekI, maxSolutions:=1, totalTimeLimitS:=1200, perSolveTimeLimitS:=1200,
+                                      numWorkers:=4, useStagedHints:=True, stage1TimeLimitS:=150)
+        sw.Stop()
+        Console.WriteLine(
+            $"Sek I SolveTop (numWorkers:=4, useStagedHints:=True): {sw.Elapsed.TotalSeconds:F1}s, " &
+            $"StopReason={result.StopReason}, Solutions.Count={result.Solutions.Count}")
+        Assert.IsTrue(result.Solutions.Count > 0, $"Sek I: kein Solve gefunden - StopReason={result.StopReason}")
+
+        Dim best = result.Solutions(0)
+        Console.WriteLine(
+            $"Quality.Total={best.Quality.Total}, ClassGapCount={best.Quality.ClassGapCount}, " &
+            $"TeacherGapCount={best.Quality.TeacherGapCount}, EdgePeriodCount={best.Quality.EdgePeriodCount}, " &
+            $"AfternoonDayCount={best.Quality.AfternoonDayCount}, ClassLoadVariance={best.Quality.ClassLoadVariance:F2}, " &
+            $"TeacherLoadVariance={best.Quality.TeacherLoadVariance:F2}")
+        Assert.AreEqual(0, Verifier.VerifySchedule(sekI, best.Schedule).Count)
+
+        Dim sekIEnt = JsonHelpers.Entities(sekI)
+        Dim sekIDays = JsonHelpers.AsStringList(JsonHelpers.Timeslots(sekIEnt), "days")
+        Dim sekIPeriods = Enumerable.Range(1, JsonHelpers.GetInt(JsonHelpers.Timeslots(sekIEnt), "periods_per_day").Value).ToList()
+        Dim classGrids = Formatting.ToClassGrids(sekI, best.Schedule)
+        Console.WriteLine(vbLf & Formatting.FormatGrid("5d (SolveTop, numWorkers:=4 + useStagedHints:=True)", classGrids("5d"), sekIDays, sekIPeriods, AddressOf ClassText))
+    End Sub
+
 End Class
