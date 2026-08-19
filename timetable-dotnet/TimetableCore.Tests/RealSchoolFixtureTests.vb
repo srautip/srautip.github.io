@@ -123,4 +123,44 @@ Public Class RealSchoolFixtureTests
         Assert.AreEqual(0, Verifier.VerifyKursblockung(data, kb.Assignment).Count)
     End Sub
 
+    ''' <summary>Phase 2.14: LLM-free sanity check for
+    ''' LehrerKontinuitaetFixture.vb's own ground truth (same
+    ''' "catch a fixture bug cheaply" rationale as the fixtures above) -
+    ''' both Kl.5 and Kl.6 scenarios must have valid entity references,
+    ''' independent of whether they can actually be solved (that's the
+    ''' next test).</summary>
+    <TestMethod>
+    Public Sub Klasse5AndKlasse6EntitiesAreValid()
+        Dim klasse5 = LehrerKontinuitaetFixture.BuildKlasse5Scenario()
+        Assert.AreEqual(0, Validation.ValidateEntities(klasse5).Count)
+
+        Dim klasse5Result = Solver.Solve(klasse5, timeLimitS:=30)
+        Assert.IsTrue(klasse5Result.Status = CpSolverStatus.Optimal OrElse klasse5Result.Status = CpSolverStatus.Feasible)
+        Dim vorjahrMap = LehrerKontinuitaetFixture.DeriveVorjahresTeacherMap(klasse5Result.Schedule)
+        Dim klasse6 = LehrerKontinuitaetFixture.BuildKlasse6Scenario(vorjahrMap)
+        Assert.AreEqual(0, Validation.ValidateEntities(klasse6).Count)
+    End Sub
+
+    ''' <summary>Live-measured: Kl.5 (5 Klassen, 45 Lehrer) loest in ~1,3s -
+    ''' deutlich unter der ~93s der vollen 30-Klassen-GymnasiumSekIFixture,
+    ''' da hier nur 5 statt 30 Klassen und ein dedizierter Lehrer pro Zug/
+    ''' Fach statt mehrerer Klassen pro Lehrer geplant werden. Kl.6 (inkl.
+    ''' der neuen 2. Fremdsprache) ist von aehnlicher Groessenordnung.
+    ''' Bewusst ungegatet (kein RUN_SLOW_BENCHMARKS noetig), anders als die
+    ''' SolveTop-Benchmarks in GsgCompleteScenarioSolveTopTests.vb - hier
+    ''' wird nur die schnelle Kann-only Solve() genutzt, kein SolveTop.</summary>
+    <TestMethod>
+    Public Sub Klasse5AndKlasse6SolveAndVerifyClean()
+        Dim klasse5 = LehrerKontinuitaetFixture.BuildKlasse5Scenario()
+        Dim klasse5Result = Solver.Solve(klasse5, timeLimitS:=30)
+        Assert.IsTrue(klasse5Result.Status = CpSolverStatus.Optimal OrElse klasse5Result.Status = CpSolverStatus.Feasible, Solver.StatusName(klasse5Result.Status))
+        Assert.AreEqual(0, Verifier.VerifySchedule(klasse5, klasse5Result.Schedule).Count)
+
+        Dim vorjahrMap = LehrerKontinuitaetFixture.DeriveVorjahresTeacherMap(klasse5Result.Schedule)
+        Dim klasse6 = LehrerKontinuitaetFixture.BuildKlasse6Scenario(vorjahrMap)
+        Dim klasse6Result = Solver.Solve(klasse6, timeLimitS:=30)
+        Assert.IsTrue(klasse6Result.Status = CpSolverStatus.Optimal OrElse klasse6Result.Status = CpSolverStatus.Feasible, Solver.StatusName(klasse6Result.Status))
+        Assert.AreEqual(0, Verifier.VerifySchedule(klasse6, klasse6Result.Schedule).Count)
+    End Sub
+
 End Class
