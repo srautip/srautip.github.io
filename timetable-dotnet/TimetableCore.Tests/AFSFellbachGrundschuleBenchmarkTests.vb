@@ -75,14 +75,15 @@ Public Class AFSFellbachGrundschuleBenchmarkTests
             Console.WriteLine($"{k.Name,-4}: {kl}")
         Next
         Console.WriteLine(
-            "Hinweis: 'Klassenlehrer' heisst hier nur, dass diese Lehrkraft " &
-            "klassenlehrerfaehig ist UND mindestens ein Fach dieser Klasse " &
-            "unterrichtet (bei mehreren Kandidaten wird die mit den meisten " &
-            "eigenen Faechern in dieser Klasse gewaehlt) - das aktuelle MVP " &
-            "erzwingt KEINE Buendelung aller Kernfaecher einer Klasse bei " &
-            "genau EINER Lehrkraft (echtes Klassenlehrerprinzip); das ist " &
-            "eine dokumentierte, zurueckgestellte Erweiterung, siehe " &
-            "docs/phase2-15-lehrereinsatzplanung.md.")
+            "Hinweis: seit dem Phase-2.16-Nachtrag bestraft die " &
+            "Zielfunktion zusaetzlich, wenn mehr als eine klassenlehrer- " &
+            "faehige Lehrkraft gleichzeitig in derselben Klasse aktiv ist " &
+            "(WeightBuendelungVerletzt) - bei ausreichender Deputat- " &
+            "Kapazitaet buendelt eine Klasse dadurch ihre Kernfaecher bei " &
+            "genau EINER Lehrkraft (echtes Klassenlehrerprinzip). Weiterhin " &
+            "ein WEICHES Ziel, kein hartes: bei disjunkt qualifizierten " &
+            "Kandidaten bleibt das Szenario loesbar statt faelschlich " &
+            "Infeasible zu werden.")
 
         ' === 3. Uebersetzung in das bestehende Constraint-Format + Stundenplan ===
         Dim assignmentConstraints = Lehrereinsatzplanung.BuildAssignmentConstraints(lehrereinsatz, bestand)

@@ -54,9 +54,12 @@ Public Module AFSFellbachStammdatenFixture
     End Sub
 
     ''' <summary>Kl.1-4, 3-zuegig (12 Klassen). Klassenlehrer-Prinzip: 6
-    ''' Kernfach-Lehrkraefte (Deputat 28h) decken die Deutsch/Mathematik/
-    ''' Sachunterricht-Gesamtnachfrage (162h) fast passgenau ab
-    ''' (168h Kapazitaet, exakt 2 Klassen pro Lehrkraft im Schnitt).
+    ''' Kernfach-Lehrkraefte: EINE Klassenlehrkraft PRO Klasse (12 statt
+    ''' urspruenglich 6, siehe Phase-2.16-Nachtrag-3-Live-Rueckmeldung "ein
+    ''' Klassenlehrer hat ueblicherweise nur eine Klasse") mit je Deputat
+    ''' 14h - haelftige Teilzeit (14 von 28h), passend zum eigenen
+    ''' Kernfach-Bedarf einer Klasse (13-14h) UND realistisch fuer eine
+    ''' Grundschule, an der Teilzeitbeschaeftigung sehr verbreitet ist.
     ''' Sport ist bewusst mit zwei Lehrkraeften bemannt (passend zum
     ''' realen Sport-/Bewegungsprofil der AFS), deren Deputate zusammen
     ''' die Sport-Gesamtnachfrage exakt treffen.</summary>
@@ -84,7 +87,7 @@ Public Module AFSFellbachStammdatenFixture
         b.Raeume.Add(New Raum With {.Name = "Turnhalle1", .Typ = "Turnhalle"})
         b.Raeume.Add(New Raum With {.Name = "Turnhalle2", .Typ = "Turnhalle"})
 
-        AddLehrerPool(b, "Klassenlehrer", 6, 28, {"Deutsch", "Mathematik", "Sachunterricht"}, klassenlehrerFaehig:=True)
+        AddLehrerPool(b, "Klassenlehrer", 12, 14, {"Deutsch", "Mathematik", "Sachunterricht"}, klassenlehrerFaehig:=True)
         AddLehrerPool(b, "Sportlehrer", 2, 18, {"Sport"}, klassenlehrerFaehig:=False)
         AddLehrerPool(b, "Musiklehrer", 1, 24, {"Musik"}, klassenlehrerFaehig:=False)
         AddLehrerPool(b, "Kunstlehrer", 1, 24, {"Kunst"}, klassenlehrerFaehig:=False)

@@ -25,6 +25,17 @@
 ' Teilzeit-Kohaerenz, Tandem-Balance, Springerreserve, Fairness) sind
 ' dokumentiert, aber bewusst nicht Teil dieses MVP - siehe
 ' docs/phase2-15-lehrereinsatzplanung.md.
+'
+' Phase 2.16-Nachtrag: die urspruengliche Klassenlehrer-Zuweisung verlangte
+' nur "mindestens ein klassenlehrerfaehiger Kandidat aktiv" - live am
+' AFS-Fellbach-Benchmark sichtbar geworden, dass das haeufig zu mehreren
+' TEILWEISE aktiven Klassenlehrer-Kandidaten pro Klasse fuehrte (jeder nur
+' 1 von 3 Kernfaechern), statt einem "richtigen" Klassenlehrer, der alle
+' seine Faecher fuer eine Klasse buendelt. Neues weiches Ziel
+' `WeightBuendelungVerletzt` bestraft mehr als einen gleichzeitig aktiven
+' klassenlehrerfaehigen Kandidaten pro Klasse - siehe den Kommentar am
+' entsprechenden Modellblock unten fuer die genaue Begruendung, warum das
+' weiterhin ein weiches statt hartes Ziel bleibt.
 Imports System.Text.Json.Nodes
 Imports Google.OrTools.Sat
 
@@ -46,28 +57,30 @@ Public NotInheritable Class LehrereinsatzResult
     ''' <summary>Klasse -&gt; Klassenlehrer-Name, nur fuer Klassen befuellt,
     ''' fuer die tatsaechlich eine klassenlehrerfaehige, zugewiesene
     ''' Lehrkraft gefunden wurde (weiches Ziel, siehe Modul-Kopfkommentar -
-    ''' kann fuer einzelne Klassen fehlen). Das CP-SAT-Modell selbst
-    ''' verlangt nur "mindestens ein Kandidat", nie Eindeutigkeit -
-    ''' existiert mehr als eine klassenlehrerfaehige, zugewiesene
-    ''' Lehrkraft fuer dieselbe Klasse (haeufig der Fall, da nichts eine
-    ''' Buendelung aller Kernfaecher einer Klasse bei EINER Lehrkraft
-    ''' erzwingt - siehe docs/phase2-15-lehrereinsatzplanung.md's
-    ''' zurueckgestellte "Kontinuitaet/Faecher-Buendelung"-Erweiterung),
-    ''' waehlt die Extraktion post-hoc diejenige mit den meisten eigenen
-    ''' Fach-Zuweisungen in dieser Klasse - die plausibelste Naeherung an
-    ''' "die" Klassenlehrkraft, ohne dass das Optimierungsmodell selbst
-    ''' dafuer erweitert werden muesste.</summary>
+    ''' kann fuer einzelne Klassen fehlen). Seit der Buendelungs-Erweiterung
+    ''' (Phase 2.16-Nachtrag) ist "mehr als eine klassenlehrerfaehige,
+    ''' aktive Lehrkraft pro Klasse" selbst ein weiches, bestraftes Ziel
+    ''' (`WeightBuendelungVerletzt`) - im Regelfall gibt es deshalb genau
+    ''' einen Kandidaten. Bleiben trotzdem mehrere uebrig (das Modell
+    ''' erzwingt Eindeutigkeit weiterhin nicht hart, um bei ungewoehnlichen
+    ''' Stammdaten nicht unnoetig Infeasible zu werden), waehlt die
+    ''' Extraktion post-hoc denjenigen mit den meisten eigenen
+    ''' Fach-Zuweisungen in dieser Klasse als Fallback.</summary>
     Public Property Klassenlehrer As Dictionary(Of String, String)
 End Class
 
 Public Module Lehrereinsatzplanung
 
     ' Gewichts-Reihenfolge aus der Feinplanungsrunde: Deputat-Abweichung
-    ' (Vertragsverletzung) > Klassenlehrer-Fehlen > Praeferenz-Verletzung -
-    ' dokumentierte Konstanten, gleiches Muster wie ScheduleQuality.vb's
-    ' Gewichtstabelle.
+    ' (Vertragsverletzung) > Klassenlehrer-Fehlen/-Buendelung > Praeferenz-
+    ' Verletzung - dokumentierte Konstanten, gleiches Muster wie
+    ' ScheduleQuality.vb's Gewichtstabelle. Klassenlehrer-Fehlen und
+    ' Buendelungs-Verletzung sind zwei Seiten derselben Frage ("hat diese
+    ' Klasse EINE klare Klassenlehrkraft?") und liegen deshalb bewusst auf
+    ' derselben Gewichtsstufe (Phase 2.16-Nachtrag).
     Public Const WeightDeputatAbweichung As Integer = 100
     Public Const WeightKlassenlehrerFehlt As Integer = 20
+    Public Const WeightBuendelungVerletzt As Integer = 20
     Public Const WeightPraeferenzVerletzt As Integer = 1
 
     Private Structure AssignKey
@@ -144,8 +157,25 @@ Public Module Lehrereinsatzplanung
             deputatUeberschuss.Add(ueberschussNeg)
         Next
 
-        ' --- Weich: Klassenlehrer-Zuweisung ---
+        ' --- Weich: Klassenlehrer-Zuweisung + Faecher-Buendelung ---
+        ' "unterrichtet[l,k]" ist wahr, sobald Lehrkraft l IRGENDEIN Fach
+        ' von Klasse k unterrichtet. hatKlassenlehrer[k] verlangt weiterhin
+        ' nur "mindestens ein klassenlehrerfaehiger Kandidat aktiv"
+        ' (Nutzerentscheidung Phase 2.15: weiches Ziel). Neu (Phase
+        ' 2.16-Nachtrag, Nutzerwunsch "richtiger Klassenlehrer"):
+        ' zusaetzlich wird bestraft, wenn MEHR als eine klassenlehrerfaehige
+        ' Lehrkraft in derselben Klasse aktiv ist - erzwingt bei
+        ' hinreichender Deputat-Kapazitaet, dass eine Klasse ihre
+        ' klassenlehrerfaehig unterrichteten Faecher (in der Praxis: die
+        ' Kernfaecher) BUENDELT statt sie ueber mehrere Klassenlehrer-
+        ' Kandidaten zu verstreuen. Bewusst weiterhin ein weiches statt
+        ' hartes Ziel: ein hartes "hoechstens 1 aktiv" koennte bei
+        ' Stammdaten, in denen die klassenlehrerfaehigen Kandidaten nicht
+        ' alle fuer dieselben Faecher qualifiziert sind, unnoetig
+        ' Infeasible werden lassen (Vollstaendigkeit koennte dann pro Fach
+        ' unterschiedliche Kandidaten erzwingen).
         Dim fehltKlassenlehrer As New List(Of BoolVar)
+        Dim buendelungVerletzt As New List(Of BoolVar)
         Dim istKlassenlehrer As New Dictionary(Of (Lehrer As String, Klasse As String), BoolVar)
         For Each klasse In bestand.Klassen
             Dim kandidaten As New List(Of BoolVar)
@@ -169,6 +199,35 @@ Public Module Lehrereinsatzplanung
             Dim fehlt = model.NewBoolVar($"fehltKlassenlehrer[{klasse.Name}]")
             model.Add(hatKlassenlehrer + fehlt = 1)
             fehltKlassenlehrer.Add(fehlt)
+
+            If kandidaten.Count > 1 Then
+                Dim mehrereAktiv = model.NewBoolVar($"buendelungVerletzt[{klasse.Name}]")
+                model.Add(LinearExpr.Sum(kandidaten) <= 1).OnlyEnforceIf(mehrereAktiv.Not())
+                buendelungVerletzt.Add(mehrereAktiv)
+            End If
+        Next
+
+        ' Symmetrische Ergaenzung (Phase 2.16-Nachtrag 3, Live-Rueckmeldung:
+        ' "ueblicherweise hat ein Klassenlehrer nur eine Klasse als
+        ' Klassenlehrer"): die obige Schleife verhindert nur, dass eine
+        ' Klasse MEHRERE klassenlehrerfaehige Kandidaten gleichzeitig hat -
+        ' sie verhindert NICHT, dass EINE Lehrkraft bei ausreichender
+        ' Deputat-Kapazitaet als buendelnder Klassenlehrer mehrerer
+        ' verschiedener Klassen auftritt (in der Realitaet unueblich - eine
+        ' Lehrkraft mag mehrere Klassen unterrichten, ist aber ueblicherweise
+        ' nur fuer EINE davon die Klassenlehrkraft). Gleiches Muster wie
+        ' oben, nur nach Lehrkraft statt nach Klasse gruppiert, und in
+        ' denselben Buendelungs-Gewichtstopf einzahlend (beide Richtungen
+        ' beantworten dieselbe Frage: "hat diese Klasse GENAU EINE klare
+        ' Klassenlehrkraft, und ist diese Lehrkraft NUR fuer diese eine
+        ' Klasse zustaendig?").
+        For Each lehrerGroup In istKlassenlehrer.GroupBy(Function(kvp) kvp.Key.Lehrer)
+            Dim vars = lehrerGroup.Select(Function(kvp) kvp.Value).ToList()
+            If vars.Count > 1 Then
+                Dim mehrereKlassen = model.NewBoolVar($"mehrfacheKlassenlehrerrolle[{lehrerGroup.Key}]")
+                model.Add(LinearExpr.Sum(vars) <= 1).OnlyEnforceIf(mehrereKlassen.Not())
+                buendelungVerletzt.Add(mehrereKlassen)
+            End If
         Next
 
         ' --- Weich: Klassenstufen-Praeferenzen (eine leere
@@ -187,6 +246,7 @@ Public Module Lehrereinsatzplanung
         model.Minimize(
             LinearExpr.Sum(deputatUeberschuss) * CLng(WeightDeputatAbweichung) +
             LinearExpr.Sum(fehltKlassenlehrer) * CLng(WeightKlassenlehrerFehlt) +
+            LinearExpr.Sum(buendelungVerletzt) * CLng(WeightBuendelungVerletzt) +
             LinearExpr.Sum(praeferenzVerletzt) * CLng(WeightPraeferenzVerletzt))
 
         Dim solver As New CpSolver()

@@ -183,23 +183,18 @@ Kollegien, keine Fehlmodellierung. Beide Szenarien lösen dennoch
 end-to-end sauber durch (0 `Validation`-/`Verifier`-Verstöße auf jeder
 Stufe) - der eigentliche Beweis der Phase.
 
+*(Diese Tabelle ist der historische Stand vor der Fächer-Bündelung, siehe
+"Nachtrag 2" unten für die aktualisierten Objective-Werte nach deren
+Einführung.)*
+
 ## Zurückgestellte Erweiterungen (nicht Teil dieses MVP)
 
 Direkte Antwort auf den Nutzerwunsch "bestimme weitere mögliche
 Constraints" - dokumentiert, aber gemäß der Nutzerentscheidung "schlanker
 Kern zuerst" bewusst nicht implementiert:
 
-- **Fächer-Bündelung pro Klassenlehrer**: aktuell erzwingt nichts, dass
-  eine Klasse ihre drei Kernfächer (Deutsch/Mathematik/Sachunterricht)
-  von EINER einzigen Lehrkraft bekommt - der Deputat-Korridor optimiert
-  Fächer/Klassen-Kombinationen frei, ohne Rücksicht auf "gehört
-  eigentlich zusammen". Live in Phase 2.16 beobachtet (AFS-Fellbach-
-  Benchmark): eine klassenlehrerfähige Lehrkraft unterrichtet häufig nur
-  1 von 3 Kernfächern einer Klasse, während die anderen zwei von anderen
-  Lehrkräften übernommen werden - das "Klassenlehrer"-Ergebnis bleibt
-  dadurch nur eine Näherung (wer die meisten eigenen Fächer in dieser
-  Klasse hat), kein echtes Klassenlehrerprinzip. Eine harte oder weiche
-  Bündelungs-Regel wäre die naheliegende Erweiterung.
+- ~~**Fächer-Bündelung pro Klassenlehrer**~~ - **umgesetzt**, siehe
+  "Nachtrag 2 (Phase 2.16-Folgeauftrag)" unten.
 - **Kontinuität über Jahre als aktive Solver-Präferenz** (nicht wie in
   Phase 2.14 nur aus einem bereits gelösten Vorjahr abgeleitet): ein
   Lehrer, der Kl. 1a unterrichtet hat, wird in der Zielfunktion bevorzugt
@@ -285,6 +280,103 @@ lösen nach dem Fix weiterhin sauber (erneut live bestätigt), die
 die oben dokumentierten Tabellenwerte bleiben also gültig, nur die
 tatsächliche Slot-Verteilung im finalen Stundenplan war vorher fehlerhaft
 unterspezifiziert.
+
+## Nachtrag 2 (Phase 2.16-Folgeauftrag): Fächer-Bündelung pro Klassenlehrer implementiert
+
+Direkte Umsetzung der oben zurückgestellten "Fächer-Bündelung"-Erweiterung,
+auf expliziten Nutzerwunsch ("Implementiere die dokumentierte Erweiterung
+zur Bündelung auf einen richtigen Klassenlehrer").
+
+**Mechanik:** ein neues weiches Ziel `WeightBuendelungVerletzt` (gleiche
+Gewichtsstufe wie `WeightKlassenlehrerFehlt`, 20) bestraft pro Klasse, wenn
+MEHR als eine klassenlehrerfähige Lehrkraft gleichzeitig in ihr aktiv ist
+(wiederverwendet dieselben `unterrichtet[l,k]`-BoolVars, die bereits für
+das bestehende Klassenlehrer-Ziel existierten - reifiziert als
+`Sum(kandidaten) <= 1` außer bei bestrafter Verletzung). Bewusst weiterhin
+ein **weiches**, kein hartes Ziel: bei Stammdaten, in denen die
+klassenlehrerfähigen Kandidaten nicht alle für dieselben Fächer
+qualifiziert sind, könnte ein hartes "höchstens 1 aktiv" das Szenario
+unnötig `Infeasible` werden lassen (Vollständigkeit könnte pro Fach
+unterschiedliche Kandidaten erzwingen). Zwei neue Hand-Smoke-Tests
+(`LehrereinsatzplanungTests.vb`) belegen live gegen die installierte
+OrTools-DLL beide Seiten:
+
+- `CoreSubjectsAreBundledOntoASingleTeacherPerClass`: zwei Klassen, zwei
+  für alle drei Kernfächer qualifizierte Lehrkräfte mit knapper
+  Deputat-Kapazität (je genau 1 Klasse) - bestätigt `Objective=0` UND dass
+  jede Klasse alle drei Fächer bei EINER einzigen Lehrkraft gebündelt
+  bekommt.
+- `BundlingViolationIsPenalizedNotInfeasibleWhenQualificationsAreDisjoint`:
+  eine Klasse, deren zwei Fächer nur von zwei UNTERSCHIEDLICHEN,
+  disjunkt qualifizierten klassenlehrerfähigen Lehrkräften abgedeckt
+  werden können - bestätigt `Optimal` (nicht `Infeasible`) mit exakt
+  `Objective=WeightBuendelungVerletzt`.
+
+**Realmaßstab-Beleg (live erneut gemessen, Referenzfixturen unverändert):**
+
+| Schule | Lehrereinsatz | Klassenlehrer | Beobachtung |
+|---|---|---|---|
+| BW-Grundschule (2-zügig, Phase 2.15) | Optimal, 0,22s, `Objective=0` | 8/8 | Klassenlehrerprinzip-Pool bleibt bündelbar - Objective unverändert 0. |
+| AFS-Fellbach-Grundschule (3-zügig, Phase 2.16) | Optimal, 0,49s, `Objective=0` | 12/12 | Jede Klasse bekommt jetzt nachweislich EINE Lehrkraft für Deutsch+Mathematik+Sachunterricht (vorher bis zu 3 verschiedene) - live im Konsolen-Report von `AFSFellbachGrundschuleBenchmarkTests.vb` bestätigt. |
+| BW-Gemeinschaftsschule (2-zügig, Phase 2.15) | Optimal, 0,05s, `Objective=2840` (vorher 2600) | 12/12 | Anstieg um genau 240 = 12 Klassen × Gewicht 20 - **erwartet, nicht fehlerhaft**: die Gemeinschaftsschul-Lehrkräftepools (Deutsch-Geschichte, Mathematik-Physik, Englisch-Erdkunde) sind alle klassenlehrerfähig, aber jeweils für DISJUNKTE Fächer qualifiziert (echtes Fachlehrerprinzip, siehe Phase-2.14-Recherche) - echte Bündelung ist dort strukturell gar nicht möglich, das Modell zeigt diesen realen Unterschied zwischen Grundschule und Gemeinschaftsschule jetzt korrekt in den Zahlen, statt ihn zu verschleiern. |
+
+Alle drei Szenarien bleiben `Optimal`/0 `VerifyLehrereinsatz`-Verstöße/0
+`Verifier.VerifySchedule`-Verstöße - die Bündelung verändert nur, WELCHE
+Lehrkraft welche Fächer bekommt, nie die strukturelle Korrektheit.
+
+`docs/arc42-architecture.md` wurde nicht zusätzlich geändert (die
+Bausteinsicht beschreibt `Lehrereinsatzplanung.vb`s Zielfunktion bereits
+allgemein als "Deputat-Korridor/Klassenlehrer/Präferenzen weich" - die
+neue Komponente fügt sich dort ohne Formulierungsbruch ein).
+
+## Nachtrag 3: "ein Klassenlehrer hat üblicherweise nur eine Klasse"
+
+Live-Rückmeldung nach Nachtrag 2: der AFS-Fellbach-Benchmark zeigte zwar
+gebündelte Kernfächer pro Klasse, aber weil 6 Klassenlehrer mit je 28h
+Deputat für 12 Klassen genügend Kapazität für je ZWEI Klassen hatten,
+tauchte dieselbe Lehrkraft als Klassenlehrer von zwei verschiedenen
+Klassen auf - unrealistisch, da eine Lehrkraft üblicherweise nur für
+GENAU EINE Klasse Klassenlehrer ist (kann aber durchaus in mehreren
+Klassen Fachunterricht geben).
+
+**Mechanik:** eine zweite, symmetrische weiche Zielfunktions-Komponente in
+`Lehrereinsatzplanung.vb` (derselbe `unterrichtet[l,k]`-BoolVar-Bestand,
+diesmal nach Lehrkraft statt nach Klasse gruppiert): bestraft, wenn
+dieselbe klassenlehrerfähige Lehrkraft in MEHR als einer Klasse als
+bündelnder Kandidat aktiv ist. Fließt in denselben `WeightBuendelungVerletzt`-
+Topf wie die Klassen-Richtung aus Nachtrag 2 (beide beantworten dieselbe
+Frage: "hat diese Klasse GENAU EINE klare, nur für sie zuständige
+Klassenlehrkraft?"). Weiterhin bewusst weich, nicht hart - siehe
+Code-Kommentar in `Lehrereinsatzplanung.vb`.
+
+**Fixture-Konsequenz:** die reine Modelländerung allein reichte nicht -
+mit zu wenigen, zu voll ausgelasteten Klassenlehrer-Kandidaten hätte das
+neue Ziel nur zusätzliche `fehltKlassenlehrer`-Strafen für die
+überzähligen Klassen produziert. `AFSFellbachStammdatenFixture.vb` und
+`StammdatenBWFixture.BuildBWGrundschule` wurden deshalb auf **eine
+Klassenlehrkraft pro Klasse** umgestellt (12 bzw. 8 statt vorher 6 bzw.
+4), mit auf ca. 14h reduziertem (hälftigem Teilzeit-)Deputat pro
+Klassenlehrkraft, passend zum eigenen Kernfach-Bedarf einer einzelnen
+Klasse (13-14h) - realistisch für eine Grundschule, an der
+Teilzeitbeschäftigung sehr verbreitet ist.
+
+**Realmaßstab-Beleg (live erneut gemessen):**
+
+| Schule | Lehrereinsatz | Klassenlehrer | Beobachtung |
+|---|---|---|---|
+| BW-Grundschule (2-zügig, 8 Klassenlehrer @14h) | Optimal, 0,19s, `Objective=0` | 8/8 | Jede Klassenlehrkraft hat nachweislich genau 1 Klasse. |
+| AFS-Fellbach-Grundschule (3-zügig, 12 Klassenlehrer @14h) | Optimal, 0,12s, `Objective=0` | 12/12 | Jede Klassenlehrkraft hat nachweislich genau 1 Klasse - live im Konsolen-Report von `AFSFellbachGrundschuleBenchmarkTests.vb` bestätigt (Klasse 4b durchgehend von derselben Lehrkraft in Deutsch/Mathematik/Sachunterricht unterrichtet). |
+| BW-Gemeinschaftsschule (2-zügig, unverändert) | Optimal, 0,13s, `Objective=3000` | 12/12 | Weiterhin mehrere Lehrkräfte mit >1 Klasse als "Klassenlehrer" (z.B. `Deutsch-Geschichte-Lehrer-1` bei 4 Klassen) - **bewusst nicht angepasst**: die dortigen Lehrkräftepools sind strukturell disjunkt qualifiziert (echtes Fachlehrerprinzip der Sekundarstufe, siehe Phase-2.14-Recherche), sodass weder echte Fächer-Bündelung noch "1 Klasse pro Klassenlehrer" dort ohne eine grundlegend andere Fixture-Modellierung erreichbar wären. Bewusst als offene, dokumentierte Grenze stehen gelassen statt einer nicht angeforderten Neugestaltung des Gemeinschaftsschule-Fixtures. |
+
+Ein neuer, isolierter Hand-Smoke-Test
+(`SameTeacherIsNotBundledAsKlassenlehrerOfTwoClassesWhenDeputatDoesNotForceIt`,
+`LehrereinsatzplanungTests.vb`) beweist die Lehrkraft-Richtung gezielt und
+losgelöst vom Deputat-Effekt: Deputat-Toleranz bewusst riesig gesetzt
+(1000h), damit jede denkbare Aufteilung deputat-neutral bleibt - einzig
+die neue Regel selbst kann den Solver dann noch dazu zwingen, zwei
+verschiedene Klassen zwei verschiedenen Lehrkräften zuzuweisen, statt
+einer einzigen (von Hand nachgerechnet: `Objective=0` nur bei Aufteilung
+erreichbar, `WeightBuendelungVerletzt` sonst).
 
 ## Definition of Done — Status
 

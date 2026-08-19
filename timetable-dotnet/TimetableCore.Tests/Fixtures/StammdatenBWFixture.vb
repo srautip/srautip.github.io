@@ -67,11 +67,12 @@ Public Module StammdatenBWFixture
         Next
     End Sub
 
-    ''' <summary>Kl.1-4, 2-zuegig (8 Klassen). Klassenlehrer-Prinzip: 4
-    ''' Kernfach-Lehrkraefte (Deputat 28h) decken zusammen die
-    ''' Deutsch/Mathematik/Sachunterricht-Gesamtnachfrage (108h) fast
-    ''' passgenau ab (112h Kapazitaet) - jede Lehrkraft uebernimmt
-    ''' realistischerweise alle drei Kernfaecher fuer ca. 2 Klassen.</summary>
+    ''' <summary>Kl.1-4, 2-zuegig (8 Klassen). Klassenlehrer-Prinzip: EINE
+    ''' Klassenlehrkraft PRO Klasse (8 statt einer kleineren, sich Klassen
+    ''' teilenden Gruppe - ein Klassenlehrer hat ueblicherweise nur eine
+    ''' Klasse, siehe Phase-2.16-Nachtrag-3), Deputat 14h haelftige
+    ''' Teilzeit, passend zum eigenen Kernfach-Bedarf einer Klasse
+    ''' (13-14h).</summary>
     Public Function BuildBWGrundschule() As Stammdatenbestand
         Dim b As New Stammdatenbestand With {
             .SchulName = "Beispiel-Grundschule (synthetisch)", .Bundesland = "BW", .Schulart = "Grundschule",
@@ -92,7 +93,7 @@ Public Module StammdatenBWFixture
         AddFachKlassenstufen(b, "Religion", {1, 2, 3, 4}, 2, maxProTag:=1)
         AddFachKlassenstufen(b, "Englisch", {3, 4}, 2, maxProTag:=1)
 
-        AddLehrerPool(b, "Klassenlehrer", 4, 28, {"Deutsch", "Mathematik", "Sachunterricht"}, klassenlehrerFaehig:=True)
+        AddLehrerPool(b, "Klassenlehrer", 8, 14, {"Deutsch", "Mathematik", "Sachunterricht"}, klassenlehrerFaehig:=True)
         AddLehrerPool(b, "Sportlehrer", 1, 24, {"Sport"}, klassenlehrerFaehig:=False)
         AddLehrerPool(b, "Musiklehrer", 1, 16, {"Musik"}, klassenlehrerFaehig:=False)
         AddLehrerPool(b, "Kunstlehrer", 1, 16, {"Kunst"}, klassenlehrerFaehig:=False)
