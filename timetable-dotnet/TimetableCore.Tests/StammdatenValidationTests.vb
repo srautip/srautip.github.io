@@ -120,4 +120,48 @@ Public Class StammdatenValidationTests
         Assert.AreEqual(0, errors.Count, String.Join(vbLf, errors))
     End Sub
 
+    ' Phase 2.19: Mitgliedschaftsdatenmodell, Schritt 1 - reine
+    ' Referenz-/Eindeutigkeitspruefung fuer Schueler/Gruppen.
+
+    <TestMethod>
+    Public Sub SchuelerReferencingUnknownKlasseIsRejected()
+        Dim bestand = CleanBestand()
+        bestand.Schueler.Add(New Schueler With {.Id = "S-1a-01", .Klasse = "9z"})
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'9z'") AndAlso e.Contains("keine bekannte Klasse")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub DuplicateSchuelerIdIsRejected()
+        Dim bestand = CleanBestand()
+        bestand.Schueler.Add(New Schueler With {.Id = "S-1a-01", .Klasse = "1a"})
+        bestand.Schueler.Add(New Schueler With {.Id = "S-1a-01", .Klasse = "1a"})
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'S-1a-01'") AndAlso e.Contains("bereits vergeben")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub GruppeReferencingUnknownSchuelerIdIsRejected()
+        Dim bestand = CleanBestand()
+        bestand.Schueler.Add(New Schueler With {.Id = "S-1a-01", .Klasse = "1a"})
+        bestand.Gruppen.Add(New Gruppe With {
+            .Name = "Religion-ev-Kl1", .Typ = "Fachgruppe",
+            .MitgliederSchuelerIds = New List(Of String) From {"S-1a-01", "S-unbekannt"}
+        })
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'S-unbekannt'") AndAlso e.Contains("keine bekannte Schueler-ID")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub GruppeWithKnownMembersIsNotAnError()
+        Dim bestand = CleanBestand()
+        bestand.Schueler.Add(New Schueler With {.Id = "S-1a-01", .Klasse = "1a"})
+        bestand.Gruppen.Add(New Gruppe With {
+            .Name = "Religion-ev-Kl1", .Typ = "Fachgruppe",
+            .MitgliederSchuelerIds = New List(Of String) From {"S-1a-01"}
+        })
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.AreEqual(0, errors.Count, String.Join(vbLf, errors))
+    End Sub
+
 End Class

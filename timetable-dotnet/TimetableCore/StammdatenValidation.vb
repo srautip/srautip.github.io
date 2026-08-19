@@ -113,6 +113,32 @@ Public Module StammdatenValidation
             Next
         Next
 
+        ' Phase 2.19: Mitgliedschaftsdatenmodell, Schritt 1 - reine
+        ' Referenz-/Eindeutigkeitspruefung, noch ohne jede Solver-Bedeutung
+        ' (siehe docs/phase2-19-mitgliedschaftsmodell.md fuer den bewusst
+        ' zurueckgestellten naechsten Schritt).
+        Dim klassenNamen As New HashSet(Of String)(bestand.Klassen.Select(Function(k) k.Name))
+        Dim schuelerIds As New HashSet(Of String)
+        For i = 0 To bestand.Schueler.Count - 1
+            Dim s = bestand.Schueler(i)
+            If Not klassenNamen.Contains(s.Klasse) Then
+                errors.Add($"schueler[{i}] (id={JsonHelpers.PyRepr(s.Id)}): klasse={JsonHelpers.PyRepr(s.Klasse)} ist keine bekannte Klasse")
+            End If
+            If Not schuelerIds.Add(s.Id) Then
+                errors.Add($"schueler[{i}]: id={JsonHelpers.PyRepr(s.Id)} ist bereits vergeben (doppelte Schueler-ID)")
+            End If
+        Next
+
+        For i = 0 To bestand.Gruppen.Count - 1
+            Dim g = bestand.Gruppen(i)
+            For j = 0 To g.MitgliederSchuelerIds.Count - 1
+                Dim schuelerId = g.MitgliederSchuelerIds(j)
+                If Not schuelerIds.Contains(schuelerId) Then
+                    errors.Add($"gruppen[{i}] (name={JsonHelpers.PyRepr(g.Name)}): mitglieder_schueler_ids[{j}]={JsonHelpers.PyRepr(schuelerId)} ist keine bekannte Schueler-ID")
+                End If
+            Next
+        Next
+
         Return errors
     End Function
 

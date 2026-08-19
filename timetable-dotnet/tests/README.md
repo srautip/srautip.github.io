@@ -110,6 +110,10 @@ dann nicht auf die Planung aus.
 - `lehrkraefte` - Liste aller Lehrkräfte der Schule (siehe unten).
 - `fach_lehrer_zuordnungen` - Liste, welche Lehrkraft welches Fach
   unterrichten darf (siehe unten).
+- `schueler` - optional, Liste aller Schüler der Schule (siehe unten) -
+  nur nötig, wenn `gruppen` genutzt wird.
+- `gruppen` - optional, Liste klassenunabhängiger Schülergruppen (siehe
+  unten), z.B. für Religion ev./kath./Ethik.
 
 ### `klassenstufen[]`
 
@@ -189,11 +193,39 @@ dann nicht auf die Planung aus.
   Zuweisung wird aber gegenüber einer regulär qualifizierten Lehrkraft
   benachteiligt.
 
+### `schueler[]`
+
+- `id` - pseudonyme ID der/des Schülers (z.B. `S-1a-01`), muss eindeutig
+  sein. Bewusst kein Name-Feld (Datenschutz - fürs Scheduling wird kein
+  Klarname gebraucht).
+- `klasse` - Heimatklasse (muss in `klassen[]` existieren).
+
+### `gruppen[]`
+
+Eine klassenunabhängige Gruppe von Schülern - deckt z.B. Religion
+ev./kath./Ethik, Fördergruppen oder Aufsichtsgruppen ab (alle strukturell
+gleich: eine benannte Gruppe, eine Liste von Schüler-IDs).
+
+- `name` - Name der Gruppe (z.B. `Religion-ev-Kl1a`), muss eindeutig sein.
+- `typ` - optional, Freitext-Kategorie zur eigenen Einordnung (z.B.
+  `Fachgruppe`, `Foerderung`, `Aufsicht`).
+- `mitglieder_schueler_ids` - Liste von Schüler-IDs (müssen in
+  `schueler[]` existieren).
+
+**Wichtiger Hinweis zum aktuellen Stand:** `schueler`/`gruppen` sind
+aktuell reine Stammdaten - geladen, gespeichert und validiert (unbekannte
+Referenzen/doppelte IDs werden erkannt), aber ohne jede Wirkung auf
+`Lehrereinsatzplanung.SolveLehrereinsatz` oder `Solver.SolveTop`. Es gibt
+noch keinen Mechanismus, der aus einer Gruppe tatsächlich gleichzeitig
+stattfindende, parallele Unterrichtssessions ableitet - das ist ein
+bewusst zurückgestellter nächster Schritt (siehe
+`docs/phase2-19-mitgliedschaftsmodell.md`).
+
 Vor jedem Lauf prüft `StammdatenValidation.ValidateStammdaten` die Datei
 auf Konsistenz (unbekannte Klassenstufen-Referenzen, Fach ohne
-qualifizierte Lehrkraft, Deputat-Unsinn, Teilzeit-Tage-Kohärenz, ...) -
-Fehler werden mit Datei-/Objektbezug in `output/lehrerzuteilung.md`
-gemeldet.
+qualifizierte Lehrkraft, Deputat-Unsinn, Teilzeit-Tage-Kohärenz, unbekannte
+Schüler-/Gruppen-Referenzen, doppelte Schüler-IDs, ...) - Fehler werden mit
+Datei-/Objektbezug in `output/lehrerzuteilung.md` gemeldet.
 
 ## `constraints.yaml`
 

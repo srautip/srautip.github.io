@@ -416,3 +416,23 @@ fach_lehrer_zuordnungen:
 - lehrer_name: Englischlehrer-1
   fach_name: Englisch
   fachfremd: false
+schueler:
+- id: S-1a-01
+  klasse: 1a
+- id: S-1a-02
+  klasse: 1a
+- id: S-1a-03
+  klasse: 1a
+- id: S-1a-04
+  klasse: 1a
+gruppen:
+- name: Religion-ev-Kl1a
+  typ: Fachgruppe
+  mitglieder_schueler_ids:
+  - S-1a-01
+  - S-1a-02
+- name: Religion-kath-Kl1a
+  typ: Fachgruppe
+  mitglieder_schueler_ids:
+  - S-1a-03
+  - S-1a-04

@@ -47,6 +47,15 @@ Public Class StammdatenTests
         bestand.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Frau Müller", .FachName = "Deutsch"})
         bestand.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Herr Schmidt", .FachName = "Sport"})
 
+        bestand.Schueler.Add(New Schueler With {.Id = "S-1a-01", .Klasse = "1a"})
+        bestand.Schueler.Add(New Schueler With {.Id = "S-1a-02", .Klasse = "1a"})
+        bestand.Schueler.Add(New Schueler With {.Id = "S-2a-01", .Klasse = "2a"})
+
+        bestand.Gruppen.Add(New Gruppe With {
+            .Name = "Religion-ev-Kl1", .Typ = "Fachgruppe",
+            .MitgliederSchuelerIds = New List(Of String) From {"S-1a-01"}
+        })
+
         Return bestand
     End Function
 
@@ -83,6 +92,16 @@ Public Class StammdatenTests
         Assert.IsFalse(schmidt.KlassenlehrerFaehig)
 
         Assert.AreEqual(2, restored.FachLehrerZuordnungen.Count)
+
+        Assert.AreEqual(3, restored.Schueler.Count)
+        Dim s1 = restored.Schueler.Single(Function(s) s.Id = "S-1a-01")
+        Assert.AreEqual("1a", s1.Klasse)
+
+        Assert.AreEqual(1, restored.Gruppen.Count)
+        Dim gruppe = restored.Gruppen(0)
+        Assert.AreEqual("Religion-ev-Kl1", gruppe.Name)
+        Assert.AreEqual("Fachgruppe", gruppe.Typ)
+        CollectionAssert.AreEqual(New List(Of String) From {"S-1a-01"}, gruppe.MitgliederSchuelerIds)
     End Sub
 
     <TestMethod>

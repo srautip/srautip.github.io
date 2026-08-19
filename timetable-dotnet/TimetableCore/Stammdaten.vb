@@ -105,6 +105,33 @@ Public NotInheritable Class Lehrer
     Public Property MaxFaecher As Integer?
 End Class
 
+''' <summary>Phase 2.19: ein Schueler - bewusst nur eine pseudonyme ID plus
+''' Heimatklasse, kein Name-Feld (Datenschutz, fuers Scheduling nicht
+''' gebraucht). Grundlage fuer das Mitgliedschaftsdatenmodell (siehe
+''' `Gruppe`) - in diesem Schritt rein additiv, ohne jede Solver-/
+''' Verifier-Wirkung (siehe docs/phase2-19-mitgliedschaftsmodell.md).</summary>
+Public NotInheritable Class Schueler
+    Public Property Id As String
+    ''' <summary>Heimatklasse, referenziert Klasse.Name.</summary>
+    Public Property Klasse As String
+End Class
+
+''' <summary>Phase 2.19: eine benannte, klassenunabhaengige Gruppe von
+''' Schuelern (per ID referenziert) - deckt strukturell identisch alle drei
+''' recherchierten Anwendungsfaelle ab (Fachgruppen wie Religion ev./
+''' kath./Ethik, Foerdergruppen, Aufsichtsgruppen), ohne fuer jeden Fall
+''' eine eigene Entitaetsklasse zu brauchen. `Typ` ist reiner Freitext zur
+''' eigenen Einordnung (mirrort `Raum.Typ`) - hat in diesem Schritt KEINE
+''' Solver-Bedeutung.</summary>
+Public NotInheritable Class Gruppe
+    Public Property Name As String
+    ''' <summary>Freitext-Kategorie, informativ (z.B. "Fachgruppe",
+    ''' "Foerderung", "Aufsicht") - keine Solver-Wirkung in diesem
+    ''' Schritt.</summary>
+    Public Property Typ As String
+    Public Property MitgliederSchuelerIds As New List(Of String)
+End Class
+
 ''' <summary>Die "Zuordnung Faecher zu Lehrer" aus der Nutzeranfrage - die
 ''' Lehrbefaehigung/Einsatzfaehigkeit einer Lehrkraft fuer ein Fach. Nur
 ''' Paare, die hier gelistet sind, kommen als Kandidat fuer
@@ -133,6 +160,16 @@ Public NotInheritable Class Stammdatenbestand
     Public Property Raeume As New List(Of Raum)
     Public Property Lehrkraefte As New List(Of Lehrer)
     Public Property FachLehrerZuordnungen As New List(Of FachLehrerZuordnung)
+    ''' <summary>Phase 2.19: Mitgliedschaftsdatenmodell, Schritt 1. Property-
+    ''' Name bewusst identisch zum Elementtyp (wie z.B. bei "Klassen As
+    ''' List(Of Klasse)" der Property-Name vom Typnamen abweicht, waere das
+    ''' hier "Schuelerschaft" gewesen - live verworfen: das YAML-Format
+    ''' zielt auf einfache GitHub-Web-Bearbeitung ab, und "schueler:" ist
+    ''' der YAML-Schluessel, den ein Autor tatsaechlich intuitiv erwartet,
+    ''' nicht "schuelerschaft:" - VB.NET erlaubt einen Property-Namen
+    ''' identisch zu seinem eigenen Elementtyp problemlos.</summary>
+    Public Property Schueler As New List(Of Schueler)
+    Public Property Gruppen As New List(Of Gruppe)
 End Class
 
 Public Module Stammdaten
