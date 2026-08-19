@@ -246,6 +246,46 @@ Kern zuerst" bewusst nicht implementiert:
 - Vollständige Regressionssuite grün, 0 Regressionen gegenüber dem
   Phase-2.14-Stand.
 
+## Nachtrag (Phase 2.16): kritischer Bug in `BuildAssignmentConstraints` gefunden und behoben
+
+Beim Bau des AFS-Fellbach-Benchmarks (Phase 2.16) wurde der gedruckte
+Stundenplan der Klasse 4b erstmals visuell geprüft (nicht nur per
+`Verifier.VerifySchedule`-Zähler) - und zeigte einen echten Fehler:
+**`BuildAssignmentConstraints` emittierte nie `no_overlap`-Regeln**, weder
+für Klassen noch für Lehrkräfte. Da `weekly_hours` nur die
+Gesamtstundenzahl zählt, nie die Verteilung auf verschiedene Slots
+erzwingt, hatte der Solver dadurch keinerlei Grund, eine Klasse über die
+Woche zu verteilen - im konkreten Fall häufte er alle 24 Wochenstunden von
+Klasse 4b auf nur zwei Slots (z.B. montags 8 verschiedene Fächer
+gleichzeitig in Periode 6). `Verifier.VerifySchedule` meldete dabei
+`0 Verstöße`, weil es nur Verstöße gegen tatsächlich VORHANDENE
+Constraint-Typen prüft (siehe `Verifier.vb`s Kopfkommentar) - eine fehlende
+Regel selbst kann es strukturell nicht erkennen, nur eine vorhandene, aber
+verletzte.
+
+**Fix:** `BuildAssignmentConstraints` emittiert jetzt zusätzlich
+`no_overlap(resource:="class", ...)` für jede betroffene Klasse und
+`no_overlap(resource:="teacher", ...)` für jede betroffene Lehrkraft -
+exakt dasselbe Muster, das jede andere synthetische Szenario-Konstruktion
+in diesem Projekt (`Schienenraster.vb`/`Raumzuordnung.vb`) bereits nutzt.
+Live erneut geprüft: derselbe AFS-Fellbach-Benchmark verteilt Klasse 4bs
+24 Wochenstunden danach korrekt über 24 verschiedene (Tag,Periode)-Slots,
+0 Verstöße. Neuer Regressionstest
+`BuildAssignmentConstraintsResultingScheduleHasNoOverlaps`
+(`LehrereinsatzplanungTests.vb`) prüft das jetzt zusätzlich direkt
+(Gruppierung nach (Klasse/Lehrkraft, Tag, Periode), harte Assertion auf
+Gruppengröße 1) statt sich nur auf `Verifier.VerifySchedule` zu verlassen.
+
+**Betroffen war der gesamte bisherige Phase-2.15-Realmaßstab-Beleg**
+(Grundschule/Gemeinschaftsschule-Endergebnisse oben) - beide Szenarien
+lösen nach dem Fix weiterhin sauber (erneut live bestätigt), die
+`Lehrereinsatzplanung`-Objective-Werte (0 bzw. 2600) ändern sich NICHT
+(der Fehler betraf ausschließlich die zweite, nachgelagerte
+`Solver.Solve`-Stufe, nicht die Lehrer-Klasse-Fach-Zuordnung selbst) -
+die oben dokumentierten Tabellenwerte bleiben also gültig, nur die
+tatsächliche Slot-Verteilung im finalen Stundenplan war vorher fehlerhaft
+unterspezifiziert.
+
 ## Definition of Done — Status
 
 - [x] `dotnet test TimetableCore.Tests` bleibt vollständig grün, 0

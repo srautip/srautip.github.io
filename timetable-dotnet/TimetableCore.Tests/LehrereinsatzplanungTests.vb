@@ -134,7 +134,10 @@ Public Class LehrereinsatzplanungTests
         Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible)
 
         Dim constraints = Lehrereinsatzplanung.BuildAssignmentConstraints(result, b)
-        Assert.AreEqual(6, constraints.Count, "2 Klassen x (assignment+weekly_hours+consecutive_required)")
+        Dim distinctKlassen = result.Zuweisungen.Select(Function(z) z.Klasse).Distinct().Count()
+        Dim distinctLehrer = result.Zuweisungen.Select(Function(z) z.Lehrer).Distinct().Count()
+        Dim erwarteteAnzahl = result.Zuweisungen.Count * 3 + distinctKlassen + distinctLehrer ' je Zuweisung: assignment+weekly_hours+consecutive_required, plus no_overlap(class)/no_overlap(teacher)
+        Assert.AreEqual(erwarteteAnzahl, constraints.Count)
 
         Dim ent = Stammdaten.BuildEntitiesFragment(b)
         Dim data As New JsonObject From {
@@ -151,6 +154,52 @@ Public Class LehrereinsatzplanungTests
 
         Dim consecutiveFor1a = constraints.Single(Function(c) JsonHelpers.GetString(c, "type") = "consecutive_required" AndAlso JsonHelpers.GetString(c, "class") = "1a")
         Assert.AreEqual(2, JsonHelpers.GetInt(consecutiveFor1a, "block_length"))
+
+        ' Phase 2.16-Bugfix: no_overlap fuer jede Klasse UND jede Lehrkraft
+        ' muss vorhanden sein - ohne diese Regeln kann Solver.Solve alle
+        ' Wochenstunden einer Klasse/Lehrkraft in denselben Slot haeufen
+        ' (live in Phase 2.16 am AFS-Fellbach-Benchmark entdeckt).
+        Assert.AreEqual(1, constraints.Where(Function(c) JsonHelpers.GetString(c, "type") = "no_overlap" AndAlso JsonHelpers.GetString(c, "resource") = "class" AndAlso JsonHelpers.GetString(c, "entity") = "1a").Count())
+        Assert.AreEqual(1, constraints.Where(Function(c) JsonHelpers.GetString(c, "type") = "no_overlap" AndAlso JsonHelpers.GetString(c, "resource") = "class" AndAlso JsonHelpers.GetString(c, "entity") = "1b").Count())
+    End Sub
+
+    ''' <summary>Phase 2.16-Bugfix, dediziert: baut ein Szenario, in dem
+    ''' zwei Klassen dieselbe Lehrkraft fuer unterschiedliche Faecher
+    ''' teilen, und beweist end-to-end (nicht nur an der Constraint-Liste),
+    ''' dass Solver.Solve daraus einen tatsaechlich kollisionsfreien
+    ''' Stundenplan macht - vor dem Fix haeufte der Solver mangels
+    ''' no_overlap alle Wochenstunden einer Klasse in denselben Slot.</summary>
+    <TestMethod>
+    Public Sub BuildAssignmentConstraintsResultingScheduleHasNoOverlaps()
+        Dim b = Bestand()
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 4, .KlassenlehrerFaehig = True})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer B", .DeputatSollstunden = 4, .KlassenlehrerFaehig = True})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = "Deutsch"})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer B", .FachName = "Deutsch"})
+
+        Dim result = Lehrereinsatzplanung.SolveLehrereinsatz(b, timeLimitS:=10)
+        Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible)
+
+        Dim constraints = Lehrereinsatzplanung.BuildAssignmentConstraints(result, b)
+        Dim ent = Stammdaten.BuildEntitiesFragment(b)
+        Dim data As New JsonObject From {
+            {"entities", ent},
+            {"constraints", New JsonArray(constraints.Select(Function(c) CType(c, JsonNode)).ToArray())}
+        }
+
+        Dim solveResult = Solver.Solve(data, timeLimitS:=10)
+        Assert.IsTrue(solveResult.Status = CpSolverStatus.Optimal OrElse solveResult.Status = CpSolverStatus.Feasible)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, solveResult.Schedule).Count)
+
+        ' Harte, direkte Kollisions-Pruefung unabhaengig vom Verifier:
+        ' keine Klasse und keine Lehrkraft darf zweimal im selben (Tag,
+        ' Periode)-Slot auftauchen.
+        For Each gruppe In solveResult.Schedule.GroupBy(Function(e) (e.ClassName, e.Day, e.Period))
+            Assert.AreEqual(1, gruppe.Count(), $"Klasse {gruppe.Key.ClassName} doppelt belegt am {gruppe.Key.Day}/{gruppe.Key.Period}")
+        Next
+        For Each gruppe In solveResult.Schedule.GroupBy(Function(e) (e.Teacher, e.Day, e.Period))
+            Assert.AreEqual(1, gruppe.Count(), $"Lehrkraft {gruppe.Key.Teacher} doppelt belegt am {gruppe.Key.Day}/{gruppe.Key.Period}")
+        Next
     End Sub
 
 End Class

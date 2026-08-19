@@ -218,13 +218,24 @@ Public Module Lehrereinsatzplanung
     ''' <summary>Phase 2.15d: uebersetzt ein geloestes LehrereinsatzResult
     ''' rein deterministisch (kein CP-SAT) in das bestehende,
     ''' UNVERAENDERTE Constraint-Format (teacher_subject_assignment/
-    ''' weekly_hours[/consecutive_required]) - siehe
+    ''' weekly_hours[/consecutive_required]/no_overlap) - siehe
     ''' docs/json-constraints-reference.md Abschnitt 5. Zusammen mit
     ''' Stammdaten.BuildEntitiesFragment(bestand) ergibt das ein
     ''' vollstaendiges entities/constraints-JSON, das unveraendert an
     ''' Solver.Solve/SolveTop uebergeben werden kann - keine einzige Zeile
     ''' in Solver.vb/ApplyConstraints aendert sich fuer diese neue
-    ''' Faehigkeit.</summary>
+    ''' Faehigkeit.
+    '''
+    ''' Emittiert zwingend `no_overlap(resource:="class", ...)` fuer jede
+    ''' betroffene Klasse UND `no_overlap(resource:="teacher", ...)` fuer
+    ''' jede betroffene Lehrkraft (live in Phase 2.16 als fehlend entdeckt:
+    ''' ohne diese beiden Regeln haeuft `Solver.Solve` mangels jeder
+    ''' Kollisions-Vermeidung alle Wochenstunden einer Klasse/Lehrkraft in
+    ''' denselben Tag/Periode-Slot, da `weekly_hours` nur die
+    ''' Gesamtanzahl zaehlt, nie die Verteilung auf verschiedene Slots
+    ''' erzwingt - `Verifier.VerifySchedule` kann eine so fehlende Regel
+    ''' strukturell nicht selbst auffangen, da es nur bereits vorhandene
+    ''' Constraint-Typen prueft, siehe Verifier.vb's Kopfkommentar).</summary>
     Public Function BuildAssignmentConstraints(result As LehrereinsatzResult, bestand As Stammdatenbestand) As List(Of JsonObject)
         Dim klasseByName = bestand.Klassen.ToDictionary(Function(k) k.Name)
         Dim fachByName = bestand.Faecher.ToDictionary(Function(f) f.Name)
@@ -251,6 +262,14 @@ Public Module Lehrereinsatzplanung
                 })
             End If
         Next
+
+        For Each klasseName In result.Zuweisungen.Select(Function(z) z.Klasse).Distinct()
+            constraints.Add(New JsonObject From {{"type", "no_overlap"}, {"resource", "class"}, {"entity", klasseName}})
+        Next
+        For Each lehrerName In result.Zuweisungen.Select(Function(z) z.Lehrer).Distinct()
+            constraints.Add(New JsonObject From {{"type", "no_overlap"}, {"resource", "teacher"}, {"entity", lehrerName}})
+        Next
+
         Return constraints
     End Function
 
