@@ -28,7 +28,9 @@ Public Module Validation
         {"class", "classes"},
         {"classes", "classes"},
         {"teacher", "teachers"},
+        {"teachers", "teachers"},
         {"subject", "subjects"},
+        {"subjects", "subjects"},
         {"room", "rooms"},
         {"allowed_rooms", "rooms"},
         {"kurse", "kurse"}

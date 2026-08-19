@@ -164,4 +164,125 @@ Public Class StammdatenValidationTests
         Assert.AreEqual(0, errors.Count, String.Join(vbLf, errors))
     End Sub
 
+    ' Phase 2.20: Parallelgruppe-Referenz-/Konsistenzpruefung.
+
+    ''' <summary>2 Klassen (1a/1b) derselben Klassenstufe, 2 Faecher
+    ''' (Religion-ev/Religion-kath, je 2h), je 1 qualifizierte Lehrkraft,
+    ''' 2 Schueler pro Klasse (je 1 pro Variante) - ein sauberer
+    ''' Parallelverbund "Religion-Kl1" ueber beide Klassen hinweg.</summary>
+    Private Function BestandMitParallelverbund() As Stammdatenbestand
+        Dim bestand = CleanBestand()
+        bestand.Klassen.Add(New Klasse With {.Name = "1b", .Klassenstufe = 1})
+
+        Dim religionEv As New Fach With {.Name = "Religion-ev"}
+        religionEv.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 2})
+        bestand.Faecher.Add(religionEv)
+
+        Dim religionKath As New Fach With {.Name = "Religion-kath"}
+        religionKath.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 2})
+        bestand.Faecher.Add(religionKath)
+
+        bestand.Lehrkraefte.Add(New Lehrer With {.Name = "Herr Ev", .DeputatSollstunden = 8})
+        bestand.Lehrkraefte.Add(New Lehrer With {.Name = "Frau Kath", .DeputatSollstunden = 8})
+        bestand.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Herr Ev", .FachName = "Religion-ev"})
+        bestand.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Frau Kath", .FachName = "Religion-kath"})
+
+        bestand.Schueler.Add(New Schueler With {.Id = "S-1a-01", .Klasse = "1a"})
+        bestand.Schueler.Add(New Schueler With {.Id = "S-1a-02", .Klasse = "1a"})
+        bestand.Schueler.Add(New Schueler With {.Id = "S-1b-01", .Klasse = "1b"})
+        bestand.Schueler.Add(New Schueler With {.Id = "S-1b-02", .Klasse = "1b"})
+
+        bestand.Gruppen.Add(New Gruppe With {
+            .Name = "Religion-ev-Kl1", .Typ = "Fachgruppe", .FachName = "Religion-ev",
+            .Klassenstufe = 1, .Parallelverbund = "Religion-Kl1",
+            .MitgliederSchuelerIds = New List(Of String) From {"S-1a-01", "S-1b-01"}
+        })
+        bestand.Gruppen.Add(New Gruppe With {
+            .Name = "Religion-kath-Kl1", .Typ = "Fachgruppe", .FachName = "Religion-kath",
+            .Klassenstufe = 1, .Parallelverbund = "Religion-Kl1",
+            .MitgliederSchuelerIds = New List(Of String) From {"S-1a-02", "S-1b-02"}
+        })
+
+        Return bestand
+    End Function
+
+    <TestMethod>
+    Public Sub CleanParallelverbundHasNoErrors()
+        Dim errors = StammdatenValidation.ValidateStammdaten(BestandMitParallelverbund())
+        Assert.AreEqual(0, errors.Count, String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub GruppeReferencingUnknownFachNameIsRejected()
+        Dim bestand = BestandMitParallelverbund()
+        bestand.Gruppen(0).FachName = "Nicht-Existent"
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'Nicht-Existent'") AndAlso e.Contains("kein bekanntes Fach")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub GruppeKlassenstufeMismatchingMembersIsRejected()
+        Dim bestand = BestandMitParallelverbund()
+        bestand.Gruppen(0).Klassenstufe = 2
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'Religion-ev-Kl1'") AndAlso e.Contains("stimmt nicht mit der tatsaechlichen Klassenstufe")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub GruppeFachNotOfferedInKlassenstufeIsRejected()
+        Dim bestand = BestandMitParallelverbund()
+        bestand.Faecher.Single(Function(f) f.Name = "Religion-ev").Klassenstufen.Clear()
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'Religion-ev-Kl1'") AndAlso e.Contains("wird in klassenstufe 1 nicht gefuehrt")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub ParallelverbundMemberWithoutFachNameIsRejected()
+        Dim bestand = BestandMitParallelverbund()
+        bestand.Gruppen(0).FachName = Nothing
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'Religion-Kl1'") AndAlso e.Contains("ohne fach_name")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub ParallelverbundWithDuplicateFachNameIsRejected()
+        Dim bestand = BestandMitParallelverbund()
+        bestand.Gruppen(1).FachName = "Religion-ev"
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'Religion-Kl1'") AndAlso e.Contains("beanspruchen dasselbe fach_name")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub ParallelverbundWithDifferingKlassenstufeIsRejected()
+        Dim bestand = BestandMitParallelverbund()
+        bestand.Klassenstufen.Add(New Klassenstufe With {.Nummer = 2, .Bezeichnung = "Klasse 2"})
+        bestand.Gruppen(1).Klassenstufe = 2
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'Religion-Kl1'") AndAlso e.Contains("unterschiedliche klassenstufe")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub ParallelverbundWithDifferingWochenstundenSollIsRejected()
+        Dim bestand = BestandMitParallelverbund()
+        bestand.Faecher.Single(Function(f) f.Name = "Religion-kath").Klassenstufen(0).WochenstundenSoll = 3
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'Religion-Kl1'") AndAlso e.Contains("unterschiedliche wochenstunden_soll")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub ParallelverbundWithDifferingBlockLengthIsRejected()
+        Dim bestand = BestandMitParallelverbund()
+        bestand.Faecher.Single(Function(f) f.Name = "Religion-ev").BlockLength = 2
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'Religion-Kl1'") AndAlso e.Contains("unterschiedliche block_length")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub ParallelverbundWithOverlappingMemberIsRejected()
+        Dim bestand = BestandMitParallelverbund()
+        bestand.Gruppen(1).MitgliederSchuelerIds.Add("S-1a-01")
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'Religion-Kl1'") AndAlso e.Contains("'S-1a-01'") AndAlso e.Contains("mehr als einer Gruppe")), String.Join(vbLf, errors))
+    End Sub
+
 End Class

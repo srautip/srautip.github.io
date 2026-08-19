@@ -33,6 +33,28 @@ Public Class FormattingTests
         Next
     End Sub
 
+    ''' <summary>Phase 2.20f: a "parallel_group"-based schedule puts MORE
+    ''' THAN ONE session into the same (Class,Day,Period) slot (e.g.
+    ''' Religion-ev/Religion-kath/Ethik firing together) - ToClassGrids
+    ''' must combine them into one readable GridCell instead of silently
+    ''' overwriting all but the last-processed entry (the pre-2.20
+    ''' assumption). Hand-built schedule, no Solve() needed.</summary>
+    <TestMethod>
+    Public Sub ToClassGridsCombinesSimultaneousParallelGroupSessions()
+        Dim data = Scenario(Mini({"1a"}, {"T-ev", "T-kath", "T-eth"}, {"Religion-ev", "Religion-kath", "Ethik"}, {}, {"Mo"}, 1), {})
+        Dim schedule As New List(Of ScheduleEntry) From {
+            New ScheduleEntry With {.ClassName = "1a", .Subject = "Religion-ev", .Teacher = "T-ev", .Day = "Mo", .Period = 1, .Room = Nothing},
+            New ScheduleEntry With {.ClassName = "1a", .Subject = "Religion-kath", .Teacher = "T-kath", .Day = "Mo", .Period = 1, .Room = Nothing},
+            New ScheduleEntry With {.ClassName = "1a", .Subject = "Ethik", .Teacher = "T-eth", .Day = "Mo", .Period = 1, .Room = Nothing}
+        }
+        Dim grids = Formatting.ToClassGrids(data, schedule)
+        Dim cell = grids("1a")("Mo")(1)
+        Assert.IsNotNull(cell)
+        Assert.AreEqual("Ethik / Religion-ev / Religion-kath", cell.Subject)
+        Assert.AreEqual("T-eth / T-ev / T-kath", cell.Teacher)
+        Assert.IsNull(cell.Room)
+    End Sub
+
     <TestMethod>
     Public Sub ToTeacherGridsMatchesRawScheduleExactly()
         Dim data = BuildFullScenario()
@@ -188,6 +210,43 @@ Public Class FormattingTests
         Assert.IsTrue(md.Contains("# Lehrerzuteilung: Test-Schule"))
         Assert.IsTrue(md.Contains("| Lehrer A | 4 | 4 | 1a | 1a/Deutsch |"))
         Assert.IsTrue(md.Contains("| 1a | Lehrer A |"))
+    End Sub
+
+    ''' <summary>Phase 2.20f: a Gruppen-led Fach's LehrereinsatzZuweisung
+    ''' gets expanded to ONE ROW PER REAL CLASS the Gruppe spans (see
+    ''' Lehrereinsatzplanung.SolveLehrereinsatz). Naively summing
+    ''' WochenstundenSoll per row would double the reported "Ist" hours -
+    ''' FormatLehrereinsatzMarkdown must instead count the Gruppe's hours
+    ''' ONCE, matching what the CP-SAT Deputat-Korridor actually
+    ''' optimizes.</summary>
+    <TestMethod>
+    Public Sub FormatLehrereinsatzMarkdownCountsGruppenFachOnceNotPerRealClass()
+        Dim b As New Stammdatenbestand With {.SchulName = "Test-Schule"}
+        Dim religionEv As New Fach With {.Name = "Religion-ev"}
+        religionEv.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 2})
+        b.Faecher.Add(religionEv)
+        b.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1})
+        b.Klassen.Add(New Klasse With {.Name = "1b", .Klassenstufe = 1})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Religionslehrer-ev-1", .DeputatSollstunden = 2})
+        b.Schueler.Add(New Schueler With {.Id = "S1", .Klasse = "1a"})
+        b.Schueler.Add(New Schueler With {.Id = "S2", .Klasse = "1b"})
+        b.Gruppen.Add(New Gruppe With {
+            .Name = "Religion-ev-Kl1", .FachName = "Religion-ev", .Klassenstufe = 1,
+            .MitgliederSchuelerIds = New List(Of String) From {"S1", "S2"}
+        })
+
+        Dim result As New LehrereinsatzResult With {
+            .Status = Google.OrTools.Sat.CpSolverStatus.Optimal,
+            .Zuweisungen = New List(Of LehrereinsatzZuweisung) From {
+                New LehrereinsatzZuweisung With {.Lehrer = "Religionslehrer-ev-1", .Klasse = "1a", .Fach = "Religion-ev"},
+                New LehrereinsatzZuweisung With {.Lehrer = "Religionslehrer-ev-1", .Klasse = "1b", .Fach = "Religion-ev"}
+            },
+            .Klassenlehrer = New Dictionary(Of String, String)
+        }
+
+        Dim md = Formatting.FormatLehrereinsatzMarkdown(b, result)
+        Assert.IsTrue(md.Contains("| Religionslehrer-ev-1 | 2 | 2 |"),
+            $"Erwartete Ist=2 (einmal fuer die Gruppe, nicht 2x2=4 fuer beide real umspannten Klassen). Tatsaechlich:{vbLf}{md}")
     End Sub
 
 End Class

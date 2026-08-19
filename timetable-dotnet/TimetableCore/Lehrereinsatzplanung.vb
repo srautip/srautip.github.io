@@ -97,10 +97,17 @@ Public Module Lehrereinsatzplanung
     ''' benannt.</summary>
     Public Const WeightUnbeliebteFaecherUngleichheit As Integer = 1
 
+    ''' <summary>Phase 2.20d: `IstGruppe`=True marks a Gruppen-gefuehrtes
+    ''' Fach (z.B. Religion-ev/-kath/Ethik ueber eine klassenuebergreifende
+    ''' Stammdaten.Gruppe) - `Klasse` then holds the Gruppe's Name, not a
+    ''' real Klasse.Name (Gruppen and Klassen are assumed to use disjoint
+    ''' name spaces, same convention as everywhere else Klasse.Name is used
+    ''' as a dictionary/lookup key in this project).</summary>
     Private Structure AssignKey
         Public Lehrer As String
         Public Klasse As String
         Public Fach As String
+        Public IstGruppe As Boolean
     End Structure
 
     ''' <summary>Loest die Lehrereinsatzplanung fuer einen kompletten
@@ -125,8 +132,31 @@ Public Module Lehrereinsatzplanung
         Dim lehrerByName = bestand.Lehrkraefte.ToDictionary(Function(l) l.Name)
         Dim klasseByName = bestand.Klassen.ToDictionary(Function(k) k.Name)
         Dim fachByName = bestand.Faecher.ToDictionary(Function(f) f.Name)
+        Dim gruppeByName = bestand.Gruppen.ToDictionary(Function(g) g.Name)
         Dim fachfremdSet As New HashSet(Of (Lehrer As String, Fach As String))(
             bestand.FachLehrerZuordnungen.Where(Function(z) z.Fachfremd).Select(Function(z) (z.LehrerName, z.FachName)))
+
+        ' Phase 2.20d: welche (Klassenstufe,Fach)-Kombinationen sind ueber
+        ' eine klassenuebergreifende Gruppe statt normal pro Klasse
+        ' gefuehrt? StammdatenValidation garantiert bereits Eindeutigkeit
+        ' innerhalb eines Parallelverbunds (paarweise verschiedene
+        ' fach_name); zwei komplett unabhaengige Gruppen fuer dieselbe
+        ' (Klassenstufe,Fach)-Kombination sind Stammdaten-seitig nicht
+        ' ausgeschlossen, werden hier aber deterministisch auf die zuletzt
+        ' gesehene reduziert (kein Anspruch auf Mehrdeutigkeits-Detektion
+        ' in diesem Modul - StammdatenValidation ist dafuer zustaendig).
+        Dim gruppeFuerKlassenstufeFach As New Dictionary(Of (Klassenstufe As Integer, Fach As String), Gruppe)
+        For Each gruppe In bestand.Gruppen.Where(Function(g) g.FachName IsNot Nothing AndAlso g.Klassenstufe.HasValue)
+            gruppeFuerKlassenstufeFach((gruppe.Klassenstufe.Value, gruppe.FachName)) = gruppe
+        Next
+
+        ' Helper: liefert die fuer eine AssignKey-Zuweisung massgebliche
+        ' Klassenstufe - bei Gruppen-Eintraegen (Klasse=Gruppe.Name) ueber
+        ' die Gruppe selbst, sonst wie bisher ueber die echte Klasse.
+        Dim KlassenstufeFuer = Function(key As AssignKey) As Integer
+                                    If key.IstGruppe Then Return gruppeByName(key.Klasse).Klassenstufe.Value
+                                    Return klasseByName(key.Klasse).Klassenstufe
+                                End Function
         ' Phase 2.17 (Tandem-Balance): Sentinel-Obergrenze fuer den
         ' Min-Trick unten - garantiert groesser als die Wochenstunden
         ' irgendeiner einzelnen Klasse (Summe ALLER Fach-Wochenstunden der
@@ -145,6 +175,10 @@ Public Module Lehrereinsatzplanung
         Dim fachfremdEinsatz As New List(Of BoolVar)
         For Each klasse In bestand.Klassen
             For Each fach In Stammdaten.FaecherOfKlassenstufe(bestand, klasse.Klassenstufe)
+                ' Phase 2.20d: ein Gruppen-gefuehrtes Fach bekommt in
+                ' diesem Zweig KEINE Pro-Klasse-Variable - es wird
+                ' stattdessen unten einmal pro Gruppe erzeugt.
+                If gruppeFuerKlassenstufeFach.ContainsKey((klasse.Klassenstufe, fach.Name)) Then Continue For
                 Dim fk = Stammdaten.WochenstundenFuer(fach, klasse.Klassenstufe)
                 For Each lehrer In Stammdaten.LehrerFuerFach(bestand, fach.Name)
                     If Not Stammdaten.IstTeilzeitKohaerent(lehrer, bestand, fk) Then Continue For
@@ -156,13 +190,42 @@ Public Module Lehrereinsatzplanung
             Next
         Next
 
+        ' Phase 2.20d: einmal pro Gruppe statt pro Klasse - eine
+        ' klassenuebergreifende Gruppe (z.B. Religion-ev-Kl1, umspannt 1a
+        ' UND 1b) bekommt genau EINEN Kandidatensatz, nicht je einen pro
+        ' real umspannter Klasse (sonst wuerde derselbe Lehrer mehrfach mit
+        ' unabhaengigen Variablen fuer dieselbe tatsaechliche Unterrichts-
+        ' einheit auftreten, was das Deputat faelschlich vervielfachen
+        ' wuerde - Plan-Agent-Befund, siehe Phase-2.20-Plan).
+        For Each gruppe In bestand.Gruppen.Where(Function(g) g.FachName IsNot Nothing AndAlso g.Klassenstufe.HasValue)
+            Dim fach = fachByName(gruppe.FachName)
+            Dim fk = Stammdaten.WochenstundenFuer(fach, gruppe.Klassenstufe.Value)
+            For Each lehrer In Stammdaten.LehrerFuerFach(bestand, fach.Name)
+                If Not Stammdaten.IstTeilzeitKohaerent(lehrer, bestand, fk) Then Continue For
+                Dim key As New AssignKey With {.Lehrer = lehrer.Name, .Klasse = gruppe.Name, .Fach = fach.Name, .IstGruppe = True}
+                Dim v = model.NewBoolVar($"assign[{lehrer.Name},{gruppe.Name},{fach.Name},gruppe]")
+                assign(key) = v
+                If fachfremdSet.Contains((lehrer.Name, fach.Name)) Then fachfremdEinsatz.Add(v)
+            Next
+        Next
+
         ' --- Hart: jede (Klasse,Fach)-Kombination bekommt genau eine Lehrkraft ---
         For Each klasse In bestand.Klassen
             For Each fach In Stammdaten.FaecherOfKlassenstufe(bestand, klasse.Klassenstufe)
+                If gruppeFuerKlassenstufeFach.ContainsKey((klasse.Klassenstufe, fach.Name)) Then Continue For
                 Dim vars = assign.Where(Function(kvp) kvp.Key.Klasse = klasse.Name AndAlso kvp.Key.Fach = fach.Name).
                     Select(Function(kvp) kvp.Value).ToList()
                 model.Add(LinearExpr.Sum(vars) = 1)
             Next
+        Next
+
+        ' --- Hart: jede (Gruppe,Fach)-Kombination bekommt ebenfalls genau
+        ' eine Lehrkraft (dieselbe Vollstaendigkeitsregel, nur ueber
+        ' IstGruppe statt ueber echte Klassen partitioniert) ---
+        For Each gruppe In bestand.Gruppen.Where(Function(g) g.FachName IsNot Nothing AndAlso g.Klassenstufe.HasValue)
+            Dim vars = assign.Where(Function(kvp) kvp.Key.IstGruppe AndAlso kvp.Key.Klasse = gruppe.Name AndAlso kvp.Key.Fach = gruppe.FachName).
+                Select(Function(kvp) kvp.Value).ToList()
+            model.Add(LinearExpr.Sum(vars) = 1)
         Next
 
         ' --- Weich: Deputat-Korridor (hinge-loss ueber die Toleranzgrenze
@@ -177,8 +240,7 @@ Public Module Lehrereinsatzplanung
             Dim maxMoeglich = 0
             For Each kvp In eigeneVars
                 Dim fach = fachByName(kvp.Key.Fach)
-                Dim klasse = klasseByName(kvp.Key.Klasse)
-                Dim fk = Stammdaten.WochenstundenFuer(fach, klasse.Klassenstufe)
+                Dim fk = Stammdaten.WochenstundenFuer(fach, KlassenstufeFuer(kvp.Key))
                 wochenstundenTerms.Add(kvp.Value * CLng(fk.WochenstundenSoll))
                 maxMoeglich += fk.WochenstundenSoll
             Next
@@ -386,8 +448,7 @@ Public Module Lehrereinsatzplanung
         For Each kvp In assign
             Dim lehrer = lehrerByName(kvp.Key.Lehrer)
             If lehrer.BevorzugteKlassenstufen.Count = 0 Then Continue For
-            Dim klasse = klasseByName(kvp.Key.Klasse)
-            If Not lehrer.BevorzugteKlassenstufen.Contains(klasse.Klassenstufe) Then
+            If Not lehrer.BevorzugteKlassenstufen.Contains(KlassenstufeFuer(kvp.Key)) Then
                 praeferenzVerletzt.Add(kvp.Value)
             End If
         Next
@@ -440,7 +501,24 @@ Public Module Lehrereinsatzplanung
         If status = CpSolverStatus.Optimal OrElse status = CpSolverStatus.Feasible Then
             Dim zuweisungen As New List(Of LehrereinsatzZuweisung)
             For Each kvp In assign
-                If solver.BooleanValue(kvp.Value) Then
+                If Not solver.BooleanValue(kvp.Value) Then Continue For
+                If kvp.Key.IstGruppe Then
+                    ' Phase 2.20d: eine Gruppen-Zuweisung wird SOFORT hier
+                    ' auf alle echten, von der Gruppe umspannten Klassen
+                    ' expandiert (Stammdaten.KlassenOfGruppe) - derselbe
+                    ' Lehrer, dasselbe Fach, einmal pro Klasse. Das haelt
+                    ' LehrereinsatzResult.Zuweisungen fuer jeden
+                    ' nachgelagerten Konsumenten (Verifier.
+                    ' VerifyLehrereinsatz's bestehende "genau 1 Zuweisung
+                    ' pro (Klasse,Fach)"-Pruefung, spaeter
+                    ' BuildAssignmentConstraints) uniform: nur echte
+                    ' Klassennamen, keine Sonderbehandlung fuer Gruppen
+                    ' noetig.
+                    Dim gruppe = gruppeByName(kvp.Key.Klasse)
+                    For Each klasseName In Stammdaten.KlassenOfGruppe(bestand, gruppe)
+                        zuweisungen.Add(New LehrereinsatzZuweisung With {.Lehrer = kvp.Key.Lehrer, .Klasse = klasseName, .Fach = kvp.Key.Fach})
+                    Next
+                Else
                     zuweisungen.Add(New LehrereinsatzZuweisung With {.Lehrer = kvp.Key.Lehrer, .Klasse = kvp.Key.Klasse, .Fach = kvp.Key.Fach})
                 End If
             Next
@@ -511,6 +589,41 @@ Public Module Lehrereinsatzplanung
         Next
         For Each lehrerName In result.Zuweisungen.Select(Function(z) z.Lehrer).Distinct()
             constraints.Add(New JsonObject From {{"type", "no_overlap"}, {"resource", "teacher"}, {"entity", lehrerName}})
+        Next
+
+        ' Phase 2.20e: pro Parallelverbund genau eine "parallel_group"-
+        ' Constraint - ein Mitglied pro (echter Klasse, Fach, Lehrer)-
+        ' Kombination, ueber alle Gruppen des Verbunds und alle von ihnen
+        ' umspannten echten Klassen hinweg (Stammdaten.KlassenOfGruppe).
+        ' Der Lehrer je Mitglied wird aus den bereits (in SolveLehrereinsatz)
+        ' klassen-expandierten result.Zuweisungen nachgeschlagen - dort
+        ' steht fuer jede von der Gruppe umspannte Klasse bereits derselbe
+        ' Lehrer (siehe VerifyLehrereinsatz's Gruppen-Konsistenzpruefung,
+        ' Phase 2.20c), es reicht daher der erste Treffer je (Klasse,Fach).
+        For Each verbund In bestand.Gruppen.Where(Function(g) g.FachName IsNot Nothing AndAlso g.Parallelverbund IsNot Nothing).
+            GroupBy(Function(g) g.Parallelverbund)
+            Dim classes As New List(Of String)
+            Dim subjects As New List(Of String)
+            Dim teachers As New List(Of String)
+            For Each gruppe In verbund
+                For Each klasseName In Stammdaten.KlassenOfGruppe(bestand, gruppe)
+                    Dim lehrerName = result.Zuweisungen.
+                        Where(Function(z) z.Klasse = klasseName AndAlso z.Fach = gruppe.FachName).
+                        Select(Function(z) z.Lehrer).FirstOrDefault()
+                    If lehrerName Is Nothing Then Continue For
+                    classes.Add(klasseName)
+                    subjects.Add(gruppe.FachName)
+                    teachers.Add(lehrerName)
+                Next
+            Next
+            If classes.Count > 0 Then
+                constraints.Add(New JsonObject From {
+                    {"type", "parallel_group"},
+                    {"classes", New JsonArray(classes.Select(Function(c) CType(c, JsonNode)).ToArray())},
+                    {"subjects", New JsonArray(subjects.Select(Function(s) CType(s, JsonNode)).ToArray())},
+                    {"teachers", New JsonArray(teachers.Select(Function(t) CType(t, JsonNode)).ToArray())}
+                })
+            End If
         Next
 
         Return constraints

@@ -14,7 +14,9 @@
 | Klassenlehrer-6 | 28 | 21 | 2a | 2a/Deutsch, 2a/Mathematik, 2a/Sachunterricht, 2a/Sport, 2a/Musik, 2a/Kunst |
 | Klassenlehrer-7 | 28 | 20 | 4b | 4b/Deutsch, 4b/Mathematik, 4b/Sachunterricht, 4b/Sport, 4b/Musik, 4b/Kunst |
 | Klassenlehrer-8 | 28 | 21 | 2b | 2b/Deutsch, 2b/Mathematik, 2b/Sachunterricht, 2b/Sport, 2b/Musik, 2b/Kunst |
-| Religionslehrer-1 | 16 | 16 |  | 1a/Religion, 1b/Religion, 2a/Religion, 2b/Religion, 3a/Religion, 3b/Religion, 4a/Religion, 4b/Religion |
+| Religionslehrer-ev-1 | 8 | 8 |  | 1a/Religion-ev, 1b/Religion-ev, 2a/Religion-ev, 2b/Religion-ev, 3a/Religion-ev, 3b/Religion-ev, 4a/Religion-ev, 4b/Religion-ev |
+| Religionslehrer-kath-1 | 8 | 8 |  | 1a/Religion-kath, 1b/Religion-kath, 2a/Religion-kath, 2b/Religion-kath, 3a/Religion-kath, 3b/Religion-kath, 4a/Religion-kath, 4b/Religion-kath |
+| Ethiklehrer-1 | 8 | 8 |  | 1a/Ethik, 1b/Ethik, 2a/Ethik, 2b/Ethik, 3a/Ethik, 3b/Ethik, 4a/Ethik, 4b/Ethik |
 | Englischlehrer-1 | 8 | 8 |  | 3a/Englisch, 3b/Englisch, 4a/Englisch, 4b/Englisch |
 
 ## Klassenlehrer je Klasse

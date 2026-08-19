@@ -126,10 +126,26 @@ End Class
 Public NotInheritable Class Gruppe
     Public Property Name As String
     ''' <summary>Freitext-Kategorie, informativ (z.B. "Fachgruppe",
-    ''' "Foerderung", "Aufsicht") - keine Solver-Wirkung in diesem
-    ''' Schritt.</summary>
+    ''' "Foerderung", "Aufsicht") - keine Solver-Wirkung.</summary>
     Public Property Typ As String
     Public Property MitgliederSchuelerIds As New List(Of String)
+    ''' <summary>Phase 2.20: welches Fach diese Gruppe unterrichtet.
+    ''' Nothing (Default) = weiterhin komplett inert (Phase-2.19-Verhalten
+    ''' unveraendert). Gesetzt = die Gruppe wird in
+    ''' Lehrereinsatzplanung.SolveLehrereinsatz als eigenstaendige
+    ''' Zuweisungseinheit gefuehrt statt jede Heimatklasse einzeln.</summary>
+    Public Property FachName As String
+    ''' <summary>Phase 2.20: Klassenstufe dieser Gruppe - noetig fuer
+    ''' Lehrereinsatzplanung-Lookups (FachKlassenstufe/Praeferenzen), da
+    ''' eine Gruppe mehrere echte Klassen umspannen kann und deshalb keiner
+    ''' einzelnen Klasse.Klassenstufe zugeordnet werden kann.</summary>
+    Public Property Klassenstufe As Integer?
+    ''' <summary>Phase 2.20: Gruppen mit demselben (nicht-leeren) Wert
+    ''' bilden gemeinsam eine Partition, die zeitgleich (auf identischen
+    ''' Tag/Periode-Slots) stattfinden MUSS - z.B. alle drei Varianten
+    ''' Religion-ev/Religion-kath/Ethik derselben Klassenstufe. Nothing
+    ''' (Default) = keine Synchronisationsanforderung.</summary>
+    Public Property Parallelverbund As String
 End Class
 
 ''' <summary>Die "Zuordnung Faecher zu Lehrer" aus der Nutzeranfrage - die
@@ -231,6 +247,20 @@ Public Module Stammdaten
         If lehrer.VerfuegbareTage Is Nothing Then Return True
         Dim effectiveMaxProTag = If(fk.MaxProTag.HasValue, fk.MaxProTag.Value, bestand.PeriodsPerDay)
         Return fk.WochenstundenSoll <= lehrer.VerfuegbareTage.Count * effectiveMaxProTag
+    End Function
+
+    ''' <summary>Phase 2.20: die distinct Heimatklassen (Klasse.Name) aller
+    ''' Mitglieder einer Gruppe - z.B. {"1a","1b"} fuer eine Gruppe, die
+    ''' Schueler beider Parallelklassen einer Klassenstufe kombiniert.
+    ''' Genutzt von Lehrereinsatzplanung.vb (welche echten Klassen eine
+    ''' Gruppen-Zuweisung betrifft) und BuildAssignmentConstraints (wo pro
+    ''' echter Klasse die Session-Constraints emittiert werden).</summary>
+    Public Function KlassenOfGruppe(bestand As Stammdatenbestand, gruppe As Gruppe) As List(Of String)
+        Dim schuelerById = bestand.Schueler.ToDictionary(Function(s) s.Id)
+        Return gruppe.MitgliederSchuelerIds.
+            Where(Function(id) schuelerById.ContainsKey(id)).
+            Select(Function(id) schuelerById(id).Klasse).
+            Distinct().ToList()
     End Function
 
     ''' <summary>Projiziert einen Stammdatenbestand in das

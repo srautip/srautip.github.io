@@ -101,6 +101,133 @@ Public Class LehrereinsatzplanungTests
         Assert.AreEqual(0, result.Klassenlehrer.Count)
     End Sub
 
+    ''' <summary>Phase 2.20d/e Gate: 2 Klassen (1a,1b), 1 Klassenstufe, 3
+    ''' Gruppen-gefuehrte Faecher (Religion-ev/Religion-kath/Ethik, je 2h,
+    ''' ein gemeinsamer Parallelverbund) - jede Gruppe umspannt BEIDE
+    ''' Klassen. 3 dedizierte, jeweils exakt fuer eine Gruppe qualifizierte
+    ''' Lehrkraefte mit Deputat=2h (exakt EINE Gruppe, nicht zwei echte
+    ''' Klassen).</summary>
+    Private Function BestandMitParallelgruppen() As Stammdatenbestand
+        Dim b As New Stammdatenbestand With {.SchulName = "Test", .Schulart = "Grundschule"}
+        b.Klassenstufen.Add(New Klassenstufe With {.Nummer = 1, .Bezeichnung = "Klasse 1"})
+        b.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1})
+        b.Klassen.Add(New Klasse With {.Name = "1b", .Klassenstufe = 1})
+
+        For Each fachName In {"Religion-ev", "Religion-kath", "Ethik"}
+            Dim fach As New Fach With {.Name = fachName}
+            fach.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 2})
+            b.Faecher.Add(fach)
+        Next
+
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "T-ev", .DeputatSollstunden = 2})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "T-kath", .DeputatSollstunden = 2})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "T-eth", .DeputatSollstunden = 2})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "T-ev", .FachName = "Religion-ev"})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "T-kath", .FachName = "Religion-kath"})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "T-eth", .FachName = "Ethik"})
+
+        b.Schueler.Add(New Schueler With {.Id = "S1", .Klasse = "1a"})
+        b.Schueler.Add(New Schueler With {.Id = "S2", .Klasse = "1b"})
+        b.Schueler.Add(New Schueler With {.Id = "S3", .Klasse = "1a"})
+        b.Schueler.Add(New Schueler With {.Id = "S4", .Klasse = "1b"})
+        b.Schueler.Add(New Schueler With {.Id = "S5", .Klasse = "1a"})
+        b.Schueler.Add(New Schueler With {.Id = "S6", .Klasse = "1b"})
+
+        b.Gruppen.Add(New Gruppe With {
+            .Name = "Religion-ev-Kl1", .FachName = "Religion-ev", .Klassenstufe = 1, .Parallelverbund = "Religion-Kl1",
+            .MitgliederSchuelerIds = New List(Of String) From {"S1", "S2"}
+        })
+        b.Gruppen.Add(New Gruppe With {
+            .Name = "Religion-kath-Kl1", .FachName = "Religion-kath", .Klassenstufe = 1, .Parallelverbund = "Religion-Kl1",
+            .MitgliederSchuelerIds = New List(Of String) From {"S3", "S4"}
+        })
+        b.Gruppen.Add(New Gruppe With {
+            .Name = "Ethik-Kl1", .FachName = "Ethik", .Klassenstufe = 1, .Parallelverbund = "Religion-Kl1",
+            .MitgliederSchuelerIds = New List(Of String) From {"S5", "S6"}
+        })
+
+        Return b
+    End Function
+
+    <TestMethod>
+    Public Sub GruppenGefuehrtesFachZaehltDeputatEinmalProGruppe()
+        Dim b = BestandMitParallelgruppen()
+        Assert.AreEqual(0, StammdatenValidation.ValidateStammdaten(b).Count)
+
+        Dim result = Lehrereinsatzplanung.SolveLehrereinsatz(b, deputatToleranzStunden:=0.0, timeLimitS:=10)
+        Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible, result.Status.ToString())
+        ' Alle 3 Lehrkraefte sind reine Fachspezialisten (keine
+        ' klassenlehrerfaehige Kandidatin fuer 1a/1b vorhanden, da Gruppen-
+        ' gefuehrte Faecher strukturell nie in die Klassenlehrer-
+        ' Kandidatenliste einer echten Klasse einfliessen) - "fehlt
+        ' Klassenlehrer" ist deshalb fuer BEIDE Klassen unvermeidbar und
+        ' unabhaengig vom hier eigentlich getesteten Deputat-Mechanismus
+        ' (2 x WeightKlassenlehrerFehlt = 40). Waere das Deputat je Gruppe
+        ' faelschlich verdoppelt worden (Ist=4h gegen Soll=2h, ausserhalb
+        ' der Toleranz 0), kaeme zusaetzlich WeightDeputatAbweichung*... on
+        ' top - das waere hier sofort sichtbar als Objective > 40.
+        Dim erwarteteKlassenlehrerFehltStrafe = 2.0 * Lehrereinsatzplanung.WeightKlassenlehrerFehlt
+        Assert.AreEqual(erwarteteKlassenlehrerFehltStrafe, result.Solver.ObjectiveValue, 0.001,
+            "Ausserhalb der (strukturell unvermeidbaren) Klassenlehrer-Fehlt-Strafe darf keine Deputat-Abweichung entstehen (waere das Deputat faelschlich verdoppelt worden, laege Ist=4h gegen Soll=2h vor).")
+
+        Assert.AreEqual(6, result.Zuweisungen.Count, "3 Gruppen x 2 real umspannte Klassen = 6 expandierte Zuweisungen erwartet")
+        For Each fachTeacher In New Dictionary(Of String, String) From {{"Religion-ev", "T-ev"}, {"Religion-kath", "T-kath"}, {"Ethik", "T-eth"}}
+            Dim lehrerVon1a = result.Zuweisungen.Single(Function(z) z.Klasse = "1a" AndAlso z.Fach = fachTeacher.Key).Lehrer
+            Dim lehrerVon1b = result.Zuweisungen.Single(Function(z) z.Klasse = "1b" AndAlso z.Fach = fachTeacher.Key).Lehrer
+            Assert.AreEqual(fachTeacher.Value, lehrerVon1a)
+            Assert.AreEqual(fachTeacher.Value, lehrerVon1b)
+        Next
+
+        Assert.AreEqual(0, Verifier.VerifyLehrereinsatz(b, result).Count)
+    End Sub
+
+    ''' <summary>Phase 2.20e Gate: das komplette Ergebnis von
+    ''' SolveLehrereinsatz wird ueber BuildAssignmentConstraints +
+    ''' Stammdaten.BuildEntitiesFragment in ein echtes entities/constraints-
+    ''' JSON uebersetzt und durch den UNVERAENDERTEN Solver.Solve geloest -
+    ''' beweist end-to-end, dass die neue "parallel_group"-Constraint
+    ''' tatsaechlich dazu fuehrt, dass alle 6 Sessions (3 Faecher x 2
+    ''' Klassen) auf einem identischen Slot landen, UND dass sowohl
+    ''' Verifier.VerifyLehrereinsatz als auch Verifier.VerifySchedule (inkl.
+    ''' des neuen parallel_group-Checks) 0 Verstoesse melden.</summary>
+    <TestMethod>
+    Public Sub GruppenBasierteZuweisungLoestEndToEndMitSynchronenSessions()
+        Dim b = BestandMitParallelgruppen()
+        Assert.AreEqual(0, StammdatenValidation.ValidateStammdaten(b).Count)
+
+        Dim result = Lehrereinsatzplanung.SolveLehrereinsatz(b, deputatToleranzStunden:=0.0, timeLimitS:=10)
+        Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible, result.Status.ToString())
+        Assert.AreEqual(0, Verifier.VerifyLehrereinsatz(b, result).Count)
+
+        Dim constraints = Lehrereinsatzplanung.BuildAssignmentConstraints(result, b)
+        Assert.IsTrue(constraints.Any(Function(c) JsonHelpers.GetString(c, "type") = "parallel_group"),
+            "Erwartete genau 1 parallel_group-Constraint fuer den gemeinsamen Parallelverbund")
+
+        Dim entities = Stammdaten.BuildEntitiesFragment(b)
+        Dim data As New JsonObject From {
+            {"entities", entities},
+            {"constraints", New JsonArray(constraints.Select(Function(c) CType(c, JsonNode)).ToArray())}
+        }
+        Assert.AreEqual(0, Validation.ValidateEntities(data).Count)
+
+        Dim r = Solver.Solve(data, timeLimitS:=10)
+        Assert.IsTrue(r.Status = CpSolverStatus.Optimal OrElse r.Status = CpSolverStatus.Feasible, Solver.StatusName(r.Status))
+        Dim scheduleViolations = Verifier.VerifySchedule(data, r.Schedule)
+        Assert.AreEqual(0, scheduleViolations.Count, String.Join(vbLf, scheduleViolations))
+
+        ' Jedes der 3 Faecher fordert 2 Wochenstunden (siehe
+        ' BestandMitParallelgruppen) - da alle Mitglieder zwingend
+        ' zusammen feuern, sind das GENAU 2 gemeinsame Slots fuer die
+        ' gesamte Gruppe (nicht 1 pro Fach - waeren die Faecher nicht
+        ' synchronisiert, kaemen bis zu 6 verschiedene Slots vor).
+        Dim slots = r.Schedule.Select(Function(l) (l.Day, l.Period)).Distinct().ToList()
+        Assert.AreEqual(2, slots.Count, "Alle Parallelgruppen-Mitglieder muessen an GENAU 2 gemeinsamen Slots (= wochenstunden_soll) synchron auftreten")
+        For Each slot In slots
+            Assert.AreEqual(6, r.Schedule.Where(Function(l) l.Day = slot.Day AndAlso l.Period = slot.Period).Count(),
+                $"Slot {slot}: erwartet alle 6 Mitglieder (3 Faecher x 2 Klassen) gemeinsam aktiv")
+        Next
+    End Sub
+
     Private Function BestandMitDreiKernfaechern() As Stammdatenbestand
         Dim b As New Stammdatenbestand With {.SchulName = "Test", .Schulart = "Grundschule"}
         b.Klassenstufen.Add(New Klassenstufe With {.Nummer = 1, .Bezeichnung = "Klasse 1"})

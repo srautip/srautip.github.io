@@ -91,6 +91,53 @@ Public Class VerifyLehrereinsatzTests
 
     ''' <summary>Lehrer A ist klassenlehrerfaehig, unterrichtet aber laut
     ''' Zuweisungen gar nicht in Klasse "1b".</summary>
+    ''' <summary>Phase 2.20c: a Fach taught via a klassenuebergreifende
+    ''' Gruppe (Stammdaten.Gruppe.FachName set, spanning 2 real classes via
+    ''' Stammdaten.KlassenOfGruppe) requires the SAME teacher in every real
+    ''' class it spans - otherwise the "parallel_group" Solver.vb
+    ''' constraint's forced slot-synchronization would be physically
+    ''' impossible.</summary>
+    Private Function BestandMitGruppe() As Stammdatenbestand
+        Dim b = Bestand()
+        b.Klassen.Add(New Klasse With {.Name = "1b", .Klassenstufe = 1})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer B", .FachName = "Deutsch"})
+        b.Schueler.Add(New Schueler With {.Id = "S1", .Klasse = "1a"})
+        b.Schueler.Add(New Schueler With {.Id = "S2", .Klasse = "1b"})
+        b.Gruppen.Add(New Gruppe With {
+            .Name = "Deutsch-Gruppe-Kl1", .FachName = "Deutsch", .Klassenstufe = 1,
+            .MitgliederSchuelerIds = New List(Of String) From {"S1", "S2"}
+        })
+        Return b
+    End Function
+
+    <TestMethod>
+    Public Sub GruppeWithConsistentTeacherAcrossClassesHasNoGruppenViolation()
+        Dim b = BestandMitGruppe()
+        Dim result As New LehrereinsatzResult With {
+            .Zuweisungen = New List(Of LehrereinsatzZuweisung) From {
+                New LehrereinsatzZuweisung With {.Lehrer = "Lehrer A", .Klasse = "1a", .Fach = "Deutsch"},
+                New LehrereinsatzZuweisung With {.Lehrer = "Lehrer A", .Klasse = "1b", .Fach = "Deutsch"}
+            },
+            .Klassenlehrer = New Dictionary(Of String, String)
+        }
+        Dim violations = Verifier.VerifyLehrereinsatz(b, result)
+        Assert.IsFalse(violations.Any(Function(v) v.Contains("Gruppe")), String.Join(vbLf, violations))
+    End Sub
+
+    <TestMethod>
+    Public Sub GruppeWithDifferingTeachersAcrossClassesIsDetected()
+        Dim b = BestandMitGruppe()
+        Dim result As New LehrereinsatzResult With {
+            .Zuweisungen = New List(Of LehrereinsatzZuweisung) From {
+                New LehrereinsatzZuweisung With {.Lehrer = "Lehrer A", .Klasse = "1a", .Fach = "Deutsch"},
+                New LehrereinsatzZuweisung With {.Lehrer = "Lehrer B", .Klasse = "1b", .Fach = "Deutsch"}
+            },
+            .Klassenlehrer = New Dictionary(Of String, String)
+        }
+        Dim violations = Verifier.VerifyLehrereinsatz(b, result)
+        Assert.IsTrue(violations.Any(Function(v) v.Contains("Gruppe 'Deutsch-Gruppe-Kl1'") AndAlso v.Contains("unterschiedliche Lehrkraefte")), String.Join(vbLf, violations))
+    End Sub
+
     <TestMethod>
     Public Sub KlassenlehrerNotActuallyTeachingClassIsDetected()
         Dim result As New LehrereinsatzResult With {

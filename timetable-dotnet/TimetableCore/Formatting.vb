@@ -40,10 +40,26 @@ Public Module Formatting
         Dim days = JsonHelpers.AsStringList(timeslots, "days")
         Dim periods = Enumerable.Range(1, JsonHelpers.GetInt(timeslots, "periods_per_day").Value).ToList()
         Dim grids = EmptyGrid(JsonHelpers.AsStringList(ent, "classes"), days, periods)
-        For Each l In schedule
-            grids(l.ClassName)(l.Day)(l.Period) = New GridCell With {
-                .Subject = l.Subject, .Teacher = l.Teacher, .Room = l.Room
-            }
+        ' Phase 2.20f: a class can have MORE THAN ONE simultaneous session
+        ' at the same (Day,Period) once it participates in a
+        ' "parallel_group" (e.g. Religion-ev/Religion-kath/Ethik all firing
+        ' together for the same class) - group by slot and combine into
+        ' ONE GridCell instead of silently overwriting with whichever entry
+        ' happens to be processed last (the pre-2.20 assumption, back when
+        ' no_overlap(class) always guaranteed at most 1 entry per slot).
+        ' For every pre-2.20 fixture this is a no-op: each group has
+        ' exactly 1 element, and joining a 1-element list is byte-identical
+        ' to using that single value directly.
+        For Each classGroup In schedule.GroupBy(Function(l) l.ClassName)
+            For Each slotGroup In classGroup.GroupBy(Function(l) (l.Day, l.Period))
+                Dim entries = slotGroup.OrderBy(Function(l) l.Subject).ToList()
+                Dim rooms = entries.Select(Function(l) l.Room).Where(Function(r) Not String.IsNullOrEmpty(r)).Distinct().ToList()
+                grids(classGroup.Key)(slotGroup.Key.Day)(slotGroup.Key.Period) = New GridCell With {
+                    .Subject = String.Join(" / ", entries.Select(Function(l) l.Subject)),
+                    .Teacher = String.Join(" / ", entries.Select(Function(l) l.Teacher)),
+                    .Room = If(rooms.Count > 0, String.Join(" / ", rooms), Nothing)
+                }
+            Next
         Next
         Return grids
     End Function
@@ -254,15 +270,35 @@ Public Module Formatting
         lines.Add("")
 
         If result.Zuweisungen IsNot Nothing Then
+            ' Phase 2.20f: welche (Klassenstufe,Fach)-Kombinationen sind
+            ' ueber eine Gruppe gefuehrt? Fuer diese wurde eine einzelne
+            ' Lehrereinsatzplanung-Zuweisung bereits bei der Loesungs-
+            ' extraktion auf ALLE echten, von der Gruppe umspannten Klassen
+            ' dupliziert (siehe Lehrereinsatzplanung.SolveLehrereinsatz) -
+            ' ohne diese Deduplizierung hier wuerde die "Ist"-Spalte die
+            ' tatsaechlichen Wochenstunden faelschlich vervielfachen (z.B.
+            ' Ist=16h statt der wirklich unterrichteten 8h bei einer
+            ' Gruppe, die 2 Klassen umspannt).
+            Dim gruppenFachKlassenstufen As New HashSet(Of (Klassenstufe As Integer, Fach As String))(
+                bestand.Gruppen.Where(Function(g) g.FachName IsNot Nothing AndAlso g.Klassenstufe.HasValue).
+                    Select(Function(g) (g.Klassenstufe.Value, g.FachName)))
+
             lines.Add("## Lehrkraefte")
             lines.Add("")
             lines.Add("| Lehrkraft | Soll (h) | Ist (h) | Klassenlehrer von | Zuweisungen |")
             lines.Add("|---|---|---|---|---|")
             For Each l In bestand.Lehrkraefte
                 Dim eigene = result.Zuweisungen.Where(Function(z) z.Lehrer = l.Name).ToList()
-                Dim ist = eigene.Sum(Function(z) Stammdaten.WochenstundenFuer(
-                    bestand.Faecher.Single(Function(f) f.Name = z.Fach),
-                    bestand.Klassen.Single(Function(k) k.Name = z.Klasse).Klassenstufe).WochenstundenSoll)
+                Dim ist = 0
+                For Each fachGroup In eigene.GroupBy(Function(z) (z.Fach, bestand.Klassen.Single(Function(k) k.Name = z.Klasse).Klassenstufe))
+                    Dim stunden = Stammdaten.WochenstundenFuer(
+                        bestand.Faecher.Single(Function(f) f.Name = fachGroup.Key.Item1), fachGroup.Key.Item2).WochenstundenSoll
+                    If gruppenFachKlassenstufen.Contains((fachGroup.Key.Item2, fachGroup.Key.Item1)) Then
+                        ist += stunden
+                    Else
+                        ist += stunden * fachGroup.Count()
+                    End If
+                Next
                 Dim klassenlehrerVon = If(result.Klassenlehrer IsNot Nothing,
                     String.Join(", ", result.Klassenlehrer.Where(Function(kvp) kvp.Value = l.Name).Select(Function(kvp) kvp.Key)),
                     "")

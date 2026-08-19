@@ -206,20 +206,38 @@ Eine klassenunabhängige Gruppe von Schülern - deckt z.B. Religion
 ev./kath./Ethik, Fördergruppen oder Aufsichtsgruppen ab (alle strukturell
 gleich: eine benannte Gruppe, eine Liste von Schüler-IDs).
 
-- `name` - Name der Gruppe (z.B. `Religion-ev-Kl1a`), muss eindeutig sein.
+- `name` - Name der Gruppe (z.B. `Religion-ev-Kl1`), muss eindeutig sein.
 - `typ` - optional, Freitext-Kategorie zur eigenen Einordnung (z.B.
   `Fachgruppe`, `Foerderung`, `Aufsicht`).
 - `mitglieder_schueler_ids` - Liste von Schüler-IDs (müssen in
   `schueler[]` existieren).
+- `fach_name` - optional (Phase 2.20): welches Fach diese Gruppe
+  unterrichtet (muss in `faecher[]` existieren). Erst mit diesem Feld
+  gesetzt bekommt eine Gruppe eine Solver-Wirkung.
+- `klassenstufe` - optional (Phase 2.20): die Klassenstufe der Gruppe
+  (nötig, da eine Gruppe mehrere echte Klassen umspannen kann und daher
+  keine einzelne `Klasse.klassenstufe` hat).
+- `parallelverbund` - optional (Phase 2.20): Gruppen mit demselben Wert
+  bilden gemeinsam eine synchron zu planende Partition (z.B.
+  `Religion-Ethik-Kl1` für die drei Religion-ev-/Religion-kath-/
+  Ethik-Kl1-Gruppen) - sie werden über eine neue `parallel_group`-
+  Constraint (siehe `docs/json-constraints-reference.md` Abschnitt 5)
+  gezwungen, immer zur exakt selben Zeit stattzufinden.
 
-**Wichtiger Hinweis zum aktuellen Stand:** `schueler`/`gruppen` sind
-aktuell reine Stammdaten - geladen, gespeichert und validiert (unbekannte
-Referenzen/doppelte IDs werden erkannt), aber ohne jede Wirkung auf
-`Lehrereinsatzplanung.SolveLehrereinsatz` oder `Solver.SolveTop`. Es gibt
-noch keinen Mechanismus, der aus einer Gruppe tatsächlich gleichzeitig
-stattfindende, parallele Unterrichtssessions ableitet - das ist ein
-bewusst zurückgestellter nächster Schritt (siehe
-`docs/phase2-19-mitgliedschaftsmodell.md`).
+**Solver-Wirkung (Phase 2.20):** ist `fach_name`/`klassenstufe`/
+`parallelverbund` gesetzt, plant `Lehrereinsatzplanung.SolveLehrereinsatz`
+für diese Gruppe automatisch EINE Lehrkraft (statt einer pro echter
+Klasse), und `BuildAssignmentConstraints` emittiert eine `parallel_group`-
+Regel, die alle Gruppen desselben Parallelverbunds im Stundenplan
+synchronisiert - der gerenderte `output/stundenplan.md` zeigt sie dann als
+kombinierte Zelle (z.B. `Ethik / Religion-ev / Religion-kath`). Ohne diese
+drei Felder bleibt eine Gruppe weiterhin reine, wirkungslose Stammdatum
+(Phase-2.19-Verhalten). `StammdatenValidation` prüft dabei hart: alle
+Gruppen eines Parallelverbunds brauchen `fach_name` (paarweise
+verschieden), dieselbe `klassenstufe`, UND dasselbe `wochenstunden_soll`/
+`block_length` für diese Klassenstufe - sonst wäre das CP-SAT-Modell
+strukturell unlösbar. Details siehe
+`docs/phase2-20-parallelgruppen.md`.
 
 Vor jedem Lauf prüft `StammdatenValidation.ValidateStammdaten` die Datei
 auf Konsistenz (unbekannte Klassenstufen-Referenzen, Fach ohne

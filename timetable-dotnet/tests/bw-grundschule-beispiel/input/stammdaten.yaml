@@ -114,8 +114,40 @@ faecher:
   - klassenstufe: 4
     wochenstunden_soll: 2
     max_pro_tag: 1
-- name: Religion
-  block_length: 
+- name: Religion-ev
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 3
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Religion-kath
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 3
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Ethik
+  block_length:
   unbeliebt: false
   klassenstufen:
   - klassenstufe: 1
@@ -247,15 +279,33 @@ lehrkraefte:
   klassenlehrer_faehig: true
   max_klassen: 
   max_faecher: 
-- name: Religionslehrer-1
-  deputat_sollstunden: 16
+- name: Religionslehrer-ev-1
+  deputat_sollstunden: 8
   anrechnungsstunden: 0
   springer_reserve_stunden: 0
-  verfuegbare_tage: 
+  verfuegbare_tage:
   bevorzugte_klassenstufen: []
   klassenlehrer_faehig: false
-  max_klassen: 
-  max_faecher: 
+  max_klassen:
+  max_faecher:
+- name: Religionslehrer-kath-1
+  deputat_sollstunden: 8
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage:
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen:
+  max_faecher:
+- name: Ethiklehrer-1
+  deputat_sollstunden: 8
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage:
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen:
+  max_faecher:
 - name: Englischlehrer-1
   deputat_sollstunden: 8
   anrechnungsstunden: 0
@@ -410,8 +460,14 @@ fach_lehrer_zuordnungen:
 - lehrer_name: Klassenlehrer-8
   fach_name: Kunst
   fachfremd: false
-- lehrer_name: Religionslehrer-1
-  fach_name: Religion
+- lehrer_name: Religionslehrer-ev-1
+  fach_name: Religion-ev
+  fachfremd: false
+- lehrer_name: Religionslehrer-kath-1
+  fach_name: Religion-kath
+  fachfremd: false
+- lehrer_name: Ethiklehrer-1
+  fach_name: Ethik
   fachfremd: false
 - lehrer_name: Englischlehrer-1
   fach_name: Englisch
@@ -772,6 +828,9 @@ schueler:
 gruppen:
 - name: Religion-ev-Kl1
   typ: Fachgruppe
+  fach_name: Religion-ev
+  klassenstufe: 1
+  parallelverbund: Religion-Ethik-Kl1
   mitglieder_schueler_ids:
   - S-1a-01
   - S-1a-02
@@ -797,6 +856,9 @@ gruppen:
   - S-1b-11
 - name: Religion-kath-Kl1
   typ: Fachgruppe
+  fach_name: Religion-kath
+  klassenstufe: 1
+  parallelverbund: Religion-Ethik-Kl1
   mitglieder_schueler_ids:
   - S-1a-12
   - S-1a-13
@@ -811,6 +873,9 @@ gruppen:
   - S-1b-16
 - name: Ethik-Kl1
   typ: Fachgruppe
+  fach_name: Ethik
+  klassenstufe: 1
+  parallelverbund: Religion-Ethik-Kl1
   mitglieder_schueler_ids:
   - S-1a-18
   - S-1a-19
@@ -825,6 +890,9 @@ gruppen:
   - S-1b-22
 - name: Religion-ev-Kl2
   typ: Fachgruppe
+  fach_name: Religion-ev
+  klassenstufe: 2
+  parallelverbund: Religion-Ethik-Kl2
   mitglieder_schueler_ids:
   - S-2a-01
   - S-2a-02
@@ -850,6 +918,9 @@ gruppen:
   - S-2b-11
 - name: Religion-kath-Kl2
   typ: Fachgruppe
+  fach_name: Religion-kath
+  klassenstufe: 2
+  parallelverbund: Religion-Ethik-Kl2
   mitglieder_schueler_ids:
   - S-2a-12
   - S-2a-13
@@ -864,6 +935,9 @@ gruppen:
   - S-2b-16
 - name: Ethik-Kl2
   typ: Fachgruppe
+  fach_name: Ethik
+  klassenstufe: 2
+  parallelverbund: Religion-Ethik-Kl2
   mitglieder_schueler_ids:
   - S-2a-18
   - S-2a-19
@@ -878,6 +952,9 @@ gruppen:
   - S-2b-22
 - name: Religion-ev-Kl3
   typ: Fachgruppe
+  fach_name: Religion-ev
+  klassenstufe: 3
+  parallelverbund: Religion-Ethik-Kl3
   mitglieder_schueler_ids:
   - S-3a-01
   - S-3a-02
@@ -903,6 +980,9 @@ gruppen:
   - S-3b-11
 - name: Religion-kath-Kl3
   typ: Fachgruppe
+  fach_name: Religion-kath
+  klassenstufe: 3
+  parallelverbund: Religion-Ethik-Kl3
   mitglieder_schueler_ids:
   - S-3a-12
   - S-3a-13
@@ -917,6 +997,9 @@ gruppen:
   - S-3b-16
 - name: Ethik-Kl3
   typ: Fachgruppe
+  fach_name: Ethik
+  klassenstufe: 3
+  parallelverbund: Religion-Ethik-Kl3
   mitglieder_schueler_ids:
   - S-3a-18
   - S-3a-19
@@ -931,6 +1014,9 @@ gruppen:
   - S-3b-22
 - name: Religion-ev-Kl4
   typ: Fachgruppe
+  fach_name: Religion-ev
+  klassenstufe: 4
+  parallelverbund: Religion-Ethik-Kl4
   mitglieder_schueler_ids:
   - S-4a-01
   - S-4a-02
@@ -956,6 +1042,9 @@ gruppen:
   - S-4b-11
 - name: Religion-kath-Kl4
   typ: Fachgruppe
+  fach_name: Religion-kath
+  klassenstufe: 4
+  parallelverbund: Religion-Ethik-Kl4
   mitglieder_schueler_ids:
   - S-4a-12
   - S-4a-13
@@ -970,6 +1059,9 @@ gruppen:
   - S-4b-16
 - name: Ethik-Kl4
   typ: Fachgruppe
+  fach_name: Ethik
+  klassenstufe: 4
+  parallelverbund: Religion-Ethik-Kl4
   mitglieder_schueler_ids:
   - S-4a-18
   - S-4a-19

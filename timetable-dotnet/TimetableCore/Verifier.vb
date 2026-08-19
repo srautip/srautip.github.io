@@ -68,6 +68,26 @@ Public Module Verifier
         Dim allPeriods = Enumerable.Range(1, JsonHelpers.GetInt(timeslots, "periods_per_day").Value).ToList()
 
         Dim constraints = JsonHelpers.Constraints(data)
+
+        ' Phase 2.20c (fix): pre-derived ONCE, used below by the "no_overlap"
+        ' case to avoid flagging legitimately-simultaneous parallel_group
+        ' sessions as a false "doppelt belegt" collision - independently
+        ' duplicated (not shared code) from Solver.vb's ApplyConstraints
+        ' term-deduplication for the exact same reason (see module header).
+        ' Without this, EVERY parallel_group-based schedule would trip the
+        ' pre-existing "class"/"teacher" no_overlap check, since that check
+        ' has no notion of intentional simultaneity.
+        Dim parallelGroupOf As New Dictionary(Of (ClassName As String, Subject As String, Teacher As String), Integer)
+        For gi = 0 To constraints.Count - 1
+            If JsonHelpers.GetString(constraints(gi), "type") <> "parallel_group" Then Continue For
+            Dim gClasses = JsonHelpers.AsStringList(constraints(gi), "classes")
+            Dim gSubjects = JsonHelpers.AsStringList(constraints(gi), "subjects")
+            Dim gTeachers = JsonHelpers.AsStringList(constraints(gi), "teachers")
+            For mi = 0 To gClasses.Count - 1
+                parallelGroupOf((gClasses(mi), gSubjects(mi), gTeachers(mi))) = gi
+            Next
+        Next
+
         For i = 0 To constraints.Count - 1
             Dim c = constraints(i)
             Dim t = JsonHelpers.GetString(c, "type")
@@ -130,6 +150,12 @@ Public Module Verifier
                     Dim resource = JsonHelpers.GetString(c, "resource")
                     Dim entityVal = JsonHelpers.GetString(c, "entity")
                     Dim seen As New Dictionary(Of (Day As String, Period As Integer), List(Of ScheduleEntry))
+                    ' Phase 2.20c (fix): per (Day,Period) slot, sessions
+                    ' belonging to the SAME parallel_group must contribute
+                    ' only ONE counted entry (resource "room" is exempt -
+                    ' each member keeps its own room). Mirrors Solver.vb's
+                    ' ApplyConstraints term-deduplication.
+                    Dim countedGroupsPerSlot As New Dictionary(Of (Day As String, Period As Integer), HashSet(Of Integer))
                     For Each l In schedule
                         Dim matches As Boolean
                         Select Case resource
@@ -140,6 +166,15 @@ Public Module Verifier
                         End Select
                         If Not matches Then Continue For
                         Dim slot = (l.Day, l.Period)
+
+                        If resource <> "room" Then
+                            Dim gi As Integer
+                            If parallelGroupOf.TryGetValue((l.ClassName, l.Subject, l.Teacher), gi) Then
+                                If Not countedGroupsPerSlot.ContainsKey(slot) Then countedGroupsPerSlot(slot) = New HashSet(Of Integer)
+                                If Not countedGroupsPerSlot(slot).Add(gi) Then Continue For
+                            End If
+                        End If
+
                         If Not seen.ContainsKey(slot) Then seen(slot) = New List(Of ScheduleEntry)
                         seen(slot).Add(l)
                     Next
@@ -209,6 +244,33 @@ Public Module Verifier
                             End If
                             idx += 1
                         End While
+                    Next
+
+                Case "parallel_group"
+                    ' Phase 2.20c: independently re-derived synchronization
+                    ' check for the Solver.vb "parallel_group" primitive -
+                    ' shares NO code with the Solver.vb pre-pass (same
+                    ' module-wide principle, see header). For every member
+                    ' triple and every (day,period), all members must be
+                    ' EITHER all present OR all absent - anything else means
+                    ' the group's sessions drifted out of sync.
+                    Dim classesInGroup = JsonHelpers.AsStringList(c, "classes")
+                    Dim subjectsInGroup = JsonHelpers.AsStringList(c, "subjects")
+                    Dim teachersInGroup = JsonHelpers.AsStringList(c, "teachers")
+                    For Each d In allDays
+                        For Each p In allPeriods
+                            Dim presentCount = 0
+                            For mi = 0 To classesInGroup.Count - 1
+                                If Find(schedule, cls:=classesInGroup(mi), teacher:=teachersInGroup(mi),
+                                        day:=d, period:=p, subject:=subjectsInGroup(mi)).Any() Then
+                                    presentCount += 1
+                                End If
+                            Next
+                            If presentCount > 0 AndAlso presentCount < classesInGroup.Count Then
+                                violations.Add((i, t, WithReason(
+                                    $"parallel_group #{i} am {d}/{p}: nur {presentCount} von {classesInGroup.Count} Mitgliedern aktiv - Gruppe ist nicht synchron", c)))
+                            End If
+                        Next
                     Next
 
                 Case "teacher_subject_assignment"
@@ -384,6 +446,33 @@ Public Module Verifier
             Dim fk = Stammdaten.WochenstundenFuer(fachByName(z.Fach), klasseByName(z.Klasse).Klassenstufe)
             If fk IsNot Nothing AndAlso Not Stammdaten.IstTeilzeitKohaerent(lehrerByName(z.Lehrer), bestand, fk) Then
                 violations.Add($"{z.Lehrer} unterrichtet {z.Klasse}/{z.Fach} ({fk.WochenstundenSoll}h/Woche), ist aber laut VerfuegbareTage teilzeit-tage-inkohaerent")
+            End If
+        Next
+
+        ' Phase 2.20c: Gruppen-bewusste Konsistenzpruefung - eine
+        ' Parallelgruppen-gefuehrte (Gruppe,Fach)-Kombination MUSS ueber
+        ' alle von der Gruppe umspannten echten Klassen (Stammdaten.
+        ' KlassenOfGruppe) hinweg vom SELBEN Lehrer unterrichtet werden,
+        ' sonst waere die vom "parallel_group"-Solver.vb-Constraint
+        ' erzwungene Slot-Synchronisation real unmoeglich (ein Lehrer
+        ' koennte nicht gleichzeitig in zwei Klassen mit unterschiedlichen
+        ' Kollegen synchron sein). Unabhaengig aus den rohen Stammdaten +
+        ' dem Zuweisungsergebnis re-derivert, kein geteilter Code mit
+        ' Lehrereinsatzplanung.vb.
+        For Each gruppe In bestand.Gruppen.Where(Function(g) g.FachName IsNot Nothing)
+            Dim klassenDerGruppe = Stammdaten.KlassenOfGruppe(bestand, gruppe)
+            If klassenDerGruppe.Count = 0 Then Continue For
+            Dim lehrerJeKlasse = klassenDerGruppe.
+                Select(Function(kn) (Klasse:=kn, Lehrer:=result.Zuweisungen.
+                    Where(Function(z) z.Klasse = kn AndAlso z.Fach = gruppe.FachName).
+                    Select(Function(z) z.Lehrer).FirstOrDefault())).
+                ToList()
+            If lehrerJeKlasse.Any(Function(x) x.Lehrer Is Nothing) Then
+                violations.Add($"Gruppe '{gruppe.Name}' ({gruppe.FachName}): mindestens eine Klasse aus {String.Join(",", klassenDerGruppe)} hat keine Zuweisung fuer {gruppe.FachName}")
+            End If
+            Dim distinctLehrer = lehrerJeKlasse.Select(Function(x) x.Lehrer).Where(Function(l) l IsNot Nothing).Distinct().ToList()
+            If distinctLehrer.Count > 1 Then
+                violations.Add($"Gruppe '{gruppe.Name}' ({gruppe.FachName}): unterschiedliche Lehrkraefte je Klasse ({String.Join(", ", lehrerJeKlasse.Select(Function(x) $"{x.Klasse}={x.Lehrer}"))}) - Parallelgruppen-Synchronisation erfordert denselben Lehrer in allen umspannten Klassen")
             End If
         Next
 

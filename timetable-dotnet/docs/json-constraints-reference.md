@@ -81,10 +81,11 @@ Fach mit z.B. `"should"` aber ohne gesetztes `max_per_day` ist ein
 Validierungsfehler, da es dann nichts gäbe, das gelockert werden könnte).
 
 **Immer hart, `"priority"` dort unzulässig:** `no_overlap`,
-`shared_resource_conflict`, `teacher_subject_assignment` - diese sind
-physisch/strukturell zwingend (ein Lehrer kann nicht an zwei Orten
-gleichzeitig sein; eine Klasse wird nur von der zugewiesenen Lehrkraft
-unterrichtet).
+`shared_resource_conflict`, `teacher_subject_assignment`, `parallel_group`
+(Phase 2.20) - diese sind physisch/strukturell zwingend (ein Lehrer kann
+nicht an zwei Orten gleichzeitig sein; eine Klasse wird nur von der
+zugewiesenen Lehrkraft unterrichtet; eine klassenübergreifende Fachgruppe
+muss synchron laufen, sonst ergibt die Aufteilung keinen Sinn).
 
 ```jsonc
 { "type": "forbidden_slot", "scope": "class", "entity": "5a",
@@ -218,6 +219,61 @@ Fachraum), damit wirklich niemand doppelt belegt werden kann.
 `no_overlap`-Regeln für Klassen/Lehrkräfte - das kann gewollt sein (eine
 Lehrkraft, die nur eine einzige Klasse unterrichtet, braucht z.B. keine
 eigene Regel), sollte aber bewusst geprüft werden.
+
+---
+
+### `parallel_group` (Phase 2.20)
+
+Erzwingt, dass mehrere (Klasse,Fach,Lehrer)-Mitglieder **immer zur exakt
+selben Zeit** stattfinden - das Gegenteil von `no_overlap`. Gedacht für
+klassenübergreifende Fachgruppen, bei denen eine Klasse für ein Fach in
+mehrere gleichzeitig laufende Gruppen aufgeteilt wird (klassisches
+Beispiel: Religion evangelisch/katholisch/Ethik - jede Klasse hat zur
+selben Zeit eines der drei Angebote, nie mehrere hintereinander). Immer
+hart, kein `priority`-Feld zulässig (die Synchronisation ist strukturell
+zwingend, keine Präferenz).
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `classes` | string[] | ja |
+| `subjects` | string[] | ja |
+| `teachers` | string[] | ja |
+
+Alle drei Arrays müssen gleich lang sein - Index `i` beschreibt zusammen
+EIN Mitglied `(classes[i], subjects[i], teachers[i])`. Jedes Mitglied muss
+bereits über eine eigene `teacher_subject_assignment`-Regel als Session
+existieren.
+
+```json
+{ "type": "parallel_group",
+  "classes":  ["1a", "1a", "1a", "1b", "1b", "1b"],
+  "subjects": ["Religion-ev", "Religion-kath", "Ethik", "Religion-ev", "Religion-kath", "Ethik"],
+  "teachers": ["Religionslehrer-ev-1", "Religionslehrer-kath-1", "Ethiklehrer-1", "Religionslehrer-ev-1", "Religionslehrer-kath-1", "Ethiklehrer-1"] }
+```
+
+**Mechanik:** pro (Tag,Periode) bekommt jede `parallel_group`-Regel EINE
+gemeinsame interne Hilfsvariable; jedes Mitglied wird per Gleichheit an
+diese gekoppelt - das erzwingt automatisch identische Slots über alle
+Mitglieder hinweg, auch über mehrere echte Klassen. `no_overlap` für
+`resource: "class"`/`"teacher"` (NICHT `"room"`) berücksichtigt
+`parallel_group`-Mitgliedschaft automatisch: Mitglieder derselben Gruppe
+zählen für die Kollisionsprüfung als EIN gemeinsamer Slot statt als
+mehrere separate Belegungen - ohne das würde die gewollte Gleichzeitigkeit
+fälschlich als Doppelbelegung erkannt. Räume bleiben unberührt: jedes
+Mitglied behält seine eigene, unabhängige Raumwahl.
+
+**Wichtige Voraussetzung:** alle Mitglieder einer Gruppe müssen dieselbe
+Wochenstundenzahl (`weekly_hours.hours_per_week`) und - falls gesetzt -
+dieselbe `consecutive_required.block_length` haben. Weichen diese
+voneinander ab, wird das erzwungene Gleichheits-Constraint strukturell
+unerfüllbar (`Infeasible`, oft schwer zu diagnostizieren) - beim
+Stammdaten-gestützten Weg (`Stammdaten.Gruppe`/`StammdatenValidation`)
+wird das bereits vor jedem Solve hart geprüft.
+
+`Formatting.ToClassGrids` kombiniert mehrere gleichzeitige Sessions
+derselben Klasse zu einer einzigen, per `" / "` getrennten Zellenanzeige
+(z.B. `"Ethik / Religion-ev / Religion-kath"`), statt nur die zuletzt
+verarbeitete Session zu zeigen.
 
 ---
 

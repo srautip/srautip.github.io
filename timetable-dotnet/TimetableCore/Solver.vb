@@ -302,7 +302,46 @@ Public Module Solver
             Next
         Next
 
-        ApplyConstraints(model, data, sessions, lesson, room, days, periods, kannVars)
+        ' Phase 2.20: Parallelgruppe-Pre-Pass - jede "parallel_group"-
+        ' Constraint bekommt pro (Tag,Periode) EINE geteilte BoolVar; jedes
+        ' Mitglied-Tripel (Klasse,Fach,Lehrer) wird per Gleichheit daran
+        ' gekoppelt, was Kreuz-Klassen-Synchronisation automatisch erzwingt
+        ' (identisches Slot-Muster ueber alle Mitglieder hinweg, auch wenn
+        ' sie zu verschiedenen echten Klassen gehoeren). Muss VOR
+        ' ApplyConstraints laufen, damit dessen "no_overlap"-Fall die
+        ' Gruppenzugehoerigkeit kennt: ohne Deduplizierung dort wuerde
+        ' no_overlap dieselbe (jetzt gleiche) Variable mehrfach in die Summe
+        ' aufnehmen und sie so permanent auf 0 zwingen (live durch einen
+        ' Plan-Agenten gegen den Code verifizierter Befund).
+        Dim parallelGroupOf As New Dictionary(Of (ClassName As String, Subject As String, Teacher As String), Integer)
+        Dim parallelVars As New Dictionary(Of (GroupIndex As Integer, Day As String, Period As Integer), BoolVar)
+        For ci = 0 To allConstraints.Count - 1
+            Dim c = allConstraints(ci)
+            If JsonHelpers.GetString(c, "type") <> "parallel_group" Then Continue For
+            Dim classesInGroup = JsonHelpers.AsStringList(c, "classes")
+            Dim subjectsInGroup = JsonHelpers.AsStringList(c, "subjects")
+            Dim teachersInGroup = JsonHelpers.AsStringList(c, "teachers")
+            For Each d In days
+                For Each p In periods
+                    parallelVars((ci, d, p)) = model.NewBoolVar($"parallel[{ci},{d},{p}]")
+                Next
+            Next
+            For mi = 0 To classesInGroup.Count - 1
+                Dim memberKey As (ClassName As String, Subject As String, Teacher As String) =
+                    (classesInGroup(mi), subjectsInGroup(mi), teachersInGroup(mi))
+                parallelGroupOf(memberKey) = ci
+                For Each d In days
+                    For Each p In periods
+                        Dim lessonKey As New LessonKey(memberKey.ClassName, memberKey.Subject, memberKey.Teacher, d, p)
+                        If lesson.ContainsKey(lessonKey) Then
+                            model.Add(lesson(lessonKey) = parallelVars((ci, d, p)))
+                        End If
+                    Next
+                Next
+            Next
+        Next
+
+        ApplyConstraints(model, data, sessions, lesson, room, days, periods, kannVars, parallelGroupOf, parallelVars)
 
         Return New BuiltModel With {
             .Model = model, .Lesson = lesson, .Room = room,
@@ -387,7 +426,9 @@ Public Module Solver
     Private Sub ApplyConstraints(model As CpModel, data As JsonObject, sessions As List(Of Session),
                                   lesson As Dictionary(Of LessonKey, BoolVar), room As Dictionary(Of RoomKey, BoolVar),
                                   days As List(Of String), periods As List(Of Integer),
-                                  kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)))
+                                  kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)),
+                                  parallelGroupOf As Dictionary(Of (ClassName As String, Subject As String, Teacher As String), Integer),
+                                  parallelVars As Dictionary(Of (GroupIndex As Integer, Day As String, Period As Integer), BoolVar))
 
         Dim sessionsOfClass = Function(className As String) sessions.Where(Function(s) s.ClassName = className).ToList()
         Dim sessionsOfTeacher = Function(teacher As String) sessions.Where(Function(s) s.Teacher = teacher).ToList()
@@ -484,8 +525,24 @@ Public Module Solver
                                     If room.ContainsKey(key) Then terms.Add(room(key))
                                 Next
                             Else
+                                ' Phase 2.20: Sessions belonging to the same
+                                ' Parallelgruppe must contribute only ONE
+                                ' shared term (the group's own parallelVar
+                                ' for this slot) instead of one term per
+                                ' member - their Lesson vars were already
+                                ' forced equal in the pre-pass, so summing
+                                ' each individually would count the same
+                                ' value multiple times and force the group
+                                ' permanently to 0 (the exact degeneracy the
+                                ' Plan-Agent review flagged).
+                                Dim countedGroups As New HashSet(Of Integer)
                                 For Each s In relevantSessions
-                                    terms.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)))
+                                    Dim gi As Integer
+                                    If parallelGroupOf.TryGetValue((s.ClassName, s.Subject, s.Teacher), gi) Then
+                                        If countedGroups.Add(gi) Then terms.Add(parallelVars((gi, d, p)))
+                                    Else
+                                        terms.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)))
+                                    End If
                                 Next
                             End If
                             If terms.Count > 0 Then
@@ -566,8 +623,8 @@ Public Module Solver
                         AddBlockConstraint(model, lesson, s, days, periods, blockLen, crViolated)
                     Next
 
-                Case "teacher_subject_assignment", "room_requirement"
-                    ' Already consumed above (session/room-choice construction); no direct constraint here.
+                Case "teacher_subject_assignment", "room_requirement", "parallel_group"
+                    ' Already consumed above (session/room-choice construction / Phase-2.20 Parallelgruppe-Pre-Pass); no direct constraint here.
 
                 Case Else
                     Throw New ArgumentException($"Unbekannter Constraint-Typ: '{constraintType}'")

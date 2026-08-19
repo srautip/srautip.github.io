@@ -585,6 +585,99 @@ Public Class SolverTests
         StringAssert.Contains(violations(0), reasonText)
     End Sub
 
+    ''' <summary>Phase 2.20b hand-smoke test for the new "parallel_group"
+    ''' primitive - proven standalone here BEFORE any Lehrereinsatzplanung.vb
+    ''' change, per the approved plan's explicit gate. Mirrors the intended
+    ''' Religion-ev/Religion-kath/Ethik use case: 2 classes x 3 subjects x 3
+    ''' teachers, all 6 (class,subject,teacher) triples in ONE parallel_group.
+    ''' Each subject demands exactly 1h/week - since the pre-pass forces every
+    ''' member's Lesson var equal to the SAME shared parallelVar per slot, the
+    ''' only way to satisfy all 6 weekly_hours=1 constraints at once is for
+    ''' every member to fire at the identical (day,period). Also exercises
+    ''' the deduped no_overlap(class)/no_overlap(teacher) term collection
+    ''' (each entity's 3 co-group sessions must contribute only ONE term).
+    ''' Deliberately does NOT assert Verifier.VerifySchedule(...).Count = 0:
+    ''' Verifier.vb has no parallel_group awareness yet (planned for 2.20c),
+    ''' so it would currently flag every legitimately-simultaneous session as
+    ''' a false-positive "doppelt belegt" violation.</summary>
+    <TestMethod>
+    Public Sub ParallelGroupSynchronizesSessionsAcrossClasses()
+        Dim ent = Mini({"1a", "1b"}, {"T-ev", "T-kath", "T-eth"},
+                        {"Religion-ev", "Religion-kath", "Ethik"}, {}, {"Mo", "Di"}, 2)
+        Dim classes = {"1a", "1a", "1a", "1b", "1b", "1b"}
+        Dim subjects = {"Religion-ev", "Religion-kath", "Ethik", "Religion-ev", "Religion-kath", "Ethik"}
+        Dim teachers = {"T-ev", "T-kath", "T-eth", "T-ev", "T-kath", "T-eth"}
+
+        Dim constraints As New List(Of JsonObject)
+        For i = 0 To 5
+            constraints.Add(New JsonObject From {{"type", "weekly_hours"}, {"class", classes(i)}, {"subject", subjects(i)}, {"hours_per_week", 1}})
+            constraints.Add(New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", teachers(i)}, {"class", classes(i)}, {"subject", subjects(i)}})
+        Next
+        constraints.Add(New JsonObject From {{"type", "no_overlap"}, {"resource", "class"}, {"entity", "1a"}})
+        constraints.Add(New JsonObject From {{"type", "no_overlap"}, {"resource", "class"}, {"entity", "1b"}})
+        constraints.Add(New JsonObject From {{"type", "no_overlap"}, {"resource", "teacher"}, {"entity", "T-ev"}})
+        constraints.Add(New JsonObject From {{"type", "no_overlap"}, {"resource", "teacher"}, {"entity", "T-kath"}})
+        constraints.Add(New JsonObject From {{"type", "no_overlap"}, {"resource", "teacher"}, {"entity", "T-eth"}})
+        constraints.Add(New JsonObject From {
+            {"type", "parallel_group"},
+            {"classes", New JsonArray(classes.Select(Function(c) CType(c, JsonNode)).ToArray())},
+            {"subjects", New JsonArray(subjects.Select(Function(s) CType(s, JsonNode)).ToArray())},
+            {"teachers", New JsonArray(teachers.Select(Function(t) CType(t, JsonNode)).ToArray())}
+        })
+
+        Dim data = Scenario(ent, constraints)
+        Assert.AreEqual(0, Validation.ValidateEntities(data).Count)
+
+        Dim r = Solver.Solve(data)
+        Assert.IsTrue(IsFeasibleOrOptimal(r.Status), Solver.StatusName(r.Status))
+        Assert.AreEqual(6, r.Schedule.Count)
+
+        Dim slots = r.Schedule.Select(Function(l) (l.Day, l.Period)).Distinct().ToList()
+        Assert.AreEqual(1, slots.Count, "All 6 parallel_group members must land on the identical (day,period) slot")
+
+        For i = 0 To 5
+            Dim entry = r.Schedule.SingleOrDefault(Function(l) l.ClassName = classes(i) AndAlso l.Subject = subjects(i) AndAlso l.Teacher = teachers(i))
+            Assert.IsNotNull(entry, $"Missing session for ({classes(i)},{subjects(i)},{teachers(i)})")
+            Assert.AreEqual(slots(0).Day, entry.Day)
+            Assert.AreEqual(slots(0).Period, entry.Period)
+        Next
+    End Sub
+
+    ''' <summary>Phase 2.20c gate: the independent Verifier.vb "parallel_group"
+    ''' check must catch a deliberately desynchronized schedule - built by
+    ''' hand here (not via Solver.Solve) so this proves Verifier.vb's own
+    ''' re-derived logic, not merely that the Solver.vb pre-pass happens to
+    ''' behave. One of the 6 members (1b/Ethik/T-eth) is simply missing from
+    ''' the Mo/1 slot where the other 5 sit.</summary>
+    <TestMethod>
+    Public Sub ParallelGroupDetectsDesynchronizedScheduleAsViolation()
+        Dim ent = Mini({"1a", "1b"}, {"T-ev", "T-kath", "T-eth"},
+                        {"Religion-ev", "Religion-kath", "Ethik"}, {}, {"Mo"}, 1)
+        Dim classes = {"1a", "1a", "1a", "1b", "1b", "1b"}
+        Dim subjects = {"Religion-ev", "Religion-kath", "Ethik", "Religion-ev", "Religion-kath", "Ethik"}
+        Dim teachers = {"T-ev", "T-kath", "T-eth", "T-ev", "T-kath", "T-eth"}
+        Dim data = Scenario(ent, {
+            New JsonObject From {
+                {"type", "parallel_group"},
+                {"classes", New JsonArray(classes.Select(Function(c) CType(c, JsonNode)).ToArray())},
+                {"subjects", New JsonArray(subjects.Select(Function(s) CType(s, JsonNode)).ToArray())},
+                {"teachers", New JsonArray(teachers.Select(Function(t) CType(t, JsonNode)).ToArray())}
+            }
+        })
+
+        Dim brokenSchedule As New List(Of ScheduleEntry) From {
+            New ScheduleEntry With {.ClassName = "1a", .Subject = "Religion-ev", .Teacher = "T-ev", .Day = "Mo", .Period = 1, .Room = Nothing},
+            New ScheduleEntry With {.ClassName = "1a", .Subject = "Religion-kath", .Teacher = "T-kath", .Day = "Mo", .Period = 1, .Room = Nothing},
+            New ScheduleEntry With {.ClassName = "1a", .Subject = "Ethik", .Teacher = "T-eth", .Day = "Mo", .Period = 1, .Room = Nothing},
+            New ScheduleEntry With {.ClassName = "1b", .Subject = "Religion-ev", .Teacher = "T-ev", .Day = "Mo", .Period = 1, .Room = Nothing},
+            New ScheduleEntry With {.ClassName = "1b", .Subject = "Religion-kath", .Teacher = "T-kath", .Day = "Mo", .Period = 1, .Room = Nothing}
+        }
+
+        Dim violations = Verifier.VerifySchedule(data, brokenSchedule)
+        Assert.AreEqual(1, violations.Count, String.Join(vbLf, violations))
+        StringAssert.Contains(violations(0), "nicht synchron")
+    End Sub
+
     Private Shared Function AllSlots(days As IEnumerable(Of String), periods As IEnumerable(Of Integer)) As JsonArray
         Dim arr As New JsonArray()
         For Each d In days

@@ -3,6 +3,14 @@
 # forbidden_slot, room_requirement. Oberste Ebene ist eine YAML-Liste, ein Mapping
 # pro Constraint.
 - type: teacher_availability
-  teacher: Religionslehrer-1
+  teacher: Religionslehrer-ev-1
+  available_days: [Mo, Di, Mi, Do]
+  reason: Teilzeit, freitags nicht im Haus
+- type: teacher_availability
+  teacher: Religionslehrer-kath-1
+  available_days: [Mo, Di, Mi, Do]
+  reason: Teilzeit, freitags nicht im Haus
+- type: teacher_availability
+  teacher: Ethiklehrer-1
   available_days: [Mo, Di, Mi, Do]
   reason: Teilzeit, freitags nicht im Haus
