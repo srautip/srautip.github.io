@@ -36,7 +36,7 @@ Die Pipeline hat zwei Stufen (siehe `docs/arc42-architecture.md` Abschnitt
    selbst ab, WER WAS unterrichtet (Deputat-Korridor, Klassenlehrer-
    Bündelung, Kontinuität, Fachfremd-Vermeidung, ... - siehe
    `docs/phase2-15-lehrereinsatzplanung.md`).
-2. **Constraints → Solver.Solve** (automatisch + optional handverfasst):
+2. **Constraints → Solver.SolveTop** (automatisch + optional handverfasst):
    das Ergebnis von Stufe 1 wird deterministisch in
    `teacher_subject_assignment`/`weekly_hours`/`consecutive_required`/
    `no_overlap`-Regeln übersetzt. `constraints.yaml` ergänzt NUR
@@ -235,10 +235,12 @@ deputat_toleranz_stunden: 2.0   # Default 2.0
 lehrereinsatz_time_limit_s: 30.0
 solve_time_limit_s: 30.0
 seed: 42
-num_workers: 1
+num_workers: 1   # Default: Anzahl CPU-Kerne - 1 (mindestens 1)
 ```
 
-Fehlt die Datei komplett, gelten diese Defaults unverändert.
+Fehlt die Datei komplett, gelten diese Defaults unverändert. `solve_time_limit_s`
+begrenzt sowohl `Solver.SolveTop`s Gesamt- als auch dessen Einzel-Solve-
+Zeitbudget (siehe unten).
 
 ## CLI: Grundgerüst per Template erzeugen
 
@@ -284,9 +286,18 @@ bleibt der bis dahin erreichte Fortschritt sichtbar (kein
 Alles-oder-Nichts). Gibt pro Schule eine `PASS`/`FAIL`-Zeile aus und
 liefert Exitcode 0 nur, wenn ALLE Stufen (StammdatenValidation,
 Lehrereinsatzplanung, VerifyLehrereinsatz, Validation.ValidateEntities,
-Solver.Solve, VerifySchedule) sauber durchlaufen - Exitcode 1 sonst
+Solver.SolveTop, VerifySchedule) sauber durchlaufen - Exitcode 1 sonst
 (nutzbar für eine spätere CI-Anbindung, ohne dass diese schon Teil dieses
 Tools ist).
+
+Der Stundenplan wird über `Solver.SolveTop` (nicht das einfachere
+`Solver.Solve`) erzeugt: dieselbe Qualitäts-Zielfunktion (Lücken,
+Randstunden, Tagesausgewogenheit - siehe `ScheduleQuality.vb`), die sonst
+erst nachträglich zum Sortieren mehrerer Kandidaten benutzt wird, fließt
+hier direkt ins CP-SAT-Modell ein - der Solver sucht von vornherein einen
+bzgl. dieser Kriterien möglichst guten statt nur irgendeinen zulässigen
+Plan. Es wird dabei nur EIN finaler Plan erzeugt (`maxSolutions=1`), kein
+Alternativen-Vergleich.
 
 ## Referenzbeispiele
 

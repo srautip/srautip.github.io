@@ -17,7 +17,10 @@ Public NotInheritable Class RunConfig
     Public Property LehrereinsatzTimeLimitS As Double = 30.0
     Public Property SolveTimeLimitS As Double = 30.0
     Public Property Seed As Integer = 42
-    Public Property NumWorkers As Integer = 1
+    ''' <summary>Default: alle CPU-Kerne minus 1 (mindestens 1) - laesst dem
+    ''' Betriebssystem/anderen Prozessen einen Kern frei, statt die Maschine
+    ''' beim CP-SAT-Portfolio-Search komplett auszulasten.</summary>
+    Public Property NumWorkers As Integer = Math.Max(1, Environment.ProcessorCount - 1)
 End Class
 
 Public Module Run
@@ -125,20 +128,32 @@ Public Module Run
             Return False
         End If
 
-        Dim solveResult = Solver.Solve(data, timeLimitS:=cfg.SolveTimeLimitS, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers)
-        Dim solveOk = solveResult.Status = CpSolverStatus.Optimal OrElse solveResult.Status = CpSolverStatus.Feasible
+        ' Nutzt SolveTop statt Solve: dieselbe volle Qualitaets-Zielfunktion
+        ' (Luecken/Randstunden/Tagesausgewogenheit, siehe ScheduleQuality.vb)
+        ' fliesst direkt ins CP-SAT-Modell ein, statt erst nachtraeglich nur
+        ' zum Sortieren einer Kann-only-Loesung benutzt zu werden - der Solver
+        ' sucht dadurch von vornherein nach einem bzgl. dieser Kriterien
+        ' moeglichst guten statt nur irgendeinem zulaessigen Plan.
+        ' maxSolutions:=1, da hier ein einzelner finaler Plan pro Schule
+        ' geschrieben wird (kein Alternativen-Vergleich noetig) - die
+        ' Zielfunktion selbst steuert bereits die Guete dieser einen Loesung.
+        Dim topResult = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=cfg.SolveTimeLimitS,
+            perSolveTimeLimitS:=cfg.SolveTimeLimitS, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers)
+        Dim solveOk = topResult.Solutions.Count > 0
         If Not solveOk Then
             IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.md"),
-                $"# Stundenplan: {bestand.SchulName}{vbLf}{vbLf}**Status:** {solveResult.Status} (Solver.Solve nicht loesbar){vbLf}")
-            Console.WriteLine($"[{schule}] FAIL - Solver.Solve: {solveResult.Status}")
+                $"# Stundenplan: {bestand.SchulName}{vbLf}{vbLf}**Status:** {topResult.StopReason} (Solver.SolveTop fand keine Loesung){vbLf}")
+            Console.WriteLine($"[{schule}] FAIL - Solver.SolveTop: {topResult.StopReason}")
             Return False
         End If
 
-        Dim scheduleViolations = Verifier.VerifySchedule(data, solveResult.Schedule)
+        Dim best = topResult.Solutions(0)
+        Dim schedule = best.Schedule
+        Dim scheduleViolations = Verifier.VerifySchedule(data, schedule)
 
         stundenplanLines.Add($"# Stundenplan: {bestand.SchulName}")
         stundenplanLines.Add("")
-        stundenplanLines.Add($"**Status:** {solveResult.Status}  |  **Verstoesse:** {scheduleViolations.Count}")
+        stundenplanLines.Add($"**Status:** SolveTop ({topResult.StopReason})  |  **Kann-Verstoesse:** {best.Quality.KannViolationCount}  |  **Qualitaet (Total):** {best.Quality.Total:F1}  |  **Verstoesse:** {scheduleViolations.Count}")
         stundenplanLines.Add("")
         If scheduleViolations.Count > 0 Then
             stundenplanLines.Add("## Verstoesse (Verifier.VerifySchedule)")
@@ -153,7 +168,7 @@ Public Module Run
 
         stundenplanLines.Add("## Klassen")
         stundenplanLines.Add("")
-        Dim classGrids = Formatting.ToClassGrids(data, solveResult.Schedule)
+        Dim classGrids = Formatting.ToClassGrids(data, schedule)
         For Each klasse In bestand.Klassen
             stundenplanLines.Add(Formatting.FormatGridMarkdown(klasse.Name, classGrids(klasse.Name), days, periods, AddressOf ClassCellText))
             stundenplanLines.Add("")
@@ -161,7 +176,7 @@ Public Module Run
 
         stundenplanLines.Add("## Lehrkraefte")
         stundenplanLines.Add("")
-        Dim teacherGrids = Formatting.ToTeacherGrids(data, solveResult.Schedule)
+        Dim teacherGrids = Formatting.ToTeacherGrids(data, schedule)
         For Each lehrer In bestand.Lehrkraefte
             stundenplanLines.Add(Formatting.FormatGridMarkdown(lehrer.Name, teacherGrids(lehrer.Name), days, periods, AddressOf TeacherCellText))
             stundenplanLines.Add("")
@@ -169,7 +184,7 @@ Public Module Run
 
         IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.md"), String.Join(vbLf, stundenplanLines))
 
-        Console.WriteLine($"[{schule}] {If(erfolg, "PASS", "FAIL")} - Lehrereinsatzplanung={lehrereinsatz.Status} (Objective={lehrereinsatz.Solver.ObjectiveValue}), Solver.Solve={solveResult.Status}, Verstoesse={scheduleViolations.Count}")
+        Console.WriteLine($"[{schule}] {If(erfolg, "PASS", "FAIL")} - Lehrereinsatzplanung={lehrereinsatz.Status} (Objective={lehrereinsatz.Solver.ObjectiveValue}), Solver.SolveTop={topResult.StopReason} (Kann-Verstoesse={best.Quality.KannViolationCount}, Quality.Total={best.Quality.Total:F1}), Verstoesse={scheduleViolations.Count}")
         Return erfolg
     End Function
 
