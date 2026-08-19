@@ -193,7 +193,26 @@ Public Module CombinedSchool
     ''' as a violation in its own right ("Unbekannter Constraint-Typ"), so
     ''' passing them through here would produce false-positive
     ''' violations unrelated to the actual no_overlap check this merge
-    ''' exists for.</summary>
+    ''' exists for.
+    '''
+    ''' Deliberately does NOT re-include either half's own original
+    ''' constraints (weekly_hours, room_requirement, teacher_availability,
+    ''' etc.) - a real, live-discovered reason why not: this project's
+    ''' `room_requirement`/`weekly_hours`/etc. constraints match purely by
+    ''' SUBJECT STRING (Verifier.vb's CollectViolations, no class/origin
+    ''' filter), and Sek I/Kursstufe intentionally reuse the same subject
+    ''' names for equivalent subjects (Phase 2.13's own premise) - so
+    ''' e.g. Sek I's `room_requirement(subject:="Physik", NaWi-only)`
+    ''' would incorrectly also apply to Kursstufe's OWN "Physik" Kurse
+    ''' even when their actual solve was never asked to honor that
+    ''' restriction (discovered via the full-scale benchmark test, which
+    ''' failed with exactly this false-positive before this fix). Each
+    ''' half's own constraints are already independently guaranteed
+    ''' satisfied by its own successful Solve()/SolveKursstufe() -
+    ''' re-checking them here would be redundant even where it wouldn't
+    ''' be outright wrong. The only thing this merge needs to prove is the
+    ''' NEW, cross-half concern Phase 2.13 exists for: no shared teacher/
+    ''' room name is ever double-booked across the two halves.</summary>
     Public Function BuildMergedVerificationScenario(sekIData As JsonObject, kursstufeData As JsonObject) As JsonObject
         Dim sekIEnt = JsonHelpers.Entities(sekIData)
         Dim kursEnt = JsonHelpers.Entities(kursstufeData)
@@ -201,14 +220,6 @@ Public Module CombinedSchool
         Dim allRooms = JsonHelpers.AsStringList(sekIEnt, "rooms").Union(JsonHelpers.AsStringList(kursEnt, "rooms")).Distinct().ToList()
 
         Dim mergedConstraints As New List(Of JsonNode)
-        For Each c In JsonHelpers.Constraints(sekIData)
-            If JsonHelpers.GetString(c, "type") = "kurswahl" Then Continue For
-            mergedConstraints.Add(DirectCast(c.DeepClone(), JsonNode))
-        Next
-        For Each c In JsonHelpers.Constraints(kursstufeData)
-            If JsonHelpers.GetString(c, "type") = "kurswahl" Then Continue For
-            mergedConstraints.Add(DirectCast(c.DeepClone(), JsonNode))
-        Next
         For Each teacher In allTeachers
             mergedConstraints.Add(New JsonObject From {{"type", "no_overlap"}, {"resource", "teacher"}, {"entity", teacher}})
         Next
