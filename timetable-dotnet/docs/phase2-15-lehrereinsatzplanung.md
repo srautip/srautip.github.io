@@ -189,6 +189,17 @@ Direkte Antwort auf den Nutzerwunsch "bestimme weitere mögliche
 Constraints" - dokumentiert, aber gemäß der Nutzerentscheidung "schlanker
 Kern zuerst" bewusst nicht implementiert:
 
+- **Fächer-Bündelung pro Klassenlehrer**: aktuell erzwingt nichts, dass
+  eine Klasse ihre drei Kernfächer (Deutsch/Mathematik/Sachunterricht)
+  von EINER einzigen Lehrkraft bekommt - der Deputat-Korridor optimiert
+  Fächer/Klassen-Kombinationen frei, ohne Rücksicht auf "gehört
+  eigentlich zusammen". Live in Phase 2.16 beobachtet (AFS-Fellbach-
+  Benchmark): eine klassenlehrerfähige Lehrkraft unterrichtet häufig nur
+  1 von 3 Kernfächern einer Klasse, während die anderen zwei von anderen
+  Lehrkräften übernommen werden - das "Klassenlehrer"-Ergebnis bleibt
+  dadurch nur eine Näherung (wer die meisten eigenen Fächer in dieser
+  Klasse hat), kein echtes Klassenlehrerprinzip. Eine harte oder weiche
+  Bündelungs-Regel wäre die naheliegende Erweiterung.
 - **Kontinuität über Jahre als aktive Solver-Präferenz** (nicht wie in
   Phase 2.14 nur aus einem bereits gelösten Vorjahr abgeleitet): ein
   Lehrer, der Kl. 1a unterrichtet hat, wird in der Zielfunktion bevorzugt

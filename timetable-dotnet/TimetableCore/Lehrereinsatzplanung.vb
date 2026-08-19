@@ -46,10 +46,17 @@ Public NotInheritable Class LehrereinsatzResult
     ''' <summary>Klasse -&gt; Klassenlehrer-Name, nur fuer Klassen befuellt,
     ''' fuer die tatsaechlich eine klassenlehrerfaehige, zugewiesene
     ''' Lehrkraft gefunden wurde (weiches Ziel, siehe Modul-Kopfkommentar -
-    ''' kann fuer einzelne Klassen fehlen). Existiert theoretisch mehr als
-    ''' eine klassenlehrerfaehige, zugewiesene Lehrkraft fuer dieselbe
-    ''' Klasse, wird undefiniert genau eine davon eingetragen - dieses MVP
-    ''' modelliert keine Prioritaet zwischen mehreren Kandidaten.</summary>
+    ''' kann fuer einzelne Klassen fehlen). Das CP-SAT-Modell selbst
+    ''' verlangt nur "mindestens ein Kandidat", nie Eindeutigkeit -
+    ''' existiert mehr als eine klassenlehrerfaehige, zugewiesene
+    ''' Lehrkraft fuer dieselbe Klasse (haeufig der Fall, da nichts eine
+    ''' Buendelung aller Kernfaecher einer Klasse bei EINER Lehrkraft
+    ''' erzwingt - siehe docs/phase2-15-lehrereinsatzplanung.md's
+    ''' zurueckgestellte "Kontinuitaet/Faecher-Buendelung"-Erweiterung),
+    ''' waehlt die Extraktion post-hoc diejenige mit den meisten eigenen
+    ''' Fach-Zuweisungen in dieser Klasse - die plausibelste Naeherung an
+    ''' "die" Klassenlehrkraft, ohne dass das Optimierungsmodell selbst
+    ''' dafuer erweitert werden muesste.</summary>
     Public Property Klassenlehrer As Dictionary(Of String, String)
 End Class
 
@@ -197,10 +204,11 @@ Public Module Lehrereinsatzplanung
             result.Zuweisungen = zuweisungen
 
             Dim klassenlehrer As New Dictionary(Of String, String)
-            For Each kvp In istKlassenlehrer
-                If solver.BooleanValue(kvp.Value) Then
-                    klassenlehrer(kvp.Key.Klasse) = kvp.Key.Lehrer
-                End If
+            For Each klasseGroup In istKlassenlehrer.Where(Function(kvp) solver.BooleanValue(kvp.Value)).GroupBy(Function(kvp) kvp.Key.Klasse)
+                Dim bester = klasseGroup.
+                    OrderByDescending(Function(kvp) zuweisungen.Where(Function(z) z.Lehrer = kvp.Key.Lehrer AndAlso z.Klasse = kvp.Key.Klasse).Count()).
+                    First()
+                klassenlehrer(klasseGroup.Key) = bester.Key.Lehrer
             Next
             result.Klassenlehrer = klassenlehrer
         End If
