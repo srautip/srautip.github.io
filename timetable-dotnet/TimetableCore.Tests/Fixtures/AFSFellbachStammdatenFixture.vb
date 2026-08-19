@@ -43,26 +43,36 @@ Public Module AFSFellbachStammdatenFixture
     End Sub
 
     Private Sub AddLehrerPool(bestand As Stammdatenbestand, namePrefix As String, anzahl As Integer, deputat As Double,
-                               faecher As IEnumerable(Of String), klassenlehrerFaehig As Boolean)
+                               faecher As IEnumerable(Of String), klassenlehrerFaehig As Boolean,
+                               Optional anrechnungsstunden As Double = 0)
         For i = 1 To anzahl
             Dim name = $"{namePrefix}-{i}"
-            bestand.Lehrkraefte.Add(New Lehrer With {.Name = name, .DeputatSollstunden = deputat, .KlassenlehrerFaehig = klassenlehrerFaehig})
+            bestand.Lehrkraefte.Add(New Lehrer With {.Name = name, .DeputatSollstunden = deputat, .KlassenlehrerFaehig = klassenlehrerFaehig, .Anrechnungsstunden = anrechnungsstunden})
             For Each f In faecher
                 bestand.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = name, .FachName = f})
             Next
         Next
     End Sub
 
-    ''' <summary>Kl.1-4, 3-zuegig (12 Klassen). Klassenlehrer-Prinzip: 6
-    ''' Kernfach-Lehrkraefte: EINE Klassenlehrkraft PRO Klasse (12 statt
-    ''' urspruenglich 6, siehe Phase-2.16-Nachtrag-3-Live-Rueckmeldung "ein
-    ''' Klassenlehrer hat ueblicherweise nur eine Klasse") mit je Deputat
-    ''' 14h - haelftige Teilzeit (14 von 28h), passend zum eigenen
-    ''' Kernfach-Bedarf einer Klasse (13-14h) UND realistisch fuer eine
-    ''' Grundschule, an der Teilzeitbeschaeftigung sehr verbreitet ist.
-    ''' Sport ist bewusst mit zwei Lehrkraeften bemannt (passend zum
-    ''' realen Sport-/Bewegungsprofil der AFS), deren Deputate zusammen
-    ''' die Sport-Gesamtnachfrage exakt treffen.</summary>
+    ''' <summary>Kl.1-4, 3-zuegig (12 Klassen). Klassenlehrer-Prinzip: 12
+    ''' Kernfach-Lehrkraefte: EINE VOLLZEIT-Klassenlehrkraft PRO Klasse (siehe
+    ''' Phase-2.16-Nachtrag-3-Live-Rueckmeldung "ein Klassenlehrer hat
+    ''' ueblicherweise nur eine Klasse"), Deputat 28h Vollzeit (Phase-2.16-
+    ''' Nachtrag-4: realistischer als die zuvor verwendete haelftige
+    ''' Teilzeit) minus 2h Klassenleitungs-Anrechnungsstunde. Faecherumfang
+    ''' erweitert auf Deutsch/Mathematik/Sachunterricht PLUS Musik/Kunst der
+    ''' eigenen Klasse (reales Klassenlehrerprinzip) - OHNE Sport, das bleibt
+    ''' bewusst bei dedizierten Sportlehrkraeften (die Fixture bildet das
+    ''' reale Sport-/Bewegungsprofil der AFS ab, siehe Phase-2.10-Recherche).
+    ''' Religion (konfessionsgebunden) und Englisch (eigene Qualifikation)
+    ''' bleiben ebenfalls bei Fachlehrkraeften. Selbst bei voller Uebernahme
+    ''' der eigenen vier Faecher erreicht eine Klasse strukturell nur
+    ''' ~17-18h/Woche - die verbleibende Deputat-Luecke bleibt bewusst als
+    ''' ehrliche Rest-Abweichung im Objective sichtbar statt ueber ein
+    ''' erweitertes Toleranzband wegoptimiert zu werden - siehe
+    ''' docs/phase2-15-lehrereinsatzplanung.md, Nachtrag 4. Sport ist
+    ''' weiterhin mit zwei Lehrkraeften bemannt, deren Deputate zusammen die
+    ''' Sport-Gesamtnachfrage exakt treffen.</summary>
     Public Function BuildAFSFellbachGrundschule() As Stammdatenbestand
         Dim b As New Stammdatenbestand With {
             .SchulName = "Anne-Frank-Schule Fellbach (synthetisch, an der realen AFS orientiert)",
@@ -87,10 +97,8 @@ Public Module AFSFellbachStammdatenFixture
         b.Raeume.Add(New Raum With {.Name = "Turnhalle1", .Typ = "Turnhalle"})
         b.Raeume.Add(New Raum With {.Name = "Turnhalle2", .Typ = "Turnhalle"})
 
-        AddLehrerPool(b, "Klassenlehrer", 12, 14, {"Deutsch", "Mathematik", "Sachunterricht"}, klassenlehrerFaehig:=True)
+        AddLehrerPool(b, "Klassenlehrer", 12, 28, {"Deutsch", "Mathematik", "Sachunterricht", "Musik", "Kunst"}, klassenlehrerFaehig:=True, anrechnungsstunden:=2)
         AddLehrerPool(b, "Sportlehrer", 2, 18, {"Sport"}, klassenlehrerFaehig:=False)
-        AddLehrerPool(b, "Musiklehrer", 1, 24, {"Musik"}, klassenlehrerFaehig:=False)
-        AddLehrerPool(b, "Kunstlehrer", 1, 24, {"Kunst"}, klassenlehrerFaehig:=False)
         AddLehrerPool(b, "Religionslehrer", 1, 24, {"Religion"}, klassenlehrerFaehig:=False)
         AddLehrerPool(b, "Englischlehrer", 1, 12, {"Englisch"}, klassenlehrerFaehig:=False)
 

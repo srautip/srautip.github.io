@@ -57,10 +57,11 @@ Public Module StammdatenBWFixture
     End Sub
 
     Private Sub AddLehrerPool(bestand As Stammdatenbestand, namePrefix As String, anzahl As Integer, deputat As Double,
-                               faecher As IEnumerable(Of String), klassenlehrerFaehig As Boolean)
+                               faecher As IEnumerable(Of String), klassenlehrerFaehig As Boolean,
+                               Optional anrechnungsstunden As Double = 0)
         For i = 1 To anzahl
             Dim name = $"{namePrefix}-{i}"
-            bestand.Lehrkraefte.Add(New Lehrer With {.Name = name, .DeputatSollstunden = deputat, .KlassenlehrerFaehig = klassenlehrerFaehig})
+            bestand.Lehrkraefte.Add(New Lehrer With {.Name = name, .DeputatSollstunden = deputat, .KlassenlehrerFaehig = klassenlehrerFaehig, .Anrechnungsstunden = anrechnungsstunden})
             For Each f In faecher
                 bestand.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = name, .FachName = f})
             Next
@@ -68,11 +69,25 @@ Public Module StammdatenBWFixture
     End Sub
 
     ''' <summary>Kl.1-4, 2-zuegig (8 Klassen). Klassenlehrer-Prinzip: EINE
-    ''' Klassenlehrkraft PRO Klasse (8 statt einer kleineren, sich Klassen
-    ''' teilenden Gruppe - ein Klassenlehrer hat ueblicherweise nur eine
-    ''' Klasse, siehe Phase-2.16-Nachtrag-3), Deputat 14h haelftige
-    ''' Teilzeit, passend zum eigenen Kernfach-Bedarf einer Klasse
-    ''' (13-14h).</summary>
+    ''' VOLLZEIT-Klassenlehrkraft PRO Klasse (8 statt einer kleineren, sich
+    ''' Klassen teilenden Gruppe - ein Klassenlehrer hat ueblicherweise nur
+    ''' eine Klasse, siehe Phase-2.16-Nachtrag-3), Deputat 28h Vollzeit
+    ''' (Phase-2.16-Nachtrag-4: realistischer als die zuvor verwendete
+    ''' haelftige Teilzeit) minus 2h Klassenleitungs-Anrechnungsstunde
+    ''' (reale BW-Praxis). Faecherumfang erweitert auf Deutsch/Mathematik/
+    ''' Sachunterricht PLUS Sport/Musik/Kunst der eigenen Klasse (reales
+    ''' Klassenlehrerprinzip: eine Lehrkraft deckt fast alle Faecher der
+    ''' eigenen Klasse ab). Religion (konfessionsgebunden, klassen-
+    ''' uebergreifend organisiert) und Englisch (eigene Qualifikation)
+    ''' bleiben bei dedizierten Fachlehrkraeften. Selbst bei voller
+    ''' Uebernahme aller sechs Faecher erreicht eine Klasse strukturell nur
+    ''' ~20-21h/Woche (weniger als das volle 28h-Deputat, da eine
+    ''' Grundschulklasse nicht mehr Wochenstunden hat) - die verbleibende
+    ''' Deputat-Luecke bleibt bewusst als ehrliche Rest-Abweichung im
+    ''' Lehrereinsatzplanung-Objective sichtbar (analog zur bereits
+    ''' dokumentierten BW-Gemeinschaftsschule-Grenze), statt sie ueber ein
+    ''' erweitertes Toleranzband wegzuoptimieren - siehe
+    ''' docs/phase2-15-lehrereinsatzplanung.md, Nachtrag 4.</summary>
     Public Function BuildBWGrundschule() As Stammdatenbestand
         Dim b As New Stammdatenbestand With {
             .SchulName = "Beispiel-Grundschule (synthetisch)", .Bundesland = "BW", .Schulart = "Grundschule",
@@ -93,10 +108,7 @@ Public Module StammdatenBWFixture
         AddFachKlassenstufen(b, "Religion", {1, 2, 3, 4}, 2, maxProTag:=1)
         AddFachKlassenstufen(b, "Englisch", {3, 4}, 2, maxProTag:=1)
 
-        AddLehrerPool(b, "Klassenlehrer", 8, 14, {"Deutsch", "Mathematik", "Sachunterricht"}, klassenlehrerFaehig:=True)
-        AddLehrerPool(b, "Sportlehrer", 1, 24, {"Sport"}, klassenlehrerFaehig:=False)
-        AddLehrerPool(b, "Musiklehrer", 1, 16, {"Musik"}, klassenlehrerFaehig:=False)
-        AddLehrerPool(b, "Kunstlehrer", 1, 16, {"Kunst"}, klassenlehrerFaehig:=False)
+        AddLehrerPool(b, "Klassenlehrer", 8, 28, {"Deutsch", "Mathematik", "Sachunterricht", "Sport", "Musik", "Kunst"}, klassenlehrerFaehig:=True, anrechnungsstunden:=2)
         AddLehrerPool(b, "Religionslehrer", 1, 16, {"Religion"}, klassenlehrerFaehig:=False)
         AddLehrerPool(b, "Englischlehrer", 1, 8, {"Englisch"}, klassenlehrerFaehig:=False)
 

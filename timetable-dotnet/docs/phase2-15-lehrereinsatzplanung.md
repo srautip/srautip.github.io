@@ -378,6 +378,51 @@ verschiedene Klassen zwei verschiedenen Lehrkräften zuzuweisen, statt
 einer einzigen (von Hand nachgerechnet: `Objective=0` nur bei Aufteilung
 erreichbar, `WeightBuendelungVerletzt` sonst).
 
+## Nachtrag 4: Vollzeit-Klassenlehrer statt hälftiger Teilzeit
+
+Direkte Folgeanweisung nach Nachtrag 3: die dortige Fixture-Anpassung
+("eine Klassenlehrkraft pro Klasse") wich auf hälftiges Teilzeit-Deputat
+(14h) aus, um den Deputat-Korridor eng am Kernfach-Bedarf einer Klasse zu
+halten - Nutzerwunsch jetzt: mehr Realismus mit VOLLZEIT-Klassenlehrern
+(28h), explizit ohne neuen Testaufwand (weder `StammdatenBWFixtureTests.vb`
+noch `AFSFellbachGrundschuleBenchmarkTests.vb` prüfen einen Objective-Wert,
+nur Optimal/Feasible + 0 Verstöße auf jeder Pipeline-Stufe - beide bleiben
+dadurch unverändert grün).
+
+**Fachaufteilung erweitert (reales Klassenlehrerprinzip):** Klassenlehrer
+übernehmen neben Deutsch/Mathematik/Sachunterricht zusätzlich Musik und
+Kunst der eigenen Klasse, bei der BW-Grundschule (ohne Sport-/
+Bewegungsprofil) zusätzlich auch Sport. Religion (konfessionsgebunden,
+klassenübergreifend organisiert) und Englisch (eigene Qualifikation)
+bleiben bei dedizierten Fachlehrkräften. Bei AFS Fellbach bleibt zusätzlich
+Sport bei den Sportlehrkräften (bildet das reale Sport-/Bewegungsprofil der
+Schule ab, bereits in Phase 2.10 recherchiert - Kapazität 2×18h=36h deckt
+sich weiterhin exakt mit der Sport-Gesamtnachfrage). Neue, optionale
+Klassenleitungs-Anrechnungsstunde (2h, reale BW-Praxis) auf den
+`AddLehrerPool`-Helper beider Fixtures ergänzt.
+
+**Ehrliche, strukturelle Deputat-Lücke:** selbst bei voller Übernahme aller
+eigenen Fächer erreicht eine Klasse strukturell weniger als das volle
+28h-Deputat, da eine Grundschulklasse schlicht nicht mehr Wochenstunden
+hat (BW-Grundschule max. ~21h, AFS Fellbach max. ~18h, da dort Sport bei
+den Sportlehrkräften bleibt). Diese Lücke bleibt bewusst als
+Rest-Abweichung im Objective sichtbar (Nutzerentscheidung, analog zur
+bereits dokumentierten BW-Gemeinschaftsschule-Grenze), statt sie über ein
+erweitertes Toleranzband wegzuoptimieren.
+
+**Realmaßstab-Beleg (live gemessen):**
+
+| Schule | Lehrereinsatz | Klassenlehrer | Ist-Deputat je Klassenlehrer |
+|---|---|---|---|
+| BW-Grundschule (2-zügig, 8 Klassenlehrer @28h, Fächer inkl. Sport) | Optimal, `Objective=2800` | 8/8, je genau 1 Klasse | 20-21h von 28h Soll (26h Sollnetto nach 2h Anrechnung) |
+| AFS-Fellbach-Grundschule (3-zügig, 12 Klassenlehrer @28h, ohne Sport) | Optimal, `Objective=7800` | 12/12, je genau 1 Klasse | 17-18h von 28h Soll (26h Sollnetto nach 2h Anrechnung) |
+
+Beide Läufe bleiben `Optimal` mit 0 `VerifyLehrereinsatz`-Verstößen und 0
+`VerifySchedule`-Verstößen im übersetzten Stundenplan - die Bündelung
+selbst (genau 1 Klassenlehrer pro Klasse, siehe Nachtrag 2/3) ist
+unverändert intakt, nur die Deputat-Komponente des Objectives ist jetzt
+größer, was erwartungsgemäß und ehrlich dokumentiert ist.
+
 ## Definition of Done — Status
 
 - [x] `dotnet test TimetableCore.Tests` bleibt vollständig grün, 0
