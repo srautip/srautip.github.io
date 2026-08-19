@@ -9,6 +9,8 @@ Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "TimetableCore.Tests", "Time
 EndProject
 Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "RobustnessRunner", "RobustnessRunner\RobustnessRunner.vbproj", "{4E03289C-05F5-43B5-8E31-E27F315DE7DE}"
 EndProject
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "SchoolTestRunner", "SchoolTestRunner\SchoolTestRunner.vbproj", "{7EC3AA1A-700F-4BC9-91C8-9C09849D8EEE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{4E03289C-05F5-43B5-8E31-E27F315DE7DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4E03289C-05F5-43B5-8E31-E27F315DE7DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4E03289C-05F5-43B5-8E31-E27F315DE7DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7EC3AA1A-700F-4BC9-91C8-9C09849D8EEE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7EC3AA1A-700F-4BC9-91C8-9C09849D8EEE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7EC3AA1A-700F-4BC9-91C8-9C09849D8EEE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7EC3AA1A-700F-4BC9-91C8-9C09849D8EEE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

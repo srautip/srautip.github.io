@@ -218,6 +218,72 @@ Public Module Formatting
         Return String.Join(vbLf, parts)
     End Function
 
+    ''' <summary>Phase 2.18: GFM-Tabellen-Pendant zum ASCII-`FormatGrid`
+    ''' (identische Signatur/Datenquelle - `ToClassGrids`/`ToTeacherGrids`
+    ''' bleiben unveraendert, nur die Ausgabe wird als Markdown-Tabelle
+    ''' statt Box-Drawing gerendert) - fuer die code-freien
+    ''' `tests/&lt;schule&gt;/output/*.md`-Reports (siehe
+    ''' `tests/README.md`).</summary>
+    Public Function FormatGridMarkdown(entityName As String, gridForEntity As Dictionary(Of String, Dictionary(Of Integer, GridCell)),
+                                        days As List(Of String), periods As List(Of Integer),
+                                        cellTextFn As Func(Of GridCell, String)) As String
+        Dim EscapeCell = Function(s As String) s.Replace("|", "\|")
+        Dim lines As New List(Of String) From {
+            $"### {entityName}",
+            "",
+            "| Std. | " & String.Join(" | ", days) & " |",
+            "|---|" & String.Join("", days.Select(Function(d) "---|"))
+        }
+        For Each p In periods
+            lines.Add($"| {p} | " & String.Join(" | ", days.Select(Function(d) EscapeCell(cellTextFn(gridForEntity(d)(p))))) & " |")
+        Next
+        Return String.Join(vbLf, lines)
+    End Function
+
+    ''' <summary>Phase 2.18: Markdown-Report fuer ein geloestes
+    ''' `Lehrereinsatzplanung.SolveLehrereinsatz`-Ergebnis - Lehrkraefte-
+    ''' Tabelle (Soll-/Ist-Deputat, Klassenlehrer-von, Zuweisungen) plus
+    ''' Klassenlehrer-je-Klasse-Tabelle. Gleiche Datenquelle wie
+    ''' `AFSFellbachGrundschuleBenchmarkTests.vb`s Konsolen-Report, hier
+    ''' als wiederverwendbare Markdown-Ausgabe fuer die code-freien
+    ''' `tests/&lt;schule&gt;/output/lehrerzuteilung.md`-Reports.</summary>
+    Public Function FormatLehrereinsatzMarkdown(bestand As Stammdatenbestand, result As LehrereinsatzResult) As String
+        Dim lines As New List(Of String) From {$"# Lehrerzuteilung: {bestand.SchulName}", ""}
+        Dim objectiveText = If(result.Solver IsNot Nothing, result.Solver.ObjectiveValue.ToString("F1", Globalization.CultureInfo.InvariantCulture), "n/a")
+        lines.Add($"**Status:** {result.Status}  |  **Objective:** {objectiveText}")
+        lines.Add("")
+
+        If result.Zuweisungen IsNot Nothing Then
+            lines.Add("## Lehrkraefte")
+            lines.Add("")
+            lines.Add("| Lehrkraft | Soll (h) | Ist (h) | Klassenlehrer von | Zuweisungen |")
+            lines.Add("|---|---|---|---|---|")
+            For Each l In bestand.Lehrkraefte
+                Dim eigene = result.Zuweisungen.Where(Function(z) z.Lehrer = l.Name).ToList()
+                Dim ist = eigene.Sum(Function(z) Stammdaten.WochenstundenFuer(
+                    bestand.Faecher.Single(Function(f) f.Name = z.Fach),
+                    bestand.Klassen.Single(Function(k) k.Name = z.Klasse).Klassenstufe).WochenstundenSoll)
+                Dim klassenlehrerVon = If(result.Klassenlehrer IsNot Nothing,
+                    String.Join(", ", result.Klassenlehrer.Where(Function(kvp) kvp.Value = l.Name).Select(Function(kvp) kvp.Key)),
+                    "")
+                Dim zuweisungenText = String.Join(", ", eigene.Select(Function(z) $"{z.Klasse}/{z.Fach}"))
+                lines.Add($"| {l.Name} | {l.DeputatSollstunden:F0} | {ist} | {klassenlehrerVon} | {zuweisungenText} |")
+            Next
+            lines.Add("")
+
+            lines.Add("## Klassenlehrer je Klasse")
+            lines.Add("")
+            lines.Add("| Klasse | Klassenlehrer |")
+            lines.Add("|---|---|")
+            For Each k In bestand.Klassen
+                Dim kl = If(result.Klassenlehrer IsNot Nothing AndAlso result.Klassenlehrer.ContainsKey(k.Name), result.Klassenlehrer(k.Name), "(keiner gefunden)")
+                lines.Add($"| {k.Name} | {kl} |")
+            Next
+        End If
+
+        Return String.Join(vbLf, lines)
+    End Function
+
     ''' <summary>Phase 2.11: renders the "kurswahl" side of a solved
     ''' Kursstufe schedule (Solver.SolveKursstufe's Schedule) as ASCII
     ''' tables, one per Wahlprofil - the Kursstufe analogue of

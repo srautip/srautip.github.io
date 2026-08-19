@@ -136,4 +136,58 @@ Public Class FormattingTests
         Next
     End Sub
 
+    ''' <summary>Phase 2.18: FormatGridMarkdown liefert eine gueltige
+    ''' GFM-Tabelle (Kopfzeile + Trennzeile + eine Datenzeile pro Periode)
+    ''' und enthaelt denselben Zelleninhalt wie das bestehende ASCII-
+    ''' FormatGrid, nur im Markdown-Pipe-Format.</summary>
+    <TestMethod>
+    Public Sub FormatGridMarkdownProducesValidTableWithExpectedCellContent()
+        Dim days = New List(Of String) From {"Mo", "Di"}
+        Dim periods = New List(Of Integer) From {1, 2}
+        Dim grid As New Dictionary(Of String, Dictionary(Of Integer, GridCell)) From {
+            {"Mo", New Dictionary(Of Integer, GridCell) From {{1, New GridCell With {.Subject = "Deutsch", .Teacher = "Lehrer A"}}, {2, Nothing}}},
+            {"Di", New Dictionary(Of Integer, GridCell) From {{1, Nothing}, {2, New GridCell With {.Subject = "Mathematik", .Teacher = "Lehrer B"}}}}
+        }
+        Dim cellText = Function(cell As GridCell) As String
+                           If cell Is Nothing Then Return "-"
+                           Return $"{cell.Subject} ({cell.Teacher})"
+                       End Function
+
+        Dim md = Formatting.FormatGridMarkdown("1a", grid, days, periods, cellText)
+        Dim lines = md.Split(vbLf)
+        Assert.AreEqual("### 1a", lines(0))
+        Assert.AreEqual("| Std. | Mo | Di |", lines(2))
+        Assert.AreEqual("|---|---|---|", lines(3))
+        Assert.AreEqual("| 1 | Deutsch (Lehrer A) | - |", lines(4))
+        Assert.AreEqual("| 2 | - | Mathematik (Lehrer B) |", lines(5))
+    End Sub
+
+    ''' <summary>Phase 2.18: FormatLehrereinsatzMarkdown rendert Status,
+    ''' die Lehrkraefte-Tabelle (Soll/Ist/Klassenlehrer-von/Zuweisungen)
+    ''' und die Klassenlehrer-je-Klasse-Tabelle aus einem gebauten
+    ''' LehrereinsatzResult - reine Formatierungspruefung, kein Solve
+    ''' noetig.</summary>
+    <TestMethod>
+    Public Sub FormatLehrereinsatzMarkdownRendersLehrkraefteAndKlassenlehrerTables()
+        Dim b As New Stammdatenbestand With {.SchulName = "Test-Schule"}
+        Dim deutsch As New Fach With {.Name = "Deutsch"}
+        deutsch.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 4})
+        b.Faecher.Add(deutsch)
+        b.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 4})
+
+        Dim result As New LehrereinsatzResult With {
+            .Status = Google.OrTools.Sat.CpSolverStatus.Optimal,
+            .Zuweisungen = New List(Of LehrereinsatzZuweisung) From {
+                New LehrereinsatzZuweisung With {.Lehrer = "Lehrer A", .Klasse = "1a", .Fach = "Deutsch"}
+            },
+            .Klassenlehrer = New Dictionary(Of String, String) From {{"1a", "Lehrer A"}}
+        }
+
+        Dim md = Formatting.FormatLehrereinsatzMarkdown(b, result)
+        Assert.IsTrue(md.Contains("# Lehrerzuteilung: Test-Schule"))
+        Assert.IsTrue(md.Contains("| Lehrer A | 4 | 4 | 1a | 1a/Deutsch |"))
+        Assert.IsTrue(md.Contains("| 1a | Lehrer A |"))
+    End Sub
+
 End Class

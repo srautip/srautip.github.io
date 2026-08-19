@@ -1,0 +1,418 @@
+schul_name: bw-grundschule-beispiel (per CLI generiert)
+bundesland: BW
+schulart: Grundschule
+tage:
+- Mo
+- Di
+- Mi
+- Do
+- Fr
+periods_per_day: 6
+klassenstufen:
+- nummer: 1
+  bezeichnung: Klasse 1
+- nummer: 2
+  bezeichnung: Klasse 2
+- nummer: 3
+  bezeichnung: Klasse 3
+- nummer: 4
+  bezeichnung: Klasse 4
+faecher:
+- name: Deutsch
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 6
+    max_pro_tag: 2
+  - klassenstufe: 2
+    wochenstunden_soll: 6
+    max_pro_tag: 2
+  - klassenstufe: 3
+    wochenstunden_soll: 5
+    max_pro_tag: 2
+  - klassenstufe: 4
+    wochenstunden_soll: 5
+    max_pro_tag: 2
+- name: Mathematik
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 5
+    max_pro_tag: 2
+  - klassenstufe: 2
+    wochenstunden_soll: 5
+    max_pro_tag: 2
+  - klassenstufe: 3
+    wochenstunden_soll: 5
+    max_pro_tag: 2
+  - klassenstufe: 4
+    wochenstunden_soll: 5
+    max_pro_tag: 2
+- name: Sachunterricht
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 3
+    max_pro_tag: 2
+  - klassenstufe: 2
+    wochenstunden_soll: 3
+    max_pro_tag: 2
+  - klassenstufe: 3
+    wochenstunden_soll: 3
+    max_pro_tag: 2
+  - klassenstufe: 4
+    wochenstunden_soll: 3
+    max_pro_tag: 2
+- name: Sport
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 3
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 3
+    max_pro_tag: 1
+  - klassenstufe: 3
+    wochenstunden_soll: 3
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 3
+    max_pro_tag: 1
+- name: Musik
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 3
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Kunst
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 3
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Religion
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 3
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Englisch
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 3
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+klassen:
+- name: 1a
+  klassenstufe: 1
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 1b
+  klassenstufe: 1
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 2a
+  klassenstufe: 2
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 2b
+  klassenstufe: 2
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 3a
+  klassenstufe: 3
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 3b
+  klassenstufe: 3
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 4a
+  klassenstufe: 4
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 4b
+  klassenstufe: 4
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+raeume: []
+lehrkraefte:
+- name: Klassenlehrer-1
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Klassenlehrer-2
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Klassenlehrer-3
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Klassenlehrer-4
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Klassenlehrer-5
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Klassenlehrer-6
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Klassenlehrer-7
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Klassenlehrer-8
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Religionslehrer-1
+  deputat_sollstunden: 16
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen: 
+  max_faecher: 
+- name: Englischlehrer-1
+  deputat_sollstunden: 8
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen: 
+  max_faecher: 
+fach_lehrer_zuordnungen:
+- lehrer_name: Klassenlehrer-1
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-1
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-1
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-1
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-1
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-1
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Religionslehrer-1
+  fach_name: Religion
+  fachfremd: false
+- lehrer_name: Englischlehrer-1
+  fach_name: Englisch
+  fachfremd: false

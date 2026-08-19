@@ -1,0 +1,558 @@
+schul_name: bw-gms-beispiel (per CLI generiert)
+bundesland: BW
+schulart: Gemeinschaftsschule
+tage:
+- Mo
+- Di
+- Mi
+- Do
+- Fr
+periods_per_day: 8
+klassenstufen:
+- nummer: 5
+  bezeichnung: Klasse 5
+- nummer: 6
+  bezeichnung: Klasse 6
+- nummer: 7
+  bezeichnung: Klasse 7
+- nummer: 8
+  bezeichnung: Klasse 8
+- nummer: 9
+  bezeichnung: Klasse 9
+- nummer: 10
+  bezeichnung: Klasse 10
+faecher:
+- name: Deutsch
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 5
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 6
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 7
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 8
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 9
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 10
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+- name: Mathematik
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 5
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 6
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 7
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 8
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 9
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 10
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+- name: Englisch
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 5
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 6
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 7
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 8
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 9
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+  - klassenstufe: 10
+    wochenstunden_soll: 4
+    max_pro_tag: 2
+- name: Erdkunde
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 5
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 6
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 7
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 8
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 9
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 10
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Sport
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 5
+    wochenstunden_soll: 3
+    max_pro_tag: 1
+  - klassenstufe: 6
+    wochenstunden_soll: 3
+    max_pro_tag: 1
+  - klassenstufe: 7
+    wochenstunden_soll: 3
+    max_pro_tag: 1
+  - klassenstufe: 8
+    wochenstunden_soll: 3
+    max_pro_tag: 1
+  - klassenstufe: 9
+    wochenstunden_soll: 3
+    max_pro_tag: 1
+  - klassenstufe: 10
+    wochenstunden_soll: 3
+    max_pro_tag: 1
+- name: Religion
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 5
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 6
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 7
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 8
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 9
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 10
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: BNT
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 5
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 6
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Musik
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 5
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 6
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 7
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 8
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Kunst
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 5
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 6
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 7
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 8
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Geschichte
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 6
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 7
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 8
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 9
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 10
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Biologie
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 7
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 8
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 9
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 10
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Physik
+  block_length: 2
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 7
+    wochenstunden_soll: 2
+    max_pro_tag: 2
+  - klassenstufe: 8
+    wochenstunden_soll: 2
+    max_pro_tag: 2
+  - klassenstufe: 9
+    wochenstunden_soll: 2
+    max_pro_tag: 2
+  - klassenstufe: 10
+    wochenstunden_soll: 2
+    max_pro_tag: 2
+- name: Chemie
+  block_length: 2
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 8
+    wochenstunden_soll: 2
+    max_pro_tag: 2
+  - klassenstufe: 9
+    wochenstunden_soll: 2
+    max_pro_tag: 2
+  - klassenstufe: 10
+    wochenstunden_soll: 2
+    max_pro_tag: 2
+- name: Gemeinschaftskunde
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 8
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 9
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 10
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+klassen:
+- name: 5a
+  klassenstufe: 5
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 5b
+  klassenstufe: 5
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 6a
+  klassenstufe: 6
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 6b
+  klassenstufe: 6
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 7a
+  klassenstufe: 7
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 7b
+  klassenstufe: 7
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 8a
+  klassenstufe: 8
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 8b
+  klassenstufe: 8
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 9a
+  klassenstufe: 9
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 9b
+  klassenstufe: 9
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 10a
+  klassenstufe: 10
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 10b
+  klassenstufe: 10
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+raeume: []
+lehrkraefte:
+- name: Deutsch-Geschichte-Lehrer-1
+  deputat_sollstunden: 27
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Deutsch-Geschichte-Lehrer-2
+  deputat_sollstunden: 27
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Deutsch-Geschichte-Lehrer-3
+  deputat_sollstunden: 27
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Mathematik-Physik-Lehrer-1
+  deputat_sollstunden: 27
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Mathematik-Physik-Lehrer-2
+  deputat_sollstunden: 27
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Englisch-Erdkunde-Lehrer-1
+  deputat_sollstunden: 27
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Englisch-Erdkunde-Lehrer-2
+  deputat_sollstunden: 27
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Englisch-Erdkunde-Lehrer-3
+  deputat_sollstunden: 27
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: NaWi-Lehrer-1
+  deputat_sollstunden: 27
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen: 
+  max_faecher: 
+- name: NaWi-Lehrer-2
+  deputat_sollstunden: 27
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen: 
+  max_faecher: 
+- name: Sportlehrer-1
+  deputat_sollstunden: 27
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen: 
+  max_faecher: 
+- name: Sportlehrer-2
+  deputat_sollstunden: 27
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen: 
+  max_faecher: 
+- name: Musik-Kunst-Lehrer-1
+  deputat_sollstunden: 27
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen: 
+  max_faecher: 
+- name: Musik-Kunst-Lehrer-2
+  deputat_sollstunden: 27
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen: 
+  max_faecher: 
+- name: Religionslehrer-1
+  deputat_sollstunden: 24
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen: 
+  max_faecher: 
+fach_lehrer_zuordnungen:
+- lehrer_name: Deutsch-Geschichte-Lehrer-1
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Deutsch-Geschichte-Lehrer-1
+  fach_name: Geschichte
+  fachfremd: false
+- lehrer_name: Deutsch-Geschichte-Lehrer-1
+  fach_name: Gemeinschaftskunde
+  fachfremd: false
+- lehrer_name: Deutsch-Geschichte-Lehrer-2
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Deutsch-Geschichte-Lehrer-2
+  fach_name: Geschichte
+  fachfremd: false
+- lehrer_name: Deutsch-Geschichte-Lehrer-2
+  fach_name: Gemeinschaftskunde
+  fachfremd: false
+- lehrer_name: Deutsch-Geschichte-Lehrer-3
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Deutsch-Geschichte-Lehrer-3
+  fach_name: Geschichte
+  fachfremd: false
+- lehrer_name: Deutsch-Geschichte-Lehrer-3
+  fach_name: Gemeinschaftskunde
+  fachfremd: false
+- lehrer_name: Mathematik-Physik-Lehrer-1
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Mathematik-Physik-Lehrer-1
+  fach_name: Physik
+  fachfremd: false
+- lehrer_name: Mathematik-Physik-Lehrer-2
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Mathematik-Physik-Lehrer-2
+  fach_name: Physik
+  fachfremd: false
+- lehrer_name: Englisch-Erdkunde-Lehrer-1
+  fach_name: Englisch
+  fachfremd: false
+- lehrer_name: Englisch-Erdkunde-Lehrer-1
+  fach_name: Erdkunde
+  fachfremd: false
+- lehrer_name: Englisch-Erdkunde-Lehrer-2
+  fach_name: Englisch
+  fachfremd: false
+- lehrer_name: Englisch-Erdkunde-Lehrer-2
+  fach_name: Erdkunde
+  fachfremd: false
+- lehrer_name: Englisch-Erdkunde-Lehrer-3
+  fach_name: Englisch
+  fachfremd: false
+- lehrer_name: Englisch-Erdkunde-Lehrer-3
+  fach_name: Erdkunde
+  fachfremd: false
+- lehrer_name: NaWi-Lehrer-1
+  fach_name: Biologie
+  fachfremd: false
+- lehrer_name: NaWi-Lehrer-1
+  fach_name: Chemie
+  fachfremd: false
+- lehrer_name: NaWi-Lehrer-1
+  fach_name: BNT
+  fachfremd: false
+- lehrer_name: NaWi-Lehrer-2
+  fach_name: Biologie
+  fachfremd: false
+- lehrer_name: NaWi-Lehrer-2
+  fach_name: Chemie
+  fachfremd: false
+- lehrer_name: NaWi-Lehrer-2
+  fach_name: BNT
+  fachfremd: false
+- lehrer_name: Sportlehrer-1
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Sportlehrer-2
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Musik-Kunst-Lehrer-1
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Musik-Kunst-Lehrer-1
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Musik-Kunst-Lehrer-2
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Musik-Kunst-Lehrer-2
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Religionslehrer-1
+  fach_name: Religion
+  fachfremd: false

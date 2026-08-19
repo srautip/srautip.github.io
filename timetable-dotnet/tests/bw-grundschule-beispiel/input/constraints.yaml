@@ -1,0 +1,8 @@
+# Zusaetzliche, handverfasste Regeln der 2. Solver-Stufe (siehe tests/README.md).
+# Nur Typen, die die Stammdaten NICHT bereits abdecken - z.B. teacher_availability,
+# forbidden_slot, room_requirement. Oberste Ebene ist eine YAML-Liste, ein Mapping
+# pro Constraint.
+- type: teacher_availability
+  teacher: Religionslehrer-1
+  available_days: [Mo, Di, Mi, Do]
+  reason: Teilzeit, freitags nicht im Haus
