@@ -338,4 +338,56 @@ Public Module Verifier
         Return violations
     End Function
 
+    ''' <summary>Phase 2.15e: unabhaengige Re-Pruefung eines geloesten
+    ''' Lehrereinsatzplanung.LehrereinsatzResult direkt aus den rohen
+    ''' Stammdaten - ruft bewusst NICHT in Lehrereinsatzplanung.vb's
+    ''' CP-SAT-Code hinein, gleiches "kein geteilter Code mit dem
+    ''' Solver"-Prinzip wie der Rest dieses Moduls (siehe Kopfkommentar)
+    ''' und wie VerifyKursblockung oben. Prueft: jede (Klasse,Pflichtfach)-
+    ''' Kombination hat genau eine Zuweisung, jede zugewiesene Lehrkraft
+    ''' ist laut fach_lehrer_zuordnungen qualifiziert, und jede gemeldete
+    ''' Klassenlehrer-Zuweisung ist sowohl klassenlehrerfaehig als auch
+    ''' tatsaechlich einer der Zuweisungen dieser Klasse.</summary>
+    Public Function VerifyLehrereinsatz(bestand As Stammdatenbestand, result As LehrereinsatzResult) As List(Of String)
+        Dim violations As New List(Of String)
+        If result.Zuweisungen Is Nothing Then Return violations
+
+        Dim lehrerByName = bestand.Lehrkraefte.ToDictionary(Function(l) l.Name)
+
+        For Each klasse In bestand.Klassen
+            For Each fach In Stammdaten.FaecherOfKlassenstufe(bestand, klasse.Klassenstufe)
+                Dim treffer = result.Zuweisungen.Where(Function(z) z.Klasse = klasse.Name AndAlso z.Fach = fach.Name).ToList()
+                If treffer.Count <> 1 Then
+                    violations.Add($"{klasse.Name}/{fach.Name}: {treffer.Count} Zuweisungen gefunden, erwartet genau 1")
+                End If
+            Next
+        Next
+
+        For Each z In result.Zuweisungen
+            Dim qualifiziert = bestand.FachLehrerZuordnungen.Any(Function(fz) fz.LehrerName = z.Lehrer AndAlso fz.FachName = z.Fach)
+            If Not qualifiziert Then
+                violations.Add($"{z.Lehrer} unterrichtet {z.Klasse}/{z.Fach}, ist dafuer aber laut fach_lehrer_zuordnungen nicht qualifiziert")
+            End If
+        Next
+
+        If result.Klassenlehrer IsNot Nothing Then
+            For Each kvp In result.Klassenlehrer
+                Dim klasseName = kvp.Key
+                Dim lehrerName = kvp.Value
+                If Not lehrerByName.ContainsKey(lehrerName) Then
+                    violations.Add($"Klasse {klasseName}: Klassenlehrer '{lehrerName}' ist keine bekannte Lehrkraft")
+                    Continue For
+                End If
+                If Not lehrerByName(lehrerName).KlassenlehrerFaehig Then
+                    violations.Add($"Klasse {klasseName}: Klassenlehrer '{lehrerName}' ist laut Stammdaten nicht klassenlehrerfaehig")
+                End If
+                If Not result.Zuweisungen.Any(Function(z) z.Klasse = klasseName AndAlso z.Lehrer = lehrerName) Then
+                    violations.Add($"Klasse {klasseName}: Klassenlehrer '{lehrerName}' unterrichtet dort laut Zuweisungen kein Fach")
+                End If
+            Next
+        End If
+
+        Return violations
+    End Function
+
 End Module

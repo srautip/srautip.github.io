@@ -174,6 +174,9 @@ timetable-dotnet/
 | **Schienenraster.vb** | Kursstufe Stufe B: Schiene→Tag/Periode. Konstruiert ein synthetisches Szenario und ruft `Solver.Solve()` unverändert auf. | Models.vb |
 | **Raumzuordnung.vb** | Kursstufe Stufe C: Kurs→Raum, mit aus Stufe B gepinntem Tag/Periode. Ebenfalls über ein synthetisches Szenario + `Solver.Solve()`. | Models.vb, Schienenraster.vb (für `SlotsForKurs`) |
 | **CombinedSchool.vb** | Orchestriert einen gemeinsamen Solve von Sek-I- und Kursstufen-Hälfte, sodass ein geteilter Lehrer-/Raum-Name nicht doppelt belegt wird - ohne `Solver.vb` selbst zu ändern. | Models.vb, Solver.vb, Kursblockung.vb, Schienenraster.vb, Raumzuordnung.vb |
+| **Stammdaten.vb** | Typisiertes Domänenmodell (Klassenstufe/Fach/Klasse/Raum/Lehrer/FachLehrerZuordnung) für dauerhaft verwaltete Schul-Stammdaten (Phase 2.15) - bewusst NICHT das rohe `JsonObject`-Muster der Constraints (siehe 8.7). Laden/Speichern als JSON, `BuildEntitiesFragment` projiziert in das bestehende `entities`-Format. | - |
+| **StammdatenValidation.vb** | Cross-Reference-Prüfung für Stammdaten (unbekannte Klassenstufen-/Lehrer-/Fach-Referenzen, unplausible Deputate), gleiche "Fail-Fast VOR jedem Solve"-Philosophie wie `Validation.vb`. | Stammdaten.vb |
+| **Lehrereinsatzplanung.vb** | Neue, vorgeschaltete Planungsstufe (Phase 2.15): verteilt Lehrkräfte IDEAL auf Klassen/Fächer (Qualifikation hart, Deputat-Korridor/Klassenlehrer/Präferenzen weich) - ein eigenständiges CP-SAT-Teilmodell ohne Tag/Periode-Bezug. `BuildAssignmentConstraints` übersetzt das Ergebnis in `teacher_subject_assignment`/`weekly_hours`-Constraints, die unverändert an `Solver.Solve` gehen. | Stammdaten.vb |
 
 **Abhängigkeitsrichtung** (keine Zyklen): `Models.vb` ist die einzige von
 praktisch allem genutzte Basis; `Solver.vb` ist der einzige "große"
@@ -305,6 +308,29 @@ Bekanntes, dokumentiertes Restrisiko der SekIFirst-Richtung: Stufe C
 Tag/Periode - ist der einzige erlaubte Raum zu genau diesem Slot durch
 Sek I belegt, wird die Kursstufe an dieser Stelle ohne Ausweichmöglichkeit
 `Infeasible` (siehe `docs/phase2-13-combined-school.md`).
+
+### 6.6 Szenario: Lehrereinsatzplanung (Stammdaten → Lehrer-Klasse-Zuordnung)
+
+1. `StammdatenValidation.ValidateStammdaten(bestand)` läuft zuerst (Pflicht,
+   gleiche Fail-Fast-Disziplin wie überall sonst im Projekt) - prüft
+   Cross-Referenzen und zwei strukturelle Lücken (Klassenstufe ohne Fach,
+   Fach ohne qualifizierte Lehrkraft), die `SolveLehrereinsatz` sonst erst
+   als schwer diagnostizierbares Infeasible entdecken würde.
+2. `Lehrereinsatzplanung.SolveLehrereinsatz(bestand)` baut pro
+   kompatiblem (Lehrer,Klasse,Fach)-Tripel eine `BoolVar`, erzwingt hart
+   genau eine Lehrkraft pro (Klasse,Pflichtfach) und minimiert eine
+   gewichtete Summe aus drei weichen Zielen (Deputat-Korridor >
+   Klassenlehrer-Fehlen > Klassenstufen-Präferenz - siehe 8.3-Analogon in
+   `Lehrereinsatzplanung.vb`).
+3. `Verifier.VerifyLehrereinsatz(bestand, result)` prüft das Ergebnis
+   unabhängig aus den rohen Stammdaten nach (kein Aufruf in die
+   CP-SAT-Modellierung hinein).
+4. `Lehrereinsatzplanung.BuildAssignmentConstraints(result, bestand)` +
+   `Stammdaten.BuildEntitiesFragment(bestand)` ergeben ein vollständiges
+   `entities`/`constraints`-JSON im bestehenden Format - `Solver.Solve`/
+   `SolveTop` laufen darauf UNVERÄNDERT weiter (Tag/Periode/Raum wie
+   bisher). Kein einziges bestehendes Solver-Modul wurde für diese Stufe
+   verändert - siehe 8.6.
 
 ## 7. Verteilungssicht
 
