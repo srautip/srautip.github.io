@@ -5,11 +5,8 @@
 # FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
 # "CP-SAT-Status"-Feld in output/stundenplan.md.
 #
-# Phase 2.23: nach dem vorherigen 30-Min-Optimalitaets-Experiment
-# (Kurzauftrag oben) wieder auf ein moderates Budget zurueckgesetzt - diese
-# Aenderung testet die neuen Zeitraster-/Chor-Constraints selbst, nicht
-# Optimalitaet.
-solve_time_limit_s: 300.0
+# Kurzauftrag: Gesamtbudget auf 2 Min gesetzt.
+solve_time_limit_s: 120.0
 
 # Anzahl paralleler CP-SAT-Suchpfade (Portfolio-Threading). Hoeher kann
 # helfen, ueberhaupt schneller eine erste Loesung zu finden, geht aber zu
@@ -17,8 +14,9 @@ solve_time_limit_s: 300.0
 num_workers: 4
 
 # Begrenzt (getrennt von solve_time_limit_s) jede EINZELNE Solve-
-# Iteration in Solver.SolveTop.
-per_solve_time_limit_s: 100.0
+# Iteration in Solver.SolveTop - hier bewusst gleich dem Gesamtbudget, da
+# solve_time_limit_s selbst bereits auf 2 Min begrenzt ist.
+per_solve_time_limit_s: 120.0
 
 # Phase 2.21: wie viele vergleichbare Loesungs-Alternativen sollen in
 # output/stundenplan.json + output/stundentafel.html exportiert werden?
