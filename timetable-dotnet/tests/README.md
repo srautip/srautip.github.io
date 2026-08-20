@@ -513,23 +513,33 @@ Details, Nutzerentscheidungen und Live-Verifikationsergebnisse siehe
 
 Zwei tatsächlich per CLI erzeugte UND ausgeführte Testfälle als
 lauffähige Vorbilder zum Kopieren. Beide haben zusätzlich eine eigene
-`input/config.yaml` mit explizit gesetztem `solve_time_limit_s` (120.0 für
-`bw-grundschule-beispiel`, 60.0 für `bw-gms-beispiel`) UND
-`max_solutions: 5` (siehe Abschnitte oben) - ein direktes Vorbild dafür,
-wie man diese Felder für die eigene Schule anpasst:
+`input/config.yaml` mit explizit gesetztem `solve_time_limit_s`/
+`per_solve_time_limit_s`/`max_solutions` (siehe Abschnitte oben, aktuelle
+Werte direkt in den beiden `config.yaml`-Dateien nachsehen - sie wurden im
+Lauf mehrerer Kurzaufträge testweise hochgesetzt, um die
+Optimalitäts-Lücke auf einem realen Szenario zu beobachten, siehe
+`docs/phase2-22-optimalitaetsluecke.md`) - ein direktes Vorbild dafür, wie
+man diese Felder für die eigene Schule anpasst. Ein kurzer,
+endnutzerorientierter Überblick über beide Beispiele steht außerdem in
+`docs/schooltestrunner-benutzerhandbuch.md`:
 
-- **`tests/bw-grundschule-beispiel/`** (4 Klassenstufen, 8 Klassenlehrer,
-  BW-Grundschule):
+- **`tests/bw-grundschule-beispiel/`** (4 Klassenstufen, 8 Klassen, 8
+  Klassenlehrer, BW-Grundschule):
   ```bash
   dotnet run --project SchoolTestRunner -- new bw-grundschule-beispiel \
     --schulart Grundschule --bundesland BW --klassenstufen 4 --lehrer 8
   dotnet run --project SchoolTestRunner -- run bw-grundschule-beispiel
   ```
-  Seine `constraints.yaml` enthält zusätzlich ein Beispiel für eine
-  handverfasste `teacher_availability`-Regel.
+  Seine `constraints.yaml` enthält zusätzlich handverfasste
+  `teacher_availability`-, `forbidden_slot`- (realistisches Zeitraster:
+  Klasse 1/2 nur vormittags, Klasse 3/4 nur dienstags nachmittags) und
+  einen `required_slot`-Regel (Chor donnerstags 6. Stunde für alle
+  Klassen gleichzeitig, Phase 2.23) sowie (Phase 2.19/2.20) einen
+  `schueler:`/`gruppen:`-Block in `stammdaten.yaml` für klassenstufen-
+  übergreifende Religion-ev-/Religion-kath-/Ethik- und Chor-Gruppen.
 
-- **`tests/bw-gms-beispiel/`** (6 Klassenstufen [5-10], 8 Klassenlehrer
-  über 3 Zwei-Fächer-Pools verteilt, BW-Gemeinschaftsschule):
+- **`tests/bw-gms-beispiel/`** (6 Klassenstufen [5-10], 12 Klassen, 8
+  Klassenlehrer über 3 Zwei-Fächer-Pools verteilt, BW-Gemeinschaftsschule):
   ```bash
   dotnet run --project SchoolTestRunner -- new bw-gms-beispiel \
     --schulart Gemeinschaftsschule --bundesland BW --klassenstufen 6 --lehrer 8

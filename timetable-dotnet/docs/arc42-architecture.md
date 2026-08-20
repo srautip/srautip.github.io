@@ -151,12 +151,19 @@ timetable-dotnet/
 ├── TimetableCore/            Klassenbibliothek (.NET 8) - der eigentliche Kern
 ├── TimetableCore.Tests/      MSTest-Suite + Fixtures (Testszenarien)
 ├── RobustnessRunner/         Konsolenprogramm: LLM-Wiederholungsstudien
+├── SchoolTestRunner/         Konsolenprogramm: code-freie YAML-Testfälle
+│                             (siehe 6.7 und docs/schooltestrunner-benutzerhandbuch.md)
 └── (nachgelagert) TimetableGui/   WinForms-GUI, referenziert TimetableCore direkt
 ```
 
-`TimetableCore` hat keine Abhängigkeit auf `TimetableCore.Tests` oder
-`RobustnessRunner`; `RobustnessRunner` bindet einzelne Testfixtures per
-`<Compile Include>` ein, um MSTest als Abhängigkeit zu vermeiden.
+`TimetableCore` hat keine Abhängigkeit auf `TimetableCore.Tests`,
+`RobustnessRunner` oder `SchoolTestRunner`. `RobustnessRunner` bindet
+einzelne Testfixtures per `<Compile Include>` ein, um MSTest als
+Abhängigkeit zu vermeiden. `SchoolTestRunner` (Phase 2.18) referenziert
+`TimetableCore` per normaler `ProjectReference` (kein Testprojekt) und
+bringt eine eigene, zusätzliche NuGet-Abhängigkeit mit (`YamlDotNet`) -
+bewusst NUR in diesem Projekt, nicht in `TimetableCore` selbst, damit
+dessen Abhängigkeitsoberfläche minimal bleibt (siehe 8.7).
 
 ### 5.2 Ebene 2 - Whitebox `TimetableCore`
 
@@ -164,12 +171,12 @@ timetable-dotnet/
 |---|---|---|
 | **Models.vb** | `JsonHelpers` (Zugriff auf das rohe `System.Text.Json.Nodes`-JSON, Python-`dict.get`-artig statt starrem Typmodell - minimiert Übersetzungsrisiko beim Portieren), Muss/Kann-Konstanten, Kursstufe-Zugriffshelfer (`GetKurse`/`GetSchienen`). | - |
 | **Validation.vb** | Deterministische Vorab-Prüfung: harte Cross-Reference-Fehler (unbekannte Entity-Referenz) vs. weiche Coverage-Warnungen (fehlende `no_overlap`-Regel). `ValidateKursstufeEntities` erweitert das um Kurs-/Schienen-/Wahlprofil-Konsistenz. | Models.vb |
-| **Solver.vb** | CP-SAT-Modellbau (`BuildCoreModel`/`BuildModel`/`ApplyConstraints`/`AddBlockConstraint`) und -Lösung (`Solve`, `SolveTop`, `SolveKursstufe`). Größtes Modul (825 Zeilen) - bewusst der einzige Ort, der `model.Add(...)` für die 9 klassenbasierten Constraint-Typen aufruft (Phase 2.20 fügt einen 10.: `parallel_group`, siehe unten). Phase 2.22: `SolveTop`s Iterationsschleife übergibt einen `CpSolverSolutionCallback` an `Solve()`, der jede gefundene Verbesserung (Zeit + Objective) aufzeichnet; `ScoredSolution` trägt zusätzlich `ObjectiveValue`/`BestObjectiveBound` (die Optimalitäts-Lücke) mit. | Models.vb, Validation.vb, Verifier.vb (für `SolveTop`s Kann-Neuberechnung), ScheduleQuality.vb, SolveTopObjective.vb, Kursblockung.vb, Schienenraster.vb, Raumzuordnung.vb |
+| **Solver.vb** | CP-SAT-Modellbau (`BuildCoreModel`/`BuildModel`/`ApplyConstraints`/`AddBlockConstraint`) und -Lösung (`Solve`, `SolveTop`, `SolveKursstufe`). Größtes Modul - bewusst der einzige Ort, der `model.Add(...)` für die 9 klassenbasierten Constraint-Typen aufruft (Phase 2.20 fügt einen 10.: `parallel_group`, siehe unten). Phase 2.22: `SolveTop`s Iterationsschleife übergibt einen `CpSolverSolutionCallback` an `Solve()`, der jede gefundene Verbesserung (Zeit + Objective) aufzeichnet; `ScoredSolution` trägt zusätzlich `ObjectiveValue`/`BestObjectiveBound` (die Optimalitäts-Lücke) mit. Phase 2.25: `SolveWithStagnationCutoff` löst jede Iteration auf einem separaten `Task`, pollt periodisch gegen die `ConvergenceCallback`-Historie und ruft `solver.StopSearch()` (dokumentiert cross-thread-sicher), sobald `stagnationTimeoutS` (Default 45s, standardmäßig aktiv) ohne neue Verbesserung verstrichen ist - die gesparte Zeit steht der nächsten `SolveTop`-Iteration zur Verfügung, statt eine stehende Suche bis zum Zeitlimit weiterlaufen zu lassen (`StagnationTriggeredCount` macht sichtbar, ob/wie oft das griff). `diversifySeed`/`randomizeSearch` streuen aufeinanderfolgende Iterationen zusätzlich, bleiben aber für denselben Basis-`seed` deterministisch. | Models.vb, Validation.vb, Verifier.vb (für `SolveTop`s Kann-Neuberechnung), ScheduleQuality.vb, SolveTopObjective.vb, Kursblockung.vb, Schienenraster.vb, Raumzuordnung.vb |
 | **Verifier.vb** | Unabhängiger Solution-Checker - teilt bewusst KEINEN Code mit Solver.vb (siehe 8.2). `VerifySchedule`/`VerifyScheduleDetailed` (Muss/Kann getrennt), `VerifyKursblockung` (Stufe-A-Ergebnis unabhängig re-prüfen), `VerifyLehrereinsatz`. Phase 2.20 ergänzt einen unabhängig re-derivierten `parallel_group`-Check plus eine Gruppen-bewusste `VerifyLehrereinsatz`-Erweiterung (alle real umspannten Klassen einer Gruppe müssen vom selben Lehrer unterrichtet werden). | Models.vb |
 | **Formatting.vb** | Rohes `ScheduleEntry`-Ergebnis → Klassen-/Lehrer-/Wahlprofil-Raster (`GridCell`), ASCII-Tabellen, JSON-Export. Reine Präsentationsschicht, keine GUI-Abhängigkeit. Seit Phase 2.20 kollisionsbewusst: mehrere gleichzeitige Sessions derselben Klasse (Parallelgruppe) werden in `ToClassGrids` zu einer kombinierten Zelle zusammengeführt statt einander zu überschreiben. Phase 2.21 ergänzt `ToStundentafelJson` (Klassenstufen-/Parallelklassen-gruppierter Multi-Lösungs-Export für den SchoolTestRunner) - erste Stelle, an der `Formatting.vb` `Verifier.vb` aufruft (pro Lösung ein unabhängiger Muss-Verstoß-Recheck). Phase 2.22: `ToStundentafelJson` exportiert pro Lösung zusätzlich `objective_value`/`best_objective_bound`/`gap_percent` (Optimalitäts-Lücke) und `convergence` (Zeit-vs-Objective-Verlauf). | Models.vb, Verifier.vb |
 | **LlmExtraction.vb** | Freitext → strukturierte Constraints via Ollama/Qwen. Ein Call pro Constraint-Typ mit eigenem JSON-Schema; `period_exception` wird deterministisch zu `forbidden_slot`-Einträgen expandiert (`ExpandPeriodException`); `DropContradictoryConsecutiveRequired` als deterministisches Sicherheitsnetz gegen unmögliche Block-Kombinationen. | Models.vb |
-| **ScheduleQuality.vb** | Post-hoc-Bewertungsschema für Kandidaten-Stundenpläne (Kann-Verstöße, Lücken, Randstunden, Nachmittags-Tage, Tagesausgewogenheit) - unabhängig von der CP-SAT-Modellierung, dient als "Wahrheit" für `SolveTop`s Endsortierung. | Models.vb |
-| **SolveTopObjective.vb** | Baut dieselben Bewertungskriterien zusätzlich direkt ins CP-SAT-Modell (`Friend`, nur von `Solver.SolveTop` genutzt) - eine CP-SAT-freundliche Näherung (Spannweite statt echter Varianz), damit die Suche selbst dorthin gelenkt wird, statt nur die gefundenen Kandidaten hinterher zu sortieren. | Models.vb |
+| **ScheduleQuality.vb** | Post-hoc-Bewertungsschema für Kandidaten-Stundenpläne, 7 Kriterien (Kann-Verstöße, Klassen-/Lehrer-Lücken, Randstunden, Nachmittags-Tage, Klassen-/Lehrer-Tagesausgewogenheit) - unabhängig von der CP-SAT-Modellierung, dient als "Wahrheit" für `SolveTop`s Endsortierung. `QualityWeights` (Phase 2.24 über `SchoolTestRunner/Run.vb`s `config.yaml` konfigurierbar, siehe `tests/README.md`) gewichtet jedes Kriterium; seit Phase 2.25-Nachtrag-2 sind `ClassGaps`/`TeacherGaps`-Gewicht mit `Kann` vereinheitlicht (früher war `ClassGaps` bewusst 10x höher gewichtet - Live-Experimente zeigten, dass nicht das Gewicht, sondern `TeacherGaps`' CP-SAT-Kodierung die eigentliche Ursache schlecht beweisbarer Lösungsschranken war, siehe `docs/phase2-25-stagnation-heuristik.md` Nachtrag 2). Neues `IncludeTeacherGaps`-Flag (Default `true`) - ein Sicherheitsventil, das den Aufbau der `TeacherGaps`-Hilfskonstrukte im CP-SAT-Modell komplett unterdrücken kann. | Models.vb |
+| **SolveTopObjective.vb** | Baut dieselben Bewertungskriterien zusätzlich direkt ins CP-SAT-Modell (`Friend`, nur von `Solver.SolveTop` genutzt), damit die Suche selbst dorthin gelenkt wird, statt nur die gefundenen Kandidaten hinterher zu sortieren: Randstunden/Nachmittags-Tage/Tagesausgewogenheit über eine CP-SAT-freundliche Näherung (Spannweite statt echter Varianz, teils weiterhin über den Sentinel-Min/Max-Trick, siehe 9). `ClassGaps`/`TeacherGaps` nutzen seit Phase 2.25-Nachtrag-2 `BuildGapFlags` - eine Big-M-freie Kodierung (Präfix/Suffix-OR-Ketten `anyBefore`/`anyAfter` + lineare Reifikation jeder einzelnen Lücken-PERIODE als eigene `BoolVar`), die die vorherige `AddMinEquality`/`AddMaxEquality`-Sentinel-Konstruktion ersetzt, siehe 9. `BuildGapFlags` wird für Lehrkräfte nur aufgerufen, wenn `QualityWeights.IncludeTeacherGaps = True` ist (strukturelles Abschalten, nicht nur Gewicht 0). | Models.vb |
 | **Kursblockung.vb** | Kursstufe Stufe A: Kurs→Schiene-Zuordnung (CP-SAT-Teilmodell, eigenständig, kein Tag/Periode-Bezug). | Models.vb |
 | **Schienenraster.vb** | Kursstufe Stufe B: Schiene→Tag/Periode. Konstruiert ein synthetisches Szenario und ruft `Solver.Solve()` unverändert auf. | Models.vb |
 | **Raumzuordnung.vb** | Kursstufe Stufe C: Kurs→Raum, mit aus Stufe B gepinntem Tag/Periode. Ebenfalls über ein synthetisches Szenario + `Solver.Solve()`. | Models.vb, Schienenraster.vb (für `SlotsForKurs`) |
@@ -234,11 +241,12 @@ Funktionen von `Solver.vb` und den drei Kursstufe-Modulen auf.
    `docs/phase2-12-staged-hints.md`).
 3. **Stufe 2**: `SolveTopObjective.ApplyQualityObjective` setzt die volle
    gewichtete Zielfunktion; eine Schleife löst wiederholt dasselbe
-   `CpModel` (jeweils neuer `CpSolver`), sperrt jede gefundene Lösung
-   per `BlockSolution` (No-Good-`AddBoolOr`) gegen Wiederholung, reicht
-   die gefundene Belegung optional als Hint an die nächste Iteration
-   weiter, und bricht ab bei `maxSolutions`, `totalTimeLimitS` oder
-   `Infeasible` (Suchraum erschöpft).
+   `CpModel` (jeweils neuer `CpSolver`, über `SolveWithStagnationCutoff` -
+   siehe Phase 2.25 in 5.2 - falls `stagnationTimeoutS` nicht `Nothing`
+   ist), sperrt jede gefundene Lösung per `BlockSolution` (No-Good-
+   `AddBoolOr`) gegen Wiederholung, reicht die gefundene Belegung optional
+   als Hint an die nächste Iteration weiter, und bricht ab bei
+   `maxSolutions`, `totalTimeLimitS` oder `Infeasible` (Suchraum erschöpft).
 4. Jede Kandidatenlösung wird unabhängig via `Verifier.VerifyScheduleDetailed`
    gezählt und `ScheduleQuality.Score` bewertet; `Solutions` wird am Ende
    nach `Quality.Total` aufsteigend sortiert - die Reihenfolge, in der
@@ -332,11 +340,57 @@ Sek I belegt, wird die Kursstufe an dieser Stelle ohne Ausweichmöglichkeit
    bisher). Kein einziges bestehendes Solver-Modul wurde für diese Stufe
    verändert - siehe 8.6.
 
+### 6.7 Szenario: code-freier Testfall über `SchoolTestRunner` (Phase 2.18)
+
+`SchoolTestRunner` ist ein eigenständiges Konsolenprogramm (kein Teil von
+`TimetableCore`), das die gesamte Pipeline aus 6.6 END-TO-END über reine
+YAML-Dateien statt VB.NET-Code steuert - eine Schule wird als
+`tests/<schule>/input/{stammdaten,constraints,config}.yaml` beschrieben,
+direkt im GitHub-Web-Editor bearbeitbar. Für die ausführliche
+Endnutzer-Anleitung siehe `docs/schooltestrunner-benutzerhandbuch.md`; für
+die vollständige YAML-Feldreferenz `tests/README.md`.
+
+```
+tests/<schule>/input/stammdaten.yaml + constraints.yaml + config.yaml
+        │
+        ▼
+YamlStammdaten.LoadStammdatenYaml / YamlConstraints.LoadConstraintsYaml
+        │  (YamlDotNet, UnderscoredNamingConvention, direkt auf die
+        │   bestehenden Stammdaten.vb-POCOs - keine eigenen Modellklassen)
+        ▼
+StammdatenValidation.ValidateStammdaten → Lehrereinsatzplanung.SolveLehrereinsatz
+        │  (identisch zu 6.6, Schritte 1-2)
+        ▼
+BuildAssignmentConstraints + geladene constraints.yaml-Einträge kombiniert
+        │  (identisch zu 6.6, Schritt 4 - constraints.yaml ergänzt NUR
+        │   handverfasste 2.-Stufe-Regeln, die Stufe 1 nicht ableiten kann,
+        │   siehe tests/README.md "Architektur-Hintergrund")
+        ▼
+Validation.ValidateEntities → Solver.SolveTop (config.yaml steuert
+        │  solve_time_limit_s/num_workers/max_solutions/quality_weights/...)
+        ▼
+Formatting: FormatLehrereinsatzMarkdown + FormatSchedule + ToStundentafelJson
+        │  + StundentafelHtml.BuildStundentafelHtml
+        ▼
+output/{lehrerzuteilung,stundenplan}.md + stundenplan.json + stundentafel.html
+```
+
+Nach JEDER Stufe wird geschrieben, was bereits feststeht (kein
+Alles-oder-Nichts bei einem Abbruch in einer späteren Stufe). Der Runner
+gibt pro Schule eine `PASS`/`FAIL`-Zeile aus und liefert Exitcode 0 nur,
+wenn ALLE Stufen sauber durchlaufen - macht eine spätere CI-Anbindung
+trivial nachrüstbar, ohne dass diese Phase selbst einen Workflow anlegt.
+Zwei tatsächlich per CLI erzeugte und ausgeführte Referenzbeispiele sind
+committet: `tests/bw-grundschule-beispiel/` (BW-Grundschule) und
+`tests/bw-gms-beispiel/` (BW-Gemeinschaftsschule) - siehe
+`docs/schooltestrunner-benutzerhandbuch.md` für eine kurze Beschreibung
+beider.
+
 ## 7. Verteilungssicht
 
 | Umgebung | Inhalt | Status |
 |---|---|---|
-| Linux-Sandbox (aktuelle Entwicklungsumgebung) | `TimetableCore`, `TimetableCore.Tests`, `RobustnessRunner`, lokaler Ollama-Server | Aktiv, vollständig lauffähig (`dotnet test`, `dotnet run --project RobustnessRunner`) |
+| Linux-Sandbox (aktuelle Entwicklungsumgebung) | `TimetableCore`, `TimetableCore.Tests`, `RobustnessRunner`, `SchoolTestRunner`, lokaler Ollama-Server | Aktiv, vollständig lauffähig (`dotnet test`, `dotnet run --project RobustnessRunner`, `dotnet run --project SchoolTestRunner`) - `SchoolTestRunner` braucht KEINEN Ollama-Server (rein YAML-basiert, keine LLM-Extraktion) |
 | Windows-Zielumgebung (nachgelagert) | `TimetableGui` (WinForms) + `TimetableCore` (per `ProjectReference`) + lokaler Ollama-Server | Noch nicht begonnen (Phase 3) |
 
 `Google.OrTools` läuft nativ unter beiden Plattformen (`Google.OrTools.runtime.linux-x64`
@@ -449,6 +503,7 @@ Begründungen jeweils in den referenzierten `docs/phase2-*.md`-Berichten):
 | Lehrerkontinuität (Kl.5→Kl.6) rein auf Fixture-/Anwendungsebene, kein neues Solver-Feature | Ein neues "weiches Kontinuitäts-Constraint" im CP-SAT-Modell | `teacher_subject_assignment` definiert bereits vor `ApplyConstraints` die Entscheidungsvariablen-Identität selbst (`SessionsFromAssignments`) - es ist strukturell nicht Kann-fähig. Kontinuität kann nur durch Wiederverwendung desselben Lehrernamens beim Bau des Folgejahr-Szenarios erreicht werden (siehe `docs/phase2-14-lehrerkontinuitaet.md`). |
 | `System.Text.Json.Nodes` statt eines generierten/handgeschriebenen typisierten Modells | Records/Klassen pro Constraint-Typ mit `JsonSerializer`-Attributen | Minimiert das Übersetzungsrisiko beim 1:1-Portieren aus Pythons dict-basiertem Original; ein typisiertes Modell kann bei Bedarf später ergänzt werden (GUI-Databinding), ohne den Kern zu ändern. |
 | Klassenlehrer-Tandem-Balance (Phase 2.17) über den bereits in `SolveTopObjective.vb` verifizierten Sentinel-Min/Max-Trick, mit `>=`-Hinge statt `=`-Gleichheit | Direkte `AddMaxEquality`/`AddMinEquality`-Gleichheit für den Bereich (`tandemRange = tandemMax - tandemMin`) | Live beim Testschreiben entdeckt: bei genau einem (oder keinem) aktiven Tandem-Kandidaten wird der Sentinel-substituierte `tandemMin` (`bigStunden`) größer als der rohe `tandemMax` (0) - eine erzwungene Gleichheit wäre in diesem Randfall unlösbar gewesen. Die Ungleichung `tandemRange >= tandemMax - tandemMin, >= 0` (gleicher Hinge-Trick wie im Deputat-Korridor) lässt der Zielfunktion die Freiheit, `tandemRange` in diesem Fall auf 0 zu setzen, statt Infeasible zu werden. |
+| `ClassGaps`/`TeacherGaps` (Phase 2.25-Nachtrag-2) über eine komplett Big-M-freie Präfix/Suffix-OR-Kodierung (`BuildGapFlags`: `anyBefore`/`anyAfter` je Periode, jede Lücken-PERIODE als eigene reifizierte `BoolVar`) statt des ursprünglichen Sentinel-Min/Max-Tricks | (1) `AddMinEquality`/`AddMaxEquality` mit Big-M-Sentinel-Substitution (Original); (2) eine erste "sentinel-freie" Zwischenstufe, die `AddMinEquality`/`AddMaxEquality` weiterhin nutzte, nur ohne Big-M-Konstante | Systematische Scratch-Experimente (Exp 1-13, `docs/phase2-25-stagnation-heuristik.md` Nachtrag 2) identifizierten `TeacherGaps`' ALTE Kodierung (nicht `ClassGaps`' ursprünglich 10x höheres Gewicht, wie zunächst vermutet) als eigentlichen Treiber einer über 300s hinweg komplett unbewegten `BestObjectiveBound` - selbst bei `TeacherGaps`' eigenem, vergleichsweise niedrigen Original-Gewicht. Zwischenstufe (2) reichte NICHT (97.9% statt 99.7% Lücke im Vollmaßstab-Test, kaum Verbesserung) - erst der komplette Verzicht auf `AddMinEquality`/`AddMaxEquality` behob es. `TeacherLoadVariance` (`BuildTeacherRangeVars`) und die Tandem-Balance oben nutzen den Sentinel-Trick bewusst unverändert weiter - beide waren nicht Teil dieser Diagnose, bleiben als möglicher späterer Kandidat dokumentiert. |
 
 ## 10. Qualitätsanforderungen
 
@@ -490,7 +545,8 @@ Qualität
 | **`SolveTop` bei kleinen/mittleren Szenarien mit Staging reproduzierbar langsamer** als ohne (Overhead der Stufe-1-Vorlösung übersteigt den Nutzen, wenn eine erste Lösung ohnehin leicht zu finden ist). | Bekannt, `useStagedHints:=False` bleibt für solche Fälle die schnellere Wahl trotz `:=True`-Default; keine größenabhängige Auto-Wahl implementiert (`docs/phase2-12-staged-hints.md`). |
 | **Muss/Kann-Priorität ("should") ist eine subjektive Sprecher-Einschätzung**, kein prüfbarer Fakt - es gibt keine deterministische Verifikation von `priority_accuracy` wie z.B. bei `block_length`. | Dokumentierte, akzeptierte Grenze (`docs/phase2-robustness-report.md`, Phase-2.6-Abschnitt). |
 | **`reason` ist eine Paraphrase, kein Verbatim-Zitat mit Zeichen-Offset** - eine exakte GUI-Textstellen-Markierung ist damit nicht möglich. | Als möglicher Umfang einer künftigen Phase vermerkt, nicht umgesetzt. |
-| **Solver.vb ist mit 825 Zeilen das mit Abstand größte Modul.** | Bewusst in Kauf genommen (alle 9 klassenbasierten Constraint-Typen an einem Ort, direkt neben der Modellkonstruktion, die sie konsumiert) statt künstlich aufgeteilt - abgemildert durch die konsequente Auslagerung neuer, orthogonaler Konzepte (`ScheduleQuality.vb`, `SolveTopObjective.vb`, `Kursblockung.vb` etc.) in eigene Module. |
+| **Solver.vb ist mit >1000 Zeilen das mit Abstand größte Modul.** | Bewusst in Kauf genommen (alle 9 klassenbasierten Constraint-Typen an einem Ort, direkt neben der Modellkonstruktion, die sie konsumiert) statt künstlich aufgeteilt - abgemildert durch die konsequente Auslagerung neuer, orthogonaler Konzepte (`ScheduleQuality.vb`, `SolveTopObjective.vb`, `Kursblockung.vb` etc.) in eigene Module. |
+| **`BestObjectiveBound` bleibt bei größeren Realmaßstab-Szenarien (`bw-grundschule-beispiel`) auch nach der Big-M-freien `ClassGaps`/`TeacherGaps`-Kodierung (Phase 2.25-Nachtrag-2) deutlich hinter `ObjectiveValue` zurück** (~74.6% Lücke bei 120s/`numWorkers:=4`, gegenüber 99.7% vorher) - CP-SAT erreicht `Feasible`, nicht bewiesen `Optimal`. Die Kodierungs-Schwäche ist behoben, eine zugrundeliegende LP-Relaxations-Schwäche des Gesamtmodells bleibt bestehen. | Teilweise behoben, ehrlich als nicht vollständig geschlossen dokumentiert (`docs/phase2-25-stagnation-heuristik.md` Nachtrag 2). `stagnation_timeout_s`/`per_solve_time_limit_s`/`max_solutions` mildern die praktische Auswirkung (mehrere schnell gefundene, gut bewertete `Feasible`-Alternativen statt einer einzelnen langen Suche). `TeacherLoadVariance` (weiterhin Sentinel-basiert) bleibt als möglicher nächster Untersuchungskandidat offen. |
 | **GUI (Phase 3) noch nicht begonnen.** | Geplant, nachgelagert unter Windows; der Kern ist bereits GUI-unabhängig entworfen (siehe 4, 7). |
 
 ## 12. Glossar
