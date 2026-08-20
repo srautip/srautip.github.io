@@ -23,4 +23,12 @@
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
 
+  <!-- Phase 2.21: die "Stundentafel"-HTML-Vorlage wird als Ressource in
+       die Assembly eingebettet (statt per CopyToOutputDirectory kopiert),
+       damit sie zur Laufzeit unabhaengig vom aktuellen Arbeitsverzeichnis
+       ueber Assembly.GetManifestResourceStream lesbar ist. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Templates\stundentafel.html" />
+  </ItemGroup>
+
 </Project>

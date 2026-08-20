@@ -19,6 +19,10 @@ tests/
       lehrerzuteilung.md             (generiert) - wer unterrichtet was,
                                      Klassenlehrer je Klasse
       stundenplan.md                  (generiert) - fertiger Stundenplan
+      stundenplan.json                (generiert) - ALLE von Solver.SolveTop
+                                     gefundenen Loesungen als JSON (Phase 2.21)
+      stundentafel.html               (generiert) - interaktive "Stundentafel"-
+                                     Gesamtuebersicht (Phase 2.21), siehe unten
 ```
 
 `output/` wird bei jedem Lauf **komplett neu geschrieben** - nicht von Hand
@@ -286,22 +290,37 @@ lehrereinsatz_time_limit_s: 30.0
 solve_time_limit_s: 30.0
 seed: 42
 num_workers: 1   # Default: Anzahl CPU-Kerne - 1 (mindestens 1)
+max_solutions: 1   # Default 1 (Phase 2.21) - siehe unten
 ```
 
 Fehlt die Datei komplett, gelten diese Defaults unverändert. `solve_time_limit_s`
 begrenzt sowohl `Solver.SolveTop`s Gesamt- als auch dessen Einzel-Solve-
 Zeitbudget (siehe unten).
 
-**Für eine möglichst optimale Lösung** ist NICHT `maxSolutions` (intern
-fest auf 1) der relevante Hebel - jede weitere Solve-Iteration optimiert
-ohnehin gegen dieselbe Zielfunktion und kann daher nur eine gleich gute,
-nie eine bessere Alternative finden. Entscheidend ist stattdessen ein
-ausreichend hohes `solve_time_limit_s`: nur mit genug Zeit kann CP-SAT den
-gefundenen Plan tatsächlich als `Optimal` BEWEISEN statt ihn nach
-Zeitablauf nur als `Feasible` zurückzugeben. Das tatsächlich erreichte
-Ergebnis steht im neuen `CP-SAT-Status`-Feld der `**Status:**`-Zeile in
-`output/stundenplan.md` - bei `Feasible` erscheint dort zusätzlich ein
-Hinweis, `solve_time_limit_s` zu erhöhen.
+**Für eine möglichst optimale EINZELNE Lösung** ist NICHT `max_solutions`
+der relevante Hebel - jede weitere Solve-Iteration optimiert ohnehin gegen
+dieselbe Zielfunktion und kann daher nur eine gleich gute, nie eine
+bessere Alternative finden. Entscheidend ist stattdessen ein ausreichend
+hohes `solve_time_limit_s`: nur mit genug Zeit kann CP-SAT den gefundenen
+Plan tatsächlich als `Optimal` BEWEISEN statt ihn nach Zeitablauf nur als
+`Feasible` zurückzugeben. Das tatsächlich erreichte Ergebnis steht im
+`CP-SAT-Status`-Feld der `**Status:**`-Zeile in `output/stundenplan.md` -
+bei `Feasible` erscheint dort zusätzlich ein Hinweis, `solve_time_limit_s`
+zu erhöhen.
+
+**`max_solutions`** (Default 1) steuert stattdessen, wie viele
+VERGLEICHBARE Alternativ-Lösungen berechnet und in `output/stundenplan.json`
++ `output/stundentafel.html` exportiert werden (siehe Abschnitt
+"Stundentafel-Visualisierung" unten) - der beste Kandidat bleibt weiterhin
+allein maßgeblich für `lehrerzuteilung.md`/`stundenplan.md`. Ein höherer
+Wert verlängert die Gesamtlaufzeit NICHT über `solve_time_limit_s` hinaus
+(`Solver.SolveTop` prüft das verbleibende Zeitbudget vor jeder weiteren
+Iteration) - er kann aber dazu führen, dass die ERSTE Lösung bereits das
+gesamte Budget aufbraucht (falls sie nicht schnell als `Optimal` bewiesen
+werden kann) und dadurch trotz höherem `max_solutions` nur eine einzige
+Lösung gefunden wird, bevor `solve_time_limit_s` abläuft - das ist kein
+Fehler, sondern zeigt lediglich, dass für weitere Alternativen zusätzlich
+`solve_time_limit_s` erhöht werden müsste.
 
 ## CLI: Grundgerüst per Template erzeugen
 
@@ -342,14 +361,16 @@ dotnet run --project SchoolTestRunner -- run --all   # alle Schulen unter tests/
 ```
 
 Durchläuft die komplette Pipeline und schreibt `output/lehrerzuteilung.md`
-+ `output/stundenplan.md` - auch bei einem Abbruch in einer späten Stufe
++ `output/stundenplan.md` + `output/stundenplan.json` +
+`output/stundentafel.html` - auch bei einem Abbruch in einer späten Stufe
 bleibt der bis dahin erreichte Fortschritt sichtbar (kein
-Alles-oder-Nichts). Gibt pro Schule eine `PASS`/`FAIL`-Zeile aus und
-liefert Exitcode 0 nur, wenn ALLE Stufen (StammdatenValidation,
-Lehrereinsatzplanung, VerifyLehrereinsatz, Validation.ValidateEntities,
-Solver.SolveTop, VerifySchedule) sauber durchlaufen - Exitcode 1 sonst
-(nutzbar für eine spätere CI-Anbindung, ohne dass diese schon Teil dieses
-Tools ist).
+Alles-oder-Nichts; die beiden neuen Stundentafel-Dateien werden nur
+geschrieben, wenn `Solver.SolveTop` mindestens eine Lösung fand). Gibt pro
+Schule eine `PASS`/`FAIL`-Zeile aus und liefert Exitcode 0 nur, wenn ALLE
+Stufen (StammdatenValidation, Lehrereinsatzplanung, VerifyLehrereinsatz,
+Validation.ValidateEntities, Solver.SolveTop, VerifySchedule) sauber
+durchlaufen - Exitcode 1 sonst (nutzbar für eine spätere CI-Anbindung,
+ohne dass diese schon Teil dieses Tools ist).
 
 Der Stundenplan wird über `Solver.SolveTop` (nicht das einfachere
 `Solver.Solve`) erzeugt: dieselbe Qualitäts-Zielfunktion (Lücken,
@@ -357,16 +378,55 @@ Randstunden, Tagesausgewogenheit - siehe `ScheduleQuality.vb`), die sonst
 erst nachträglich zum Sortieren mehrerer Kandidaten benutzt wird, fließt
 hier direkt ins CP-SAT-Modell ein - der Solver sucht von vornherein einen
 bzgl. dieser Kriterien möglichst guten statt nur irgendeinen zulässigen
-Plan. Es wird dabei nur EIN finaler Plan erzeugt (`maxSolutions=1`), kein
-Alternativen-Vergleich.
+Plan. Standardmäßig wird nur EIN finaler Plan erzeugt (`max_solutions: 1`);
+ein höherer Wert in `config.yaml` exportiert zusätzliche, vergleichbare
+Alternativen (siehe Abschnitt "Stundentafel-Visualisierung" unten).
+
+## Stundentafel-Visualisierung (Phase 2.21)
+
+`output/stundenplan.json` enthält ALLE von `Solver.SolveTop` gefundenen
+Lösungen (nicht nur die beste) mit Status/Kann-Verstößen/Quality-Wert je
+Lösung, dazu die Klassenstufen-/Parallelklassen-Struktur der Schule
+(siehe Feldschema unten). `output/stundentafel.html` ist ein
+eigenständiger, wiederverwendbarer JavaScript-Viewer: die JSON-Daten sind
+inline eingebettet (kein `fetch()`, funktioniert deshalb auch bei
+direktem Öffnen per Doppelklick ohne lokalen Webserver), ein
+Dropdown-Menü schaltet zwischen den gefundenen Lösungen um. Die Tabelle
+zeigt Wochentage in Spalten (unterteilt durch Klassenstufen) und
+Schulstunden in Zeilen (unterteilt durch die Parallelklassen a/b/c/...
+jeder Klassenstufe) - eine Gesamtübersicht über alle Klassen zugleich,
+statt der separaten Pro-Klasse-Raster aus `stundenplan.md`.
+
+**JSON-Feldschema** (Ausschnitt, snake_case):
+```jsonc
+{
+  "schul_name": "...", "tage": ["Mo", ...], "periods_per_day": 6,
+  "max_parallel_klassen": 2,   // groesste Parallelklassen-Anzahl je Klassenstufe
+  "klassenstufen": [
+    { "nummer": 1, "bezeichnung": "Klasse 1", "klassen": ["1a", "1b"] }
+    // "klassen" ist auf max_parallel_klassen Laenge gepolstert (null bei
+    // fehlender Parallelklasse an dieser Buchstaben-Position)
+  ],
+  "stop_reason": "MaxSolutionsReached",
+  "solutions": [
+    { "index": 0, "status": "Optimal", "kann_violation_count": 0,
+      "muss_violation_count": 0, "quality_total": -515.4,
+      "classes": { "1a": { "Mo": { "1": null, "2": {"subject":"...","teacher":"...","room": null}, ... }, ... } } }
+  ]
+}
+```
+
+Details, Nutzerentscheidungen und Live-Verifikationsergebnisse siehe
+`docs/phase2-21-stundentafel-visualisierung.md`.
 
 ## Referenzbeispiele
 
 Zwei tatsächlich per CLI erzeugte UND ausgeführte Testfälle als
 lauffähige Vorbilder zum Kopieren. Beide haben zusätzlich eine eigene
-`input/config.yaml` mit explizit gesetztem `solve_time_limit_s: 60.0`
-(siehe Abschnitt oben) - ein direktes Vorbild dafür, wie man dieses Feld
-für die eigene Schule anpasst:
+`input/config.yaml` mit explizit gesetztem `solve_time_limit_s` (120.0 für
+`bw-grundschule-beispiel`, 60.0 für `bw-gms-beispiel`) UND
+`max_solutions: 5` (siehe Abschnitte oben) - ein direktes Vorbild dafür,
+wie man diese Felder für die eigene Schule anpasst:
 
 - **`tests/bw-grundschule-beispiel/`** (4 Klassenstufen, 8 Klassenlehrer,
   BW-Grundschule):

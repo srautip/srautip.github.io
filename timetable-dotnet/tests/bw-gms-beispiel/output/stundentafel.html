@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Stundentafel</title>
+<style>
+  :root {
+    color-scheme: light dark;
+  }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    margin: 1.5rem;
+  }
+  h1 {
+    font-size: 1.3rem;
+    margin-bottom: 0.2rem;
+  }
+  #meta {
+    color: #666;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  #controls {
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  #solution-summary {
+    font-size: 0.9rem;
+    color: #444;
+  }
+  #table-container {
+    overflow: auto;
+    max-height: 85vh;
+    border: 1px solid #ccc;
+  }
+  table {
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    min-width: 100%;
+  }
+  th, td {
+    border: 1px solid #ccc;
+    padding: 2px 4px;
+    text-align: center;
+    vertical-align: middle;
+    min-width: 4.2rem;
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: #f2f2f2;
+    z-index: 2;
+  }
+  tbody th {
+    position: sticky;
+    left: 0;
+    background: #f2f2f2;
+    z-index: 1;
+  }
+  td.klassenstufe-odd {
+    background: #fafafa;
+  }
+  td.leer {
+    background: #f7f7f7;
+  }
+  .klasse-badge {
+    display: block;
+    font-weight: bold;
+    font-size: 0.68rem;
+    color: #888;
+  }
+  .subject {
+    font-weight: 600;
+  }
+  .teacher {
+    font-size: 0.72rem;
+    color: #555;
+  }
+  .frei {
+    color: #bbb;
+  }
+</style>
+</head>
+<body>
+  <h1 id="schul-name">Stundentafel</h1>
+  <div id="meta"></div>
+  <div id="controls">
+    <label for="solution-select">Loesung:</label>
+    <select id="solution-select"></select>
+    <span id="solution-summary"></span>
+  </div>
+  <div id="table-container"></div>
+
+  <script type="application/json" id="stundentafel-data">{"schul_name":"bw-gms-beispiel (per CLI generiert)","tage":["Mo","Di","Mi","Do","Fr"],"periods_per_day":8,"max_parallel_klassen":2,"klassenstufen":[{"nummer":5,"bezeichnung":"Klasse 5","klassen":["5a","5b"]},{"nummer":6,"bezeichnung":"Klasse 6","klassen":["6a","6b"]},{"nummer":7,"bezeichnung":"Klasse 7","klassen":["7a","7b"]},{"nummer":8,"bezeichnung":"Klasse 8","klassen":["8a","8b"]},{"nummer":9,"bezeichnung":"Klasse 9","klassen":["9a","9b"]},{"nummer":10,"bezeichnung":"Klasse 10","klassen":["10a","10b"]}],"stop_reason":"TimeLimitReached","solutions":[{"index":0,"status":"Feasible","kann_violation_count":0,"muss_violation_count":0,"quality_total":547.72,"classes":{"5a":{"Mo":{"1":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"2":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"3":{"subject":"BNT","teacher":"NaWi-Lehrer-2","room":null},"4":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"5":{"subject":"Sport","teacher":"Sportlehrer-2","room":null},"6":null,"7":null,"8":null},"Di":{"1":null,"2":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"3":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"4":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-1","room":null},"5":{"subject":"Sport","teacher":"Sportlehrer-2","room":null},"6":null,"7":null,"8":null},"Mi":{"1":null,"2":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"3":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"4":{"subject":"Sport","teacher":"Sportlehrer-2","room":null},"5":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"6":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"7":null,"8":null},"Do":{"1":null,"2":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"3":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"4":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"5":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-2","room":null},"6":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"7":null,"8":null},"Fr":{"1":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-1","room":null},"2":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-2","room":null},"3":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"4":{"subject":"BNT","teacher":"NaWi-Lehrer-2","room":null},"5":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"6":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"7":null,"8":null}},"5b":{"Mo":{"1":null,"2":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-1","room":null},"3":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"4":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"5":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"6":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"7":null,"8":null},"Di":{"1":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"2":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"3":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-2","room":null},"4":{"subject":"BNT","teacher":"NaWi-Lehrer-2","room":null},"5":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"6":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"7":null,"8":null},"Mi":{"1":null,"2":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"3":{"subject":"BNT","teacher":"NaWi-Lehrer-2","room":null},"4":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-1","room":null},"5":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"6":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"7":null,"8":null},"Do":{"1":null,"2":null,"3":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"4":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"5":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"6":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-2","room":null},"7":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"8":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null}},"Fr":{"1":null,"2":null,"3":null,"4":null,"5":null,"6":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"7":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"8":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null}}},"6a":{"Mo":{"1":null,"2":{"subject":"BNT","teacher":"NaWi-Lehrer-2","room":null},"3":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"4":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"5":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"6":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"7":null,"8":null},"Di":{"1":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"2":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-2","room":null},"3":{"subject":"BNT","teacher":"NaWi-Lehrer-2","room":null},"4":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"5":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"6":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"7":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"8":{"subject":"Sport","teacher":"Sportlehrer-1","room":null}},"Mi":{"1":null,"2":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-2","room":null},"3":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"4":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"5":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"6":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"7":null,"8":null},"Do":{"1":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"2":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"3":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"4":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"5":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-1","room":null},"6":null,"7":null,"8":null},"Fr":{"1":null,"2":null,"3":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"4":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"5":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"6":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-1","room":null},"7":null,"8":null}},"6b":{"Mo":{"1":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-1","room":null},"2":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"3":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"4":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"5":null,"6":null,"7":null,"8":null},"Di":{"1":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-1","room":null},"2":{"subject":"BNT","teacher":"NaWi-Lehrer-2","room":null},"3":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"4":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"5":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"6":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"7":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"8":null},"Mi":{"1":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"2":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"3":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-1","room":null},"4":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"5":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"6":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"7":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"8":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-3","room":null}},"Do":{"1":null,"2":null,"3":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"4":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"5":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"6":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"7":null,"8":null},"Fr":{"1":null,"2":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"3":{"subject":"BNT","teacher":"NaWi-Lehrer-2","room":null},"4":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-1","room":null},"5":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"6":null,"7":null,"8":null}},"7a":{"Mo":{"1":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"2":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"3":{"subject":"Sport","teacher":"Sportlehrer-2","room":null},"4":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-1","room":null},"5":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"6":{"subject":"Biologie","teacher":"NaWi-Lehrer-1","room":null},"7":null,"8":null},"Di":{"1":null,"2":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"3":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"4":{"subject":"Sport","teacher":"Sportlehrer-2","room":null},"5":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"6":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"7":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"8":null},"Mi":{"1":null,"2":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-1","room":null},"3":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"4":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"5":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-1","room":null},"6":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"7":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"8":null},"Do":{"1":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"2":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"3":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"4":{"subject":"Sport","teacher":"Sportlehrer-2","room":null},"5":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"6":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"7":null,"8":null},"Fr":{"1":null,"2":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"3":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"4":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"5":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-1","room":null},"6":{"subject":"Biologie","teacher":"NaWi-Lehrer-1","room":null},"7":null,"8":null}},"7b":{"Mo":{"1":null,"2":null,"3":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"4":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"5":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-1","room":null},"6":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"7":null,"8":null},"Di":{"1":null,"2":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-1","room":null},"3":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-1","room":null},"4":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"5":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"6":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"7":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"8":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null}},"Mi":{"1":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"2":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"3":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"4":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"5":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"6":{"subject":"Biologie","teacher":"NaWi-Lehrer-1","room":null},"7":null,"8":null},"Do":{"1":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"2":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"3":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"4":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"5":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"6":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"7":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"8":null},"Fr":{"1":null,"2":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"3":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-1","room":null},"4":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"5":{"subject":"Biologie","teacher":"NaWi-Lehrer-1","room":null},"6":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"7":null,"8":null}},"8a":{"Mo":{"1":null,"2":null,"3":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-1","room":null},"4":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"5":{"subject":"Biologie","teacher":"NaWi-Lehrer-1","room":null},"6":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-1","room":null},"7":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"8":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-1","room":null}},"Di":{"1":{"subject":"Biologie","teacher":"NaWi-Lehrer-1","room":null},"2":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"3":{"subject":"Gemeinschaftskunde","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"4":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"5":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"6":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"7":null,"8":null},"Mi":{"1":{"subject":"Chemie","teacher":"NaWi-Lehrer-2","room":null},"2":{"subject":"Chemie","teacher":"NaWi-Lehrer-2","room":null},"3":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"4":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"5":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"6":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"7":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"8":null},"Do":{"1":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"2":{"subject":"Gemeinschaftskunde","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"3":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"4":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"5":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"6":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-1","room":null},"7":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"8":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-2","room":null}},"Fr":{"1":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"2":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-1","room":null},"3":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"4":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"5":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"6":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"7":null,"8":null}},"8b":{"Mo":{"1":null,"2":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"3":{"subject":"Biologie","teacher":"NaWi-Lehrer-1","room":null},"4":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"5":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"6":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-2","room":null},"7":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-1","room":null},"8":null},"Di":{"1":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"2":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"3":{"subject":"Chemie","teacher":"NaWi-Lehrer-1","room":null},"4":{"subject":"Chemie","teacher":"NaWi-Lehrer-1","room":null},"5":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"6":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"7":null,"8":null},"Mi":{"1":{"subject":"Gemeinschaftskunde","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"2":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"3":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"4":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"5":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"6":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"7":null,"8":null},"Do":{"1":null,"2":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"3":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"4":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"5":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"6":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"7":{"subject":"Kunst","teacher":"Musik-Kunst-Lehrer-1","room":null},"8":{"subject":"Biologie","teacher":"NaWi-Lehrer-1","room":null}},"Fr":{"1":{"subject":"Musik","teacher":"Musik-Kunst-Lehrer-2","room":null},"2":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"3":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"4":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"5":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"6":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"7":{"subject":"Gemeinschaftskunde","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"8":{"subject":"Sport","teacher":"Sportlehrer-1","room":null}}},"9a":{"Mo":{"1":null,"2":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"3":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"4":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"5":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"6":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"7":{"subject":"Chemie","teacher":"NaWi-Lehrer-1","room":null},"8":{"subject":"Chemie","teacher":"NaWi-Lehrer-1","room":null}},"Di":{"1":null,"2":null,"3":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"4":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"5":{"subject":"Biologie","teacher":"NaWi-Lehrer-2","room":null},"6":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"7":null,"8":null},"Mi":{"1":null,"2":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"3":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"4":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"5":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"6":{"subject":"Gemeinschaftskunde","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"7":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"8":{"subject":"Religion","teacher":"Religionslehrer-1","room":null}},"Do":{"1":null,"2":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"3":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"4":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"5":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"6":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"7":null,"8":null},"Fr":{"1":null,"2":{"subject":"Biologie","teacher":"NaWi-Lehrer-2","room":null},"3":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"4":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"5":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"6":{"subject":"Gemeinschaftskunde","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"7":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"8":null}},"9b":{"Mo":{"1":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"2":{"subject":"Sport","teacher":"Sportlehrer-2","room":null},"3":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"4":{"subject":"Gemeinschaftskunde","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"5":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"6":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"7":null,"8":null},"Di":{"1":null,"2":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"3":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"4":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"5":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"6":{"subject":"Sport","teacher":"Sportlehrer-2","room":null},"7":null,"8":null},"Mi":{"1":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"2":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"3":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"4":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"5":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"6":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"7":null,"8":null},"Do":{"1":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"2":{"subject":"Gemeinschaftskunde","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"3":{"subject":"Chemie","teacher":"NaWi-Lehrer-2","room":null},"4":{"subject":"Chemie","teacher":"NaWi-Lehrer-2","room":null},"5":{"subject":"Biologie","teacher":"NaWi-Lehrer-2","room":null},"6":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"7":null,"8":null},"Fr":{"1":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"2":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-1","room":null},"3":{"subject":"Sport","teacher":"Sportlehrer-2","room":null},"4":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"5":{"subject":"Biologie","teacher":"NaWi-Lehrer-2","room":null},"6":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"7":null,"8":null}},"10a":{"Mo":{"1":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"2":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"3":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"4":{"subject":"Sport","teacher":"Sportlehrer-2","room":null},"5":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"6":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"7":null,"8":null},"Di":{"1":null,"2":null,"3":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"4":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"5":{"subject":"Gemeinschaftskunde","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"6":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"7":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"8":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null}},"Mi":{"1":{"subject":"Gemeinschaftskunde","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"2":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"3":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"4":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"5":{"subject":"Sport","teacher":"Sportlehrer-2","room":null},"6":null,"7":null,"8":null},"Do":{"1":null,"2":{"subject":"Biologie","teacher":"NaWi-Lehrer-2","room":null},"3":{"subject":"Sport","teacher":"Sportlehrer-2","room":null},"4":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"5":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"6":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"7":null,"8":null},"Fr":{"1":null,"2":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"3":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-1","room":null},"4":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"5":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"6":{"subject":"Chemie","teacher":"NaWi-Lehrer-2","room":null},"7":{"subject":"Chemie","teacher":"NaWi-Lehrer-2","room":null},"8":{"subject":"Biologie","teacher":"NaWi-Lehrer-2","room":null}}},"10b":{"Mo":{"1":null,"2":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"3":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"4":{"subject":"Biologie","teacher":"NaWi-Lehrer-1","room":null},"5":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"6":{"subject":"Gemeinschaftskunde","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"7":null,"8":null},"Di":{"1":null,"2":{"subject":"Biologie","teacher":"NaWi-Lehrer-1","room":null},"3":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"4":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"5":{"subject":"Chemie","teacher":"NaWi-Lehrer-1","room":null},"6":{"subject":"Chemie","teacher":"NaWi-Lehrer-1","room":null},"7":null,"8":null},"Mi":{"1":{"subject":"Erdkunde","teacher":"Englisch-Erdkunde-Lehrer-2","room":null},"2":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"3":{"subject":"Geschichte","teacher":"Deutsch-Geschichte-Lehrer-2","room":null},"4":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"5":{"subject":"Gemeinschaftskunde","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"6":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"7":null,"8":null},"Do":{"1":null,"2":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"3":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"4":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"5":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"6":{"subject":"Religion","teacher":"Religionslehrer-1","room":null},"7":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"8":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null}},"Fr":{"1":{"subject":"Deutsch","teacher":"Deutsch-Geschichte-Lehrer-3","room":null},"2":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"3":{"subject":"Physik","teacher":"Mathematik-Physik-Lehrer-2","room":null},"4":{"subject":"Englisch","teacher":"Englisch-Erdkunde-Lehrer-3","room":null},"5":{"subject":"Sport","teacher":"Sportlehrer-1","room":null},"6":{"subject":"Mathematik","teacher":"Mathematik-Physik-Lehrer-1","room":null},"7":null,"8":null}}}}]}</script>
+  <script>
+    (function () {
+      var raw = document.getElementById('stundentafel-data').textContent;
+      var data = JSON.parse(raw);
+
+      document.getElementById('schul-name').textContent = 'Stundentafel: ' + data.schul_name;
+      document.getElementById('meta').textContent =
+        data.tage.join(', ') + ' | ' + data.periods_per_day + ' Stunden/Tag | Stop-Grund: ' + data.stop_reason;
+
+      var select = document.getElementById('solution-select');
+      data.solutions.forEach(function (sol, i) {
+        var opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = 'Loesung ' + (i + 1) + ': ' + sol.status +
+          ', ' + sol.kann_violation_count + ' Kann-Verstoesse, Quality ' + sol.quality_total.toFixed(1);
+        select.appendChild(opt);
+      });
+      select.addEventListener('change', function () {
+        render(parseInt(select.value, 10));
+      });
+
+      function cellContentHtml(klasse, sol, day, period) {
+        if (klasse === null) {
+          return '';
+        }
+        var badge = '<span class="klasse-badge">' + klasse + '</span>';
+        var perClass = sol.classes[klasse];
+        var cell = perClass && perClass[day] ? perClass[day][String(period)] : null;
+        if (!cell) {
+          return badge + '<span class="frei">-</span>';
+        }
+        var teacher = cell.teacher ? '<div class="teacher">' + cell.teacher + '</div>' : '';
+        var title = cell.room ? ' title="Raum: ' + cell.room + '"' : '';
+        return '<span' + title + '>' + badge + '<div class="subject">' + cell.subject + '</div>' + teacher + '</span>';
+      }
+
+      function render(solIndex) {
+        var sol = data.solutions[solIndex];
+        document.getElementById('solution-summary').textContent =
+          'Muss-Verstoesse: ' + sol.muss_violation_count + ' | Kann-Verstoesse: ' + sol.kann_violation_count +
+          ' | Quality (Total): ' + sol.quality_total.toFixed(1);
+
+        var table = document.createElement('table');
+        var thead = document.createElement('thead');
+
+        var headRow1 = document.createElement('tr');
+        var stdTh = document.createElement('th');
+        stdTh.textContent = 'Std.';
+        stdTh.rowSpan = 2;
+        headRow1.appendChild(stdTh);
+        data.tage.forEach(function (tag) {
+          var th = document.createElement('th');
+          th.textContent = tag;
+          th.colSpan = data.klassenstufen.length;
+          headRow1.appendChild(th);
+        });
+        thead.appendChild(headRow1);
+
+        var headRow2 = document.createElement('tr');
+        data.tage.forEach(function () {
+          data.klassenstufen.forEach(function (ks) {
+            var th = document.createElement('th');
+            th.textContent = ks.bezeichnung;
+            headRow2.appendChild(th);
+          });
+        });
+        thead.appendChild(headRow2);
+        table.appendChild(thead);
+
+        var tbody = document.createElement('tbody');
+        for (var period = 1; period <= data.periods_per_day; period++) {
+          for (var rowIndex = 0; rowIndex < data.max_parallel_klassen; rowIndex++) {
+            var tr = document.createElement('tr');
+            if (rowIndex === 0) {
+              var periodTh = document.createElement('th');
+              periodTh.textContent = period;
+              periodTh.rowSpan = data.max_parallel_klassen;
+              tr.appendChild(periodTh);
+            }
+            data.tage.forEach(function (tag) {
+              data.klassenstufen.forEach(function (ks, ksIndex) {
+                var klasse = ks.klassen[rowIndex];
+                var td = document.createElement('td');
+                if (klasse === null) {
+                  td.className = 'leer';
+                } else if (ksIndex % 2 === 1) {
+                  td.className = 'klassenstufe-odd';
+                }
+                td.innerHTML = cellContentHtml(klasse, sol, tag, period);
+                tr.appendChild(td);
+              });
+            });
+            tbody.appendChild(tr);
+          }
+        }
+        table.appendChild(tbody);
+
+        var container = document.getElementById('table-container');
+        container.innerHTML = '';
+        container.appendChild(table);
+      }
+
+      if (data.solutions.length > 0) {
+        select.value = 0;
+        render(0);
+      } else {
+        document.getElementById('table-container').textContent = 'Keine Loesungen vorhanden.';
+      }
+    })();
+  </script>
+</body>
+</html>

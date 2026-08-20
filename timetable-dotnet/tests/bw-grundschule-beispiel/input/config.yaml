@@ -5,3 +5,11 @@
 # FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
 # "CP-SAT-Status"-Feld in output/stundenplan.md.
 solve_time_limit_s: 120.0
+
+# Phase 2.21: wie viele vergleichbare Loesungs-Alternativen sollen in
+# output/stundenplan.json + output/stundentafel.html exportiert werden?
+# Das Gesamt-Zeitbudget bleibt unabhaengig davon durch solve_time_limit_s
+# gedeckelt (Solver.SolveTop prueft das verbleibende Budget vor jeder
+# weiteren Iteration) - ein hoeherer Wert verlangsamt den Lauf also nicht
+# ueber das obige Zeitbudget hinaus.
+max_solutions: 5

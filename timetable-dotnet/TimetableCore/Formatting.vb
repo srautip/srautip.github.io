@@ -81,6 +81,30 @@ Public Module Formatting
         Return grids
     End Function
 
+    ''' <summary>Turns one entity's {day: {period: GridCell | Nothing}} grid
+    ''' into a JSON-ready object (period keys converted to string since JSON
+    ''' object keys must be strings) - shared by ToJsonPerClass and Phase
+    ''' 2.21's ToStundentafelJson so the cell-serialization format has a
+    ''' single source of truth.</summary>
+    Private Function GridToJsonObject(grid As Dictionary(Of String, Dictionary(Of Integer, GridCell))) As JsonObject
+        Dim byDayObj As New JsonObject()
+        For Each dayEntry In grid
+            Dim byPeriodObj As New JsonObject()
+            For Each periodEntry In dayEntry.Value
+                Dim cell = periodEntry.Value
+                If cell Is Nothing Then
+                    byPeriodObj(periodEntry.Key.ToString()) = Nothing
+                Else
+                    byPeriodObj(periodEntry.Key.ToString()) = New JsonObject From {
+                        {"subject", cell.Subject}, {"teacher", cell.Teacher}, {"room", cell.Room}
+                    }
+                End If
+            Next
+            byDayObj(dayEntry.Key) = byPeriodObj
+        Next
+        Return byDayObj
+    End Function
+
     ''' <summary>Same content as ToClassGrids, ready for JSON export
     ''' (period keys converted to string since JSON object keys must be
     ''' strings).</summary>
@@ -88,24 +112,100 @@ Public Module Formatting
         Dim grids = ToClassGrids(data, schedule)
         Dim result As New JsonObject()
         For Each clsEntry In grids
-            Dim byDayObj As New JsonObject()
-            For Each dayEntry In clsEntry.Value
-                Dim byPeriodObj As New JsonObject()
-                For Each periodEntry In dayEntry.Value
-                    Dim cell = periodEntry.Value
-                    If cell Is Nothing Then
-                        byPeriodObj(periodEntry.Key.ToString()) = Nothing
-                    Else
-                        byPeriodObj(periodEntry.Key.ToString()) = New JsonObject From {
-                            {"subject", cell.Subject}, {"teacher", cell.Teacher}, {"room", cell.Room}
-                        }
-                    End If
-                Next
-                byDayObj(dayEntry.Key) = byPeriodObj
-            Next
-            result(clsEntry.Key) = byDayObj
+            result(clsEntry.Key) = GridToJsonObject(clsEntry.Value)
         Next
         Return result
+    End Function
+
+    ''' <summary>Phase 2.21: parses the "parallel letter" suffix out of a
+    ''' Klasse.Name (the sole naming convention in this codebase is
+    ''' "&lt;Klassenstufe.Nummer&gt;&lt;single lowercase letter&gt;", e.g.
+    ''' "1a"/"1b"/"2a" - see Scaffold.vb - there is no dedicated model
+    ''' field). Returns the 0-based letter index ('a'=0,'b'=1,...) for a
+    ''' conforming name; for anything that doesn't match (defensive
+    ''' fallback, not expected in practice), returns the class's
+    ''' alphabetical position among its Klassenstufe-siblings instead of
+    ''' throwing - deterministic and stable, just not necessarily aligned
+    ''' with any other Klassenstufe's lettering.</summary>
+    Private Function ParallelIndexOf(klasse As Klasse, geschwister As List(Of Klasse)) As Integer
+        Dim praefix = klasse.Klassenstufe.ToString()
+        If klasse.Name IsNot Nothing AndAlso klasse.Name.StartsWith(praefix) Then
+            Dim rest = klasse.Name.Substring(praefix.Length)
+            If rest.Length = 1 AndAlso rest(0) >= "a"c AndAlso rest(0) <= "z"c Then
+                Return Asc(rest(0)) - Asc("a"c)
+            End If
+        End If
+        Return geschwister.OrderBy(Function(k) k.Name).ToList().IndexOf(klasse)
+    End Function
+
+    ''' <summary>Phase 2.21: builds the full "Stundentafel"-visualization
+    ''' JSON for the SchoolTestRunner - a school-wide, multi-solution
+    ''' export (not just the single best schedule): weekdays x
+    ''' Klassenstufen as the (nested) columns, Schulstunden x
+    ''' Parallelklassen as the (nested) rows, one full grid per candidate
+    ''' solution from Solver.SolveTop. Field names are snake_case/lowercase
+    ''' throughout, matching the only JSON-naming convention already
+    ''' established in this codebase (Stammdaten.vb's SnakeCaseLower,
+    ''' ToJsonPerClass's hand-built lowercase keys).</summary>
+    Public Function ToStundentafelJson(bestand As Stammdatenbestand, data As JsonObject, multiResult As MultiSolveResult) As JsonObject
+        Dim klassenstufenSorted = bestand.Klassenstufen.OrderBy(Function(ks) ks.Nummer).ToList()
+        Dim klassenByKlassenstufe = bestand.Klassen.GroupBy(Function(k) k.Klassenstufe).
+            ToDictionary(Function(g) g.Key, Function(g) g.ToList())
+
+        Dim maxParallelKlassen = 0
+        For Each ks In klassenstufenSorted
+            Dim anzahl = If(klassenByKlassenstufe.ContainsKey(ks.Nummer), klassenByKlassenstufe(ks.Nummer).Count, 0)
+            maxParallelKlassen = Math.Max(maxParallelKlassen, anzahl)
+        Next
+
+        Dim klassenstufenJson As New JsonArray()
+        Dim alleKlassenNamen As New List(Of String)
+        For Each ks In klassenstufenSorted
+            Dim geschwister = If(klassenByKlassenstufe.ContainsKey(ks.Nummer), klassenByKlassenstufe(ks.Nummer), New List(Of Klasse))
+            Dim reihe(maxParallelKlassen - 1) As String
+            For Each klasse In geschwister
+                Dim idx = ParallelIndexOf(klasse, geschwister)
+                If idx >= 0 AndAlso idx < maxParallelKlassen Then
+                    reihe(idx) = klasse.Name
+                    alleKlassenNamen.Add(klasse.Name)
+                End If
+            Next
+            klassenstufenJson.Add(New JsonObject From {
+                {"nummer", ks.Nummer},
+                {"bezeichnung", ks.Bezeichnung},
+                {"klassen", New JsonArray(reihe.Select(Function(n) CType(n, JsonNode)).ToArray())}
+            })
+        Next
+
+        Dim solutionsJson As New JsonArray()
+        For i = 0 To multiResult.Solutions.Count - 1
+            Dim sol = multiResult.Solutions(i)
+            Dim grids = ToClassGrids(data, sol.Schedule)
+            Dim classesJson As New JsonObject()
+            For Each name In alleKlassenNamen
+                If grids.ContainsKey(name) Then
+                    classesJson(name) = GridToJsonObject(grids(name))
+                End If
+            Next
+            solutionsJson.Add(New JsonObject From {
+                {"index", i},
+                {"status", sol.Status.ToString()},
+                {"kann_violation_count", sol.Quality.KannViolationCount},
+                {"muss_violation_count", Verifier.VerifySchedule(data, sol.Schedule).Count},
+                {"quality_total", sol.Quality.Total},
+                {"classes", classesJson}
+            })
+        Next
+
+        Return New JsonObject From {
+            {"schul_name", bestand.SchulName},
+            {"tage", New JsonArray(bestand.Tage.Select(Function(t) CType(t, JsonNode)).ToArray())},
+            {"periods_per_day", bestand.PeriodsPerDay},
+            {"max_parallel_klassen", maxParallelKlassen},
+            {"klassenstufen", klassenstufenJson},
+            {"stop_reason", multiResult.StopReason.ToString()},
+            {"solutions", solutionsJson}
+        }
     End Function
 
     ''' <summary>Phase 2.11: {wahlprofil_id: {day: {period: GridCell |

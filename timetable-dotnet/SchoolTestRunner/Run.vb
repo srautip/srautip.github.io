@@ -8,6 +8,7 @@
 ' Stufe loescht nicht die vorherigen Ergebnisse.
 Imports TimetableCore
 Imports Google.OrTools.Sat
+Imports System.Text.Json
 Imports System.Text.Json.Nodes
 Imports YamlDotNet.Serialization
 Imports YamlDotNet.Serialization.NamingConventions
@@ -21,6 +22,15 @@ Public NotInheritable Class RunConfig
     ''' Betriebssystem/anderen Prozessen einen Kern frei, statt die Maschine
     ''' beim CP-SAT-Portfolio-Search komplett auszulasten.</summary>
     Public Property NumWorkers As Integer = Math.Max(1, Environment.ProcessorCount - 1)
+    ''' <summary>Phase 2.21: Default UNVERAENDERT bei 1 - bestehende Schulen
+    ''' ohne explizites `max_solutions` in ihrer config.yaml berechnen
+    ''' weiterhin genau eine Loesung, keine Laufzeit-/Output-Diff-
+    ''' Regression. Ein hoeherer Wert exportiert zusaetzliche, vergleichbare
+    ''' Alternativen in output/stundenplan.json + output/stundentafel.html -
+    ''' das Gesamt-Zeitbudget bleibt dabei unveraendert durch
+    ''' solve_time_limit_s gedeckelt (Solver.SolveTop prueft das
+    ''' verbleibende Budget vor jeder weiteren Iteration).</summary>
+    Public Property MaxSolutions As Integer = 1
 End Class
 
 Public Module Run
@@ -134,10 +144,12 @@ Public Module Run
         ' zum Sortieren einer Kann-only-Loesung benutzt zu werden - der Solver
         ' sucht dadurch von vornherein nach einem bzgl. dieser Kriterien
         ' moeglichst guten statt nur irgendeinem zulaessigen Plan.
-        ' maxSolutions:=1, da hier ein einzelner finaler Plan pro Schule
-        ' geschrieben wird (kein Alternativen-Vergleich noetig) - die
-        ' Zielfunktion selbst steuert bereits die Guete dieser einen Loesung.
-        Dim topResult = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=cfg.SolveTimeLimitS,
+        ' maxSolutions:=cfg.MaxSolutions (Phase 2.21, Default weiterhin 1):
+        ' der beste Kandidat (Solutions(0)) bleibt fuer lehrerzuteilung.md/
+        ' stundenplan.md massgeblich, ALLE gefundenen Kandidaten werden
+        ' zusaetzlich in output/stundenplan.json + output/stundentafel.html
+        ' als vergleichbare Alternativen exportiert (siehe unten).
+        Dim topResult = Solver.SolveTop(data, maxSolutions:=cfg.MaxSolutions, totalTimeLimitS:=cfg.SolveTimeLimitS,
             perSolveTimeLimitS:=cfg.SolveTimeLimitS, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers)
         Dim solveOk = topResult.Solutions.Count > 0
         If Not solveOk Then
@@ -187,6 +199,18 @@ Public Module Run
         Next
 
         IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.md"), String.Join(vbLf, stundenplanLines))
+
+        ' Phase 2.21: "Stundentafel"-Visualisierung - eine JSON-Datei mit
+        ' ALLEN von SolveTop gefundenen Loesungen (nicht nur der besten,
+        ' siehe Zeile 150 oben) plus eine dazugehoerige, generische
+        ' JS-Viewer-HTML, die dieselben Daten inline eingebettet enthaelt
+        ' (kein fetch() noetig, funktioniert daher auch bei direktem
+        ' Doeffnen per Doppelklick ohne lokalen Webserver).
+        Dim stundentafelJson = Formatting.ToStundentafelJson(bestand, data, topResult)
+        Dim stundentafelJsonText = stundentafelJson.ToJsonString(New JsonSerializerOptions With {.WriteIndented = True})
+        IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.json"), stundentafelJsonText)
+        IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundentafel.html"),
+            StundentafelHtml.BuildStundentafelHtml(stundentafelJson.ToJsonString()))
 
         Console.WriteLine($"[{schule}] {If(erfolg, "PASS", "FAIL")} - Lehrereinsatzplanung={lehrereinsatz.Status} (Objective={lehrereinsatz.Solver.ObjectiveValue}), Solver.SolveTop={topResult.StopReason}, CP-SAT-Status={best.Status} (Kann-Verstoesse={best.Quality.KannViolationCount}, Quality.Total={best.Quality.Total:F1}), Verstoesse={scheduleViolations.Count}")
         Return erfolg
