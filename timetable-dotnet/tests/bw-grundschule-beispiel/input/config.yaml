@@ -4,7 +4,7 @@
 # mehr Zeit, den gefundenen Plan als OPTIMAL zu beweisen statt nur
 # FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
 # "CP-SAT-Status"-Feld in output/stundenplan.md.
-solve_time_limit_s: 600.0
+solve_time_limit_s: 1800.0
 
 # Anzahl paralleler CP-SAT-Suchpfade (Portfolio-Threading). Hoeher kann
 # helfen, ueberhaupt schneller eine erste Loesung zu finden, geht aber zu
@@ -12,10 +12,12 @@ solve_time_limit_s: 600.0
 num_workers: 4
 
 # Begrenzt (getrennt von solve_time_limit_s) jede EINZELNE Solve-
-# Iteration in Solver.SolveTop, sodass innerhalb des 10-Min-Gesamtbudgets
-# Raum fuer mehrere Versuche bleibt statt dass der erste Versuch allein
-# das ganze Budget aufbraucht.
-per_solve_time_limit_s: 300.0
+# Iteration in Solver.SolveTop. Hier bewusst gleich dem Gesamtbudget
+# gesetzt: die erste (und einzige) Iteration bekommt das volle
+# 30-Min-Fenster, um moeglichst nah an Optimal zu kommen bzw. per
+# gap_percent/convergence in output/stundenplan.json abzuschaetzen, wie
+# lange eine vollstaendige Optimalitaetssuche noch braeuchte.
+per_solve_time_limit_s: 1800.0
 
 # Phase 2.21: wie viele vergleichbare Loesungs-Alternativen sollen in
 # output/stundenplan.json + output/stundentafel.html exportiert werden?
