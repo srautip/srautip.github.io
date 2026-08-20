@@ -509,6 +509,52 @@ sein.
 Details, Nutzerentscheidungen und Live-Verifikationsergebnisse siehe
 `docs/phase2-21-stundentafel-visualisierung.md`.
 
+## Veröffentlichung als GitHub Page (`main`-Branch)
+
+Da `stundentafel.html` (siehe oben) komplett eigenständig ist (JSON-Daten
+inline eingebettet, kein `fetch()`, kein Build-Schritt), lässt sie sich
+1:1 als statische GitHub-Pages-Seite veröffentlichen. Dieses Repository
+ist ein `<benutzer>.github.io`-Repo - **alles im `main`-Branch wird direkt
+unter `https://srautip.github.io/` ausgeliefert**, unabhängig vom
+Feature-Branch, auf dem dieses `timetable-dotnet/`-Verzeichnis entwickelt
+wird.
+
+Beide Referenzbeispiele sind auf diese Weise veröffentlicht, im
+`stundentafel/`-Ordner an der Wurzel von `main` (NICHT unter
+`timetable-dotnet/` - GitHub Pages braucht die Datei am erwarteten
+öffentlichen Pfad, unabhängig von der internen Repo-Struktur):
+
+- **Übersichtsseite:** <https://srautip.github.io/stundentafel/> (`stundentafel/index.html`)
+- **BW-Grundschule:** <https://srautip.github.io/stundentafel/bw-grundschule-beispiel.html>
+- **BW-Gemeinschaftsschule:** <https://srautip.github.io/stundentafel/bw-gms-beispiel.html>
+
+**Wichtig - keine automatische Synchronisation:** ein `run`-Lauf hier im
+Feature-Branch aktualisiert NUR die lokale
+`tests/<schule>/output/stundentafel.html`. Die veröffentlichte Kopie auf
+`main` muss nach jeder gewünschten Aktualisierung manuell nachgezogen
+werden (ein Redeploy pro geändertem Beispiel, kein automatischer
+Workflow) - über einen isolierten `git worktree` für `main`, damit der
+aktuelle Feature-Branch-Arbeitsstand unangetastet bleibt:
+
+```bash
+git worktree add /tmp/main-worktree main
+cp timetable-dotnet/tests/<schule>/output/stundentafel.html \
+   /tmp/main-worktree/stundentafel/<schule>.html
+cd /tmp/main-worktree
+git add stundentafel/<schule>.html
+git commit -m "Update <schule> Stundentafel"
+git push origin main
+cd -
+git worktree remove /tmp/main-worktree
+```
+
+Nur die eine generierte `stundentafel.html`-Datei wird kopiert - kein
+anderer Site-Content wird dabei angefasst. Da GitHub Pages nur eine
+statische Momentaufnahme zeigt, kann die veröffentlichte Version
+zwischenzeitlich hinter dem aktuellen `output/`-Stand im Feature-Branch
+zurückliegen (z.B. nach einer neuen `config.yaml`-Kalibrierung wie in
+den Kurzaufträgen zu Phase 2.22/2.25) - bei Bedarf erneut nachziehen.
+
 ## Referenzbeispiele
 
 Zwei tatsächlich per CLI erzeugte UND ausgeführte Testfälle als
