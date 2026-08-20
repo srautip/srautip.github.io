@@ -218,6 +218,21 @@ Public Module Verifier
                         End If
                     Next
 
+                Case "required_slot"
+                    ' Phase 2.23: unabhaengig re-derivierte Gegenpruefung
+                    ' zum Solver.vb-Case "required_slot" - teilt keinen Code
+                    ' mit dessen Pre-Pass, nutzt nur den bereits bestehenden
+                    ' Find-Helper (gleiches Prinzip wie ueberall sonst in
+                    ' diesem Modul).
+                    Dim requiredClassName = JsonHelpers.GetString(c, "class")
+                    Dim requiredSubject = JsonHelpers.GetString(c, "subject")
+                    Dim requiredDay = JsonHelpers.GetString(c, "day")
+                    Dim requiredPeriod = JsonHelpers.GetInt(c, "period").Value
+                    If Not Find(schedule, cls:=requiredClassName, subject:=requiredSubject, day:=requiredDay, period:=requiredPeriod).Any() Then
+                        violations.Add((i, t, WithReason(
+                            $"{requiredClassName}/{requiredSubject} findet nicht im geforderten Slot {requiredDay}/{requiredPeriod} statt", c)))
+                    End If
+
                 Case "consecutive_required"
                     Dim className = JsonHelpers.GetString(c, "class")
                     Dim subject = JsonHelpers.GetString(c, "subject")

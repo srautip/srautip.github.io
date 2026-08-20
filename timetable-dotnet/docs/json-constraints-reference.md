@@ -73,12 +73,13 @@ Optionales Feld `"priority"` auf einem Constraint-Objekt:
 | `"must"` (Default, auch wenn das Feld ganz fehlt) | Hart - darf im Ergebnis nie verletzt sein; eine unerfüllbare Kombination aus Muss-Constraints macht das gesamte Szenario `Infeasible`. |
 | `"should"` | Weich ("Kann") - der Solver versucht, die Regel einzuhalten, darf sie aber verletzen, um überhaupt einen Plan zu finden. Die Anzahl verletzter `should`-Constraints wird minimiert (jede verletzte Regel zählt gleich 1, unabhängig davon, wie viele Slots sie betrifft). |
 
-**Nur diese fünf Typen dürfen `"should"` sein:**
-`teacher_availability`, `forbidden_slot`, `room_requirement`,
-`consecutive_required`, sowie **nur der `max_per_day`-Teil** von
-`weekly_hours` (die `hours_per_week`-Exaktzahl bleibt immer hart - ein
-Fach mit z.B. `"should"` aber ohne gesetztes `max_per_day` ist ein
-Validierungsfehler, da es dann nichts gäbe, das gelockert werden könnte).
+**Nur diese sechs Typen dürfen `"should"` sein:**
+`teacher_availability`, `forbidden_slot`, `required_slot` (Phase 2.23),
+`room_requirement`, `consecutive_required`, sowie **nur der
+`max_per_day`-Teil** von `weekly_hours` (die `hours_per_week`-Exaktzahl
+bleibt immer hart - ein Fach mit z.B. `"should"` aber ohne gesetztes
+`max_per_day` ist ein Validierungsfehler, da es dann nichts gäbe, das
+gelockert werden könnte).
 
 **Immer hart, `"priority"` dort unzulässig:** `no_overlap`,
 `shared_resource_conflict`, `teacher_subject_assignment`, `parallel_group`
@@ -316,6 +317,37 @@ Lehrkraft oder einen Raum.
 
 Gilt eine Sperrzeit schulweit für alle Klassen, wird üblicherweise **ein
 Objekt pro Klasse** erzeugt (kein Wildcard-Mechanismus).
+
+---
+
+### `required_slot` (Phase 2.23)
+
+Das positive Gegenstück zu `forbidden_slot` - erzwingt (statt verbietet)
+eine (Klasse,Fach)-Session auf einem exakten Tag+Periode-Slot. Typischer
+Anwendungsfall: eine schulweite Gesamtveranstaltung (z.B. eine Chorprobe),
+die in mehreren Klassen gleichzeitig stattfinden soll - kombiniert mit
+`parallel_group` reicht dafür EIN `required_slot`-Objekt auf einem
+repräsentativen Mitglied der Parallelgruppe, da alle anderen Mitglieder
+über die gemeinsame Slot-Variable automatisch mitgezogen werden.
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `class` | string | ja |
+| `subject` | string | ja |
+| `day` | string | ja |
+| `period` | int | ja |
+| `priority` | `"must"`\|`"should"` | nein |
+| `reason` | string | nein |
+
+```json
+{ "type": "required_slot", "class": "1a", "subject": "Chor", "day": "Do", "period": 6 }
+```
+
+Anders als `forbidden_slot` (Feldnamen `scope`/`entity`, deckt Klasse/
+Lehrkraft/Raum ab) adressiert `required_slot` ausschließlich eine
+(Klasse,Fach)-Session - Feldnamen `class`/`subject` wie bei den meisten
+übrigen Constraint-Typen, damit die bestehende generische
+Cross-Reference-Validierung automatisch greift.
 
 ---
 

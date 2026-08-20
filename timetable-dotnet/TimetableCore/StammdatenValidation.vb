@@ -178,30 +178,42 @@ Public Module StammdatenValidation
                 errors.Add($"parallelverbund {JsonHelpers.PyRepr(verbund)}: {ohneFach.Count} Gruppe(n) ohne fach_name ({String.Join(",", ohneFach.Select(Function(g) g.Name))})")
             End If
 
-            Dim fachNamenInVerbund = mitglieder.Where(Function(g) g.FachName IsNot Nothing).Select(Function(g) g.FachName).ToList()
-            If fachNamenInVerbund.Distinct().Count() < fachNamenInVerbund.Count Then
-                errors.Add($"parallelverbund {JsonHelpers.PyRepr(verbund)}: mehrere Gruppen beanspruchen dasselbe fach_name - muss innerhalb eines Parallelverbunds eindeutig sein")
+            ' Phase 2.23: Dublettenpruefung auf das Tupel (Klassenstufe,
+            ' FachName) statt nur FachName - deckt weiterhin den
+            ' urspruenglichen Fehlerfall ab ("2 Gruppen derselben
+            ' Klassenstufe beanspruchen dasselbe Fach", z.B. 2x
+            ' Religion-ev in Klassenstufe 1), erlaubt aber jetzt zusaetzlich
+            ' den umgekehrten, klassenstufenuebergreifenden Fall (dasselbe
+            ' Fach ueber mehrere Klassenstufen hinweg synchronisiert, z.B.
+            ' eine schulweite Chor-Gesamtprobe).
+            Dim tupelInVerbund = mitglieder.
+                Where(Function(g) g.FachName IsNot Nothing AndAlso g.Klassenstufe.HasValue).
+                Select(Function(g) (g.Klassenstufe.Value, g.FachName)).ToList()
+            If tupelInVerbund.Distinct().Count() < tupelInVerbund.Count Then
+                errors.Add($"parallelverbund {JsonHelpers.PyRepr(verbund)}: mehrere Gruppen beanspruchen dieselbe Kombination aus klassenstufe und fach_name - muss innerhalb eines Parallelverbunds eindeutig sein")
             End If
 
-            Dim klassenstufenInVerbund = mitglieder.Where(Function(g) g.Klassenstufe.HasValue).Select(Function(g) g.Klassenstufe.Value).Distinct().ToList()
-            If klassenstufenInVerbund.Count > 1 Then
-                errors.Add($"parallelverbund {JsonHelpers.PyRepr(verbund)}: Gruppen haben unterschiedliche klassenstufe ({String.Join(",", klassenstufenInVerbund)}) - muessen fuer eine synchrone Partition identisch sein")
+            ' Phase 2.23: die WochenstundenSoll/BlockLength-Konsistenzpruefung
+            ' gilt jetzt fuer ALLE Mitglieder unabhaengig davon, ob sie
+            ' dieselbe oder unterschiedliche Klassenstufen haben - jedes
+            ' Mitglied schlaegt seinen Wert ueber seine EIGENE Klassenstufe
+            ' nach. Die zugrunde liegende Notwendigkeit bleibt unveraendert:
+            ' Solver.vb erzwingt fuer den ganzen Verbund eine Lesson-
+            ' Gleichheitskette (parallel_group) - unterschiedliche
+            ' Wochenstunden/Blocklaengen waeren dabei strukturell
+            ' unloesbar, egal ob die Mitglieder dieselbe Klassenstufe teilen
+            ' oder nicht.
+            Dim details As New List(Of (Gruppe As String, Stunden As Integer?, Block As Integer?))
+            For Each g In mitglieder.Where(Function(mg) mg.FachName IsNot Nothing AndAlso mg.Klassenstufe.HasValue AndAlso fachByName.ContainsKey(mg.FachName))
+                Dim fach = fachByName(g.FachName)
+                Dim fk = Stammdaten.WochenstundenFuer(fach, g.Klassenstufe.Value)
+                details.Add((g.Name, If(fk IsNot Nothing, CType(fk.WochenstundenSoll, Integer?), Nothing), fach.BlockLength))
+            Next
+            If details.Select(Function(d) d.Stunden).Distinct().Count() > 1 Then
+                errors.Add($"parallelverbund {JsonHelpers.PyRepr(verbund)}: unterschiedliche wochenstunden_soll je Fach/Klassenstufe ({String.Join(", ", details.Select(Function(d) $"{d.Gruppe}={d.Stunden}"))}) - muss fuer eine synchrone Partition identisch sein")
             End If
-
-            If klassenstufenInVerbund.Count = 1 Then
-                Dim klassenstufe = klassenstufenInVerbund(0)
-                Dim details As New List(Of (Gruppe As String, Stunden As Integer?, Block As Integer?))
-                For Each g In mitglieder.Where(Function(mg) mg.FachName IsNot Nothing AndAlso fachByName.ContainsKey(mg.FachName))
-                    Dim fach = fachByName(g.FachName)
-                    Dim fk = Stammdaten.WochenstundenFuer(fach, klassenstufe)
-                    details.Add((g.Name, If(fk IsNot Nothing, CType(fk.WochenstundenSoll, Integer?), Nothing), fach.BlockLength))
-                Next
-                If details.Select(Function(d) d.Stunden).Distinct().Count() > 1 Then
-                    errors.Add($"parallelverbund {JsonHelpers.PyRepr(verbund)}: unterschiedliche wochenstunden_soll je Fach ({String.Join(", ", details.Select(Function(d) $"{d.Gruppe}={d.Stunden}"))}) - muss fuer eine synchrone Partition identisch sein")
-                End If
-                If details.Select(Function(d) d.Block).Distinct().Count() > 1 Then
-                    errors.Add($"parallelverbund {JsonHelpers.PyRepr(verbund)}: unterschiedliche block_length je Fach ({String.Join(", ", details.Select(Function(d) $"{d.Gruppe}={d.Block}"))}) - muss fuer eine synchrone Partition identisch sein")
-                End If
+            If details.Select(Function(d) d.Block).Distinct().Count() > 1 Then
+                errors.Add($"parallelverbund {JsonHelpers.PyRepr(verbund)}: unterschiedliche block_length je Fach/Klassenstufe ({String.Join(", ", details.Select(Function(d) $"{d.Gruppe}={d.Block}"))}) - muss fuer eine synchrone Partition identisch sein")
             End If
 
             ' Ueberschneidende Mitgliedschaft: ein Schueler kann nicht

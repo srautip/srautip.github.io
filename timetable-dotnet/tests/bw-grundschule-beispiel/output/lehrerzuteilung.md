@@ -18,6 +18,7 @@
 | Religionslehrer-kath-1 | 8 | 8 |  | 1a/Religion-kath, 1b/Religion-kath, 2a/Religion-kath, 2b/Religion-kath, 3a/Religion-kath, 3b/Religion-kath, 4a/Religion-kath, 4b/Religion-kath |
 | Ethiklehrer-1 | 8 | 8 |  | 1a/Ethik, 1b/Ethik, 2a/Ethik, 2b/Ethik, 3a/Ethik, 3b/Ethik, 4a/Ethik, 4b/Ethik |
 | Englischlehrer-1 | 8 | 8 |  | 3a/Englisch, 3b/Englisch, 4a/Englisch, 4b/Englisch |
+| Chorleiterin-1 | 4 | 4 |  | 1a/Chor, 1b/Chor, 2a/Chor, 2b/Chor, 3a/Chor, 3b/Chor, 4a/Chor, 4b/Chor |
 
 ## Klassenlehrer je Klasse
 

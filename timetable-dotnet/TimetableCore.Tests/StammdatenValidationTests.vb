@@ -249,16 +249,34 @@ Public Class StammdatenValidationTests
         Dim bestand = BestandMitParallelverbund()
         bestand.Gruppen(1).FachName = "Religion-ev"
         Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
-        Assert.IsTrue(errors.Any(Function(e) e.Contains("'Religion-Kl1'") AndAlso e.Contains("beanspruchen dasselbe fach_name")), String.Join(vbLf, errors))
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'Religion-Kl1'") AndAlso e.Contains("beanspruchen dieselbe Kombination aus klassenstufe und fach_name")), String.Join(vbLf, errors))
     End Sub
 
+    ''' <summary>Phase 2.23: die frueher harte "alle Mitglieder muessen
+    ''' dieselbe Klassenstufe haben"-Pruefung ist einer klassenstufen-
+    ''' uebergreifenden Kombination gewichen (Anwendungsfall: eine
+    ''' schulweite Chor-Gesamtprobe, bei der ein Fach ueber mehrere
+    ''' Klassenstufen hinweg synchron laufen soll) - ein drittes Mitglied
+    ''' mit ABWEICHENDER Klassenstufe UND demselben Fach wie ein
+    ''' bestehendes Mitglied (Religion-ev, bereits in Klassenstufe 1
+    ''' vertreten) validiert jetzt sauber, solange die (Klassenstufe,
+    ''' FachName)-Kombination im Verbund eindeutig bleibt und
+    ''' WochenstundenSoll/BlockLength identisch sind.</summary>
     <TestMethod>
-    Public Sub ParallelverbundWithDifferingKlassenstufeIsRejected()
+    Public Sub ParallelverbundAcrossKlassenstufenIsAllowed()
         Dim bestand = BestandMitParallelverbund()
         bestand.Klassenstufen.Add(New Klassenstufe With {.Nummer = 2, .Bezeichnung = "Klasse 2"})
-        bestand.Gruppen(1).Klassenstufe = 2
+        bestand.Klassen.Add(New Klasse With {.Name = "2a", .Klassenstufe = 2})
+        bestand.Faecher.Single(Function(f) f.Name = "Religion-ev").Klassenstufen.Add(
+            New FachKlassenstufe With {.Klassenstufe = 2, .WochenstundenSoll = 2})
+        bestand.Schueler.Add(New Schueler With {.Id = "S-2a-01", .Klasse = "2a"})
+        bestand.Gruppen.Add(New Gruppe With {
+            .Name = "Religion-ev-Kl2", .Typ = "Fachgruppe", .FachName = "Religion-ev",
+            .Klassenstufe = 2, .Parallelverbund = "Religion-Kl1",
+            .MitgliederSchuelerIds = New List(Of String) From {"S-2a-01"}
+        })
         Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
-        Assert.IsTrue(errors.Any(Function(e) e.Contains("'Religion-Kl1'") AndAlso e.Contains("unterschiedliche klassenstufe")), String.Join(vbLf, errors))
+        Assert.AreEqual(0, errors.Count, String.Join(vbLf, errors))
     End Sub
 
     <TestMethod>

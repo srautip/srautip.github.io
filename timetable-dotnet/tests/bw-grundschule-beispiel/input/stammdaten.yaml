@@ -7,7 +7,7 @@ tage:
 - Mi
 - Do
 - Fr
-periods_per_day: 6
+periods_per_day: 8
 klassenstufen:
 - nummer: 1
   bezeichnung: Klasse 1
@@ -172,6 +172,22 @@ faecher:
   - klassenstufe: 4
     wochenstunden_soll: 2
     max_pro_tag: 1
+- name: Chor
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+  - klassenstufe: 3
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 1
+    max_pro_tag: 1
 klassen:
 - name: 1a
   klassenstufe: 1
@@ -310,11 +326,20 @@ lehrkraefte:
   deputat_sollstunden: 8
   anrechnungsstunden: 0
   springer_reserve_stunden: 0
-  verfuegbare_tage: 
+  verfuegbare_tage:
   bevorzugte_klassenstufen: []
   klassenlehrer_faehig: false
-  max_klassen: 
-  max_faecher: 
+  max_klassen:
+  max_faecher:
+- name: Chorleiterin-1
+  deputat_sollstunden: 4
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage:
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen:
+  max_faecher:
 fach_lehrer_zuordnungen:
 - lehrer_name: Klassenlehrer-1
   fach_name: Deutsch
@@ -471,6 +496,9 @@ fach_lehrer_zuordnungen:
   fachfremd: false
 - lehrer_name: Englischlehrer-1
   fach_name: Englisch
+  fachfremd: false
+- lehrer_name: Chorleiterin-1
+  fach_name: Chor
   fachfremd: false
 schueler:
 - id: S-1a-01
@@ -1074,3 +1102,59 @@ gruppen:
   - S-4b-20
   - S-4b-21
   - S-4b-22
+- name: Chor-Kl1
+  typ: Fachgruppe
+  fach_name: Chor
+  klassenstufe: 1
+  parallelverbund: Chor-Gesamt
+  mitglieder_schueler_ids:
+  - S-1a-01
+  - S-1a-02
+  - S-1a-03
+  - S-1a-04
+  - S-1b-01
+  - S-1b-02
+  - S-1b-03
+  - S-1b-04
+- name: Chor-Kl2
+  typ: Fachgruppe
+  fach_name: Chor
+  klassenstufe: 2
+  parallelverbund: Chor-Gesamt
+  mitglieder_schueler_ids:
+  - S-2a-01
+  - S-2a-02
+  - S-2a-03
+  - S-2a-04
+  - S-2b-01
+  - S-2b-02
+  - S-2b-03
+  - S-2b-04
+- name: Chor-Kl3
+  typ: Fachgruppe
+  fach_name: Chor
+  klassenstufe: 3
+  parallelverbund: Chor-Gesamt
+  mitglieder_schueler_ids:
+  - S-3a-01
+  - S-3a-02
+  - S-3a-03
+  - S-3a-04
+  - S-3b-01
+  - S-3b-02
+  - S-3b-03
+  - S-3b-04
+- name: Chor-Kl4
+  typ: Fachgruppe
+  fach_name: Chor
+  klassenstufe: 4
+  parallelverbund: Chor-Gesamt
+  mitglieder_schueler_ids:
+  - S-4a-01
+  - S-4a-02
+  - S-4a-03
+  - S-4a-04
+  - S-4b-01
+  - S-4b-02
+  - S-4b-03
+  - S-4b-04

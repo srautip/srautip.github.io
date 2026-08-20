@@ -654,6 +654,32 @@ Public Module Solver
                         Next
                     End If
 
+                Case "required_slot"
+                    ' Phase 2.23: positives Gegenstueck zu forbidden_slot -
+                    ' erzwingt (statt verbietet) eine (Klasse,Fach)-Session
+                    ' auf einem exakten (Tag,Periode)-Slot. Kombiniert mit
+                    ' dem bestehenden parallel_group-Pre-Pass reicht es, NUR
+                    ' EIN Mitglied einer synchronisierten Gruppe zu pinnen -
+                    ' die per Gleichheit gekoppelten uebrigen Mitglieder
+                    ' wandern automatisch mit.
+                    Dim reqClassName = JsonHelpers.GetString(c, "class")
+                    Dim reqSubject = JsonHelpers.GetString(c, "subject")
+                    Dim reqDay = JsonHelpers.GetString(c, "day")
+                    Dim reqPeriod = JsonHelpers.GetInt(c, "period").Value
+
+                    Dim rsViolated As BoolVar = Nothing
+                    If priority = JsonHelpers.PriorityShould Then
+                        rsViolated = GetOrCreateKannVar(model, kannVars, ci, constraintType, JsonHelpers.GetReason(c))
+                    End If
+
+                    For Each s In sessionsOfSubjectClass(reqSubject, reqClassName)
+                        Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, reqDay, reqPeriod)
+                        If lesson.ContainsKey(key) Then
+                            Dim con = model.Add(lesson(key) = 1)
+                            If rsViolated IsNot Nothing Then con.OnlyEnforceIf(rsViolated.Not())
+                        End If
+                    Next
+
                 Case "consecutive_required"
                     Dim className = JsonHelpers.GetString(c, "class")
                     Dim subject = JsonHelpers.GetString(c, "subject")

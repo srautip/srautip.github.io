@@ -47,7 +47,8 @@ Public Module Validation
     ' teacher_subject_assignment, and weekly_hours' own hours_per_week) is
     ' physically/structurally necessary and must always stay "must".
     Private ReadOnly KannCapableTypes As New HashSet(Of String) From {
-        "teacher_availability", "forbidden_slot", "room_requirement", "consecutive_required", "weekly_hours"
+        "teacher_availability", "forbidden_slot", "room_requirement", "consecutive_required", "weekly_hours",
+        "required_slot"
     }
 
     ''' <summary>Appends the constraint's "reason" (if any) to an error/

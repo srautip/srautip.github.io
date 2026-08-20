@@ -14,3 +14,653 @@
   teacher: Ethiklehrer-1
   available_days: [Mo, Di, Mi, Do]
   reason: Teilzeit, freitags nicht im Haus
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Mo
+  period: 1
+  priority: must
+  reason: "1. Klasse: kein Unterricht in der 1. Stunde"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Mo
+  period: 6
+  priority: should
+  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Mo
+  period: 7
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Mo
+  period: 8
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Di
+  period: 1
+  priority: must
+  reason: "1. Klasse: kein Unterricht in der 1. Stunde"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Di
+  period: 6
+  priority: should
+  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Di
+  period: 7
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Di
+  period: 8
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Mi
+  period: 1
+  priority: must
+  reason: "1. Klasse: kein Unterricht in der 1. Stunde"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Mi
+  period: 6
+  priority: should
+  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Mi
+  period: 7
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Mi
+  period: 8
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Do
+  period: 1
+  priority: must
+  reason: "1. Klasse: kein Unterricht in der 1. Stunde"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Do
+  period: 6
+  priority: should
+  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Do
+  period: 7
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Do
+  period: 8
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Fr
+  period: 1
+  priority: must
+  reason: "1. Klasse: kein Unterricht in der 1. Stunde"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Fr
+  period: 6
+  priority: should
+  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Fr
+  period: 7
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Fr
+  period: 8
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Mo
+  period: 1
+  priority: must
+  reason: "1. Klasse: kein Unterricht in der 1. Stunde"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Mo
+  period: 6
+  priority: should
+  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Mo
+  period: 7
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Mo
+  period: 8
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Di
+  period: 1
+  priority: must
+  reason: "1. Klasse: kein Unterricht in der 1. Stunde"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Di
+  period: 6
+  priority: should
+  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Di
+  period: 7
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Di
+  period: 8
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Mi
+  period: 1
+  priority: must
+  reason: "1. Klasse: kein Unterricht in der 1. Stunde"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Mi
+  period: 6
+  priority: should
+  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Mi
+  period: 7
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Mi
+  period: 8
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Do
+  period: 1
+  priority: must
+  reason: "1. Klasse: kein Unterricht in der 1. Stunde"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Do
+  period: 6
+  priority: should
+  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Do
+  period: 7
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Do
+  period: 8
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Fr
+  period: 1
+  priority: must
+  reason: "1. Klasse: kein Unterricht in der 1. Stunde"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Fr
+  period: 6
+  priority: should
+  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Fr
+  period: 7
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 1b
+  day: Fr
+  period: 8
+  priority: must
+  reason: "1. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2a
+  day: Mo
+  period: 7
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2a
+  day: Mo
+  period: 8
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2a
+  day: Di
+  period: 7
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2a
+  day: Di
+  period: 8
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2a
+  day: Mi
+  period: 7
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2a
+  day: Mi
+  period: 8
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2a
+  day: Do
+  period: 7
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2a
+  day: Do
+  period: 8
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2a
+  day: Fr
+  period: 7
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2a
+  day: Fr
+  period: 8
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2b
+  day: Mo
+  period: 7
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2b
+  day: Mo
+  period: 8
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2b
+  day: Di
+  period: 7
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2b
+  day: Di
+  period: 8
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2b
+  day: Mi
+  period: 7
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2b
+  day: Mi
+  period: 8
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2b
+  day: Do
+  period: 7
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2b
+  day: Do
+  period: 8
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2b
+  day: Fr
+  period: 7
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 2b
+  day: Fr
+  period: 8
+  priority: must
+  reason: "2. Klasse: nur Vormittagsunterricht"
+- type: forbidden_slot
+  scope: class
+  entity: 3a
+  day: Mo
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3a
+  day: Mo
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3a
+  day: Mi
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3a
+  day: Mi
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3a
+  day: Do
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3a
+  day: Do
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3a
+  day: Fr
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3a
+  day: Fr
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3b
+  day: Mo
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3b
+  day: Mo
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3b
+  day: Mi
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3b
+  day: Mi
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3b
+  day: Do
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3b
+  day: Do
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3b
+  day: Fr
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 3b
+  day: Fr
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4a
+  day: Mo
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4a
+  day: Mo
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4a
+  day: Mi
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4a
+  day: Mi
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4a
+  day: Do
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4a
+  day: Do
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4a
+  day: Fr
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4a
+  day: Fr
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4b
+  day: Mo
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4b
+  day: Mo
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4b
+  day: Mi
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4b
+  day: Mi
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4b
+  day: Do
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4b
+  day: Do
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4b
+  day: Fr
+  period: 7
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: forbidden_slot
+  scope: class
+  entity: 4b
+  day: Fr
+  period: 8
+  priority: must
+  reason: "3./4. Klasse: Nachmittagsunterricht nur dienstags erlaubt"
+- type: required_slot
+  class: 1a
+  subject: Chor
+  day: Do
+  period: 6
+  reason: Chor-Gesamtprobe donnerstags 6. Stunde fuer alle Klassenstufen (ueber parallel_group synchronisiert)
