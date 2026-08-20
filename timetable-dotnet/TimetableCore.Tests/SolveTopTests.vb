@@ -478,6 +478,108 @@ Public Class SolveTopTests
         Assert.AreEqual(0, Verifier.VerifySchedule(data, withoutTeacherGaps.Solutions(0).Schedule).Count)
     End Sub
 
+    ''' <summary>Proves `QualityWeights.IncludeClassLoadVariance` genuinely
+    ''' steers the SOLVER (not just a display difference) - same "opposite
+    ''' pull" pattern as IncludeTeacherGapsControlsWhetherSolverSteersAroundTeacherGaps
+    ''' above, this time between ClassLoadVariance and EdgePeriod.
+    '''
+    ''' 1 class "5a", 1 teacher "T1" teaching both Deutsch and Mathe (1h
+    ''' each - 2 total lessons), 2 days x 4 periods; forbidden_slot narrows
+    ''' class "5a" to exactly 3 open (day,period) slots: Mo/2, Mo/3, Di/1 -
+    ''' leaving exactly 3 ways to place the 2 lessons (no_overlap forbids
+    ''' two lessons in the same slot; WHICH subject lands where is
+    ''' irrelevant to either criterion below, only the resulting OCCUPIED
+    ''' set matters):
+    ''' - {Mo/2,Di/1} or {Mo/3,Di/1}: Monday=1, Tuesday=1 -&gt; balanced
+    '''   (ClassLoadVariance=0.0), but Di/period1 is an edge period -&gt;
+    '''   EdgePeriod cost = 1 occurrence (5.0). TOTAL = 5.0.
+    ''' - {Mo/2,Mo/3}: Monday=2, Tuesday=0 -&gt; imbalanced (real population
+    '''   variance = ((2-1)^2+(0-1)^2)/2 = 1.0, cost 3.0), but NEITHER
+    '''   period is an edge -&gt; EdgePeriod cost = 0. TOTAL = 3.0.
+    ''' With IncludeClassLoadVariance:=True (default): 5.0 &lt; 6.0 (the
+    ''' {Mo2,Mo3} set's cost WITH ClassLoadVariance counted, i.e. 0+3.0*2=6.0
+    ''' using the in-model RANGE approximation, not the 3.0 real-variance
+    ''' figure above - SolveTopObjective's search uses range, ScheduleQuality.
+    ''' Score's post-hoc display uses population variance, see both
+    ''' modules' doc comments) -&gt; solver picks a Di/1-containing set
+    ''' (Tuesday count = 1). With IncludeClassLoadVariance:=False: 0(edge
+    ''' excluded)+0(loadvar excluded)=0 for {Mo2,Mo3} beats 5(edge, still
+    ''' counted)+0(loadvar excluded) for the Di/1 sets -&gt; solver switches
+    ''' to {Mo/2,Mo/3} (Tuesday count = 0), even though that's worse on the
+    ''' still-displayed Quality.ClassLoadVariance (1.0 vs 0.0).
+    ''' IncludeTeacherLoadVariance is disabled in BOTH configs here purely
+    ''' to isolate the test to ClassLoadVariance alone - it turns out NOT
+    ''' to matter numerically either way: T1 teaches only this one class,
+    ''' but ScheduleQuality.LoadVarianceOverWorkingDaysOnly (the real,
+    ''' always-computed teacher-side metric) counts variance only across a
+    ''' teacher's OWN busy days, and in every candidate set here T1 is busy
+    ''' on either 1 day (trivially 0 variance - a single data point has no
+    ''' spread) or 2 EQUAL-count days (also 0) - unlike the class-side
+    ''' LoadVarianceOverAllDays, which always spans every declared day
+    ''' (including an empty one), so 5a's own imbalance IS visible while
+    ''' T1's mirrored schedule never trips this particular metric.</summary>
+    <TestMethod>
+    Public Sub IncludeClassLoadVarianceControlsWhetherSolverBalancesDailyLoad()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe", "Deutsch"}, {}, {"Mo", "Di"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Deutsch"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Deutsch"}},
+            New JsonObject From {{"type", "no_overlap"}, {"resource", "class"}, {"entity", "5a"}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 4}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Di"}, {"period", 2}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Di"}, {"period", 3}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Di"}, {"period", 4}}
+        })
+
+        Dim withLoadVar = New QualityWeights With {.IncludeTeacherLoadVariance = False}
+        Dim r1 = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1, qualityWeights:=withLoadVar)
+        Assert.AreEqual(CpSolverStatus.Optimal, r1.Solutions(0).Status)
+        Dim tuesdayCountOn = r1.Solutions(0).Schedule.Where(Function(l) l.ClassName = "5a" AndAlso l.Day = "Di").Count()
+        Assert.AreEqual(1, tuesdayCountOn, "With IncludeClassLoadVariance (default True), the solver should use the Tuesday slot to keep the daily load balanced, even at the cost of an edge period.")
+        Assert.AreEqual(0.0, r1.Solutions(0).Quality.ClassLoadVariance, 0.0000001)
+        Assert.AreEqual(5.0, r1.Solutions(0).Quality.Total, 0.0000001)
+
+        Dim withoutLoadVar = New QualityWeights With {.IncludeTeacherLoadVariance = False, .IncludeClassLoadVariance = False}
+        Dim r2 = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1, qualityWeights:=withoutLoadVar)
+        Assert.AreEqual(CpSolverStatus.Optimal, r2.Solutions(0).Status)
+        Dim tuesdayCountOff = r2.Solutions(0).Schedule.Where(Function(l) l.ClassName = "5a" AndAlso l.Day = "Di").Count()
+        Assert.AreEqual(0, tuesdayCountOff, "With IncludeClassLoadVariance:=False, the solver must be blind to the imbalance and prefer avoiding the edge period instead.")
+        Assert.AreEqual(1.0, r2.Solutions(0).Quality.ClassLoadVariance, 0.0000001,
+            "The post-hoc score still sees the real imbalance - only the SOLVER's search was blind to it.")
+        Assert.AreEqual(3.0, r2.Solutions(0).Quality.Total, 0.0000001)
+
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, r1.Solutions(0).Schedule).Count)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, r2.Solutions(0).Schedule).Count)
+    End Sub
+
+    ''' <summary>Combined smoke test mirroring the real bw-grundschule-
+    ''' beispiel config.yaml deployment (all four newly-configurable
+    ''' secondary criteria - EdgePeriod, AfternoonDayCount, ClassLoadVariance,
+    ''' TeacherLoadVariance - disabled at once, only Kann/ClassGaps/
+    ''' TeacherGaps still contribute): proves SolveTop still returns a
+    ''' valid, fully verified schedule with all four IncludeX flags off
+    ''' simultaneously, not just one at a time as in the dedicated steering
+    ''' tests above (which cover the identical code path for TeacherGaps
+    ''' and ClassLoadVariance individually - EdgePeriod/AfternoonDayCount/
+    ''' TeacherLoadVariance share that same "If w.IncludeX Then Build...()"
+    ''' structure, see SolveTopObjective.ApplyQualityObjective).</summary>
+    <TestMethod>
+    Public Sub AllFourNewIncludeFlagsCanBeDisabledSimultaneously()
+        Dim data = CoupledTeacherContentionScenario()
+        Dim weights As New QualityWeights With {
+            .IncludeEdgePeriod = False,
+            .IncludeAfternoonDayCount = False,
+            .IncludeClassLoadVariance = False,
+            .IncludeTeacherLoadVariance = False
+        }
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=15, numWorkers:=1, qualityWeights:=weights)
+        Assert.AreEqual(1, result.Solutions.Count)
+        Assert.IsTrue(result.Solutions(0).Status = CpSolverStatus.Optimal OrElse result.Solutions(0).Status = CpSolverStatus.Feasible)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Solutions(0).Schedule).Count)
+    End Sub
+
     ''' <summary>9 classes sharing only 3 teachers (3 classes per teacher -
     ''' real no_overlap(teacher) contention, not the trivially-independent
     ''' per-class-own-teacher shape the old ThreeClassLooseScenario used),
