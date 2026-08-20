@@ -1,0 +1,1228 @@
+schul_name: bw-grundschule-beispiel (per CLI generiert)
+bundesland: BW
+schulart: Grundschule
+tage:
+- Mo
+- Di
+- Mi
+- Do
+- Fr
+periods_per_day: 8
+klassenstufen:
+- nummer: 1
+  bezeichnung: Klasse 1
+- nummer: 2
+  bezeichnung: Klasse 2
+- nummer: 3
+  bezeichnung: Klasse 3
+- nummer: 4
+  bezeichnung: Klasse 4
+faecher:
+- name: Deutsch
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 6
+    max_pro_tag: 2
+  - klassenstufe: 2
+    wochenstunden_soll: 7
+    max_pro_tag: 2
+  - klassenstufe: 3
+    wochenstunden_soll: 8
+    max_pro_tag: 2
+  - klassenstufe: 4
+    wochenstunden_soll: 7
+    max_pro_tag: 2
+- name: Deutsch-Förderstunde
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+- name: Mathematik
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 5
+    max_pro_tag: 2
+  - klassenstufe: 2
+    wochenstunden_soll: 5
+    max_pro_tag: 2
+  - klassenstufe: 3
+    wochenstunden_soll: 5
+    max_pro_tag: 2
+  - klassenstufe: 4
+    wochenstunden_soll: 6
+    max_pro_tag: 2
+- name: Mathe-Förderstunde
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+- name: Sachunterricht
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 3
+    max_pro_tag: 2
+  - klassenstufe: 2
+    wochenstunden_soll: 3
+    max_pro_tag: 2
+  - klassenstufe: 3
+    wochenstunden_soll: 3
+    max_pro_tag: 2
+  - klassenstufe: 4
+    wochenstunden_soll: 3
+    max_pro_tag: 2
+- name: Sport
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 3
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 3
+    max_pro_tag: 1
+  - klassenstufe: 3
+    wochenstunden_soll: 3
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 3
+    max_pro_tag: 1
+- name: Musik
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+  - klassenstufe: 3
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Kunst
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 3
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Religion-ev
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 3
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Religion-kath
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 3
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Ethik
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 3
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Englisch
+  block_length: 
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 3
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 2
+    max_pro_tag: 1
+- name: Chor
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+  - klassenstufe: 3
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+  - klassenstufe: 4
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+klassen:
+- name: 1a
+  klassenstufe: 1
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 1b
+  klassenstufe: 1
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 2a
+  klassenstufe: 2
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 2b
+  klassenstufe: 2
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 3a
+  klassenstufe: 3
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 3b
+  klassenstufe: 3
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 4a
+  klassenstufe: 4
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+- name: 4b
+  klassenstufe: 4
+  schuelerzahl: 22
+  erlaubt_klassenlehrer_tandem: false
+raeume: []
+lehrkraefte:
+- name: Klassenlehrer-1
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Klassenlehrer-2
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Klassenlehrer-3
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Klassenlehrer-4
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Klassenlehrer-5
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Klassenlehrer-6
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Klassenlehrer-7
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Klassenlehrer-8
+  deputat_sollstunden: 28
+  anrechnungsstunden: 2
+  springer_reserve_stunden: 0
+  verfuegbare_tage: 
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: true
+  max_klassen: 
+  max_faecher: 
+- name: Religionslehrer-ev-1
+  deputat_sollstunden: 8
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage:
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen:
+  max_faecher:
+- name: Religionslehrer-kath-1
+  deputat_sollstunden: 8
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage:
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen:
+  max_faecher:
+- name: Ethiklehrer-1
+  deputat_sollstunden: 8
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage:
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen:
+  max_faecher:
+- name: Englischlehrer-1
+  deputat_sollstunden: 8
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage:
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen:
+  max_faecher:
+- name: Chorleiterin-1
+  deputat_sollstunden: 4
+  anrechnungsstunden: 0
+  springer_reserve_stunden: 0
+  verfuegbare_tage:
+  bevorzugte_klassenstufen: []
+  klassenlehrer_faehig: false
+  max_klassen:
+  max_faecher:
+fach_lehrer_zuordnungen:
+- lehrer_name: Klassenlehrer-1
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-1
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-1
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-1
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-1
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-1
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-1
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-1
+  fach_name: Mathe-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Mathe-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Mathe-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Mathe-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Mathe-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Mathe-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Mathe-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Deutsch
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Mathematik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Sachunterricht
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Sport
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Musik
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Mathe-Förderstunde
+  fachfremd: false
+- lehrer_name: Religionslehrer-ev-1
+  fach_name: Religion-ev
+  fachfremd: false
+- lehrer_name: Religionslehrer-kath-1
+  fach_name: Religion-kath
+  fachfremd: false
+- lehrer_name: Ethiklehrer-1
+  fach_name: Ethik
+  fachfremd: false
+- lehrer_name: Englischlehrer-1
+  fach_name: Englisch
+  fachfremd: false
+- lehrer_name: Chorleiterin-1
+  fach_name: Chor
+  fachfremd: false
+schueler:
+- id: S-1a-01
+  klasse: 1a
+- id: S-1a-02
+  klasse: 1a
+- id: S-1a-03
+  klasse: 1a
+- id: S-1a-04
+  klasse: 1a
+- id: S-1a-05
+  klasse: 1a
+- id: S-1a-06
+  klasse: 1a
+- id: S-1a-07
+  klasse: 1a
+- id: S-1a-08
+  klasse: 1a
+- id: S-1a-09
+  klasse: 1a
+- id: S-1a-10
+  klasse: 1a
+- id: S-1a-11
+  klasse: 1a
+- id: S-1a-12
+  klasse: 1a
+- id: S-1a-13
+  klasse: 1a
+- id: S-1a-14
+  klasse: 1a
+- id: S-1a-15
+  klasse: 1a
+- id: S-1a-16
+  klasse: 1a
+- id: S-1a-17
+  klasse: 1a
+- id: S-1a-18
+  klasse: 1a
+- id: S-1a-19
+  klasse: 1a
+- id: S-1a-20
+  klasse: 1a
+- id: S-1a-21
+  klasse: 1a
+- id: S-1a-22
+  klasse: 1a
+- id: S-1b-01
+  klasse: 1b
+- id: S-1b-02
+  klasse: 1b
+- id: S-1b-03
+  klasse: 1b
+- id: S-1b-04
+  klasse: 1b
+- id: S-1b-05
+  klasse: 1b
+- id: S-1b-06
+  klasse: 1b
+- id: S-1b-07
+  klasse: 1b
+- id: S-1b-08
+  klasse: 1b
+- id: S-1b-09
+  klasse: 1b
+- id: S-1b-10
+  klasse: 1b
+- id: S-1b-11
+  klasse: 1b
+- id: S-1b-12
+  klasse: 1b
+- id: S-1b-13
+  klasse: 1b
+- id: S-1b-14
+  klasse: 1b
+- id: S-1b-15
+  klasse: 1b
+- id: S-1b-16
+  klasse: 1b
+- id: S-1b-17
+  klasse: 1b
+- id: S-1b-18
+  klasse: 1b
+- id: S-1b-19
+  klasse: 1b
+- id: S-1b-20
+  klasse: 1b
+- id: S-1b-21
+  klasse: 1b
+- id: S-1b-22
+  klasse: 1b
+- id: S-2a-01
+  klasse: 2a
+- id: S-2a-02
+  klasse: 2a
+- id: S-2a-03
+  klasse: 2a
+- id: S-2a-04
+  klasse: 2a
+- id: S-2a-05
+  klasse: 2a
+- id: S-2a-06
+  klasse: 2a
+- id: S-2a-07
+  klasse: 2a
+- id: S-2a-08
+  klasse: 2a
+- id: S-2a-09
+  klasse: 2a
+- id: S-2a-10
+  klasse: 2a
+- id: S-2a-11
+  klasse: 2a
+- id: S-2a-12
+  klasse: 2a
+- id: S-2a-13
+  klasse: 2a
+- id: S-2a-14
+  klasse: 2a
+- id: S-2a-15
+  klasse: 2a
+- id: S-2a-16
+  klasse: 2a
+- id: S-2a-17
+  klasse: 2a
+- id: S-2a-18
+  klasse: 2a
+- id: S-2a-19
+  klasse: 2a
+- id: S-2a-20
+  klasse: 2a
+- id: S-2a-21
+  klasse: 2a
+- id: S-2a-22
+  klasse: 2a
+- id: S-2b-01
+  klasse: 2b
+- id: S-2b-02
+  klasse: 2b
+- id: S-2b-03
+  klasse: 2b
+- id: S-2b-04
+  klasse: 2b
+- id: S-2b-05
+  klasse: 2b
+- id: S-2b-06
+  klasse: 2b
+- id: S-2b-07
+  klasse: 2b
+- id: S-2b-08
+  klasse: 2b
+- id: S-2b-09
+  klasse: 2b
+- id: S-2b-10
+  klasse: 2b
+- id: S-2b-11
+  klasse: 2b
+- id: S-2b-12
+  klasse: 2b
+- id: S-2b-13
+  klasse: 2b
+- id: S-2b-14
+  klasse: 2b
+- id: S-2b-15
+  klasse: 2b
+- id: S-2b-16
+  klasse: 2b
+- id: S-2b-17
+  klasse: 2b
+- id: S-2b-18
+  klasse: 2b
+- id: S-2b-19
+  klasse: 2b
+- id: S-2b-20
+  klasse: 2b
+- id: S-2b-21
+  klasse: 2b
+- id: S-2b-22
+  klasse: 2b
+- id: S-3a-01
+  klasse: 3a
+- id: S-3a-02
+  klasse: 3a
+- id: S-3a-03
+  klasse: 3a
+- id: S-3a-04
+  klasse: 3a
+- id: S-3a-05
+  klasse: 3a
+- id: S-3a-06
+  klasse: 3a
+- id: S-3a-07
+  klasse: 3a
+- id: S-3a-08
+  klasse: 3a
+- id: S-3a-09
+  klasse: 3a
+- id: S-3a-10
+  klasse: 3a
+- id: S-3a-11
+  klasse: 3a
+- id: S-3a-12
+  klasse: 3a
+- id: S-3a-13
+  klasse: 3a
+- id: S-3a-14
+  klasse: 3a
+- id: S-3a-15
+  klasse: 3a
+- id: S-3a-16
+  klasse: 3a
+- id: S-3a-17
+  klasse: 3a
+- id: S-3a-18
+  klasse: 3a
+- id: S-3a-19
+  klasse: 3a
+- id: S-3a-20
+  klasse: 3a
+- id: S-3a-21
+  klasse: 3a
+- id: S-3a-22
+  klasse: 3a
+- id: S-3b-01
+  klasse: 3b
+- id: S-3b-02
+  klasse: 3b
+- id: S-3b-03
+  klasse: 3b
+- id: S-3b-04
+  klasse: 3b
+- id: S-3b-05
+  klasse: 3b
+- id: S-3b-06
+  klasse: 3b
+- id: S-3b-07
+  klasse: 3b
+- id: S-3b-08
+  klasse: 3b
+- id: S-3b-09
+  klasse: 3b
+- id: S-3b-10
+  klasse: 3b
+- id: S-3b-11
+  klasse: 3b
+- id: S-3b-12
+  klasse: 3b
+- id: S-3b-13
+  klasse: 3b
+- id: S-3b-14
+  klasse: 3b
+- id: S-3b-15
+  klasse: 3b
+- id: S-3b-16
+  klasse: 3b
+- id: S-3b-17
+  klasse: 3b
+- id: S-3b-18
+  klasse: 3b
+- id: S-3b-19
+  klasse: 3b
+- id: S-3b-20
+  klasse: 3b
+- id: S-3b-21
+  klasse: 3b
+- id: S-3b-22
+  klasse: 3b
+- id: S-4a-01
+  klasse: 4a
+- id: S-4a-02
+  klasse: 4a
+- id: S-4a-03
+  klasse: 4a
+- id: S-4a-04
+  klasse: 4a
+- id: S-4a-05
+  klasse: 4a
+- id: S-4a-06
+  klasse: 4a
+- id: S-4a-07
+  klasse: 4a
+- id: S-4a-08
+  klasse: 4a
+- id: S-4a-09
+  klasse: 4a
+- id: S-4a-10
+  klasse: 4a
+- id: S-4a-11
+  klasse: 4a
+- id: S-4a-12
+  klasse: 4a
+- id: S-4a-13
+  klasse: 4a
+- id: S-4a-14
+  klasse: 4a
+- id: S-4a-15
+  klasse: 4a
+- id: S-4a-16
+  klasse: 4a
+- id: S-4a-17
+  klasse: 4a
+- id: S-4a-18
+  klasse: 4a
+- id: S-4a-19
+  klasse: 4a
+- id: S-4a-20
+  klasse: 4a
+- id: S-4a-21
+  klasse: 4a
+- id: S-4a-22
+  klasse: 4a
+- id: S-4b-01
+  klasse: 4b
+- id: S-4b-02
+  klasse: 4b
+- id: S-4b-03
+  klasse: 4b
+- id: S-4b-04
+  klasse: 4b
+- id: S-4b-05
+  klasse: 4b
+- id: S-4b-06
+  klasse: 4b
+- id: S-4b-07
+  klasse: 4b
+- id: S-4b-08
+  klasse: 4b
+- id: S-4b-09
+  klasse: 4b
+- id: S-4b-10
+  klasse: 4b
+- id: S-4b-11
+  klasse: 4b
+- id: S-4b-12
+  klasse: 4b
+- id: S-4b-13
+  klasse: 4b
+- id: S-4b-14
+  klasse: 4b
+- id: S-4b-15
+  klasse: 4b
+- id: S-4b-16
+  klasse: 4b
+- id: S-4b-17
+  klasse: 4b
+- id: S-4b-18
+  klasse: 4b
+- id: S-4b-19
+  klasse: 4b
+- id: S-4b-20
+  klasse: 4b
+- id: S-4b-21
+  klasse: 4b
+- id: S-4b-22
+  klasse: 4b
+gruppen:
+- name: Religion-ev-Kl1
+  typ: Fachgruppe
+  fach_name: Religion-ev
+  klassenstufe: 1
+  parallelverbund: Religion-Ethik-Kl1
+  mitglieder_schueler_ids:
+  - S-1a-01
+  - S-1a-02
+  - S-1a-03
+  - S-1a-04
+  - S-1a-05
+  - S-1a-06
+  - S-1a-07
+  - S-1a-08
+  - S-1a-09
+  - S-1a-10
+  - S-1a-11
+  - S-1b-01
+  - S-1b-02
+  - S-1b-03
+  - S-1b-04
+  - S-1b-05
+  - S-1b-06
+  - S-1b-07
+  - S-1b-08
+  - S-1b-09
+  - S-1b-10
+  - S-1b-11
+- name: Religion-kath-Kl1
+  typ: Fachgruppe
+  fach_name: Religion-kath
+  klassenstufe: 1
+  parallelverbund: Religion-Ethik-Kl1
+  mitglieder_schueler_ids:
+  - S-1a-12
+  - S-1a-13
+  - S-1a-14
+  - S-1a-15
+  - S-1a-16
+  - S-1a-17
+  - S-1b-12
+  - S-1b-13
+  - S-1b-14
+  - S-1b-15
+  - S-1b-16
+- name: Ethik-Kl1
+  typ: Fachgruppe
+  fach_name: Ethik
+  klassenstufe: 1
+  parallelverbund: Religion-Ethik-Kl1
+  mitglieder_schueler_ids:
+  - S-1a-18
+  - S-1a-19
+  - S-1a-20
+  - S-1a-21
+  - S-1a-22
+  - S-1b-17
+  - S-1b-18
+  - S-1b-19
+  - S-1b-20
+  - S-1b-21
+  - S-1b-22
+- name: Religion-ev-Kl2
+  typ: Fachgruppe
+  fach_name: Religion-ev
+  klassenstufe: 2
+  parallelverbund: Religion-Ethik-Kl2
+  mitglieder_schueler_ids:
+  - S-2a-01
+  - S-2a-02
+  - S-2a-03
+  - S-2a-04
+  - S-2a-05
+  - S-2a-06
+  - S-2a-07
+  - S-2a-08
+  - S-2a-09
+  - S-2a-10
+  - S-2a-11
+  - S-2b-01
+  - S-2b-02
+  - S-2b-03
+  - S-2b-04
+  - S-2b-05
+  - S-2b-06
+  - S-2b-07
+  - S-2b-08
+  - S-2b-09
+  - S-2b-10
+  - S-2b-11
+- name: Religion-kath-Kl2
+  typ: Fachgruppe
+  fach_name: Religion-kath
+  klassenstufe: 2
+  parallelverbund: Religion-Ethik-Kl2
+  mitglieder_schueler_ids:
+  - S-2a-12
+  - S-2a-13
+  - S-2a-14
+  - S-2a-15
+  - S-2a-16
+  - S-2a-17
+  - S-2b-12
+  - S-2b-13
+  - S-2b-14
+  - S-2b-15
+  - S-2b-16
+- name: Ethik-Kl2
+  typ: Fachgruppe
+  fach_name: Ethik
+  klassenstufe: 2
+  parallelverbund: Religion-Ethik-Kl2
+  mitglieder_schueler_ids:
+  - S-2a-18
+  - S-2a-19
+  - S-2a-20
+  - S-2a-21
+  - S-2a-22
+  - S-2b-17
+  - S-2b-18
+  - S-2b-19
+  - S-2b-20
+  - S-2b-21
+  - S-2b-22
+- name: Religion-ev-Kl3
+  typ: Fachgruppe
+  fach_name: Religion-ev
+  klassenstufe: 3
+  parallelverbund: Religion-Ethik-Kl3
+  mitglieder_schueler_ids:
+  - S-3a-01
+  - S-3a-02
+  - S-3a-03
+  - S-3a-04
+  - S-3a-05
+  - S-3a-06
+  - S-3a-07
+  - S-3a-08
+  - S-3a-09
+  - S-3a-10
+  - S-3a-11
+  - S-3b-01
+  - S-3b-02
+  - S-3b-03
+  - S-3b-04
+  - S-3b-05
+  - S-3b-06
+  - S-3b-07
+  - S-3b-08
+  - S-3b-09
+  - S-3b-10
+  - S-3b-11
+- name: Religion-kath-Kl3
+  typ: Fachgruppe
+  fach_name: Religion-kath
+  klassenstufe: 3
+  parallelverbund: Religion-Ethik-Kl3
+  mitglieder_schueler_ids:
+  - S-3a-12
+  - S-3a-13
+  - S-3a-14
+  - S-3a-15
+  - S-3a-16
+  - S-3a-17
+  - S-3b-12
+  - S-3b-13
+  - S-3b-14
+  - S-3b-15
+  - S-3b-16
+- name: Ethik-Kl3
+  typ: Fachgruppe
+  fach_name: Ethik
+  klassenstufe: 3
+  parallelverbund: Religion-Ethik-Kl3
+  mitglieder_schueler_ids:
+  - S-3a-18
+  - S-3a-19
+  - S-3a-20
+  - S-3a-21
+  - S-3a-22
+  - S-3b-17
+  - S-3b-18
+  - S-3b-19
+  - S-3b-20
+  - S-3b-21
+  - S-3b-22
+- name: Religion-ev-Kl4
+  typ: Fachgruppe
+  fach_name: Religion-ev
+  klassenstufe: 4
+  parallelverbund: Religion-Ethik-Kl4
+  mitglieder_schueler_ids:
+  - S-4a-01
+  - S-4a-02
+  - S-4a-03
+  - S-4a-04
+  - S-4a-05
+  - S-4a-06
+  - S-4a-07
+  - S-4a-08
+  - S-4a-09
+  - S-4a-10
+  - S-4a-11
+  - S-4b-01
+  - S-4b-02
+  - S-4b-03
+  - S-4b-04
+  - S-4b-05
+  - S-4b-06
+  - S-4b-07
+  - S-4b-08
+  - S-4b-09
+  - S-4b-10
+  - S-4b-11
+- name: Religion-kath-Kl4
+  typ: Fachgruppe
+  fach_name: Religion-kath
+  klassenstufe: 4
+  parallelverbund: Religion-Ethik-Kl4
+  mitglieder_schueler_ids:
+  - S-4a-12
+  - S-4a-13
+  - S-4a-14
+  - S-4a-15
+  - S-4a-16
+  - S-4a-17
+  - S-4b-12
+  - S-4b-13
+  - S-4b-14
+  - S-4b-15
+  - S-4b-16
+- name: Ethik-Kl4
+  typ: Fachgruppe
+  fach_name: Ethik
+  klassenstufe: 4
+  parallelverbund: Religion-Ethik-Kl4
+  mitglieder_schueler_ids:
+  - S-4a-18
+  - S-4a-19
+  - S-4a-20
+  - S-4a-21
+  - S-4a-22
+  - S-4b-17
+  - S-4b-18
+  - S-4b-19
+  - S-4b-20
+  - S-4b-21
+  - S-4b-22
+- name: Chor-Kl1
+  typ: Fachgruppe
+  fach_name: Chor
+  klassenstufe: 1
+  parallelverbund: Chor-Gesamt
+  mitglieder_schueler_ids:
+  - S-1a-01
+  - S-1a-02
+  - S-1a-03
+  - S-1a-04
+  - S-1b-01
+  - S-1b-02
+  - S-1b-03
+  - S-1b-04
+- name: Chor-Kl2
+  typ: Fachgruppe
+  fach_name: Chor
+  klassenstufe: 2
+  parallelverbund: Chor-Gesamt
+  mitglieder_schueler_ids:
+  - S-2a-01
+  - S-2a-02
+  - S-2a-03
+  - S-2a-04
+  - S-2b-01
+  - S-2b-02
+  - S-2b-03
+  - S-2b-04
+- name: Chor-Kl3
+  typ: Fachgruppe
+  fach_name: Chor
+  klassenstufe: 3
+  parallelverbund: Chor-Gesamt
+  mitglieder_schueler_ids:
+  - S-3a-01
+  - S-3a-02
+  - S-3a-03
+  - S-3a-04
+  - S-3b-01
+  - S-3b-02
+  - S-3b-03
+  - S-3b-04
+- name: Chor-Kl4
+  typ: Fachgruppe
+  fach_name: Chor
+  klassenstufe: 4
+  parallelverbund: Chor-Gesamt
+  mitglieder_schueler_ids:
+  - S-4a-01
+  - S-4a-02
+  - S-4a-03
+  - S-4a-04
+  - S-4b-01
+  - S-4b-02
+  - S-4b-03
+  - S-4b-04

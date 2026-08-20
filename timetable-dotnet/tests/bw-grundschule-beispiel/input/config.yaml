@@ -1,0 +1,63 @@
+# Steuert Solver.SolveTop (siehe tests/README.md, Abschnitt
+# "config.yaml (optional)"): wie lange darf der Solver nach dem
+# Stundenplan suchen, bevor er abbricht? Ein hoeherer Wert gibt CP-SAT
+# mehr Zeit, den gefundenen Plan als OPTIMAL zu beweisen statt nur
+# FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
+# "CP-SAT-Status"-Feld in output/stundenplan.md.
+#
+# Kurzauftrag: Gesamtbudget auf maximal 3 Min begrenzt - siehe
+# per_solve_time_limit_s/stagnation_timeout_s unten fuer die Abstimmung
+# auf "moeglichst viele optimale UND unterschiedliche Loesungen".
+solve_time_limit_s: 180.0
+
+# Anzahl paralleler CP-SAT-Suchpfade (Portfolio-Threading). Hoeher kann
+# helfen, ueberhaupt schneller eine erste Loesung zu finden, geht aber zu
+# Lasten der pro Suchpfad verfuegbaren Zeit.
+num_workers: 4
+
+# Begrenzt (getrennt von solve_time_limit_s) jede EINZELNE Solve-
+# Iteration in Solver.SolveTop. Bewusst deutlich UNTER dem 3-Min-
+# Gesamtbudget gesetzt, damit innerhalb der 180s mehrere verschiedene
+# Iterationen (= mehrere verschiedene Loesungen) Platz haben, statt dass
+# die erste Iteration allein das komplette Budget verbraucht.
+per_solve_time_limit_s: 30.0
+
+# Phase 2.25: bricht eine einzelne Solve-Iteration vorzeitig ab, sobald so
+# lange keine neue Verbesserung mehr gefunden wurde - die gesparte Zeit
+# steht der naechsten Iteration zur Verfuegung. Bewusst deutlich UNTER
+# per_solve_time_limit_s gesetzt, damit eine Iteration, die bereits
+# frueh ihr Optimum gefunden hat (oder feststeckt), nicht unnoetig bis
+# zum vollen 30s-Limit weiterlaeuft, sondern die eingesparte Zeit fuer
+# eine WEITERE, andere Loesung genutzt wird.
+#
+# Live kalibriert (3 Testlaeufe je volles 180s-Budget, siehe
+# tests/bw-grundschule-beispiel/output/stundenplan.json fuer das
+# tatsaechliche Ergebnis): 8.0s -> 11 Loesungen (Quality.Total 192.6-408.4),
+# 4.0s -> 14 Loesungen (167.8-236.2, insgesamt beste Einzelloesung UND
+# engste Streuung), 2.0s -> 21 Loesungen, aber deutlich breitere Streuung
+# nach oben (171.0-357.6 - mehrere schlechte Ausreisser, da manche
+# Iterationen zu frueh abgebrochen werden, um ueberhaupt ein brauchbares
+# lokales Optimum zu erreichen). 4.0s gewaehlt als bester Kompromiss aus
+# Anzahl UND Qualitaet der gefundenen Alternativen.
+stagnation_timeout_s: 4.0
+
+# Phase 2.21: wie viele vergleichbare Loesungs-Alternativen sollen in
+# output/stundenplan.json + output/stundentafel.html exportiert werden?
+# Das Gesamt-Zeitbudget bleibt unabhaengig davon durch solve_time_limit_s
+# gedeckelt (Solver.SolveTop prueft das verbleibende Budget vor jeder
+# weiteren Iteration) - ein hoeherer Wert verlangsamt den Lauf also nicht
+# ueber das obige Zeitbudget hinaus. Hoch gesetzt, damit NICHT dieses
+# Feld (sondern das Zeitbudget) die begrenzende Groesse ist.
+max_solutions: 30
+
+# Phase 2.24/2.25-Nachtrag-2: Springstunden (Luecken zwischen belegten
+# Stunden an einem Tag) fuer Klassen deutlich staerker gewichtet als fuer
+# Lehrkraefte - Nutzerentscheidung fuer dieses Beispiel, ClassGaps auf das
+# 10-fache von TeacherGaps zu setzen (unabhaengig konfigurierbar, siehe
+# tests/README.md "quality_weights" - die Big-M-freie Kodierung aus Phase
+# 2.25-Nachtrag-2 aendert daran nichts, sie betrifft nur, WIE eine
+# einzelne Luecken-Variable berechnet wird, nicht wie die beiden Summen
+# gewichtet in die Zielfunktion einfliessen).
+quality_weights:
+  class_gaps: 1000.0
+  teacher_gaps: 50.0
