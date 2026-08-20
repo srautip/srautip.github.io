@@ -31,6 +31,15 @@ Public NotInheritable Class RunConfig
     ''' solve_time_limit_s gedeckelt (Solver.SolveTop prueft das
     ''' verbleibende Budget vor jeder weiteren Iteration).</summary>
     Public Property MaxSolutions As Integer = 1
+    ''' <summary>Default Nothing - faellt dann auf SolveTimeLimitS zurueck,
+    ''' identisch zum bisherigen Verhalten (jede bestehende Schule ohne
+    ''' dieses Feld bleibt byte-identisch). Begrenzt nur die EINZELNE
+    ''' Solve-Iteration in Solver.SolveTop, waehrend SolveTimeLimitS
+    ''' weiterhin das Gesamtbudget ueber alle Iterationen deckelt -
+    ''' relevant, wenn eine einzelne Iteration sonst das komplette Budget
+    ''' aufbrauchen wuerde, bevor SolveTop bei max_solutions > 1 ueberhaupt
+    ''' zu einer zweiten Iteration kommt.</summary>
+    Public Property PerSolveTimeLimitS As Double? = Nothing
 End Class
 
 Public Module Run
@@ -149,8 +158,9 @@ Public Module Run
         ' stundenplan.md massgeblich, ALLE gefundenen Kandidaten werden
         ' zusaetzlich in output/stundenplan.json + output/stundentafel.html
         ' als vergleichbare Alternativen exportiert (siehe unten).
+        Dim perSolveLimit = If(cfg.PerSolveTimeLimitS, cfg.SolveTimeLimitS)
         Dim topResult = Solver.SolveTop(data, maxSolutions:=cfg.MaxSolutions, totalTimeLimitS:=cfg.SolveTimeLimitS,
-            perSolveTimeLimitS:=cfg.SolveTimeLimitS, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers)
+            perSolveTimeLimitS:=perSolveLimit, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers)
         Dim solveOk = topResult.Solutions.Count > 0
         If Not solveOk Then
             IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.md"),
@@ -169,6 +179,9 @@ Public Module Run
         stundenplanLines.Add("")
         If best.Status = CpSolverStatus.Feasible Then
             stundenplanLines.Add($"*Hinweis: `Feasible` statt `Optimal` bedeutet, CP-SAT konnte innerhalb von `solve_time_limit_s` (aktuell {cfg.SolveTimeLimitS}s) keinen Optimalitaetsbeweis erbringen - ein hoeherer Wert in `config.yaml` kann helfen, ein noch besseres Ergebnis zu finden oder das aktuelle als optimal zu beweisen.*")
+            If cfg.PerSolveTimeLimitS.HasValue AndAlso perSolveLimit <> cfg.SolveTimeLimitS Then
+                stundenplanLines.Add($"*Zusaetzlich begrenzt `per_solve_time_limit_s` (aktuell {perSolveLimit}s) jede EINZELNE Solve-Iteration - ein hoeherer Wert kann derselben Iteration mehr Zeit fuer einen Optimalitaetsbeweis geben, auf Kosten weniger Iterationen fuer zusaetzliche `max_solutions`-Alternativen innerhalb desselben Gesamtbudgets.*")
+            End If
             stundenplanLines.Add("")
         End If
         If scheduleViolations.Count > 0 Then

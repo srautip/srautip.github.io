@@ -288,14 +288,17 @@ zusätzlichen Regeln).
 deputat_toleranz_stunden: 2.0   # Default 2.0
 lehrereinsatz_time_limit_s: 30.0
 solve_time_limit_s: 30.0
+per_solve_time_limit_s: 30.0   # Optional, Default: faellt auf solve_time_limit_s zurueck - siehe unten
 seed: 42
 num_workers: 1   # Default: Anzahl CPU-Kerne - 1 (mindestens 1)
 max_solutions: 1   # Default 1 (Phase 2.21) - siehe unten
 ```
 
 Fehlt die Datei komplett, gelten diese Defaults unverändert. `solve_time_limit_s`
-begrenzt sowohl `Solver.SolveTop`s Gesamt- als auch dessen Einzel-Solve-
-Zeitbudget (siehe unten).
+begrenzt `Solver.SolveTop`s GESAMTBUDGET über alle Iterationen hinweg;
+`per_solve_time_limit_s` (optional, fehlt es, gilt derselbe Wert wie
+`solve_time_limit_s` - identisch zum bisherigen Verhalten) begrenzt
+zusätzlich jede EINZELNE Solve-Iteration innerhalb dieses Gesamtbudgets.
 
 **Für eine möglichst optimale EINZELNE Lösung** ist NICHT `max_solutions`
 der relevante Hebel - jede weitere Solve-Iteration optimiert ohnehin gegen
@@ -320,7 +323,12 @@ gesamte Budget aufbraucht (falls sie nicht schnell als `Optimal` bewiesen
 werden kann) und dadurch trotz höherem `max_solutions` nur eine einzige
 Lösung gefunden wird, bevor `solve_time_limit_s` abläuft - das ist kein
 Fehler, sondern zeigt lediglich, dass für weitere Alternativen zusätzlich
-`solve_time_limit_s` erhöht werden müsste.
+Zeit benötigt wird. Zwei Hebel dafür: `solve_time_limit_s` selbst erhöhen
+(mehr Gesamtzeit für alle Iterationen zusammen), oder gezielter
+`per_solve_time_limit_s` NIEDRIGER als `solve_time_limit_s` setzen - das
+zwingt jede einzelne Iteration früher zum Abbruch (statt das gesamte
+Budget zu verbrauchen, bevor sie `Optimal` beweisen kann) und lässt so
+innerhalb desselben Gesamtbudgets mehrere Iterationen zu.
 
 ## CLI: Grundgerüst per Template erzeugen
 
