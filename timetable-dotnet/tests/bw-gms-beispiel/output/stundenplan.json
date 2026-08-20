@@ -66,40 +66,10 @@
       "status": "Feasible",
       "kann_violation_count": 0,
       "muss_violation_count": 0,
-      "quality_total": 547.72,
+      "quality_total": 451.62,
       "classes": {
         "5a": {
           "Mo": {
-            "1": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
-            "2": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
-              "room": null
-            },
-            "3": {
-              "subject": "BNT",
-              "teacher": "NaWi-Lehrer-2",
-              "room": null
-            },
-            "4": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
-            "5": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-2",
-              "room": null
-            },
-            "6": null,
-            "7": null,
-            "8": null
-          },
-          "Di": {
             "1": null,
             "2": {
               "subject": "Englisch",
@@ -107,13 +77,47 @@
               "room": null
             },
             "3": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
+              "subject": "Sport",
+              "teacher": "Sportlehrer-2",
               "room": null
             },
             "4": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            },
+            "5": {
               "subject": "Kunst",
-              "teacher": "Musik-Kunst-Lehrer-1",
+              "teacher": "Musik-Kunst-Lehrer-2",
+              "room": null
+            },
+            "6": {
+              "subject": "Musik",
+              "teacher": "Musik-Kunst-Lehrer-2",
+              "room": null
+            },
+            "7": null,
+            "8": null
+          },
+          "Di": {
+            "1": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
+            "2": {
+              "subject": "Kunst",
+              "teacher": "Musik-Kunst-Lehrer-2",
+              "room": null
+            },
+            "3": {
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
+              "room": null
+            },
+            "4": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
               "room": null
             },
             "5": {
@@ -121,20 +125,54 @@
               "teacher": "Sportlehrer-2",
               "room": null
             },
-            "6": null,
+            "6": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "room": null
+            },
             "7": null,
             "8": null
           },
           "Mi": {
             "1": null,
             "2": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "subject": "Musik",
+              "teacher": "Musik-Kunst-Lehrer-2",
               "room": null
             },
             "3": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "room": null
+            },
+            "4": {
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
+              "room": null
+            },
+            "5": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "room": null
+            },
+            "6": null,
+            "7": null,
+            "8": null
+          },
+          "Do": {
+            "1": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            },
+            "2": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "room": null
+            },
+            "3": {
+              "subject": "BNT",
+              "teacher": "NaWi-Lehrer-2",
               "room": null
             },
             "4": {
@@ -143,62 +181,24 @@
               "room": null
             },
             "5": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
               "room": null
             },
-            "6": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "7": null,
-            "8": null
-          },
-          "Do": {
-            "1": null,
-            "2": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
-              "room": null
-            },
-            "3": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "4": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
-            "5": {
-              "subject": "Musik",
-              "teacher": "Musik-Kunst-Lehrer-2",
-              "room": null
-            },
-            "6": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
+            "6": null,
             "7": null,
             "8": null
           },
           "Fr": {
-            "1": {
-              "subject": "Kunst",
-              "teacher": "Musik-Kunst-Lehrer-1",
-              "room": null
-            },
+            "1": null,
             "2": {
-              "subject": "Musik",
-              "teacher": "Musik-Kunst-Lehrer-2",
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
               "room": null
             },
             "3": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
               "room": null
             },
             "4": {
@@ -207,13 +207,13 @@
               "room": null
             },
             "5": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "6": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "7": null,
@@ -223,43 +223,65 @@
         "5b": {
           "Mo": {
             "1": null,
-            "2": {
-              "subject": "Musik",
-              "teacher": "Musik-Kunst-Lehrer-1",
-              "room": null
-            },
+            "2": null,
             "3": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
               "room": null
             },
             "4": {
               "subject": "Sport",
-              "teacher": "Sportlehrer-1",
+              "teacher": "Sportlehrer-2",
               "room": null
             },
             "5": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "subject": "BNT",
+              "teacher": "NaWi-Lehrer-1",
               "room": null
             },
             "6": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "7": null,
             "8": null
           },
           "Di": {
+            "1": null,
+            "2": null,
+            "3": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "room": null
+            },
+            "4": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            },
+            "5": {
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
+            "6": {
+              "subject": "Sport",
+              "teacher": "Sportlehrer-2",
+              "room": null
+            },
+            "7": null,
+            "8": null
+          },
+          "Mi": {
             "1": {
               "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "2": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
               "room": null
             },
             "3": {
@@ -268,33 +290,67 @@
               "room": null
             },
             "4": {
-              "subject": "BNT",
-              "teacher": "NaWi-Lehrer-2",
-              "room": null
-            },
-            "5": {
-              "subject": "Erdkunde",
+              "subject": "Englisch",
               "teacher": "Englisch-Erdkunde-Lehrer-3",
               "room": null
             },
-            "6": {
+            "5": {
               "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            },
+            "6": {
+              "subject": "Sport",
+              "teacher": "Sportlehrer-2",
               "room": null
             },
             "7": null,
             "8": null
           },
-          "Mi": {
+          "Do": {
+            "1": {
+              "subject": "Musik",
+              "teacher": "Musik-Kunst-Lehrer-1",
+              "room": null
+            },
+            "2": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "room": null
+            },
+            "3": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "room": null
+            },
+            "4": {
+              "subject": "Kunst",
+              "teacher": "Musik-Kunst-Lehrer-2",
+              "room": null
+            },
+            "5": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "room": null
+            },
+            "6": {
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
+            "7": null,
+            "8": null
+          },
+          "Fr": {
             "1": null,
             "2": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
               "room": null
             },
             "3": {
               "subject": "BNT",
-              "teacher": "NaWi-Lehrer-2",
+              "teacher": "NaWi-Lehrer-1",
               "room": null
             },
             "4": {
@@ -303,96 +359,40 @@
               "room": null
             },
             "5": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-1",
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
               "room": null
             },
             "6": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
               "room": null
             },
             "7": null,
             "8": null
-          },
-          "Do": {
-            "1": null,
-            "2": null,
-            "3": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
-              "room": null
-            },
-            "4": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
-              "room": null
-            },
-            "5": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
-              "room": null
-            },
-            "6": {
-              "subject": "Kunst",
-              "teacher": "Musik-Kunst-Lehrer-2",
-              "room": null
-            },
-            "7": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-1",
-              "room": null
-            },
-            "8": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            }
-          },
-          "Fr": {
-            "1": null,
-            "2": null,
-            "3": null,
-            "4": null,
-            "5": null,
-            "6": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
-              "room": null
-            },
-            "7": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "8": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
-              "room": null
-            }
           }
         },
         "6a": {
           "Mo": {
             "1": null,
             "2": {
-              "subject": "BNT",
-              "teacher": "NaWi-Lehrer-2",
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
               "room": null
             },
             "3": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
               "room": null
             },
             "4": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
+              "subject": "Kunst",
+              "teacher": "Musik-Kunst-Lehrer-1",
               "room": null
             },
             "5": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
               "room": null
             },
             "6": {
@@ -405,127 +405,127 @@
           },
           "Di": {
             "1": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
-              "room": null
-            },
-            "2": {
               "subject": "Musik",
               "teacher": "Musik-Kunst-Lehrer-2",
               "room": null
             },
+            "2": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            },
+            "3": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "room": null
+            },
+            "4": {
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "room": null
+            },
+            "5": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "room": null
+            },
+            "6": {
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
+            "7": null,
+            "8": null
+          },
+          "Mi": {
+            "1": null,
+            "2": null,
             "3": {
               "subject": "BNT",
               "teacher": "NaWi-Lehrer-2",
               "room": null
             },
             "4": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "subject": "Sport",
+              "teacher": "Sportlehrer-2",
               "room": null
             },
             "5": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
               "room": null
             },
             "6": {
+              "subject": "Kunst",
+              "teacher": "Musik-Kunst-Lehrer-1",
+              "room": null
+            },
+            "7": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            },
+            "8": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "room": null
+            }
+          },
+          "Do": {
+            "1": null,
+            "2": null,
+            "3": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            },
+            "4": {
               "subject": "Religion",
               "teacher": "Religionslehrer-1",
               "room": null
             },
-            "7": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
-            "8": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-1",
-              "room": null
-            }
-          },
-          "Mi": {
-            "1": null,
-            "2": {
+            "5": {
               "subject": "Musik",
               "teacher": "Musik-Kunst-Lehrer-2",
               "room": null
             },
-            "3": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-1",
-              "room": null
-            },
-            "4": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "5": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
-              "room": null
-            },
             "6": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "subject": "Sport",
+              "teacher": "Sportlehrer-2",
               "room": null
             },
-            "7": null,
-            "8": null
-          },
-          "Do": {
-            "1": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
-              "room": null
-            },
-            "2": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
-            "3": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
-              "room": null
-            },
-            "4": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "5": {
-              "subject": "Kunst",
-              "teacher": "Musik-Kunst-Lehrer-1",
-              "room": null
-            },
-            "6": null,
             "7": null,
             "8": null
           },
           "Fr": {
-            "1": null,
-            "2": null,
-            "3": {
+            "1": {
               "subject": "Sport",
-              "teacher": "Sportlehrer-1",
+              "teacher": "Sportlehrer-2",
+              "room": null
+            },
+            "2": {
+              "subject": "BNT",
+              "teacher": "NaWi-Lehrer-2",
+              "room": null
+            },
+            "3": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
               "room": null
             },
             "4": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "5": {
               "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
               "room": null
             },
             "6": {
-              "subject": "Kunst",
-              "teacher": "Musik-Kunst-Lehrer-1",
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
               "room": null
             },
             "7": null,
@@ -534,160 +534,160 @@
         },
         "6b": {
           "Mo": {
-            "1": {
-              "subject": "Musik",
-              "teacher": "Musik-Kunst-Lehrer-1",
-              "room": null
-            },
+            "1": null,
             "2": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
-              "room": null
-            },
-            "3": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
-            "4": {
               "subject": "Religion",
               "teacher": "Religionslehrer-1",
               "room": null
             },
-            "5": null,
-            "6": null,
+            "3": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
+            "4": {
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
+              "room": null
+            },
+            "5": {
+              "subject": "Kunst",
+              "teacher": "Musik-Kunst-Lehrer-1",
+              "room": null
+            },
+            "6": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
             "7": null,
             "8": null
           },
           "Di": {
             "1": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            },
+            "2": {
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
+              "room": null
+            },
+            "3": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
+            "4": {
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
+              "room": null
+            },
+            "5": {
               "subject": "Kunst",
               "teacher": "Musik-Kunst-Lehrer-1",
               "room": null
             },
-            "2": {
+            "6": {
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "room": null
+            },
+            "7": null,
+            "8": null
+          },
+          "Mi": {
+            "1": null,
+            "2": null,
+            "3": {
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "room": null
+            },
+            "4": {
+              "subject": "Musik",
+              "teacher": "Musik-Kunst-Lehrer-1",
+              "room": null
+            },
+            "5": {
               "subject": "BNT",
               "teacher": "NaWi-Lehrer-2",
               "room": null
             },
-            "3": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
-              "room": null
-            },
-            "4": {
+            "6": {
               "subject": "Mathematik",
               "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
-            "5": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
-              "room": null
-            },
-            "6": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
-              "room": null
-            },
-            "7": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-1",
-              "room": null
-            },
+            "7": null,
             "8": null
           },
-          "Mi": {
+          "Do": {
             "1": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
               "room": null
             },
             "2": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
               "room": null
             },
             "3": {
-              "subject": "Kunst",
-              "teacher": "Musik-Kunst-Lehrer-1",
-              "room": null
-            },
-            "4": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
-              "room": null
-            },
-            "5": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
-              "room": null
-            },
-            "6": {
               "subject": "Sport",
               "teacher": "Sportlehrer-1",
               "room": null
             },
-            "7": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            },
-            "8": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            }
-          },
-          "Do": {
-            "1": null,
-            "2": null,
-            "3": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            },
             "4": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
               "room": null
             },
             "5": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "6": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-1",
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "7": null,
             "8": null
           },
           "Fr": {
-            "1": null,
+            "1": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "room": null
+            },
             "2": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
-              "room": null
-            },
-            "3": {
-              "subject": "BNT",
-              "teacher": "NaWi-Lehrer-2",
-              "room": null
-            },
-            "4": {
               "subject": "Musik",
               "teacher": "Musik-Kunst-Lehrer-1",
               "room": null
             },
-            "5": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
+            "3": {
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
               "room": null
             },
-            "6": null,
+            "4": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "room": null
+            },
+            "5": {
+              "subject": "BNT",
+              "teacher": "NaWi-Lehrer-2",
+              "room": null
+            },
+            "6": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
             "7": null,
             "8": null
           }
@@ -696,27 +696,27 @@
           "Mo": {
             "1": {
               "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
-              "room": null
-            },
-            "2": {
-              "subject": "Erdkunde",
               "teacher": "Englisch-Erdkunde-Lehrer-3",
               "room": null
             },
-            "3": {
+            "2": {
               "subject": "Sport",
               "teacher": "Sportlehrer-2",
               "room": null
             },
+            "3": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            },
             "4": {
-              "subject": "Kunst",
-              "teacher": "Musik-Kunst-Lehrer-1",
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
               "room": null
             },
             "5": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
               "room": null
             },
             "6": {
@@ -730,23 +730,53 @@
           "Di": {
             "1": null,
             "2": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
               "room": null
             },
             "3": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "subject": "Kunst",
+              "teacher": "Musik-Kunst-Lehrer-1",
               "room": null
             },
             "4": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-2",
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
               "room": null
             },
             "5": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "room": null
+            },
+            "6": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "room": null
+            },
+            "7": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "room": null
+            },
+            "8": null
+          },
+          "Mi": {
+            "1": null,
+            "2": null,
+            "3": {
+              "subject": "Musik",
+              "teacher": "Musik-Kunst-Lehrer-1",
+              "room": null
+            },
+            "4": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "room": null
+            },
+            "5": {
+              "subject": "Sport",
+              "teacher": "Sportlehrer-2",
               "room": null
             },
             "6": {
@@ -755,13 +785,13 @@
               "room": null
             },
             "7": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
               "room": null
             },
             "8": null
           },
-          "Mi": {
+          "Do": {
             "1": null,
             "2": {
               "subject": "Kunst",
@@ -769,86 +799,18 @@
               "room": null
             },
             "3": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
-              "room": null
-            },
-            "4": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
-              "room": null
-            },
-            "5": {
-              "subject": "Musik",
-              "teacher": "Musik-Kunst-Lehrer-1",
-              "room": null
-            },
-            "6": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            },
-            "7": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
-            "8": null
-          },
-          "Do": {
-            "1": {
-              "subject": "Physik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            },
-            "2": {
-              "subject": "Physik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            },
-            "3": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
-            "4": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-2",
-              "room": null
-            },
-            "5": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
-            "6": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            },
-            "7": null,
-            "8": null
-          },
-          "Fr": {
-            "1": null,
-            "2": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
-              "room": null
-            },
-            "3": {
               "subject": "Geschichte",
               "teacher": "Deutsch-Geschichte-Lehrer-1",
               "room": null
             },
             "4": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "5": {
-              "subject": "Musik",
-              "teacher": "Musik-Kunst-Lehrer-1",
+              "subject": "Sport",
+              "teacher": "Sportlehrer-2",
               "room": null
             },
             "6": {
@@ -856,14 +818,56 @@
               "teacher": "NaWi-Lehrer-1",
               "room": null
             },
-            "7": null,
+            "7": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            },
             "8": null
+          },
+          "Fr": {
+            "1": null,
+            "2": null,
+            "3": {
+              "subject": "Musik",
+              "teacher": "Musik-Kunst-Lehrer-1",
+              "room": null
+            },
+            "4": {
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
+              "room": null
+            },
+            "5": {
+              "subject": "Physik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "6": {
+              "subject": "Physik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "7": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "room": null
+            },
+            "8": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            }
           }
         },
         "7b": {
           "Mo": {
             "1": null,
-            "2": null,
+            "2": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
             "3": {
               "subject": "Mathematik",
               "teacher": "Mathematik-Physik-Lehrer-2",
@@ -875,153 +879,149 @@
               "room": null
             },
             "5": {
-              "subject": "Kunst",
-              "teacher": "Musik-Kunst-Lehrer-1",
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
               "room": null
             },
             "6": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "subject": "Kunst",
+              "teacher": "Musik-Kunst-Lehrer-1",
               "room": null
             },
             "7": null,
             "8": null
           },
           "Di": {
-            "1": null,
-            "2": {
+            "1": {
               "subject": "Musik",
               "teacher": "Musik-Kunst-Lehrer-1",
               "room": null
             },
+            "2": {
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
             "3": {
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
+              "room": null
+            },
+            "4": {
               "subject": "Kunst",
               "teacher": "Musik-Kunst-Lehrer-1",
               "room": null
             },
-            "4": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
-              "room": null
-            },
             "5": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-1",
+              "subject": "Physik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "6": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
-              "room": null
-            },
-            "7": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
-              "room": null
-            },
-            "8": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            }
-          },
-          "Mi": {
-            "1": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-1",
-              "room": null
-            },
-            "2": {
               "subject": "Physik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "3": {
-              "subject": "Physik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "4": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
-            "5": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
-              "room": null
-            },
-            "6": {
-              "subject": "Biologie",
-              "teacher": "NaWi-Lehrer-1",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "7": null,
             "8": null
           },
-          "Do": {
-            "1": {
-              "subject": "Deutsch",
+          "Mi": {
+            "1": null,
+            "2": {
+              "subject": "Geschichte",
               "teacher": "Deutsch-Geschichte-Lehrer-3",
               "room": null
             },
-            "2": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
-              "room": null
-            },
             "3": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
               "room": null
             },
             "4": {
+              "subject": "Biologie",
+              "teacher": "NaWi-Lehrer-2",
+              "room": null
+            },
+            "5": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "6": {
               "subject": "Englisch",
               "teacher": "Englisch-Erdkunde-Lehrer-2",
               "room": null
             },
-            "5": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
-              "room": null
-            },
-            "6": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
             "7": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
               "room": null
             },
             "8": null
           },
-          "Fr": {
-            "1": null,
-            "2": {
-              "subject": "Deutsch",
+          "Do": {
+            "1": {
+              "subject": "Geschichte",
               "teacher": "Deutsch-Geschichte-Lehrer-3",
               "room": null
             },
-            "3": {
-              "subject": "Musik",
-              "teacher": "Musik-Kunst-Lehrer-1",
-              "room": null
-            },
-            "4": {
+            "2": {
               "subject": "Mathematik",
               "teacher": "Mathematik-Physik-Lehrer-2",
               "room": null
             },
+            "3": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "room": null
+            },
+            "4": {
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
+              "room": null
+            },
             "5": {
-              "subject": "Biologie",
-              "teacher": "NaWi-Lehrer-1",
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
               "room": null
             },
             "6": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "room": null
+            },
+            "7": null,
+            "8": null
+          },
+          "Fr": {
+            "1": {
+              "subject": "Musik",
+              "teacher": "Musik-Kunst-Lehrer-1",
+              "room": null
+            },
+            "2": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "room": null
+            },
+            "3": {
+              "subject": "Biologie",
+              "teacher": "NaWi-Lehrer-2",
+              "room": null
+            },
+            "4": {
               "subject": "Sport",
               "teacher": "Sportlehrer-1",
+              "room": null
+            },
+            "5": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "room": null
+            },
+            "6": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
               "room": null
             },
             "7": null,
@@ -1030,43 +1030,9 @@
         },
         "8a": {
           "Mo": {
-            "1": null,
-            "2": null,
-            "3": {
-              "subject": "Kunst",
-              "teacher": "Musik-Kunst-Lehrer-1",
-              "room": null
-            },
-            "4": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
-              "room": null
-            },
-            "5": {
-              "subject": "Biologie",
-              "teacher": "NaWi-Lehrer-1",
-              "room": null
-            },
-            "6": {
-              "subject": "Musik",
-              "teacher": "Musik-Kunst-Lehrer-1",
-              "room": null
-            },
-            "7": {
-              "subject": "Physik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            },
-            "8": {
-              "subject": "Physik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            }
-          },
-          "Di": {
             "1": {
-              "subject": "Biologie",
-              "teacher": "NaWi-Lehrer-1",
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "2": {
@@ -1075,137 +1041,171 @@
               "room": null
             },
             "3": {
-              "subject": "Gemeinschaftskunde",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "subject": "Kunst",
+              "teacher": "Musik-Kunst-Lehrer-1",
               "room": null
             },
             "4": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
               "room": null
             },
             "5": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "6": {
-              "subject": "Geschichte",
+              "subject": "Deutsch",
               "teacher": "Deutsch-Geschichte-Lehrer-2",
               "room": null
             },
-            "7": null,
-            "8": null
-          },
-          "Mi": {
-            "1": {
-              "subject": "Chemie",
-              "teacher": "NaWi-Lehrer-2",
-              "room": null
-            },
-            "2": {
-              "subject": "Chemie",
-              "teacher": "NaWi-Lehrer-2",
-              "room": null
-            },
-            "3": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
-              "room": null
-            },
-            "4": {
+            "7": {
               "subject": "Sport",
               "teacher": "Sportlehrer-1",
               "room": null
             },
-            "5": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
+            "8": null
+          },
+          "Di": {
+            "1": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
               "room": null
             },
-            "6": {
+            "2": {
               "subject": "Englisch",
               "teacher": "Englisch-Erdkunde-Lehrer-2",
               "room": null
             },
+            "3": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            },
+            "4": {
+              "subject": "Biologie",
+              "teacher": "NaWi-Lehrer-1",
+              "room": null
+            },
+            "5": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "room": null
+            },
+            "6": {
+              "subject": "Musik",
+              "teacher": "Musik-Kunst-Lehrer-1",
+              "room": null
+            },
             "7": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            },
+            "8": {
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "room": null
+            }
+          },
+          "Mi": {
+            "1": {
+              "subject": "Kunst",
+              "teacher": "Musik-Kunst-Lehrer-1",
+              "room": null
+            },
+            "2": {
               "subject": "Religion",
               "teacher": "Religionslehrer-1",
+              "room": null
+            },
+            "3": {
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
+              "room": null
+            },
+            "4": {
+              "subject": "Gemeinschaftskunde",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "room": null
+            },
+            "5": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "room": null
+            },
+            "6": {
+              "subject": "Physik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "7": {
+              "subject": "Physik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
               "room": null
             },
             "8": null
           },
           "Do": {
-            "1": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
-              "room": null
-            },
+            "1": null,
             "2": {
-              "subject": "Gemeinschaftskunde",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
               "room": null
             },
             "3": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
               "room": null
             },
             "4": {
+              "subject": "Biologie",
+              "teacher": "NaWi-Lehrer-1",
+              "room": null
+            },
+            "5": {
+              "subject": "Chemie",
+              "teacher": "NaWi-Lehrer-2",
+              "room": null
+            },
+            "6": {
+              "subject": "Chemie",
+              "teacher": "NaWi-Lehrer-2",
+              "room": null
+            },
+            "7": null,
+            "8": null
+          },
+          "Fr": {
+            "1": {
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "room": null
+            },
+            "2": {
               "subject": "Sport",
               "teacher": "Sportlehrer-1",
               "room": null
             },
+            "3": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "room": null
+            },
+            "4": {
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "room": null
+            },
             "5": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "6": {
-              "subject": "Kunst",
-              "teacher": "Musik-Kunst-Lehrer-1",
-              "room": null
-            },
-            "7": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
-              "room": null
-            },
-            "8": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
-              "room": null
-            }
-          },
-          "Fr": {
-            "1": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
-              "room": null
-            },
-            "2": {
               "subject": "Musik",
               "teacher": "Musik-Kunst-Lehrer-1",
               "room": null
             },
-            "3": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
-              "room": null
-            },
-            "4": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-1",
-              "room": null
-            },
-            "5": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
             "6": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
+              "subject": "Gemeinschaftskunde",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
               "room": null
             },
             "7": null,
@@ -1214,38 +1214,46 @@
         },
         "8b": {
           "Mo": {
-            "1": null,
+            "1": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
             "2": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "subject": "Gemeinschaftskunde",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
               "room": null
             },
             "3": {
-              "subject": "Biologie",
-              "teacher": "NaWi-Lehrer-1",
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
               "room": null
             },
             "4": {
-              "subject": "Englisch",
+              "subject": "Erdkunde",
               "teacher": "Englisch-Erdkunde-Lehrer-3",
               "room": null
             },
             "5": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
               "room": null
             },
             "6": {
-              "subject": "Musik",
-              "teacher": "Musik-Kunst-Lehrer-2",
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
               "room": null
             },
             "7": {
-              "subject": "Kunst",
-              "teacher": "Musik-Kunst-Lehrer-1",
+              "subject": "Chemie",
+              "teacher": "NaWi-Lehrer-1",
               "room": null
             },
-            "8": null
+            "8": {
+              "subject": "Chemie",
+              "teacher": "NaWi-Lehrer-1",
+              "room": null
+            }
           },
           "Di": {
             "1": {
@@ -1254,28 +1262,28 @@
               "room": null
             },
             "2": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "subject": "Kunst",
+              "teacher": "Musik-Kunst-Lehrer-1",
               "room": null
             },
             "3": {
-              "subject": "Chemie",
+              "subject": "Biologie",
               "teacher": "NaWi-Lehrer-1",
               "room": null
             },
             "4": {
-              "subject": "Chemie",
-              "teacher": "NaWi-Lehrer-1",
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
               "room": null
             },
             "5": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
+              "subject": "Gemeinschaftskunde",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
               "room": null
             },
             "6": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
               "room": null
             },
             "7": null,
@@ -1283,32 +1291,32 @@
           },
           "Mi": {
             "1": {
-              "subject": "Gemeinschaftskunde",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
-              "room": null
-            },
-            "2": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-1",
-              "room": null
-            },
-            "3": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
-              "room": null
-            },
-            "4": {
               "subject": "Religion",
               "teacher": "Religionslehrer-1",
               "room": null
             },
+            "2": {
+              "subject": "Kunst",
+              "teacher": "Musik-Kunst-Lehrer-1",
+              "room": null
+            },
+            "3": {
+              "subject": "Physik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "4": {
+              "subject": "Physik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
             "5": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
+              "subject": "Musik",
+              "teacher": "Musik-Kunst-Lehrer-1",
               "room": null
             },
             "6": {
-              "subject": "Englisch",
+              "subject": "Erdkunde",
               "teacher": "Englisch-Erdkunde-Lehrer-3",
               "room": null
             },
@@ -1316,141 +1324,103 @@
             "8": null
           },
           "Do": {
-            "1": null,
-            "2": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-1",
-              "room": null
-            },
-            "3": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
-              "room": null
-            },
-            "4": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
-              "room": null
-            },
-            "5": {
+            "1": {
               "subject": "Religion",
               "teacher": "Religionslehrer-1",
               "room": null
             },
-            "6": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
-              "room": null
-            },
-            "7": {
-              "subject": "Kunst",
-              "teacher": "Musik-Kunst-Lehrer-1",
-              "room": null
-            },
-            "8": {
-              "subject": "Biologie",
-              "teacher": "NaWi-Lehrer-1",
-              "room": null
-            }
-          },
-          "Fr": {
-            "1": {
-              "subject": "Musik",
-              "teacher": "Musik-Kunst-Lehrer-2",
-              "room": null
-            },
             "2": {
               "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
               "room": null
             },
             "3": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "4": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "5": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
+            "6": {
               "subject": "Geschichte",
               "teacher": "Deutsch-Geschichte-Lehrer-3",
               "room": null
             },
-            "4": {
-              "subject": "Physik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            },
-            "5": {
-              "subject": "Physik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            },
-            "6": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
-              "room": null
-            },
             "7": {
-              "subject": "Gemeinschaftskunde",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "subject": "Biologie",
+              "teacher": "NaWi-Lehrer-1",
               "room": null
             },
-            "8": {
+            "8": null
+          },
+          "Fr": {
+            "1": null,
+            "2": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
+            "3": {
               "subject": "Sport",
               "teacher": "Sportlehrer-1",
               "room": null
-            }
+            },
+            "4": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "5": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
+            "6": {
+              "subject": "Musik",
+              "teacher": "Musik-Kunst-Lehrer-1",
+              "room": null
+            },
+            "7": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "room": null
+            },
+            "8": null
           }
         },
         "9a": {
           "Mo": {
-            "1": null,
+            "1": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
             "2": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
-              "room": null
-            },
-            "3": {
-              "subject": "Physik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            },
-            "4": {
-              "subject": "Physik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            },
-            "5": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "6": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "7": {
               "subject": "Chemie",
               "teacher": "NaWi-Lehrer-1",
               "room": null
             },
-            "8": {
+            "3": {
               "subject": "Chemie",
               "teacher": "NaWi-Lehrer-1",
               "room": null
-            }
-          },
-          "Di": {
-            "1": null,
-            "2": null,
-            "3": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
-              "room": null
             },
             "4": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
               "room": null
             },
             "5": {
-              "subject": "Biologie",
-              "teacher": "NaWi-Lehrer-2",
+              "subject": "Gemeinschaftskunde",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
               "room": null
             },
             "6": {
@@ -1461,30 +1431,34 @@
             "7": null,
             "8": null
           },
-          "Mi": {
-            "1": null,
+          "Di": {
+            "1": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
             "2": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
-              "room": null
-            },
-            "3": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
-              "room": null
-            },
-            "4": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
-              "room": null
-            },
-            "5": {
               "subject": "Deutsch",
               "teacher": "Deutsch-Geschichte-Lehrer-2",
               "room": null
             },
+            "3": {
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "room": null
+            },
+            "4": {
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "room": null
+            },
+            "5": {
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
+              "room": null
+            },
             "6": {
-              "subject": "Gemeinschaftskunde",
+              "subject": "Deutsch",
               "teacher": "Deutsch-Geschichte-Lehrer-2",
               "room": null
             },
@@ -1493,37 +1467,67 @@
               "teacher": "Mathematik-Physik-Lehrer-2",
               "room": null
             },
-            "8": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
-              "room": null
-            }
+            "8": null
           },
-          "Do": {
-            "1": null,
+          "Mi": {
+            "1": {
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "room": null
+            },
             "2": {
               "subject": "Mathematik",
               "teacher": "Mathematik-Physik-Lehrer-2",
               "room": null
             },
             "3": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-1",
+              "subject": "Physik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "4": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "subject": "Physik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "5": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
+            "6": {
               "subject": "Deutsch",
               "teacher": "Deutsch-Geschichte-Lehrer-2",
               "room": null
             },
+            "7": null,
+            "8": null
+          },
+          "Do": {
+            "1": null,
+            "2": {
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
+              "room": null
+            },
+            "3": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
+            "4": {
+              "subject": "Biologie",
+              "teacher": "NaWi-Lehrer-2",
+              "room": null
+            },
+            "5": {
+              "subject": "Gemeinschaftskunde",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "room": null
+            },
             "6": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
               "room": null
             },
             "7": null,
@@ -1532,8 +1536,8 @@
           "Fr": {
             "1": null,
             "2": {
-              "subject": "Biologie",
-              "teacher": "NaWi-Lehrer-2",
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
               "room": null
             },
             "3": {
@@ -1542,43 +1546,35 @@
               "room": null
             },
             "4": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
               "room": null
             },
             "5": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
               "room": null
             },
             "6": {
-              "subject": "Gemeinschaftskunde",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "subject": "Biologie",
+              "teacher": "NaWi-Lehrer-2",
               "room": null
             },
-            "7": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-1",
-              "room": null
-            },
+            "7": null,
             "8": null
           }
         },
         "9b": {
           "Mo": {
-            "1": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
-              "room": null
-            },
+            "1": null,
             "2": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-2",
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
               "room": null
             },
             "3": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
               "room": null
             },
             "4": {
@@ -1587,320 +1583,156 @@
               "room": null
             },
             "5": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
               "room": null
             },
             "6": {
               "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
               "room": null
             },
             "7": null,
             "8": null
           },
           "Di": {
-            "1": null,
-            "2": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "3": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
-              "room": null
-            },
-            "4": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
-              "room": null
-            },
-            "5": {
+            "1": {
               "subject": "Religion",
               "teacher": "Religionslehrer-1",
               "room": null
             },
-            "6": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-2",
-              "room": null
-            },
-            "7": null,
-            "8": null
-          },
-          "Mi": {
-            "1": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
             "2": {
-              "subject": "Physik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
               "room": null
             },
             "3": {
-              "subject": "Physik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
               "room": null
             },
             "4": {
               "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "room": null
+            },
+            "5": {
+              "subject": "Biologie",
+              "teacher": "NaWi-Lehrer-1",
+              "room": null
+            },
+            "6": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "7": {
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "room": null
+            },
+            "8": null
+          },
+          "Mi": {
+            "1": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "room": null
+            },
+            "2": {
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "room": null
+            },
+            "3": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "room": null
+            },
+            "4": {
+              "subject": "Erdkunde",
               "teacher": "Englisch-Erdkunde-Lehrer-2",
               "room": null
             },
             "5": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "subject": "Gemeinschaftskunde",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
               "room": null
             },
             "6": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
               "room": null
             },
             "7": null,
             "8": null
           },
           "Do": {
-            "1": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "2": {
-              "subject": "Gemeinschaftskunde",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
-              "room": null
-            },
-            "3": {
-              "subject": "Chemie",
-              "teacher": "NaWi-Lehrer-2",
-              "room": null
-            },
-            "4": {
-              "subject": "Chemie",
-              "teacher": "NaWi-Lehrer-2",
-              "room": null
-            },
-            "5": {
-              "subject": "Biologie",
-              "teacher": "NaWi-Lehrer-2",
-              "room": null
-            },
-            "6": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
-              "room": null
-            },
-            "7": null,
-            "8": null
-          },
-          "Fr": {
-            "1": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "2": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-1",
-              "room": null
-            },
-            "3": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-2",
-              "room": null
-            },
-            "4": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
-              "room": null
-            },
-            "5": {
-              "subject": "Biologie",
-              "teacher": "NaWi-Lehrer-2",
-              "room": null
-            },
-            "6": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
-              "room": null
-            },
-            "7": null,
-            "8": null
-          }
-        },
-        "10a": {
-          "Mo": {
-            "1": {
-              "subject": "Physik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "2": {
-              "subject": "Physik",
-              "teacher": "Mathematik-Physik-Lehrer-2",
-              "room": null
-            },
-            "3": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
-              "room": null
-            },
-            "4": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-2",
-              "room": null
-            },
-            "5": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
-            "6": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            },
-            "7": null,
-            "8": null
-          },
-          "Di": {
             "1": null,
-            "2": null,
+            "2": {
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
+              "room": null
+            },
             "3": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
               "room": null
             },
             "4": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
-              "room": null
-            },
-            "5": {
-              "subject": "Gemeinschaftskunde",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
-              "room": null
-            },
-            "6": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
-              "room": null
-            },
-            "7": {
               "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
-              "room": null
-            },
-            "8": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            }
-          },
-          "Mi": {
-            "1": {
-              "subject": "Gemeinschaftskunde",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
-              "room": null
-            },
-            "2": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
-              "room": null
-            },
-            "3": {
-              "subject": "Geschichte",
               "teacher": "Deutsch-Geschichte-Lehrer-3",
               "room": null
             },
-            "4": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
-              "room": null
-            },
             "5": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-2",
+              "subject": "Biologie",
+              "teacher": "NaWi-Lehrer-1",
               "room": null
             },
             "6": null,
             "7": null,
             "8": null
           },
-          "Do": {
-            "1": null,
-            "2": {
-              "subject": "Biologie",
-              "teacher": "NaWi-Lehrer-2",
-              "room": null
-            },
-            "3": {
-              "subject": "Sport",
-              "teacher": "Sportlehrer-2",
-              "room": null
-            },
-            "4": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
-              "room": null
-            },
-            "5": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            },
-            "6": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
-              "room": null
-            },
-            "7": null,
-            "8": null
-          },
           "Fr": {
             "1": null,
             "2": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "subject": "Physik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "3": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "subject": "Physik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "4": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
+              "subject": "Chemie",
+              "teacher": "NaWi-Lehrer-1",
               "room": null
             },
             "5": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "subject": "Chemie",
+              "teacher": "NaWi-Lehrer-1",
               "room": null
             },
             "6": {
-              "subject": "Chemie",
-              "teacher": "NaWi-Lehrer-2",
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
               "room": null
             },
             "7": {
-              "subject": "Chemie",
-              "teacher": "NaWi-Lehrer-2",
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
               "room": null
             },
             "8": {
-              "subject": "Biologie",
-              "teacher": "NaWi-Lehrer-2",
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
               "room": null
             }
           }
         },
-        "10b": {
+        "10a": {
           "Mo": {
             "1": null,
             "2": {
@@ -1909,12 +1741,76 @@
               "room": null
             },
             "3": {
-              "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
               "room": null
             },
             "4": {
               "subject": "Biologie",
+              "teacher": "NaWi-Lehrer-1",
+              "room": null
+            },
+            "5": {
+              "subject": "Gemeinschaftskunde",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "room": null
+            },
+            "6": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "room": null
+            },
+            "7": null,
+            "8": null
+          },
+          "Di": {
+            "1": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "room": null
+            },
+            "2": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "room": null
+            },
+            "3": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "room": null
+            },
+            "4": {
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "room": null
+            },
+            "5": {
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "room": null
+            },
+            "6": {
+              "subject": "Biologie",
+              "teacher": "NaWi-Lehrer-1",
+              "room": null
+            },
+            "7": null,
+            "8": null
+          },
+          "Mi": {
+            "1": null,
+            "2": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            },
+            "3": {
+              "subject": "Chemie",
+              "teacher": "NaWi-Lehrer-1",
+              "room": null
+            },
+            "4": {
+              "subject": "Chemie",
               "teacher": "NaWi-Lehrer-1",
               "room": null
             },
@@ -1924,72 +1820,8 @@
               "room": null
             },
             "6": {
-              "subject": "Gemeinschaftskunde",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
-            "7": null,
-            "8": null
-          },
-          "Di": {
-            "1": null,
-            "2": {
-              "subject": "Biologie",
-              "teacher": "NaWi-Lehrer-1",
-              "room": null
-            },
-            "3": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
-              "room": null
-            },
-            "4": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
-              "room": null
-            },
-            "5": {
-              "subject": "Chemie",
-              "teacher": "NaWi-Lehrer-1",
-              "room": null
-            },
-            "6": {
-              "subject": "Chemie",
-              "teacher": "NaWi-Lehrer-1",
-              "room": null
-            },
-            "7": null,
-            "8": null
-          },
-          "Mi": {
-            "1": {
-              "subject": "Erdkunde",
-              "teacher": "Englisch-Erdkunde-Lehrer-2",
-              "room": null
-            },
-            "2": {
-              "subject": "Religion",
-              "teacher": "Religionslehrer-1",
-              "room": null
-            },
-            "3": {
               "subject": "Geschichte",
-              "teacher": "Deutsch-Geschichte-Lehrer-2",
-              "room": null
-            },
-            "4": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
-              "room": null
-            },
-            "5": {
-              "subject": "Gemeinschaftskunde",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
-            "6": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
               "room": null
             },
             "7": null,
@@ -1998,18 +1830,18 @@
           "Do": {
             "1": null,
             "2": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
               "room": null
             },
             "3": {
-              "subject": "Englisch",
-              "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
               "room": null
             },
             "4": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
               "room": null
             },
             "5": {
@@ -2022,16 +1854,8 @@
               "teacher": "Religionslehrer-1",
               "room": null
             },
-            "7": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            },
-            "8": {
-              "subject": "Deutsch",
-              "teacher": "Deutsch-Geschichte-Lehrer-3",
-              "room": null
-            }
+            "7": null,
+            "8": null
           },
           "Fr": {
             "1": {
@@ -2050,8 +1874,176 @@
               "room": null
             },
             "4": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "room": null
+            },
+            "5": {
+              "subject": "Gemeinschaftskunde",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "room": null
+            },
+            "6": {
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
+              "room": null
+            },
+            "7": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-1",
+              "room": null
+            },
+            "8": {
               "subject": "Englisch",
               "teacher": "Englisch-Erdkunde-Lehrer-3",
+              "room": null
+            }
+          }
+        },
+        "10b": {
+          "Mo": {
+            "1": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "room": null
+            },
+            "2": {
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
+              "room": null
+            },
+            "3": {
+              "subject": "Gemeinschaftskunde",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "room": null
+            },
+            "4": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "room": null
+            },
+            "5": {
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
+              "room": null
+            },
+            "6": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "7": null,
+            "8": null
+          },
+          "Di": {
+            "1": null,
+            "2": {
+              "subject": "Physik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "3": {
+              "subject": "Physik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "4": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "5": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "6": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "room": null
+            },
+            "7": null,
+            "8": null
+          },
+          "Mi": {
+            "1": null,
+            "2": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "room": null
+            },
+            "3": {
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "room": null
+            },
+            "4": {
+              "subject": "Sport",
+              "teacher": "Sportlehrer-1",
+              "room": null
+            },
+            "5": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "room": null
+            },
+            "6": {
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
+            "7": null,
+            "8": null
+          },
+          "Do": {
+            "1": {
+              "subject": "Chemie",
+              "teacher": "NaWi-Lehrer-1",
+              "room": null
+            },
+            "2": {
+              "subject": "Chemie",
+              "teacher": "NaWi-Lehrer-1",
+              "room": null
+            },
+            "3": {
+              "subject": "Biologie",
+              "teacher": "NaWi-Lehrer-1",
+              "room": null
+            },
+            "4": {
+              "subject": "Erdkunde",
+              "teacher": "Englisch-Erdkunde-Lehrer-1",
+              "room": null
+            },
+            "5": {
+              "subject": "Mathematik",
+              "teacher": "Mathematik-Physik-Lehrer-2",
+              "room": null
+            },
+            "6": {
+              "subject": "Deutsch",
+              "teacher": "Deutsch-Geschichte-Lehrer-2",
+              "room": null
+            },
+            "7": null,
+            "8": null
+          },
+          "Fr": {
+            "1": null,
+            "2": {
+              "subject": "Gemeinschaftskunde",
+              "teacher": "Deutsch-Geschichte-Lehrer-3",
+              "room": null
+            },
+            "3": {
+              "subject": "Religion",
+              "teacher": "Religionslehrer-1",
+              "room": null
+            },
+            "4": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
               "room": null
             },
             "5": {
@@ -2060,12 +2052,20 @@
               "room": null
             },
             "6": {
-              "subject": "Mathematik",
-              "teacher": "Mathematik-Physik-Lehrer-1",
+              "subject": "Biologie",
+              "teacher": "NaWi-Lehrer-1",
               "room": null
             },
-            "7": null,
-            "8": null
+            "7": {
+              "subject": "Englisch",
+              "teacher": "Englisch-Erdkunde-Lehrer-2",
+              "room": null
+            },
+            "8": {
+              "subject": "Geschichte",
+              "teacher": "Deutsch-Geschichte-Lehrer-1",
+              "room": null
+            }
           }
         }
       }
