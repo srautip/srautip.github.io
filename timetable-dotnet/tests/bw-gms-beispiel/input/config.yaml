@@ -4,7 +4,7 @@
 # mehr Zeit, den gefundenen Plan als OPTIMAL zu beweisen statt nur
 # FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
 # "CP-SAT-Status"-Feld in output/stundenplan.md.
-solve_time_limit_s: 600.0
+solve_time_limit_s: 1800.0
 
 # Anzahl paralleler CP-SAT-Suchpfade (Portfolio-Threading). Hoeher kann
 # helfen, ueberhaupt schneller eine erste Loesung zu finden, geht aber zu
@@ -16,10 +16,10 @@ num_workers: 4
 # Iteration das komplette solve_time_limit_s-Budget zur Verfuegung -
 # dieses Szenario war dabei bisher nicht schnell genug fuer einen
 # Optimalitaetsbeweis, sodass SolveTop nie zu einer zweiten Iteration kam
-# und trotz max_solutions: 5 nur 1 Loesung fand. Mit 3 Min pro Versuch
-# bleibt innerhalb der 10-Min-Gesamtgrenze (solve_time_limit_s) Raum fuer
+# und trotz max_solutions: 5 nur 1 Loesung fand. Mit 10 Min pro Versuch
+# bleibt innerhalb der 30-Min-Gesamtgrenze (solve_time_limit_s) Raum fuer
 # mehrere Versuche.
-per_solve_time_limit_s: 180.0
+per_solve_time_limit_s: 600.0
 
 # Phase 2.21: wie viele vergleichbare Loesungs-Alternativen sollen in
 # output/stundenplan.json + output/stundentafel.html exportiert werden?
