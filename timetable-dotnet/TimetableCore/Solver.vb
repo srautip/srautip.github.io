@@ -829,7 +829,9 @@ Public Module Solver
                               Optional seed As Integer = 42,
                               Optional numWorkers As Integer = 1,
                               Optional stage1TimeLimitS As Double = 60.0,
-                              Optional useStagedHints As Boolean = True) As MultiSolveResult
+                              Optional useStagedHints As Boolean = True,
+                              Optional qualityWeights As QualityWeights = Nothing) As MultiSolveResult
+        Dim weights = If(qualityWeights, New QualityWeights())
         Dim built = BuildCoreModel(data)
         Dim sw = Stopwatch.StartNew()
 
@@ -848,7 +850,7 @@ Public Module Solver
             End If
         End If
 
-        SolveTopObjective.ApplyQualityObjective(built, data)
+        SolveTopObjective.ApplyQualityObjective(built, data, weights)
         Dim solutions As New List(Of ScoredSolution)
         Dim iterations = 0
         Dim stopReason As MultiSolveStopReason
@@ -887,7 +889,7 @@ Public Module Solver
             Dim schedule = ExtractSchedule(built, solver, status)
             Dim kannFlags = ExtractKannFlags(built, solver, status)
             Dim kannCount = Verifier.VerifyScheduleDetailed(data, schedule).KannViolations.Count
-            Dim quality = ScheduleQuality.Score(data, schedule, kannCount)
+            Dim quality = ScheduleQuality.Score(data, schedule, kannCount, weights)
             solutions.Add(New ScoredSolution With {
                 .Schedule = schedule, .KannConstraintFlags = kannFlags, .Quality = quality, .Status = status,
                 .ObjectiveValue = solver.ObjectiveValue, .BestObjectiveBound = solver.BestObjectiveBound,

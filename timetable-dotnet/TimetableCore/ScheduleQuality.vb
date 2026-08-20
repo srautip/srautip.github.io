@@ -20,6 +20,30 @@ Public NotInheritable Class QualityScore
     Public Property Total As Double
 End Class
 
+''' <summary>Phase 2.24: the seven weights ScheduleQuality.Score and
+''' SolveTopObjective.ApplyQualityObjective combine into a single ranking/
+''' CP-SAT objective, pulled out of hardcoded module constants into an
+''' overridable object - lets SchoolTestRunner's config.yaml tune them per
+''' school without any code change. Every property defaults to the
+''' module's own Weight*-constants below, so `New QualityWeights()`
+''' reproduces today's behavior byte-identically (every existing school
+''' without a `quality_weights` section in its config.yaml keeps exactly
+''' the same ranking/objective as before this class existed).
+''' Note: SolveTopObjective.ApplyQualityObjective feeds these into a
+''' CP-SAT objective via CLng(...) (integer coefficients only) - a
+''' fractional weight there gets rounded to the nearest whole number for
+''' the actual SEARCH, while ScheduleQuality.Score's post-hoc Quality.Total
+''' display uses the exact (unrounded) Double value.</summary>
+Public NotInheritable Class QualityWeights
+    Public Property Kann As Double = ScheduleQuality.WeightKann
+    Public Property ClassGaps As Double = ScheduleQuality.WeightClassGaps
+    Public Property TeacherGaps As Double = ScheduleQuality.WeightTeacherGaps
+    Public Property EdgePeriod As Double = ScheduleQuality.WeightEdgePeriod
+    Public Property AfternoonDayCount As Double = ScheduleQuality.WeightAfternoonDayCount
+    Public Property ClassLoadVariance As Double = ScheduleQuality.WeightClassLoadVariance
+    Public Property TeacherLoadVariance As Double = ScheduleQuality.WeightTeacherLoadVariance
+End Class
+
 Public Module ScheduleQuality
 
     ' Kann-Verstoesse must dominate the ranking - chosen large enough that
@@ -70,8 +94,13 @@ Public Module ScheduleQuality
     ''' it from Verifier.VerifyScheduleDetailed, independently re-derived
     ''' from the schedule rather than trusted off the solver's own
     ''' KannConstraintFlags - same "don't trust the solver" philosophy as
-    ''' Verifier.vb's header comment).</summary>
-    Public Function Score(data As JsonObject, schedule As List(Of ScheduleEntry), kannViolationCount As Integer) As QualityScore
+    ''' Verifier.vb's header comment). `weights` defaults (Nothing) to the
+    ''' module's own Weight*-constants via `New QualityWeights()` - see
+    ''' that class's doc comment for the backward-compatibility
+    ''' guarantee.</summary>
+    Public Function Score(data As JsonObject, schedule As List(Of ScheduleEntry), kannViolationCount As Integer,
+                           Optional weights As QualityWeights = Nothing) As QualityScore
+        Dim w = If(weights, New QualityWeights())
         Dim ent = JsonHelpers.Entities(data)
         Dim timeslots = JsonHelpers.Timeslots(ent)
         Dim allDays = JsonHelpers.AsStringList(timeslots, "days")
@@ -85,10 +114,10 @@ Public Module ScheduleQuality
         Dim classVariance = LoadVarianceOverAllDays(schedule.GroupBy(Function(l) l.ClassName), allDays)
         Dim teacherVariance = LoadVarianceOverWorkingDaysOnly(schedule.GroupBy(Function(l) l.Teacher))
 
-        Dim total = WeightKann * kannViolationCount +
-                    WeightClassGaps * classGaps + WeightTeacherGaps * teacherGaps +
-                    WeightEdgePeriod * edgeCount + WeightAfternoonDayCount * afternoonDayCount +
-                    WeightClassLoadVariance * classVariance + WeightTeacherLoadVariance * teacherVariance
+        Dim total = w.Kann * kannViolationCount +
+                    w.ClassGaps * classGaps + w.TeacherGaps * teacherGaps +
+                    w.EdgePeriod * edgeCount + w.AfternoonDayCount * afternoonDayCount +
+                    w.ClassLoadVariance * classVariance + w.TeacherLoadVariance * teacherVariance
 
         Return New QualityScore With {
             .KannViolationCount = kannViolationCount, .ClassGapCount = classGaps, .TeacherGapCount = teacherGaps,

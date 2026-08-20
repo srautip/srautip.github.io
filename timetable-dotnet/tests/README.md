@@ -292,6 +292,14 @@ per_solve_time_limit_s: 30.0   # Optional, Default: faellt auf solve_time_limit_
 seed: 42
 num_workers: 1   # Default: Anzahl CPU-Kerne - 1 (mindestens 1)
 max_solutions: 1   # Default 1 (Phase 2.21) - siehe unten
+quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe unten
+  kann: 100000.0
+  class_gaps: 10.0
+  teacher_gaps: 10.0
+  edge_period: 5.0
+  afternoon_day_count: 5.0
+  class_load_variance: 3.0
+  teacher_load_variance: 3.0
 ```
 
 Fehlt die Datei komplett, gelten diese Defaults unverändert. `solve_time_limit_s`
@@ -329,6 +337,31 @@ Zeit benötigt wird. Zwei Hebel dafür: `solve_time_limit_s` selbst erhöhen
 zwingt jede einzelne Iteration früher zum Abbruch (statt das gesamte
 Budget zu verbrauchen, bevor sie `Optimal` beweisen kann) und lässt so
 innerhalb desselben Gesamtbudgets mehrere Iterationen zu.
+
+**`quality_weights`** (Phase 2.24, komplett optional - fehlt der Block
+oder ein einzelnes Unterfeld darin, gilt unverändert der jeweils oben
+gezeigte Default) gewichtet, wie stark jedes der 7 Bewertungskriterien in
+`Solver.SolveTop`s Zielfunktion UND in der angezeigten `Quality.Total`
+(`stundenplan.md`/`stundenplan.json`) einfließt - dieselben Werte steuern
+beides gleichzeitig, damit die Anzeige immer zu dem passt, wonach der
+Solver tatsächlich gesucht hat:
+
+| Feld | Bedeutet |
+|---|---|
+| `kann` | Verletzte "Kann"-Regeln (`priority: should`) - bewusst riesig, damit sie praktisch nie zugunsten der übrigen 6 Kriterien gebrochen werden |
+| `class_gaps` / `teacher_gaps` | Springstunden (Lücken zwischen belegten Stunden an einem Tag) für Klassen bzw. Lehrkräfte |
+| `edge_period` | Randstunden: 1. Stunde oder Nachmittag (Periode ≥ 7) |
+| `afternoon_day_count` | Anzahl unterschiedlicher Tage mit Nachmittagsunterricht pro Klasse (nicht die Stundenanzahl - 4 Nachmittagsstunden an 1 Tag zählen als 1, an 4 Tagen verteilt als 4) |
+| `class_load_variance` / `teacher_load_variance` | Ausgewogenheit der täglichen Stundenzahl (Lehrkräfte nur über ihre tatsächlichen Arbeitstage) |
+
+Nur explizit gesetzte Unterfelder überschreiben ihren Default - eine
+Schule kann also z.B. nur `edge_period` anpassen, ohne die übrigen 6
+Gewichte mit angeben zu müssen. Ein Wert von `0` schaltet ein Kriterium
+komplett ab (der Solver optimiert dann gar nicht mehr danach). Intern
+fließen die Gewichte im CP-SAT-Modell als GANZE Zahlen ein (gerundet) -
+für die reine Rangfolge zwischen Kriterien spielt das praktisch nie eine
+Rolle, aber die in `stundenplan.md`/`stundenplan.json` angezeigte
+`Quality.Total` selbst verwendet die exakten (nicht gerundeten) Werte.
 
 ## CLI: Grundgerüst per Template erzeugen
 

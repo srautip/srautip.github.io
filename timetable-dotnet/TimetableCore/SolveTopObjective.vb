@@ -202,13 +202,17 @@ Friend Module SolveTopObjective
 
     ''' <summary>Adds a Minimize objective to `built.Model` combining all 6
     ''' ScheduleQuality criteria (Kann-violations dominant, then gaps, edge
-    ''' periods, afternoon-day count, and class/teacher load balance), using the same weight
-    ''' constants ScheduleQuality.vb uses to score candidates afterward -
-    ''' so the search itself is now steered toward what SolveTop's final
-    ''' ranking already valued. Called once by SolveTop, on a BuiltModel
-    ''' from BuildCoreModel (NOT BuildModel - this replaces, rather than
-    ''' adds to, BuildModel's own Kann-only Minimize).</summary>
-    Friend Sub ApplyQualityObjective(built As BuiltModel, data As JsonObject)
+    ''' periods, afternoon-day count, and class/teacher load balance), using
+    ''' the same weights ScheduleQuality.vb uses to score candidates
+    ''' afterward - so the search itself is now steered toward what
+    ''' SolveTop's final ranking already valued. `weights` defaults
+    ''' (Nothing) to `New ScheduleQuality.QualityWeights()` (today's
+    ''' hardcoded constants) - see that class's doc comment for the
+    ''' backward-compatibility guarantee. Called once by SolveTop, on a
+    ''' BuiltModel from BuildCoreModel (NOT BuildModel - this replaces,
+    ''' rather than adds to, BuildModel's own Kann-only Minimize).</summary>
+    Friend Sub ApplyQualityObjective(built As BuiltModel, data As JsonObject, Optional weights As QualityWeights = Nothing)
+        Dim w = If(weights, New QualityWeights())
         Dim model = built.Model
         Dim classNames = built.Sessions.Select(Function(s) s.ClassName).Distinct().ToList()
         Dim teacherNames = built.Sessions.Select(Function(s) s.Teacher).Distinct().ToList()
@@ -246,14 +250,14 @@ Friend Module SolveTopObjective
 
         Dim terms As New List(Of LinearExpr)
         If built.KannVars.Count > 0 Then
-            terms.Add(CLng(ScheduleQuality.WeightKann) * LinearExpr.Sum(built.KannVars.Values.Select(Function(kv) kv.Var)))
+            terms.Add(CLng(w.Kann) * LinearExpr.Sum(built.KannVars.Values.Select(Function(kv) kv.Var)))
         End If
-        If classGapVars.Count > 0 Then terms.Add(CLng(ScheduleQuality.WeightClassGaps) * LinearExpr.Sum(classGapVars))
-        If teacherGapVars.Count > 0 Then terms.Add(CLng(ScheduleQuality.WeightTeacherGaps) * LinearExpr.Sum(teacherGapVars))
-        terms.Add(CLng(ScheduleQuality.WeightEdgePeriod) * edgeTerm)
-        If classAfternoonDayVars.Count > 0 Then terms.Add(CLng(ScheduleQuality.WeightAfternoonDayCount) * LinearExpr.Sum(classAfternoonDayVars))
-        If classRangeVars.Count > 0 Then terms.Add(CLng(ScheduleQuality.WeightClassLoadVariance) * LinearExpr.Sum(classRangeVars))
-        If teacherRangeVars.Count > 0 Then terms.Add(CLng(ScheduleQuality.WeightTeacherLoadVariance) * LinearExpr.Sum(teacherRangeVars))
+        If classGapVars.Count > 0 Then terms.Add(CLng(w.ClassGaps) * LinearExpr.Sum(classGapVars))
+        If teacherGapVars.Count > 0 Then terms.Add(CLng(w.TeacherGaps) * LinearExpr.Sum(teacherGapVars))
+        terms.Add(CLng(w.EdgePeriod) * edgeTerm)
+        If classAfternoonDayVars.Count > 0 Then terms.Add(CLng(w.AfternoonDayCount) * LinearExpr.Sum(classAfternoonDayVars))
+        If classRangeVars.Count > 0 Then terms.Add(CLng(w.ClassLoadVariance) * LinearExpr.Sum(classRangeVars))
+        If teacherRangeVars.Count > 0 Then terms.Add(CLng(w.TeacherLoadVariance) * LinearExpr.Sum(teacherRangeVars))
 
         model.Minimize(terms.Aggregate(Function(a, b) a + b))
     End Sub

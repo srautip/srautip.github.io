@@ -40,6 +40,30 @@ Public NotInheritable Class RunConfig
     ''' aufbrauchen wuerde, bevor SolveTop bei max_solutions > 1 ueberhaupt
     ''' zu einer zweiten Iteration kommt.</summary>
     Public Property PerSolveTimeLimitS As Double? = Nothing
+    ''' <summary>Phase 2.24: Default Nothing - faellt dann komplett auf
+    ''' ScheduleQuality.vb's eigene Weight*-Konstanten zurueck (identisch
+    ''' zum Verhalten vor dieser Config-Erweiterung, byte-identisch fuer
+    ''' jede bestehende Schule ohne "quality_weights"-Block in ihrer
+    ''' config.yaml). Jedes einzelne Unterfeld ist selbst wieder optional -
+    ''' nur gesetzte Felder ueberschreiben den jeweiligen Default, siehe
+    ''' BuildQualityWeights.</summary>
+    Public Property QualityWeights As QualityWeightsConfig = Nothing
+End Class
+
+''' <summary>Phase 2.24: die sieben Gewichte aus ScheduleQuality.
+''' QualityWeights, als optionale (Nothing = ungesetzt) YAML-Felder unter
+''' `quality_weights:` in config.yaml. Feldnamen bewusst identisch zu den
+''' Property-Namen von ScheduleQuality.QualityWeights (nur snake_case ueber
+''' YamlDotNets UnderscoredNamingConvention), damit BuildQualityWeights
+''' unten eine simple 1:1-Uebertragung bleibt.</summary>
+Public NotInheritable Class QualityWeightsConfig
+    Public Property Kann As Double? = Nothing
+    Public Property ClassGaps As Double? = Nothing
+    Public Property TeacherGaps As Double? = Nothing
+    Public Property EdgePeriod As Double? = Nothing
+    Public Property AfternoonDayCount As Double? = Nothing
+    Public Property ClassLoadVariance As Double? = Nothing
+    Public Property TeacherLoadVariance As Double? = Nothing
 End Class
 
 Public Module Run
@@ -53,6 +77,25 @@ Public Module Run
         Dim yaml = IO.File.ReadAllText(path)
         If String.IsNullOrWhiteSpace(yaml) Then Return New RunConfig()
         Return ConfigDeserializer.Deserialize(Of RunConfig)(yaml)
+    End Function
+
+    ''' <summary>Phase 2.24: startet bei ScheduleQuality.QualityWeights'
+    ''' eigenen Defaults (`New QualityWeights()` - identisch zu den
+    ''' hartcodierten Weight*-Konstanten) und ueberschreibt nur die in
+    ''' config.yaml tatsaechlich gesetzten Unterfelder. `cfg = Nothing`
+    ''' (kein "quality_weights"-Block in config.yaml) liefert unveraendert
+    ''' die reinen Defaults.</summary>
+    Private Function BuildQualityWeights(cfg As QualityWeightsConfig) As QualityWeights
+        Dim w As New QualityWeights()
+        If cfg Is Nothing Then Return w
+        If cfg.Kann.HasValue Then w.Kann = cfg.Kann.Value
+        If cfg.ClassGaps.HasValue Then w.ClassGaps = cfg.ClassGaps.Value
+        If cfg.TeacherGaps.HasValue Then w.TeacherGaps = cfg.TeacherGaps.Value
+        If cfg.EdgePeriod.HasValue Then w.EdgePeriod = cfg.EdgePeriod.Value
+        If cfg.AfternoonDayCount.HasValue Then w.AfternoonDayCount = cfg.AfternoonDayCount.Value
+        If cfg.ClassLoadVariance.HasValue Then w.ClassLoadVariance = cfg.ClassLoadVariance.Value
+        If cfg.TeacherLoadVariance.HasValue Then w.TeacherLoadVariance = cfg.TeacherLoadVariance.Value
+        Return w
     End Function
 
     Private Function ClassCellText(cell As GridCell) As String
@@ -159,8 +202,9 @@ Public Module Run
         ' zusaetzlich in output/stundenplan.json + output/stundentafel.html
         ' als vergleichbare Alternativen exportiert (siehe unten).
         Dim perSolveLimit = If(cfg.PerSolveTimeLimitS, cfg.SolveTimeLimitS)
+        Dim qualityWeights = BuildQualityWeights(cfg.QualityWeights)
         Dim topResult = Solver.SolveTop(data, maxSolutions:=cfg.MaxSolutions, totalTimeLimitS:=cfg.SolveTimeLimitS,
-            perSolveTimeLimitS:=perSolveLimit, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers)
+            perSolveTimeLimitS:=perSolveLimit, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers, qualityWeights:=qualityWeights)
         Dim solveOk = topResult.Solutions.Count > 0
         If Not solveOk Then
             IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.md"),

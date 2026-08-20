@@ -173,4 +173,47 @@ Public Class ScheduleQualityTests
         Assert.AreEqual(ScheduleQuality.WeightKann, scoreGood.Total)
     End Sub
 
+    ''' <summary>Phase 2.24: Score's new optional `weights` parameter must
+    ''' default to today's hardcoded module constants - an explicit
+    ''' `New QualityWeights()` (which itself defaults every property to
+    ''' those same constants) must produce a BYTE-IDENTICAL Total to
+    ''' omitting the parameter entirely. Regression guard for every
+    ''' existing caller (SolveTop, the tests above) that never passes
+    ''' weights.</summary>
+    <TestMethod>
+    Public Sub DefaultWeightsMatchImplicitOmission()
+        Dim data = BuildData({"Mo", "Di"}, 4)
+        Dim schedule As New List(Of ScheduleEntry) From {
+            Entry("5a", "Fach1", "T1", "Mo", 1),
+            Entry("5a", "Fach1", "T1", "Mo", 4)
+        }
+        Dim implicit = ScheduleQuality.Score(data, schedule, 1)
+        Dim explicitDefault = ScheduleQuality.Score(data, schedule, 1, New QualityWeights())
+        Assert.AreEqual(implicit.Total, explicitDefault.Total, 0.0000001)
+    End Sub
+
+    ''' <summary>Phase 2.24: custom weights must change Total exactly per
+    ''' the formula (hand-computed, not just "changes somehow") - proves
+    ''' the QualityWeights object actually reaches every one of the 7
+    ''' terms, not just a subset.</summary>
+    <TestMethod>
+    Public Sub CustomWeightsChangeTotalPerFormula()
+        Dim data = BuildData({"Mo"}, 4)
+        ' 5a: periods {1,4} on Mo -> span = 4-1+1 = 4, 2 occupied -> 2 gaps
+        ' (periods 2 and 3 sit unoccupied between them); 1 edge occurrence
+        ' (period=1; period=4 < AfternoonThresholdPeriod=7 so doesn't count),
+        ' 0 afternoon days, class/teacher variance both 0 (single day).
+        Dim schedule As New List(Of ScheduleEntry) From {
+            Entry("5a", "Fach1", "T1", "Mo", 1),
+            Entry("5a", "Fach1", "T1", "Mo", 4)
+        }
+        Dim weights As New QualityWeights With {
+            .Kann = 1000.0, .ClassGaps = 7.0, .TeacherGaps = 11.0, .EdgePeriod = 3.0,
+            .AfternoonDayCount = 0.0, .ClassLoadVariance = 0.0, .TeacherLoadVariance = 0.0
+        }
+        Dim result = ScheduleQuality.Score(data, schedule, 2, weights)
+        Dim expected = 1000.0 * 2 + 7.0 * 2 + 11.0 * 2 + 3.0 * 1
+        Assert.AreEqual(expected, result.Total, 0.0000001)
+    End Sub
+
 End Class

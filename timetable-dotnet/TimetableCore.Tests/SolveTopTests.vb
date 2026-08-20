@@ -322,4 +322,41 @@ Public Class SolveTopTests
         Next
     End Sub
 
+    ''' <summary>Phase 2.24: proves SolveTop's optional `qualityWeights`
+    ''' parameter actually reaches the CP-SAT objective (not just the
+    ''' post-hoc QualityScore display) - constructs a scenario with a
+    ''' genuine trade-off between two secondary criteria (Springstunden
+    ''' vs. Randstunden): period 3 is hard-blocked, leaving periods
+    ''' {1,2,4} for 2 weekly Mathe hours. {1,2} has 0 gaps but uses the
+    ''' edge period (1); {2,4} has 1 gap but avoids it. Default weights
+    ''' (class+teacher gaps = 20 combined > edge = 5) must pick {1,2};
+    ''' weights that invert the priority (edge=100 >> gaps=1+1) must flip
+    ''' the SOLVER's actual choice to {2,4} - hand-verified live against
+    ''' the installed OrTools build before writing this test (both Optimal,
+    ''' Totals 5 and 2 respectively, matching the formula exactly).</summary>
+    <TestMethod>
+    Public Sub SolveTopQualityWeightsInfluenceChosenSchedule()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 3}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+
+        Dim defaultResult = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10)
+        Assert.AreEqual(CpSolverStatus.Optimal, defaultResult.Solutions(0).Status)
+        Dim defaultPeriods = defaultResult.Solutions(0).Schedule.Select(Function(l) l.Period).OrderBy(Function(p) p).ToList()
+        CollectionAssert.AreEqual(New List(Of Integer) From {1, 2}, defaultPeriods)
+        Assert.AreEqual(5.0, defaultResult.Solutions(0).Quality.Total, 0.0000001)
+
+        Dim customWeights As New QualityWeights With {.EdgePeriod = 100.0, .ClassGaps = 1.0, .TeacherGaps = 1.0}
+        Dim customResult = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, qualityWeights:=customWeights)
+        Assert.AreEqual(CpSolverStatus.Optimal, customResult.Solutions(0).Status)
+        Dim customPeriods = customResult.Solutions(0).Schedule.Select(Function(l) l.Period).OrderBy(Function(p) p).ToList()
+        CollectionAssert.AreEqual(New List(Of Integer) From {2, 4}, customPeriods)
+        Assert.AreEqual(2.0, customResult.Solutions(0).Quality.Total, 0.0000001)
+
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, defaultResult.Solutions(0).Schedule).Count)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, customResult.Solutions(0).Schedule).Count)
+    End Sub
+
 End Class
