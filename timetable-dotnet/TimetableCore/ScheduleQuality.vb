@@ -117,12 +117,24 @@ Public Module ScheduleQuality
     ''' <summary>Sum, over every (entity, day) group with >=1 lesson, of
     ''' the free periods trapped between the first and last occupied period
     ''' that day ("Springstunden"). A day with no lessons contributes
-    ''' nothing - there's no first/last occupied period to speak of.</summary>
+    ''' nothing - there's no first/last occupied period to speak of.
+    ''' Phase 2.22 bugfix: periods are DISTINCT-ed before counting - a
+    ''' Phase 2.20 "parallel_group" slot (e.g. Religion-ev/Religion-kath/
+    ''' Ethik running simultaneously for one class) puts multiple
+    ''' ScheduleEntry rows on the SAME period for that class; counting raw
+    ''' rows there over-counted "occupied periods" past the day's actual
+    ''' span, making span - periods.Count go negative (discovered live: a
+    ''' real bw-grundschule-beispiel run showed Quality.Total = -513,
+    ''' impossible under this function's all-non-negative-terms design -
+    ''' confirmed the cause by cross-checking against Solver.SolveTop's
+    ''' own, unaffected in-model objective, which correctly treats a
+    ''' parallel_group slot as a single occupied period via a reified
+    ''' BoolVar rather than a raw row count).</summary>
     Private Function GapsOverEntities(byEntity As IEnumerable(Of IGrouping(Of String, ScheduleEntry))) As Integer
         Dim total = 0
         For Each entityGroup In byEntity
             For Each dayGroup In entityGroup.GroupBy(Function(l) l.Day)
-                Dim periods = dayGroup.Select(Function(l) l.Period).ToList()
+                Dim periods = dayGroup.Select(Function(l) l.Period).Distinct().ToList()
                 Dim span = periods.Max() - periods.Min() + 1
                 total += span - periods.Count
             Next

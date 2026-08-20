@@ -41,6 +41,29 @@ Public Class SolveTopTests
         Assert.AreEqual(CpSolverStatus.Optimal, result.Solutions(0).Status)
     End Sub
 
+    ''' <summary>Phase 2.22: ScoredSolution.ObjectiveValue/BestObjectiveBound/
+    ''' Convergence must carry real, non-default data - the direct answer to
+    ''' "how far from optimal, and when did it stop improving". Same
+    ''' single-assignment scenario as above (proves Optimal almost
+    ''' instantly): at Optimal, CP-SAT's own bound must equal its own
+    ''' objective exactly (zero gap, not just "close"), and the callback
+    ''' must have recorded at least the one accepted solution.</summary>
+    <TestMethod>
+    Public Sub SolveTopScoredSolutionCarriesObjectiveGapAndConvergence()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 1), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=30)
+        Dim sol = result.Solutions(0)
+        Assert.AreEqual(CpSolverStatus.Optimal, sol.Status)
+        Assert.AreEqual(sol.ObjectiveValue, sol.BestObjectiveBound, 0.0001,
+            "Proven-Optimal must mean zero optimality gap.")
+        Assert.IsTrue(sol.Convergence.Count >= 1, "Must have recorded at least the accepted incumbent.")
+        Assert.AreEqual(sol.ObjectiveValue, sol.Convergence.Last().ObjectiveValue, 0.0001,
+            "The final recorded incumbent must match the solve's own final ObjectiveValue.")
+    End Sub
+
     ''' <summary>2 days x 1 period, 1 hour/week -> exactly 2 distinct
     ''' Lesson assignments (Mo or Di). A "should" forbidden_slot on Mo
     ''' means the Di placement has 0 Kann violations, the Mo placement 1 -

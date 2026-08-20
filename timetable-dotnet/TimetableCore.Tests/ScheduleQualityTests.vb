@@ -33,6 +33,34 @@ Public Class ScheduleQualityTests
         Assert.AreEqual(3, result.TeacherGapCount)
     End Sub
 
+    ''' <summary>Phase 2.22 bugfix regression: a Phase 2.20 "parallel_group"
+    ''' slot (e.g. Religion-ev/Religion-kath/Ethik running simultaneously)
+    ''' puts SEVERAL ScheduleEntry rows on the SAME (class, day, period) for
+    ''' one class - before the fix this made ClassGapCount go negative
+    ''' (periods.Count exceeded the day's actual span, since the same
+    ''' period was counted 3x instead of once), which in turn could make
+    ''' the whole QualityScore.Total go negative despite every weighted
+    ''' term supposedly being non-negative by construction - discovered
+    ''' live via a real bw-grundschule-beispiel run
+    ''' (Quality.Total = -513.0) while adding the Phase 2.22 optimality-gap
+    ''' feature.</summary>
+    <TestMethod>
+    Public Sub ClassGapCountIgnoresParallelGroupDuplicatesAtSamePeriod()
+        Dim data = BuildData({"Mo"}, 5)
+        Dim schedule As New List(Of ScheduleEntry) From {
+            Entry("1a", "Religion-ev", "Religionslehrer-ev-1", "Mo", 2),
+            Entry("1a", "Religion-kath", "Religionslehrer-kath-1", "Mo", 2),
+            Entry("1a", "Ethik", "Ethiklehrer-1", "Mo", 2),
+            Entry("1a", "Deutsch", "T1", "Mo", 4)
+        }
+        Dim result = ScheduleQuality.Score(data, schedule, 0)
+        ' Distinct occupied periods for 1a/Mo are {2, 4} -> span 3, 2
+        ' distinct periods occupied -> gap = 1, NOT a negative number from
+        ' miscounting the tripled period-2 as 3 separate occupied periods.
+        Assert.AreEqual(1, result.ClassGapCount)
+        Assert.IsTrue(result.Total >= 0.0, "Total must never be negative by construction.")
+    End Sub
+
     <TestMethod>
     Public Sub TeacherGapsIgnoreDaysTeacherIsNotWorking()
         Dim data = BuildData({"Mo", "Di", "Mi", "Do", "Fr"}, 5)

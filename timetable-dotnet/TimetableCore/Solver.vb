@@ -145,6 +145,29 @@ Public Enum MultiSolveStopReason
     SearchSpaceExhausted
 End Enum
 
+''' <summary>One incumbent improvement CP-SAT found while solving a single
+''' SolveTop iteration - ElapsedS/ObjectiveValue at the moment a new, better
+''' solution was accepted (NOT a fixed sampling interval - CP-SAT calls the
+''' underlying callback exactly once per incumbent, so a flat tail simply
+''' means no further improvement happened before the time limit).</summary>
+Public NotInheritable Class ConvergencePoint
+    Public Property ElapsedS As Double
+    Public Property ObjectiveValue As Double
+End Class
+
+''' <summary>Records every incumbent CP-SAT finds during one Solve() call,
+''' live-verified against the installed Google.OrTools DLL (9.15.6755):
+''' CpSolverSolutionCallback.OnSolutionCallback() fires per improving
+''' solution, and WallTime()/ObjectiveValue() are both readable from
+''' inside it (inherited from the SolutionCallback base class).</summary>
+Friend NotInheritable Class ConvergenceCallback
+    Inherits CpSolverSolutionCallback
+    Public ReadOnly Points As New List(Of ConvergencePoint)
+    Public Overrides Sub OnSolutionCallback()
+        Points.Add(New ConvergencePoint With {.ElapsedS = WallTime(), .ObjectiveValue = ObjectiveValue()})
+    End Sub
+End Class
+
 ''' <summary>One candidate schedule from Solver.SolveTop, bundled with
 ''' everything a caller needs to render/rank it - same bundling philosophy
 ''' as KannViolationDetail (index/type/message/reason together).</summary>
@@ -161,6 +184,26 @@ Public NotInheritable Class ScoredSolution
     ''' Quality.Total, since they all optimize the same objective and only
     ''' exclude already-found exact Lesson assignments).</summary>
     Public Property Status As CpSolverStatus
+    ''' <summary>The raw CP-SAT objective (the same weighted Kann/Luecken/
+    ''' Randstunden/Ausgewogenheits-sum SolveTopObjective.ApplyQualityObjective
+    ''' builds into the model) that THIS solve iteration found - normally
+    ''' tracks Quality.Total closely, but is the model's own value, not a
+    ''' post-hoc recomputation (see Quality.Total's own doc comment for the
+    ''' narrow case where they can diverge).</summary>
+    Public Property ObjectiveValue As Double
+    ''' <summary>CP-SAT's proven lower bound on the objective for this
+    ''' iteration - at Status=Optimal this equals ObjectiveValue exactly
+    ''' (zero gap, proven optimal); at Status=Feasible it is strictly lower,
+    ''' and (ObjectiveValue - BestObjectiveBound) is how much better a
+    ''' solution COULD exist, not how much better one DOES exist.</summary>
+    Public Property BestObjectiveBound As Double
+    ''' <summary>Every incumbent this iteration's Solve() call found, in
+    ''' order - lets a caller show "how much did quality still improve over
+    ''' time" instead of only the final number. Defaults to an empty list
+    ''' (not Nothing) so a caller/test that constructs a ScoredSolution by
+    ''' hand without setting this - e.g. StundentafelJsonTests.vb's
+    ''' hand-built ScoredSolutions - never hits a NullReferenceException.</summary>
+    Public Property Convergence As New List(Of ConvergencePoint)
 End Class
 
 Public NotInheritable Class MultiSolveResult
@@ -798,7 +841,8 @@ Public Module Solver
 
             Dim solver As New CpSolver()
             solver.StringParameters = $"max_time_in_seconds:{thisLimit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
-            Dim status = solver.Solve(built.Model)
+            Dim convergenceCb As New ConvergenceCallback()
+            Dim status = solver.Solve(built.Model, convergenceCb)
             iterations += 1
 
             If status = CpSolverStatus.Infeasible OrElse status = CpSolverStatus.ModelInvalid Then
@@ -818,7 +862,10 @@ Public Module Solver
             Dim kannFlags = ExtractKannFlags(built, solver, status)
             Dim kannCount = Verifier.VerifyScheduleDetailed(data, schedule).KannViolations.Count
             Dim quality = ScheduleQuality.Score(data, schedule, kannCount)
-            solutions.Add(New ScoredSolution With {.Schedule = schedule, .KannConstraintFlags = kannFlags, .Quality = quality, .Status = status})
+            solutions.Add(New ScoredSolution With {
+                .Schedule = schedule, .KannConstraintFlags = kannFlags, .Quality = quality, .Status = status,
+                .ObjectiveValue = solver.ObjectiveValue, .BestObjectiveBound = solver.BestObjectiveBound,
+                .Convergence = convergenceCb.Points})
 
             BlockSolution(built.Model, built.Lesson, solver)
             If useStagedHints Then ApplyLessonHints(built.Model, built.Lesson, solver)

@@ -418,11 +418,28 @@ statt der separaten Pro-Klasse-Raster aus `stundenplan.md`.
   "stop_reason": "MaxSolutionsReached",
   "solutions": [
     { "index": 0, "status": "Optimal", "kann_violation_count": 0,
-      "muss_violation_count": 0, "quality_total": -515.4,
+      "muss_violation_count": 0, "quality_total": 12.5,
+      "objective_value": 12.5, "best_objective_bound": 12.5, "gap_percent": 0.0,
+      "convergence": [ {"elapsed_s": 0.3, "objective_value": 45.0}, {"elapsed_s": 2.1, "objective_value": 12.5} ],
       "classes": { "1a": { "Mo": { "1": null, "2": {"subject":"...","teacher":"...","room": null}, ... }, ... } } }
   ]
 }
 ```
+
+**Optimalitäts-Lücke + Konvergenz-Verlauf (Phase 2.22):** `objective_value`
+ist CP-SATs eigener (roher) Zielfunktionswert für diese Lösung,
+`best_objective_bound` die dazu bewiesene untere Schranke -
+`gap_percent = 100 * (objective_value - best_objective_bound) / objective_value`
+ist die maximal noch mögliche Verbesserung (bei `status: "Optimal"` immer
+0%, da dann bewiesen keine bessere Lösung existiert). `convergence` ist
+der Verlauf JEDER von CP-SAT gefundenen Verbesserung innerhalb DIESES
+einen Solve-Versuchs (Zeitpunkt + Objective) - ein deutlich früherer
+letzter Eintrag als das genutzte Zeitbudget zeigt an, dass mehr Zeit für
+DIESEN Versuch vermutlich wenig gebracht hätte; `output/stundenplan.md`
+und `stundentafel.html` (Diagramm unter der Lösungsauswahl) zeigen beides
+bereits aufbereitet an. Wichtig: die Lücke ist eine bewiesene OBERGRENZE,
+keine Vorhersage - die tatsächlich erreichbare Verbesserung kann kleiner
+sein.
 
 Details, Nutzerentscheidungen und Live-Verifikationsergebnisse siehe
 `docs/phase2-21-stundentafel-visualisierung.md`.

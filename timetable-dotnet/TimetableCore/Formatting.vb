@@ -187,12 +187,27 @@ Public Module Formatting
                     classesJson(name) = GridToJsonObject(grids(name))
                 End If
             Next
+            ' Phase 2.22: Optimalitaets-Luecke - CP-SAT's ObjectiveValue
+            ' (dieser Iteration) minus BestObjectiveBound (bewiesene untere
+            ' Schranke) ist die maximal noch moegliche Verbesserung; bei
+            ' Status=Optimal ist die Luecke per Definition 0.
+            Dim gapAbs = Math.Max(sol.ObjectiveValue - sol.BestObjectiveBound, 0.0)
+            Dim gapPercent = If(sol.ObjectiveValue > 0.0, 100.0 * gapAbs / sol.ObjectiveValue, 0.0)
+            Dim convergenceJson As New JsonArray(
+                sol.Convergence.Select(Function(p) CType(New JsonObject From {
+                    {"elapsed_s", p.ElapsedS}, {"objective_value", p.ObjectiveValue}
+                }, JsonNode)).ToArray())
+
             solutionsJson.Add(New JsonObject From {
                 {"index", i},
                 {"status", sol.Status.ToString()},
                 {"kann_violation_count", sol.Quality.KannViolationCount},
                 {"muss_violation_count", Verifier.VerifySchedule(data, sol.Schedule).Count},
                 {"quality_total", sol.Quality.Total},
+                {"objective_value", sol.ObjectiveValue},
+                {"best_objective_bound", sol.BestObjectiveBound},
+                {"gap_percent", gapPercent},
+                {"convergence", convergenceJson},
                 {"classes", classesJson}
             })
         Next

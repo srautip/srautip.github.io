@@ -50,7 +50,200 @@
       "status": "Feasible",
       "kann_violation_count": 0,
       "muss_violation_count": 0,
-      "quality_total": -513,
+      "quality_total": 48.879999999999995,
+      "objective_value": 70,
+      "best_objective_bound": 24,
+      "gap_percent": 65.71428571428571,
+      "convergence": [
+        {
+          "elapsed_s": 0.35710012900000004,
+          "objective_value": 1002
+        },
+        {
+          "elapsed_s": 0.375831644,
+          "objective_value": 977
+        },
+        {
+          "elapsed_s": 0.400385354,
+          "objective_value": 962
+        },
+        {
+          "elapsed_s": 0.5161854770000001,
+          "objective_value": 887
+        },
+        {
+          "elapsed_s": 0.5863730730000001,
+          "objective_value": 708
+        },
+        {
+          "elapsed_s": 0.716219496,
+          "objective_value": 704
+        },
+        {
+          "elapsed_s": 0.823803968,
+          "objective_value": 669
+        },
+        {
+          "elapsed_s": 0.8539536310000001,
+          "objective_value": 324
+        },
+        {
+          "elapsed_s": 1.0344694810000001,
+          "objective_value": 314
+        },
+        {
+          "elapsed_s": 1.3599589840000001,
+          "objective_value": 312
+        },
+        {
+          "elapsed_s": 1.4790638930000002,
+          "objective_value": 285
+        },
+        {
+          "elapsed_s": 1.639161745,
+          "objective_value": 273
+        },
+        {
+          "elapsed_s": 1.7118490110000002,
+          "objective_value": 271
+        },
+        {
+          "elapsed_s": 1.8379730840000001,
+          "objective_value": 251
+        },
+        {
+          "elapsed_s": 2.158037089,
+          "objective_value": 246
+        },
+        {
+          "elapsed_s": 2.29853612,
+          "objective_value": 235
+        },
+        {
+          "elapsed_s": 2.5441683040000003,
+          "objective_value": 218
+        },
+        {
+          "elapsed_s": 2.822780305,
+          "objective_value": 213
+        },
+        {
+          "elapsed_s": 3.461941346,
+          "objective_value": 210
+        },
+        {
+          "elapsed_s": 3.5238235610000004,
+          "objective_value": 205
+        },
+        {
+          "elapsed_s": 3.6728493180000004,
+          "objective_value": 200
+        },
+        {
+          "elapsed_s": 3.8125619920000005,
+          "objective_value": 197
+        },
+        {
+          "elapsed_s": 4.1570481720000005,
+          "objective_value": 195
+        },
+        {
+          "elapsed_s": 4.225540033000001,
+          "objective_value": 193
+        },
+        {
+          "elapsed_s": 4.274427752,
+          "objective_value": 170
+        },
+        {
+          "elapsed_s": 4.375735565,
+          "objective_value": 165
+        },
+        {
+          "elapsed_s": 6.322680358,
+          "objective_value": 159
+        },
+        {
+          "elapsed_s": 6.332834779000001,
+          "objective_value": 154
+        },
+        {
+          "elapsed_s": 7.443401120000001,
+          "objective_value": 151
+        },
+        {
+          "elapsed_s": 9.24363374,
+          "objective_value": 149
+        },
+        {
+          "elapsed_s": 9.518322156,
+          "objective_value": 141
+        },
+        {
+          "elapsed_s": 9.849851886000001,
+          "objective_value": 128
+        },
+        {
+          "elapsed_s": 10.007643853000001,
+          "objective_value": 126
+        },
+        {
+          "elapsed_s": 10.738822902,
+          "objective_value": 121
+        },
+        {
+          "elapsed_s": 11.339252869000001,
+          "objective_value": 118
+        },
+        {
+          "elapsed_s": 11.506665806,
+          "objective_value": 113
+        },
+        {
+          "elapsed_s": 12.149623156,
+          "objective_value": 110
+        },
+        {
+          "elapsed_s": 12.352335679000001,
+          "objective_value": 107
+        },
+        {
+          "elapsed_s": 13.092767529000001,
+          "objective_value": 102
+        },
+        {
+          "elapsed_s": 13.580991729,
+          "objective_value": 100
+        },
+        {
+          "elapsed_s": 14.357278502000002,
+          "objective_value": 99
+        },
+        {
+          "elapsed_s": 15.772102190000002,
+          "objective_value": 98
+        },
+        {
+          "elapsed_s": 34.025862127,
+          "objective_value": 89
+        },
+        {
+          "elapsed_s": 36.061485865,
+          "objective_value": 88
+        },
+        {
+          "elapsed_s": 41.524593620000005,
+          "objective_value": 82
+        },
+        {
+          "elapsed_s": 42.111659189,
+          "objective_value": 72
+        },
+        {
+          "elapsed_s": 116.39058742300001,
+          "objective_value": 70
+        }
+      ],
       "classes": {
         "1a": {
           "Mo": {
@@ -61,22 +254,22 @@
               "room": null
             },
             "3": {
-              "subject": "Sport",
+              "subject": "Kunst",
               "teacher": "Klassenlehrer-5",
               "room": null
             },
             "4": {
-              "subject": "Sachunterricht",
+              "subject": "Musik",
               "teacher": "Klassenlehrer-5",
               "room": null
             },
             "5": {
-              "subject": "Mathematik",
+              "subject": "Sport",
               "teacher": "Klassenlehrer-5",
               "room": null
             },
             "6": {
-              "subject": "Musik",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-5",
               "room": null
             }
@@ -84,22 +277,22 @@
           "Di": {
             "1": null,
             "2": {
-              "subject": "Deutsch",
+              "subject": "Kunst",
               "teacher": "Klassenlehrer-5",
               "room": null
             },
             "3": {
-              "subject": "Sport",
+              "subject": "Musik",
               "teacher": "Klassenlehrer-5",
               "room": null
             },
             "4": {
-              "subject": "Mathematik",
+              "subject": "Sport",
               "teacher": "Klassenlehrer-5",
               "room": null
             },
             "5": {
-              "subject": "Mathematik",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-5",
               "room": null
             },
@@ -110,6 +303,58 @@
             }
           },
           "Mi": {
+            "1": null,
+            "2": {
+              "subject": "Mathematik",
+              "teacher": "Klassenlehrer-5",
+              "room": null
+            },
+            "3": {
+              "subject": "Sachunterricht",
+              "teacher": "Klassenlehrer-5",
+              "room": null
+            },
+            "4": {
+              "subject": "Mathematik",
+              "teacher": "Klassenlehrer-5",
+              "room": null
+            },
+            "5": {
+              "subject": "Deutsch",
+              "teacher": "Klassenlehrer-5",
+              "room": null
+            },
+            "6": {
+              "subject": "Deutsch",
+              "teacher": "Klassenlehrer-5",
+              "room": null
+            }
+          },
+          "Do": {
+            "1": null,
+            "2": {
+              "subject": "Deutsch",
+              "teacher": "Klassenlehrer-5",
+              "room": null
+            },
+            "3": {
+              "subject": "Deutsch",
+              "teacher": "Klassenlehrer-5",
+              "room": null
+            },
+            "4": {
+              "subject": "Sport",
+              "teacher": "Klassenlehrer-5",
+              "room": null
+            },
+            "5": {
+              "subject": "Mathematik",
+              "teacher": "Klassenlehrer-5",
+              "room": null
+            },
+            "6": null
+          },
+          "Fr": {
             "1": null,
             "2": null,
             "3": {
@@ -123,64 +368,12 @@
               "room": null
             },
             "5": {
-              "subject": "Deutsch",
-              "teacher": "Klassenlehrer-5",
-              "room": null
-            },
-            "6": {
               "subject": "Mathematik",
               "teacher": "Klassenlehrer-5",
               "room": null
-            }
-          },
-          "Do": {
-            "1": null,
-            "2": {
-              "subject": "Sachunterricht",
-              "teacher": "Klassenlehrer-5",
-              "room": null
-            },
-            "3": {
-              "subject": "Deutsch",
-              "teacher": "Klassenlehrer-5",
-              "room": null
-            },
-            "4": {
-              "subject": "Sachunterricht",
-              "teacher": "Klassenlehrer-5",
-              "room": null
-            },
-            "5": {
-              "subject": "Kunst",
-              "teacher": "Klassenlehrer-5",
-              "room": null
-            },
-            "6": null
-          },
-          "Fr": {
-            "1": null,
-            "2": {
-              "subject": "Kunst",
-              "teacher": "Klassenlehrer-5",
-              "room": null
-            },
-            "3": {
-              "subject": "Deutsch",
-              "teacher": "Klassenlehrer-5",
-              "room": null
-            },
-            "4": {
-              "subject": "Musik",
-              "teacher": "Klassenlehrer-5",
-              "room": null
-            },
-            "5": {
-              "subject": "Deutsch",
-              "teacher": "Klassenlehrer-5",
-              "room": null
             },
             "6": {
-              "subject": "Sport",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-5",
               "room": null
             }
@@ -195,7 +388,7 @@
               "room": null
             },
             "3": {
-              "subject": "Sachunterricht",
+              "subject": "Kunst",
               "teacher": "Klassenlehrer-4",
               "room": null
             },
@@ -205,12 +398,12 @@
               "room": null
             },
             "5": {
-              "subject": "Mathematik",
+              "subject": "Sport",
               "teacher": "Klassenlehrer-4",
               "room": null
             },
             "6": {
-              "subject": "Deutsch",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-4",
               "room": null
             }
@@ -218,17 +411,17 @@
           "Di": {
             "1": null,
             "2": {
-              "subject": "Deutsch",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-4",
               "room": null
             },
             "3": {
-              "subject": "Mathematik",
+              "subject": "Sport",
               "teacher": "Klassenlehrer-4",
               "room": null
             },
             "4": {
-              "subject": "Sachunterricht",
+              "subject": "Kunst",
               "teacher": "Klassenlehrer-4",
               "room": null
             },
@@ -245,13 +438,9 @@
           },
           "Mi": {
             "1": null,
-            "2": {
-              "subject": "Deutsch",
-              "teacher": "Klassenlehrer-4",
-              "room": null
-            },
+            "2": null,
             "3": {
-              "subject": "Kunst",
+              "subject": "Sport",
               "teacher": "Klassenlehrer-4",
               "room": null
             },
@@ -266,20 +455,16 @@
               "room": null
             },
             "6": {
-              "subject": "Sport",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-4",
               "room": null
             }
           },
           "Do": {
             "1": null,
-            "2": {
-              "subject": "Deutsch",
-              "teacher": "Klassenlehrer-4",
-              "room": null
-            },
+            "2": null,
             "3": {
-              "subject": "Sport",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-4",
               "room": null
             },
@@ -289,11 +474,15 @@
               "room": null
             },
             "5": {
-              "subject": "Mathematik",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-4",
               "room": null
             },
-            "6": null
+            "6": {
+              "subject": "Deutsch",
+              "teacher": "Klassenlehrer-4",
+              "room": null
+            }
           },
           "Fr": {
             "1": null,
@@ -303,12 +492,12 @@
               "room": null
             },
             "3": {
-              "subject": "Sport",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-4",
               "room": null
             },
             "4": {
-              "subject": "Kunst",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-4",
               "room": null
             },
@@ -317,7 +506,11 @@
               "teacher": "Klassenlehrer-4",
               "room": null
             },
-            "6": null
+            "6": {
+              "subject": "Deutsch",
+              "teacher": "Klassenlehrer-4",
+              "room": null
+            }
           }
         },
         "2a": {
@@ -330,12 +523,12 @@
               "room": null
             },
             "4": {
-              "subject": "Deutsch",
+              "subject": "Kunst",
               "teacher": "Klassenlehrer-6",
               "room": null
             },
             "5": {
-              "subject": "Deutsch",
+              "subject": "Musik",
               "teacher": "Klassenlehrer-6",
               "room": null
             },
@@ -348,27 +541,27 @@
           "Di": {
             "1": null,
             "2": {
-              "subject": "Sport",
-              "teacher": "Klassenlehrer-6",
-              "room": null
-            },
-            "3": {
-              "subject": "Kunst",
-              "teacher": "Klassenlehrer-6",
-              "room": null
-            },
-            "4": {
-              "subject": "Deutsch",
-              "teacher": "Klassenlehrer-6",
-              "room": null
-            },
-            "5": {
               "subject": "Mathematik",
               "teacher": "Klassenlehrer-6",
               "room": null
             },
-            "6": {
+            "3": {
+              "subject": "Sport",
+              "teacher": "Klassenlehrer-6",
+              "room": null
+            },
+            "4": {
               "subject": "Musik",
+              "teacher": "Klassenlehrer-6",
+              "room": null
+            },
+            "5": {
+              "subject": "Kunst",
+              "teacher": "Klassenlehrer-6",
+              "room": null
+            },
+            "6": {
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-6",
               "room": null
             }
@@ -376,12 +569,12 @@
           "Mi": {
             "1": null,
             "2": {
-              "subject": "Mathematik",
+              "subject": "Sport",
               "teacher": "Klassenlehrer-6",
               "room": null
             },
             "3": {
-              "subject": "Deutsch",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-6",
               "room": null
             },
@@ -391,12 +584,12 @@
               "room": null
             },
             "5": {
-              "subject": "Mathematik",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-6",
               "room": null
             },
             "6": {
-              "subject": "Kunst",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-6",
               "room": null
             }
@@ -404,17 +597,17 @@
           "Do": {
             "1": null,
             "2": {
-              "subject": "Mathematik",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-6",
               "room": null
             },
             "3": {
-              "subject": "Mathematik",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-6",
               "room": null
             },
             "4": {
-              "subject": "Sachunterricht",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-6",
               "room": null
             },
@@ -428,27 +621,27 @@
           "Fr": {
             "1": null,
             "2": {
-              "subject": "Sport",
-              "teacher": "Klassenlehrer-6",
-              "room": null
-            },
-            "3": {
-              "subject": "Sachunterricht",
-              "teacher": "Klassenlehrer-6",
-              "room": null
-            },
-            "4": {
               "subject": "Deutsch",
               "teacher": "Klassenlehrer-6",
               "room": null
             },
+            "3": {
+              "subject": "Mathematik",
+              "teacher": "Klassenlehrer-6",
+              "room": null
+            },
+            "4": {
+              "subject": "Sachunterricht",
+              "teacher": "Klassenlehrer-6",
+              "room": null
+            },
             "5": {
-              "subject": "Musik",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-6",
               "room": null
             },
             "6": {
-              "subject": "Sachunterricht",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-6",
               "room": null
             }
@@ -464,17 +657,17 @@
               "room": null
             },
             "4": {
-              "subject": "Deutsch",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-8",
               "room": null
             },
             "5": {
-              "subject": "Deutsch",
+              "subject": "Kunst",
               "teacher": "Klassenlehrer-8",
               "room": null
             },
             "6": {
-              "subject": "Mathematik",
+              "subject": "Sport",
               "teacher": "Klassenlehrer-8",
               "room": null
             }
@@ -482,27 +675,27 @@
           "Di": {
             "1": null,
             "2": {
-              "subject": "Sachunterricht",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-8",
               "room": null
             },
             "3": {
-              "subject": "Sachunterricht",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-8",
               "room": null
             },
             "4": {
-              "subject": "Sport",
+              "subject": "Musik",
               "teacher": "Klassenlehrer-8",
               "room": null
             },
             "5": {
-              "subject": "Mathematik",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-8",
               "room": null
             },
             "6": {
-              "subject": "Mathematik",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-8",
               "room": null
             }
@@ -510,7 +703,7 @@
           "Mi": {
             "1": null,
             "2": {
-              "subject": "Mathematik",
+              "subject": "Kunst",
               "teacher": "Klassenlehrer-8",
               "room": null
             },
@@ -520,12 +713,12 @@
               "room": null
             },
             "4": {
-              "subject": "Sport",
+              "subject": "Musik",
               "teacher": "Klassenlehrer-8",
               "room": null
             },
             "5": {
-              "subject": "Musik",
+              "subject": "Sport",
               "teacher": "Klassenlehrer-8",
               "room": null
             },
@@ -538,12 +731,12 @@
           "Do": {
             "1": null,
             "2": {
-              "subject": "Kunst",
+              "subject": "Sport",
               "teacher": "Klassenlehrer-8",
               "room": null
             },
             "3": {
-              "subject": "Deutsch",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-8",
               "room": null
             },
@@ -562,27 +755,27 @@
           "Fr": {
             "1": null,
             "2": {
-              "subject": "Musik",
-              "teacher": "Klassenlehrer-8",
-              "room": null
-            },
-            "3": {
-              "subject": "Kunst",
-              "teacher": "Klassenlehrer-8",
-              "room": null
-            },
-            "4": {
               "subject": "Deutsch",
               "teacher": "Klassenlehrer-8",
               "room": null
             },
+            "3": {
+              "subject": "Mathematik",
+              "teacher": "Klassenlehrer-8",
+              "room": null
+            },
+            "4": {
+              "subject": "Sachunterricht",
+              "teacher": "Klassenlehrer-8",
+              "room": null
+            },
             "5": {
-              "subject": "Sport",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-8",
               "room": null
             },
             "6": {
-              "subject": "Sachunterricht",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-8",
               "room": null
             }
@@ -592,22 +785,22 @@
           "Mo": {
             "1": null,
             "2": {
-              "subject": "Deutsch",
+              "subject": "Musik",
               "teacher": "Klassenlehrer-3",
               "room": null
             },
             "3": {
-              "subject": "Mathematik",
-              "teacher": "Klassenlehrer-3",
-              "room": null
-            },
-            "4": {
               "subject": "Deutsch",
               "teacher": "Klassenlehrer-3",
               "room": null
             },
-            "5": {
+            "4": {
               "subject": "Mathematik",
+              "teacher": "Klassenlehrer-3",
+              "room": null
+            },
+            "5": {
+              "subject": "Kunst",
               "teacher": "Klassenlehrer-3",
               "room": null
             },
@@ -620,27 +813,27 @@
           "Di": {
             "1": null,
             "2": {
-              "subject": "Kunst",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-3",
               "room": null
             },
             "3": {
-              "subject": "Deutsch",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-3",
               "room": null
             },
             "4": {
-              "subject": "Deutsch",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-3",
               "room": null
             },
             "5": {
-              "subject": "Musik",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-3",
               "room": null
             },
             "6": {
-              "subject": "Mathematik",
+              "subject": "Sport",
               "teacher": "Klassenlehrer-3",
               "room": null
             }
@@ -653,12 +846,12 @@
               "room": null
             },
             "3": {
-              "subject": "Sport",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-3",
               "room": null
             },
             "4": {
-              "subject": "Mathematik",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-3",
               "room": null
             },
@@ -667,16 +860,12 @@
               "teacher": "Ethiklehrer-1 / Religionslehrer-ev-1 / Religionslehrer-kath-1",
               "room": null
             },
-            "6": {
-              "subject": "Englisch",
-              "teacher": "Englischlehrer-1",
-              "room": null
-            }
+            "6": null
           },
           "Do": {
             "1": null,
             "2": {
-              "subject": "Kunst",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-3",
               "room": null
             },
@@ -691,8 +880,8 @@
               "room": null
             },
             "5": {
-              "subject": "Sachunterricht",
-              "teacher": "Klassenlehrer-3",
+              "subject": "Englisch",
+              "teacher": "Englischlehrer-1",
               "room": null
             },
             "6": {
@@ -703,24 +892,28 @@
           },
           "Fr": {
             "1": null,
-            "2": null,
-            "3": {
+            "2": {
               "subject": "Englisch",
               "teacher": "Englischlehrer-1",
               "room": null
             },
+            "3": {
+              "subject": "Kunst",
+              "teacher": "Klassenlehrer-3",
+              "room": null
+            },
             "4": {
-              "subject": "Deutsch",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-3",
               "room": null
             },
             "5": {
-              "subject": "Sport",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-3",
               "room": null
             },
             "6": {
-              "subject": "Sachunterricht",
+              "subject": "Sport",
               "teacher": "Klassenlehrer-3",
               "room": null
             }
@@ -735,35 +928,35 @@
               "room": null
             },
             "3": {
-              "subject": "Musik",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-2",
               "room": null
             },
             "4": {
-              "subject": "Kunst",
-              "teacher": "Klassenlehrer-2",
-              "room": null
-            },
-            "5": {
               "subject": "Mathematik",
               "teacher": "Klassenlehrer-2",
               "room": null
             },
+            "5": {
+              "subject": "Musik",
+              "teacher": "Klassenlehrer-2",
+              "room": null
+            },
             "6": {
-              "subject": "Englisch",
-              "teacher": "Englischlehrer-1",
+              "subject": "Mathematik",
+              "teacher": "Klassenlehrer-2",
               "room": null
             }
           },
           "Di": {
             "1": null,
             "2": {
-              "subject": "Sachunterricht",
+              "subject": "Musik",
               "teacher": "Klassenlehrer-2",
               "room": null
             },
             "3": {
-              "subject": "Deutsch",
+              "subject": "Kunst",
               "teacher": "Klassenlehrer-2",
               "room": null
             },
@@ -773,7 +966,7 @@
               "room": null
             },
             "5": {
-              "subject": "Mathematik",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-2",
               "room": null
             },
@@ -786,17 +979,17 @@
           "Mi": {
             "1": null,
             "2": {
-              "subject": "Musik",
+              "subject": "Sport",
               "teacher": "Klassenlehrer-2",
               "room": null
             },
             "3": {
-              "subject": "Deutsch",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-2",
               "room": null
             },
             "4": {
-              "subject": "Kunst",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-2",
               "room": null
             },
@@ -805,17 +998,21 @@
               "teacher": "Ethiklehrer-1 / Religionslehrer-ev-1 / Religionslehrer-kath-1",
               "room": null
             },
-            "6": null
+            "6": {
+              "subject": "Englisch",
+              "teacher": "Englischlehrer-1",
+              "room": null
+            }
           },
           "Do": {
             "1": null,
             "2": {
-              "subject": "Sport",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-2",
               "room": null
             },
             "3": {
-              "subject": "Mathematik",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-2",
               "room": null
             },
@@ -825,8 +1022,8 @@
               "room": null
             },
             "5": {
-              "subject": "Englisch",
-              "teacher": "Englischlehrer-1",
+              "subject": "Kunst",
+              "teacher": "Klassenlehrer-2",
               "room": null
             },
             "6": {
@@ -837,18 +1034,14 @@
           },
           "Fr": {
             "1": null,
-            "2": {
-              "subject": "Mathematik",
-              "teacher": "Klassenlehrer-2",
-              "room": null
-            },
+            "2": null,
             "3": {
-              "subject": "Mathematik",
-              "teacher": "Klassenlehrer-2",
+              "subject": "Englisch",
+              "teacher": "Englischlehrer-1",
               "room": null
             },
             "4": {
-              "subject": "Sachunterricht",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-2",
               "room": null
             },
@@ -858,7 +1051,7 @@
               "room": null
             },
             "6": {
-              "subject": "Sachunterricht",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-2",
               "room": null
             }
@@ -868,7 +1061,7 @@
           "Mo": {
             "1": null,
             "2": {
-              "subject": "Mathematik",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
@@ -878,35 +1071,39 @@
               "room": null
             },
             "4": {
-              "subject": "Deutsch",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
             "5": {
-              "subject": "Mathematik",
+              "subject": "Sport",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
-            "6": null
+            "6": {
+              "subject": "Englisch",
+              "teacher": "Englischlehrer-1",
+              "room": null
+            }
           },
           "Di": {
             "1": {
-              "subject": "Musik",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
             "2": {
-              "subject": "Sachunterricht",
+              "subject": "Musik",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
             "3": {
-              "subject": "Kunst",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
             "4": {
-              "subject": "Deutsch",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
@@ -920,22 +1117,22 @@
           "Mi": {
             "1": null,
             "2": {
-              "subject": "Mathematik",
+              "subject": "Deutsch",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
             "3": {
-              "subject": "Mathematik",
-              "teacher": "Klassenlehrer-1",
-              "room": null
-            },
-            "4": {
               "subject": "Sport",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
+            "4": {
+              "subject": "Mathematik",
+              "teacher": "Klassenlehrer-1",
+              "room": null
+            },
             "5": {
-              "subject": "Deutsch",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
@@ -948,22 +1145,22 @@
           "Do": {
             "1": null,
             "2": {
-              "subject": "Sport",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
             "3": {
-              "subject": "Mathematik",
-              "teacher": "Klassenlehrer-1",
-              "room": null
-            },
-            "4": {
               "subject": "Kunst",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
+            "4": {
+              "subject": "Sport",
+              "teacher": "Klassenlehrer-1",
+              "room": null
+            },
             "5": {
-              "subject": "Sachunterricht",
+              "subject": "Musik",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
@@ -976,66 +1173,42 @@
           "Fr": {
             "1": null,
             "2": {
-              "subject": "Englisch",
-              "teacher": "Englischlehrer-1",
-              "room": null
-            },
-            "3": {
               "subject": "Deutsch",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
+            "3": {
+              "subject": "Kunst",
+              "teacher": "Klassenlehrer-1",
+              "room": null
+            },
             "4": {
-              "subject": "Sachunterricht",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
             "5": {
-              "subject": "Musik",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-1",
               "room": null
             },
-            "6": {
-              "subject": "Sport",
-              "teacher": "Klassenlehrer-1",
-              "room": null
-            }
+            "6": null
           }
         },
         "4b": {
           "Mo": {
-            "1": null,
-            "2": null,
-            "3": {
-              "subject": "Kunst",
-              "teacher": "Klassenlehrer-7",
-              "room": null
-            },
-            "4": {
-              "subject": "Mathematik",
-              "teacher": "Klassenlehrer-7",
-              "room": null
-            },
-            "5": {
-              "subject": "Mathematik",
-              "teacher": "Klassenlehrer-7",
-              "room": null
-            },
-            "6": {
+            "1": {
               "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-7",
               "room": null
-            }
-          },
-          "Di": {
-            "1": null,
+            },
             "2": {
-              "subject": "Mathematik",
+              "subject": "Sachunterricht",
               "teacher": "Klassenlehrer-7",
               "room": null
             },
             "3": {
-              "subject": "Musik",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-7",
               "room": null
             },
@@ -1045,17 +1218,13 @@
               "room": null
             },
             "5": {
-              "subject": "Ethik / Religion-ev / Religion-kath",
-              "teacher": "Ethiklehrer-1 / Religionslehrer-ev-1 / Religionslehrer-kath-1",
-              "room": null
-            },
-            "6": {
               "subject": "Englisch",
               "teacher": "Englischlehrer-1",
               "room": null
-            }
+            },
+            "6": null
           },
-          "Mi": {
+          "Di": {
             "1": null,
             "2": {
               "subject": "Sachunterricht",
@@ -1069,6 +1238,30 @@
             },
             "4": {
               "subject": "Sport",
+              "teacher": "Klassenlehrer-7",
+              "room": null
+            },
+            "5": {
+              "subject": "Ethik / Religion-ev / Religion-kath",
+              "teacher": "Ethiklehrer-1 / Religionslehrer-ev-1 / Religionslehrer-kath-1",
+              "room": null
+            },
+            "6": null
+          },
+          "Mi": {
+            "1": null,
+            "2": {
+              "subject": "Deutsch",
+              "teacher": "Klassenlehrer-7",
+              "room": null
+            },
+            "3": {
+              "subject": "Mathematik",
+              "teacher": "Klassenlehrer-7",
+              "room": null
+            },
+            "4": {
+              "subject": "Musik",
               "teacher": "Klassenlehrer-7",
               "room": null
             },
@@ -1086,7 +1279,7 @@
           "Do": {
             "1": null,
             "2": {
-              "subject": "Sport",
+              "subject": "Mathematik",
               "teacher": "Klassenlehrer-7",
               "room": null
             },
@@ -1096,12 +1289,12 @@
               "room": null
             },
             "4": {
-              "subject": "Musik",
+              "subject": "Kunst",
               "teacher": "Klassenlehrer-7",
               "room": null
             },
             "5": {
-              "subject": "Sachunterricht",
+              "subject": "Musik",
               "teacher": "Klassenlehrer-7",
               "room": null
             },
@@ -1129,12 +1322,12 @@
               "room": null
             },
             "5": {
-              "subject": "Kunst",
+              "subject": "Sport",
               "teacher": "Klassenlehrer-7",
               "room": null
             },
             "6": {
-              "subject": "Deutsch",
+              "subject": "Kunst",
               "teacher": "Klassenlehrer-7",
               "room": null
             }

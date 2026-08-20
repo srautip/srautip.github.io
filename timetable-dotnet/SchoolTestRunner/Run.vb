@@ -184,6 +184,41 @@ Public Module Run
             End If
             stundenplanLines.Add("")
         End If
+
+        ' Phase 2.22: Antwort auf "wie weit von Optimal entfernt?"/"wuerde
+        ' mehr Zeit die Qualitaet noch deutlich verbessern?" - CP-SAT's
+        ' bewiesene untere Schranke (BestObjectiveBound) macht die
+        ' Optimalitaets-Luecke sichtbar, der Konvergenz-Verlauf zeigt, WANN
+        ' innerhalb dieses einen Solve-Versuchs die letzte Verbesserung
+        ' gefunden wurde.
+        Dim gapAbs = Math.Max(best.ObjectiveValue - best.BestObjectiveBound, 0.0)
+        Dim gapPercent = If(best.ObjectiveValue > 0.0, 100.0 * gapAbs / best.ObjectiveValue, 0.0)
+        stundenplanLines.Add("## Optimalitaets-Luecke")
+        stundenplanLines.Add("")
+        If best.Status = CpSolverStatus.Optimal Then
+            stundenplanLines.Add("CP-SAT hat bewiesen, dass diese Loesung fuer das aktuelle Modell optimal ist (Luecke = 0%).")
+        Else
+            stundenplanLines.Add($"Gefundene Loesung (Objective): **{best.ObjectiveValue:F1}**  |  Bewiesene untere Schranke: **{best.BestObjectiveBound:F1}**  |  Maximal noch moegliche Verbesserung: **{gapPercent:F1}%**")
+            stundenplanLines.Add("")
+            stundenplanLines.Add("*Diese Luecke ist eine bewiesene OBERGRENZE, keine Vorhersage - die tatsaechlich erreichbare Verbesserung kann kleiner sein (bis hin zu 0, falls die gefundene Loesung bereits optimal ist, CP-SAT das aber innerhalb der Zeit nicht beweisen konnte).*")
+        End If
+        stundenplanLines.Add("")
+        If best.Convergence.Count > 1 Then
+            stundenplanLines.Add("**Verlauf dieses Solve-Versuchs** (jede gefundene Verbesserung, nicht in festen Zeitabstaenden):")
+            stundenplanLines.Add("")
+            stundenplanLines.Add("| Zeit (s) | Objective |")
+            stundenplanLines.Add("|---|---|")
+            For Each p In best.Convergence
+                stundenplanLines.Add($"| {p.ElapsedS:F1} | {p.ObjectiveValue:F1} |")
+            Next
+            Dim lastImprovementS = best.Convergence.Last().ElapsedS
+            stundenplanLines.Add("")
+            stundenplanLines.Add($"*Letzte Verbesserung bei {lastImprovementS:F1}s - fand danach bis zum Abbruch keine weitere statt. Ein deutlich frueherer letzter Eintrag als das Zeitbudget legt nahe, dass zusaetzliche Zeit fuer DIESEN Versuch wenig bringen wuerde.*")
+        Else
+            stundenplanLines.Add("*Nur eine einzige (die erste gefundene) Loesung in diesem Versuch - kein Verbesserungsverlauf.*")
+        End If
+        stundenplanLines.Add("")
+
         If scheduleViolations.Count > 0 Then
             stundenplanLines.Add("## Verstoesse (Verifier.VerifySchedule)")
             stundenplanLines.Add("")

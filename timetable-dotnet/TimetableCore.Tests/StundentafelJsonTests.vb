@@ -109,7 +109,13 @@ Public Class StundentafelJsonTests
             New ScheduleEntry With {.ClassName = "1a", .Subject = "Mathe", .Teacher = "T1", .Day = "Mo", .Period = 1, .Room = Nothing}
         }
         Dim quality1 As New QualityScore With {.KannViolationCount = 0, .Total = 1.5}
-        Dim sol1 As New ScoredSolution With {.Schedule = schedule1, .KannConstraintFlags = New List(Of KannConstraintFlag), .Quality = quality1, .Status = CpSolverStatus.Optimal}
+        Dim convergence1 As New List(Of ConvergencePoint) From {
+            New ConvergencePoint With {.ElapsedS = 0.2, .ObjectiveValue = 10.0},
+            New ConvergencePoint With {.ElapsedS = 1.5, .ObjectiveValue = 8.0}
+        }
+        Dim sol1 As New ScoredSolution With {
+            .Schedule = schedule1, .KannConstraintFlags = New List(Of KannConstraintFlag), .Quality = quality1, .Status = CpSolverStatus.Optimal,
+            .ObjectiveValue = 8.0, .BestObjectiveBound = 6.0, .Convergence = convergence1}
 
         Dim multiResult As New MultiSolveResult With {
             .Solutions = New List(Of ScoredSolution) From {sol1},
@@ -126,6 +132,15 @@ Public Class StundentafelJsonTests
         Assert.AreEqual("Optimal", JsonHelpers.GetString(sol0, "status"))
         Assert.AreEqual(0, JsonHelpers.GetInt(sol0, "kann_violation_count").Value)
         Assert.AreEqual(1.5, sol0("quality_total").GetValue(Of Double)(), 0.001)
+
+        ' Phase 2.22: Optimalitaets-Luecke + Konvergenz-Verlauf.
+        Assert.AreEqual(8.0, sol0("objective_value").GetValue(Of Double)(), 0.001)
+        Assert.AreEqual(6.0, sol0("best_objective_bound").GetValue(Of Double)(), 0.001)
+        Assert.AreEqual(25.0, sol0("gap_percent").GetValue(Of Double)(), 0.001, "(8-6)/8 = 25%")
+        Dim convergenceJson = sol0("convergence").AsArray()
+        Assert.AreEqual(2, convergenceJson.Count)
+        Assert.AreEqual(1.5, convergenceJson(1).AsObject()("elapsed_s").GetValue(Of Double)(), 0.001)
+        Assert.AreEqual(8.0, convergenceJson(1).AsObject()("objective_value").GetValue(Of Double)(), 0.001)
 
         Dim cell = sol0("classes").AsObject()("1a").AsObject()("Mo").AsObject()("1").AsObject()
         Assert.AreEqual("Mathe", JsonHelpers.GetString(cell, "subject"))
