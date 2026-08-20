@@ -8,6 +8,7 @@
 ' motivated this ordering.
 Imports System.Diagnostics
 Imports System.Text.Json.Nodes
+Imports System.Threading.Tasks
 Imports Google.OrTools.Sat
 
 
@@ -212,6 +213,12 @@ Public NotInheritable Class MultiSolveResult
     Public Property StopReason As MultiSolveStopReason
     Public Property IterationsRun As Integer
     Public Property ElapsedS As Double
+    ''' <summary>Phase 2.25: how many of the IterationsRun solves were cut
+    ''' short by the stagnation-cutoff (see SolveWithStagnationCutoff) rather
+    ''' than running to their natural time limit or proving Optimal - lets a
+    ''' caller see whether/how often the mechanism actually fired instead of
+    ''' leaving it invisible. 0 whenever stagnationTimeoutS is Nothing.</summary>
+    Public Property StagnationTriggeredCount As Integer
 End Class
 
 ''' <summary>Replaces the plain Dictionary(Of String, List(Of String)) that
@@ -781,6 +788,42 @@ Public Module Solver
         model.AddBoolOr(literals)
     End Sub
 
+    ''' <summary>Phase 2.25: runs `solver.Solve(model, callback)` on a
+    ''' background Task and, if `stagnationTimeoutS` is set, polls the
+    ''' calling thread every 500ms for how long it has been since
+    ''' `callback`'s last recorded improvement (CpSolverSolutionCallback.
+    ''' OnSolutionCallback only fires on a NEW incumbent, never periodically -
+    ''' there is no way to observe "stuck for N seconds" from inside the
+    ''' callback itself, hence the separate polling thread). Once idle time
+    ''' exceeds the timeout AND at least one solution already exists, calls
+    ''' `solver.StopSearch()` - live-verified (Phase 2.25a) to make an
+    ''' in-progress cross-thread Solve() call return promptly with its
+    ''' best-found result rather than running out the full time budget on a
+    ''' plateau. `stagnationTimeoutS = Nothing` (or an iteration whose time
+    ''' budget is already shorter) reduces this to a plain, un-cutoff
+    ''' `solver.Solve(model, callback)` call - no behavior change from before
+    ''' this phase for that case.</summary>
+    Private Function SolveWithStagnationCutoff(model As CpModel, solver As CpSolver, callback As ConvergenceCallback,
+                                                 stagnationTimeoutS As Double?, ByRef triggered As Boolean) As CpSolverStatus
+        If Not stagnationTimeoutS.HasValue Then
+            Return solver.Solve(model, callback)
+        End If
+        Dim solveTask = Task.Run(Function() solver.Solve(model, callback))
+        Dim sw = Stopwatch.StartNew()
+        Do
+            If solveTask.Wait(500) Then Exit Do
+            Dim lastImprovementS = If(callback.Points.Count > 0, callback.Points.Last().ElapsedS, 0.0)
+            Dim idleS = sw.Elapsed.TotalSeconds - lastImprovementS
+            If callback.Points.Count > 0 AndAlso idleS >= stagnationTimeoutS.Value Then
+                triggered = True
+                solver.StopSearch()
+                solveTask.Wait()
+                Exit Do
+            End If
+        Loop
+        Return solveTask.Result
+    End Function
+
     ''' <summary>Phase 2.8: returns up to `maxSolutions` distinct candidate
     ''' schedules, ranked by ScheduleQuality.Score (ascending Total, best
     ''' first), instead of Solve()'s single result. Builds the model once,
@@ -821,7 +864,33 @@ Public Module Solver
     ''' but still a useful "near miss" search bias) solution, instead of
     ''' every iteration after the first starting cold. Hints only bias
     ''' search order; they never change the feasible-solution set or any
-    ''' correctness guarantee.</summary>
+    ''' correctness guarantee.
+    '''
+    ''' Phase 2.25: `stagnationTimeoutS` (default 45.0s, ACTIVE BY DEFAULT -
+    ''' a deliberate exception to this module's usual "Nothing = today's
+    ''' behavior" convention, per explicit user decision) cuts an iteration
+    ''' short via SolveWithStagnationCutoff once it has gone that long
+    ''' without a new incumbent AND already has at least one solution -
+    ''' motivated by a live-measured real scenario (bw-grundschule-beispiel)
+    ''' where BestObjectiveBound sat completely flat for a full 30-minute
+    ''' single run AND identically across 4 different-seed runs, while
+    ''' `perSolveTimeLimitS`/`totalTimeLimitS` had no way to react to that
+    ''' plateau except waiting it out. At the small default budgets most
+    ''' callers use (`perSolveTimeLimitS` default 30.0s), the cutoff is
+    ''' shorter than the iteration's own time limit and never fires - no
+    ''' behavior change there. `diversifySeed` (default True) makes
+    ''' iterations after the first use `seed + iterations` instead of the
+    ''' same fixed seed, so a stagnation-triggered or natural next iteration
+    ''' explores a different part of the search space instead of retracing
+    ''' the same one (still fully deterministic for repeated SolveTop calls
+    ''' with the same base seed, since it's a pure function of the iteration
+    ''' index). `randomizeSearch` (default True) sets CP-SAT's
+    ''' `randomize_search` parameter, adding search-order diversity
+    ''' independent of `numWorkers` (helpful at `numWorkers:=1`, where
+    ''' portfolio threading isn't already providing that). `relativeGapLimit`
+    ''' stays opt-in (default Nothing) - unlike the above, it changes WHEN
+    ''' CP-SAT accepts a solution as proven-final, a stronger behavioral
+    ''' change this phase deliberately does not force on every caller.</summary>
     Public Function SolveTop(data As JsonObject,
                               Optional maxSolutions As Integer = 10,
                               Optional totalTimeLimitS As Double = 120.0,
@@ -830,7 +899,11 @@ Public Module Solver
                               Optional numWorkers As Integer = 1,
                               Optional stage1TimeLimitS As Double = 60.0,
                               Optional useStagedHints As Boolean = True,
-                              Optional qualityWeights As QualityWeights = Nothing) As MultiSolveResult
+                              Optional qualityWeights As QualityWeights = Nothing,
+                              Optional stagnationTimeoutS As Double? = 45.0,
+                              Optional diversifySeed As Boolean = True,
+                              Optional randomizeSearch As Boolean = True,
+                              Optional relativeGapLimit As Double? = Nothing) As MultiSolveResult
         Dim weights = If(qualityWeights, New QualityWeights())
         Dim built = BuildCoreModel(data)
         Dim sw = Stopwatch.StartNew()
@@ -853,6 +926,7 @@ Public Module Solver
         SolveTopObjective.ApplyQualityObjective(built, data, weights)
         Dim solutions As New List(Of ScoredSolution)
         Dim iterations = 0
+        Dim stagnationTriggeredCount = 0
         Dim stopReason As MultiSolveStopReason
 
         Do
@@ -867,10 +941,18 @@ Public Module Solver
             End If
             Dim thisLimit = Math.Min(perSolveTimeLimitS, remaining)
 
+            Dim effectiveSeed = If(diversifySeed, seed + iterations, seed)
+            Dim paramsStr = $"max_time_in_seconds:{thisLimit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{effectiveSeed},num_search_workers:{numWorkers}"
+            If randomizeSearch Then paramsStr &= ",randomize_search:true"
+            If relativeGapLimit.HasValue Then paramsStr &= $",relative_gap_limit:{relativeGapLimit.Value.ToString(Globalization.CultureInfo.InvariantCulture)}"
+
             Dim solver As New CpSolver()
-            solver.StringParameters = $"max_time_in_seconds:{thisLimit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
+            solver.StringParameters = paramsStr
             Dim convergenceCb As New ConvergenceCallback()
-            Dim status = solver.Solve(built.Model, convergenceCb)
+            Dim triggered = False
+            Dim thisStagnationTimeout = If(stagnationTimeoutS.HasValue AndAlso stagnationTimeoutS.Value < thisLimit, stagnationTimeoutS, Nothing)
+            Dim status = SolveWithStagnationCutoff(built.Model, solver, convergenceCb, thisStagnationTimeout, triggered)
+            If triggered Then stagnationTriggeredCount += 1
             iterations += 1
 
             If status = CpSolverStatus.Infeasible OrElse status = CpSolverStatus.ModelInvalid Then
@@ -901,7 +983,8 @@ Public Module Solver
 
         Return New MultiSolveResult With {
             .Solutions = solutions.OrderBy(Function(s) s.Quality.Total).ToList(),
-            .StopReason = stopReason, .IterationsRun = iterations, .ElapsedS = sw.Elapsed.TotalSeconds
+            .StopReason = stopReason, .IterationsRun = iterations, .ElapsedS = sw.Elapsed.TotalSeconds,
+            .StagnationTriggeredCount = stagnationTriggeredCount
         }
     End Function
 

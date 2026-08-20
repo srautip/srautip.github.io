@@ -48,6 +48,20 @@ Public NotInheritable Class RunConfig
     ''' nur gesetzte Felder ueberschreiben den jeweiligen Default, siehe
     ''' BuildQualityWeights.</summary>
     Public Property QualityWeights As QualityWeightsConfig = Nothing
+    ''' <summary>Phase 2.25: Nothing falls back to SolveTop's own 45.0s
+    ''' default (active there regardless of this field - see SolveTop's
+    ''' doc comment). Set explicitly here only to override that default
+    ''' per school, e.g. a larger value for a school whose genuine
+    ''' improvements are known to arrive slowly.</summary>
+    Public Property StagnationTimeoutS As Double? = Nothing
+    Public Property DiversifySeed As Boolean? = Nothing
+    Public Property RandomizeSearch As Boolean? = Nothing
+    ''' <summary>Phase 2.25: stays Nothing (SolveTop's own default, i.e.
+    ''' CP-SAT's proof-of-optimality behavior is unchanged) unless a school
+    ''' explicitly opts in - unlike the three fields above, this one
+    ''' changes WHEN a solution is accepted as proven-final, not just how
+    ''' long a stagnant search runs.</summary>
+    Public Property RelativeGapLimit As Double? = Nothing
 End Class
 
 ''' <summary>Phase 2.24: die sieben Gewichte aus ScheduleQuality.
@@ -203,8 +217,20 @@ Public Module Run
         ' als vergleichbare Alternativen exportiert (siehe unten).
         Dim perSolveLimit = If(cfg.PerSolveTimeLimitS, cfg.SolveTimeLimitS)
         Dim qualityWeights = BuildQualityWeights(cfg.QualityWeights)
+        ' Phase 2.25: resolves each nullable config field to a concrete
+        ' value BEFORE the call (same pattern as perSolveLimit above) -
+        ' cfg.StagnationTimeoutS/DiversifySeed/RandomizeSearch = Nothing
+        ' (no override in config.yaml) must reproduce SolveTop's OWN
+        ' defaults (45.0s/True/True), not silently disable them.
+        ' RelativeGapLimit passes through as-is - Nothing means the same
+        ' thing (no gap-limit override) on both sides.
+        Dim stagnationTimeoutS = If(cfg.StagnationTimeoutS.HasValue, cfg.StagnationTimeoutS, New Double?(45.0))
+        Dim diversifySeed = If(cfg.DiversifySeed, True)
+        Dim randomizeSearch = If(cfg.RandomizeSearch, True)
         Dim topResult = Solver.SolveTop(data, maxSolutions:=cfg.MaxSolutions, totalTimeLimitS:=cfg.SolveTimeLimitS,
-            perSolveTimeLimitS:=perSolveLimit, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers, qualityWeights:=qualityWeights)
+            perSolveTimeLimitS:=perSolveLimit, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers, qualityWeights:=qualityWeights,
+            stagnationTimeoutS:=stagnationTimeoutS, diversifySeed:=diversifySeed, randomizeSearch:=randomizeSearch,
+            relativeGapLimit:=cfg.RelativeGapLimit)
         Dim solveOk = topResult.Solutions.Count > 0
         If Not solveOk Then
             IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.md"),
@@ -221,6 +247,10 @@ Public Module Run
         stundenplanLines.Add("")
         stundenplanLines.Add($"**Status:** SolveTop ({topResult.StopReason})  |  **CP-SAT-Status:** {best.Status}  |  **Kann-Verstoesse:** {best.Quality.KannViolationCount}  |  **Qualitaet (Total):** {best.Quality.Total:F1}  |  **Verstoesse:** {scheduleViolations.Count}")
         stundenplanLines.Add("")
+        If topResult.StagnationTriggeredCount > 0 Then
+            stundenplanLines.Add($"*Phase 2.25: die Stagnationserkennung hat {topResult.StagnationTriggeredCount} von {topResult.IterationsRun} Solve-Iteration(en) vorzeitig abgebrochen, weil ueber `stagnation_timeout_s` hinweg keine Verbesserung mehr gefunden wurde - spart Zeit fuer weitere Iterationen statt eine stehende Suche bis zum Zeitlimit weiterlaufen zu lassen.*")
+            stundenplanLines.Add("")
+        End If
         If best.Status = CpSolverStatus.Feasible Then
             stundenplanLines.Add($"*Hinweis: `Feasible` statt `Optimal` bedeutet, CP-SAT konnte innerhalb von `solve_time_limit_s` (aktuell {cfg.SolveTimeLimitS}s) keinen Optimalitaetsbeweis erbringen - ein hoeherer Wert in `config.yaml` kann helfen, ein noch besseres Ergebnis zu finden oder das aktuelle als optimal zu beweisen.*")
             If cfg.PerSolveTimeLimitS.HasValue AndAlso perSolveLimit <> cfg.SolveTimeLimitS Then

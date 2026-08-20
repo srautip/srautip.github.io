@@ -292,6 +292,10 @@ per_solve_time_limit_s: 30.0   # Optional, Default: faellt auf solve_time_limit_
 seed: 42
 num_workers: 1   # Default: Anzahl CPU-Kerne - 1 (mindestens 1)
 max_solutions: 1   # Default 1 (Phase 2.21) - siehe unten
+stagnation_timeout_s: 45.0   # Optional, Default 45.0 - Phase 2.25, siehe unten
+diversify_seed: true   # Optional, Default true - Phase 2.25
+randomize_search: true   # Optional, Default true - Phase 2.25
+relative_gap_limit: null   # Optional, Default nicht gesetzt - Phase 2.25, siehe unten
 quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe unten
   kann: 100.0
   class_gaps: 1000.0
@@ -337,6 +341,32 @@ Zeit benötigt wird. Zwei Hebel dafür: `solve_time_limit_s` selbst erhöhen
 zwingt jede einzelne Iteration früher zum Abbruch (statt das gesamte
 Budget zu verbrauchen, bevor sie `Optimal` beweisen kann) und lässt so
 innerhalb desselben Gesamtbudgets mehrere Iterationen zu.
+
+**`stagnation_timeout_s`/`diversify_seed`/`randomize_search`/`relative_gap_limit`**
+(Phase 2.25, direkte Antwort auf die Beobachtung, dass `Solver.SolveTop`s
+`BestObjectiveBound` bei manchen Szenarien über lange Zeit unbewegt bleibt,
+obwohl noch Budget übrig ist): `stagnation_timeout_s` (Default 45.0s,
+**standardmäßig aktiv** - eine bewusste Ausnahme vom sonst üblichen
+"fehlt das Feld, bleibt das Verhalten unverändert"-Prinzip) bricht eine
+einzelne Solve-Iteration vorzeitig ab, sobald so lange keine neue
+Verbesserung mehr gefunden wurde - die dadurch gesparte Zeit steht der
+nächsten Iteration zur Verfügung, statt eine stehende Suche bis zum
+Zeitlimit weiterlaufen zu lassen (sichtbar an `IterationsRun`/
+`StagnationTriggeredCount`, siehe der entsprechende Hinweis in
+`stundenplan.md`, falls der Mechanismus tatsächlich gegriffen hat). Bei
+den üblichen kurzen `per_solve_time_limit_s`-Budgets greift dieser Cutoff
+in der Praxis nie (das Budget ist ohnehin kürzer) - relevant wird er erst
+bei großzügig konfigurierten Zeitbudgets. `diversify_seed`/
+`randomize_search` (beide Default `true`) lassen aufeinanderfolgende
+Iterationen unterschiedliche Teile des Suchraums erkunden (verschiedener
+effektiver Seed pro Iteration bzw. CP-SATs eigene `randomize_search`-
+Option) - beide bleiben für wiederholte Aufrufe mit demselben `seed`
+weiterhin vollständig deterministisch. `relative_gap_limit` bleibt bewusst
+NICHT standardmäßig aktiv (Default nicht gesetzt) - anders als die drei
+Felder oben ändert es, WANN CP-SAT eine Lösung als bewiesen optimal
+akzeptiert (eine Lücke bis zu diesem Prozentsatz wird toleriert statt
+weiter nach Beweis gesucht), eine stärkere Verhaltensänderung, die diese
+Phase nicht für jede Schule ungefragt erzwingt.
 
 **`quality_weights`** (Phase 2.24, komplett optional - fehlt der Block
 oder ein einzelnes Unterfeld darin, gilt unverändert der jeweils oben

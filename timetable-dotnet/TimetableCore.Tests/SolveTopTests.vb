@@ -359,4 +359,69 @@ Public Class SolveTopTests
         Assert.AreEqual(0, Verifier.VerifySchedule(data, customResult.Solutions(0).Schedule).Count)
     End Sub
 
+    ''' <summary>Phase 2.25: a 3-class/3-teacher, 5-day/8-period scenario
+    ''' (weekly_hours=15 each - loose enough to have multiple genuine
+    ''' improving incumbents before reaching the optimum) with a
+    ''' deliberately tiny stagnationTimeoutS - live-observed to reliably
+    ''' find its first incumbent within ~0.06s and NOT improve again for
+    ''' well over 0.1s afterward, so the cutoff fires at the very next
+    ''' 500ms poll tick (8/8 manual repeats during test development:
+    ''' StagnationTriggeredCount=1, Status=Feasible, ElapsedS~0.62s -
+    ''' noticeably short of the ~0.89s this same scenario needs to reach
+    ''' proven-Optimal without a cutoff, see the companion test below).
+    ''' Proves: (a) the cutoff actually fires (StagnationTriggeredCount
+    ''' &gt;= 1), (b) it returns the best-so-far incumbent rather than
+    ''' nothing (Solutions.Count = 1, Status=Feasible since optimality was
+    ''' never proven), (c) that incumbent is still a fully valid schedule
+    ''' (0 Verifier violations) despite being cut short mid-search.</summary>
+    <TestMethod>
+    Public Sub StagnationCutoffFiresAndReturnsEarly()
+        Dim data = ThreeClassLooseScenario()
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=20, perSolveTimeLimitS:=20, stagnationTimeoutS:=0.1, numWorkers:=1)
+        Assert.AreEqual(1, result.Solutions.Count)
+        Assert.IsTrue(result.StagnationTriggeredCount >= 1, "Stagnation cutoff should have fired at least once.")
+        Assert.AreEqual(CpSolverStatus.Feasible, result.Solutions(0).Status,
+            "A stagnation-cut-off iteration must not claim Optimal - it never finished proving that.")
+        Assert.IsTrue(result.ElapsedS < 5.0, $"ElapsedS={result.ElapsedS} - cutoff should keep this well under the 20s budget.")
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Solutions(0).Schedule).Count)
+    End Sub
+
+    ''' <summary>Companion to the test above, same scenario: `stagnationTimeoutS:=
+    ''' Nothing` must reproduce the pre-Phase-2.25 behavior byte-for-byte -
+    ''' no cutoff ever fires, and the (small, quickly provable) scenario
+    ''' reaches genuine Optimal with 0 gap.</summary>
+    <TestMethod>
+    Public Sub StagnationTimeoutNothingNeverTriggersAndReachesOptimal()
+        Dim data = ThreeClassLooseScenario()
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=20, perSolveTimeLimitS:=20, stagnationTimeoutS:=Nothing, numWorkers:=1)
+        Assert.AreEqual(1, result.Solutions.Count)
+        Assert.AreEqual(0, result.StagnationTriggeredCount)
+        Assert.AreEqual(CpSolverStatus.Optimal, result.Solutions(0).Status)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Solutions(0).Schedule).Count)
+    End Sub
+
+    ''' <summary>Guard-logic regression: a stagnationTimeoutS LARGER than
+    ''' the iteration's own perSolveTimeLimitS must behave exactly like
+    ''' Nothing (SolveTop's `thisStagnationTimeout` clamp) - it can never
+    ''' fire before the iteration would have finished on its own anyway.</summary>
+    <TestMethod>
+    Public Sub StagnationTimeoutLargerThanBudgetNeverTriggers()
+        Dim data = ThreeClassLooseScenario()
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=20, perSolveTimeLimitS:=20, stagnationTimeoutS:=100.0, numWorkers:=1)
+        Assert.AreEqual(1, result.Solutions.Count)
+        Assert.AreEqual(0, result.StagnationTriggeredCount)
+        Assert.AreEqual(CpSolverStatus.Optimal, result.Solutions(0).Status)
+    End Sub
+
+    Private Function ThreeClassLooseScenario() As JsonObject
+        Return Scenario(Mini({"5a", "5b", "5c"}, {"T1", "T2", "T3"}, {"Mathe"}, {}, {"Mo", "Di", "Mi", "Do", "Fr"}, 8), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 15}},
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5b"}, {"subject", "Mathe"}, {"hours_per_week", 15}},
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5c"}, {"subject", "Mathe"}, {"hours_per_week", 15}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T2"}, {"class", "5b"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T3"}, {"class", "5c"}, {"subject", "Mathe"}}
+        })
+    End Function
+
 End Class
