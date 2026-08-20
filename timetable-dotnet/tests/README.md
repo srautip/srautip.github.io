@@ -298,12 +298,13 @@ randomize_search: true   # Optional, Default true - Phase 2.25
 relative_gap_limit: null   # Optional, Default nicht gesetzt - Phase 2.25, siehe unten
 quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe unten
   kann: 100.0
-  class_gaps: 1000.0
-  teacher_gaps: 10.0
+  class_gaps: 100.0
+  teacher_gaps: 100.0
   edge_period: 5.0
   afternoon_day_count: 5.0
   class_load_variance: 3.0
   teacher_load_variance: 3.0
+  include_teacher_gaps: true   # Optional, Default true - Phase 2.25-Nachtrag-2, siehe unten
 ```
 
 Fehlt die Datei komplett, gelten diese Defaults unverändert. `solve_time_limit_s`
@@ -378,11 +379,12 @@ Solver tatsächlich gesucht hat:
 
 | Feld | Bedeutet |
 |---|---|
-| `kann` | Verletzte "Kann"-Regeln (`priority: should`) - dominiert `teacher_gaps`/`edge_period`/`afternoon_day_count`/`*_load_variance`, wird aber selbst von `class_gaps` überstimmt (Nutzerentscheidung: eine einzelne Springstunde bei einer Klasse zählt schwerer als 9 Kann-Verstöße) |
-| `class_gaps` / `teacher_gaps` | Springstunden (Lücken zwischen belegten Stunden an einem Tag) für Klassen bzw. Lehrkräfte - `class_gaps` ist per Default das mit Abstand höchste der 7 Gewichte |
+| `kann` | Verletzte "Kann"-Regeln (`priority: should`) - dominiert `edge_period`/`afternoon_day_count`/`*_load_variance` |
+| `class_gaps` / `teacher_gaps` | Springstunden (Lücken zwischen belegten Stunden an einem Tag) für Klassen bzw. Lehrkräfte - seit Phase 2.25-Nachtrag-2 mit `kann` gleichgewichtet (früher `class_gaps` bewusst höher als `kann`; Live-Experimente zeigten, dass nicht das Gewicht, sondern die CP-SAT-Kodierung von `teacher_gaps` die eigentliche Ursache für schlecht beweisbare Lösungsschranken war - siehe `docs/phase2-25-stagnation-heuristik.md`, Nachtrag 2) |
 | `edge_period` | Randstunden: 1. Stunde oder Nachmittag (Periode ≥ 7) |
 | `afternoon_day_count` | Anzahl unterschiedlicher Tage mit Nachmittagsunterricht pro Klasse (nicht die Stundenanzahl - 4 Nachmittagsstunden an 1 Tag zählen als 1, an 4 Tagen verteilt als 4) |
 | `class_load_variance` / `teacher_load_variance` | Ausgewogenheit der täglichen Stundenzahl (Lehrkräfte nur über ihre tatsächlichen Arbeitstage) |
+| `include_teacher_gaps` | `false` schaltet `teacher_gaps` STRUKTURELL aus der Zielfunktion aus (keine Hilfsvariablen im Modell, nicht nur Gewicht 0) - Sicherheitsventil für Schulen, bei denen selbst die gefixte Kodierung (Phase 2.25-Nachtrag-2) noch zu teuer ist. Default `true`. |
 
 Nur explizit gesetzte Unterfelder überschreiben ihren Default - eine
 Schule kann also z.B. nur `edge_period` anpassen, ohne die übrigen 6

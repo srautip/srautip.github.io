@@ -42,26 +42,45 @@ Public NotInheritable Class QualityWeights
     Public Property AfternoonDayCount As Double = ScheduleQuality.WeightAfternoonDayCount
     Public Property ClassLoadVariance As Double = ScheduleQuality.WeightClassLoadVariance
     Public Property TeacherLoadVariance As Double = ScheduleQuality.WeightTeacherLoadVariance
+    ''' <summary>Phase 2.25-Nachtrag-2: whether SolveTopObjective.
+    ''' ApplyQualityObjective builds TeacherGaps' auxiliary variables/
+    ''' constraints into the CP-SAT model at all - a structural on/off
+    ''' switch, not just a weight of 0 (setting TeacherGaps=0 alone would
+    ''' still build the now-cheap-but-nonzero auxiliary construction; this
+    ''' flag skips building it entirely, for schools where even the fixed
+    ''' Phase-2.25-Nachtrag-2 encoding remains too costly at their scale).
+    ''' Default True - unchanged behavior for every existing school without
+    ''' an explicit override. Does NOT affect ScheduleQuality.Score's own
+    ''' independent, always-computed TeacherGapCount (display/ranking
+    ''' still sees the true count regardless of whether the solver
+    ''' searched for it).</summary>
+    Public Property IncludeTeacherGaps As Boolean = True
 End Class
 
 Public Module ScheduleQuality
 
-    ' Nutzerentscheidung: Kann-Verstoesse dominieren NICHT mehr automatisch
-    ' die gesamte Rangfolge (anders als in der urspruenglichen, hier
-    ' bewusst verworfenen Heuristik "100000, damit nichts es je aufwiegen
-    ' kann") - WeightClassGaps (siehe unten) liegt jetzt hoeher als dieses
-    ' Gewicht. Kann-Verstoesse dominieren weiterhin die UEBRIGEN
-    ' Sekundaerkriterien (TeacherGaps/EdgePeriod/AfternoonDayCount/
-    ' LoadVariance), nur nicht mehr Springstunden bei Klassen.
+    ' Kann-Verstoesse dominieren die uebrigen Sekundaerkriterien
+    ' (EdgePeriod/AfternoonDayCount/LoadVariance), aber NICHT mehr per
+    ' Brechstange (verworfene urspruengliche Heuristik "100000, damit
+    ' nichts es je aufwiegen kann").
     Public Const WeightKann As Double = 100.0
 
-    ' Springstunden (mid-day gaps) sind der stoerendste Sekundaerfaktor in
-    ' der Praxis (ungenutzte Wartezeit fuer Klassen/Lehrkraefte) - per
-    ' Nutzerentscheidung bewusst sogar hoeher als WeightKann gewichtet
-    ' (siehe dessen Kommentar oben), nicht nur das hoechste der uebrigen
-    ' Sekundaergewichte.
-    Public Const WeightClassGaps As Double = 1000.0
-    Public Const WeightTeacherGaps As Double = 10.0
+    ' Phase 2.25-Nachtrag-2: einheitliches Gewicht mit WeightKann (frueher
+    ' bewusst hoeher gewichtet, WeightClassGaps=1000 - siehe
+    ' docs/phase2-25-stagnation-heuristik.md, Nachtrag 2, fuer die volle
+    ' Historie). Live-Experimente gegen die reale bw-grundschule-beispiel-
+    ' Fixture zeigten: das Gewicht selbst war nie das eigentliche Problem
+    ' (Springstunden bei Klassen loesten bei JEDEM getesteten Gewicht,
+    ' 1 bis 10000, in Sekunden bis zum bewiesenen Optimum) - die
+    ' eigentliche Bound-Proving-Schwaeche kam von TeacherGaps' fruehere
+    ' Sentinel/Min-Max-Kodierung (siehe SolveTopObjective.BuildGapFlags'
+    ' Dokumentation), nicht von einem der beiden Gewichte. Die
+    ' Vereinheitlichung auf WeightKann ist eine bewusste, bei dieser
+    ' Gelegenheit getroffene Nutzerentscheidung, keine technische
+    ' Notwendigkeit - sie hebt die vorherige explizite Prioritaet
+    ' "ClassGaps > Kann" auf "ClassGaps == Kann" auf.
+    Public Const WeightClassGaps As Double = 100.0
+    Public Const WeightTeacherGaps As Double = 100.0
 
     ' Randstunden-Vermeidung: mildly disruptive, weighted below gaps.
     Public Const WeightEdgePeriod As Double = 5.0

@@ -238,3 +238,140 @@ anpassen), die außerhalb des Umfangs dieser Phase liegt.
       `StagnationTriggeredCount`) oben dokumentiert - inkl. des ehrlichen
       Befunds, dass die Bound selbst unverändert bleibt.
 - [x] Committet und gepusht auf `claude/qwen-3.5-sandbox-test-ubfhmo`.
+
+## Nachtrag 2: ClassGaps/TeacherGaps-Kodierung korrigieren + einheitliches Kann-Gewicht
+
+**Kontext:** Phase 2.25c hatte die Encoding-Änderung noch als "empirisch
+nicht gerechtfertigt" verworfen (Exp 5: neue sentinel-freie, aber weiterhin
+Min/Max-basierte Kodierung brachte im vollen 7-Kriterien-Kontext fast keine
+Verbesserung, 97.9% statt 99.7% Lücke). Eine Reihe weiterer Nutzerfragen
+und Scratch-Experimente (gleiches `/tmp/.../scratchpad/phase225diag/`-
+Projekt) hat diese Diagnose korrigiert.
+
+### Experiment-Historie (alle gegen die reale `bw-grundschule-beispiel`-Fixture, `seed:=42`)
+
+| # | Aufbau | Ergebnis |
+|---|---|---|
+| 1 (Baseline) | Voller 7-Kriterien-Kontext, alte Sentinel-Kodierung, alte Gewichte (Kann=100, ClassGaps=1000) | Objective=17688, Bound=51, Gap=99.7%, 150s |
+| 2 (Kann-only) | Nur Kann, `Solver.Solve()` | Optimal, 0/0, 0.2s |
+| 3b | Voller Kontext MINUS Sentinel-Konstrukte (Terme weggelassen) | Objective=78, Bound=52, Gap=33.3% |
+| 5 | Voller Kontext, ERSTE sentinel-freie Kodierung (weiterhin AddMinEquality/AddMaxEquality) | Objective=2424, Bound=52, Gap=97.9% - kaum Verbesserung |
+| 6 | Voller Kontext, NUR ClassGaps auf neue Kodierung+Gewicht 100 | Objective=361, Bound=51, Gap=85.9% - ClassGaps war nicht der Treiber |
+| 9/10/11 | ClassGaps ISOLIERT, alte Kodierung, Gewichte 1/10 bis 10000/10000 | alle ~4-5s bis bewiesen Optimal - ClassGaps nie das Problem |
+| 12 | Kann+ClassGaps+TeacherGaps+AfternoonDayCount, alte Kodierung, alte Gewichte, OHNE EdgePeriod/ClassLoadVariance/TeacherLoadVariance | Bound=0 (schlechter als 6!), Objective=70 - TeacherGaps als Treiber sichtbar |
+| 13 | TeacherGaps ISOLIERT, alte Kodierung, Original-Gewicht 10 (!) | Bound=0 über volle 300s, nur 13 Lehrkräfte - **TeacherGaps' Kodierung ist der Treiber, nicht das Gewicht** |
+| 7/8 | Kann+ClassGaps[+TeacherGaps], NEUE Pro-Perioden-`isGap`-Kodierung, Gewicht=100 | 1.7s bzw. 12.4s bis bewiesen Optimal |
+
+**Zentraler Befund:** nicht das Gewicht (TeacherGaps' Original-Gewicht war
+mit 10 sogar niedriger als Kann=100), sondern die
+`AddMinEquality`/`AddMaxEquality`-Konstruktion selbst war für TeacherGaps
+(deutlich mehr Freiheitsgrade als bei Klassen, da Lehrkräfte i.d.R.
+mehrere Klassen unterrichten) der Treiber der Bound-Schwäche. Auch die
+ERSTE "sentinel-freie" Variante aus 2.25c reichte nicht - sie behielt
+`AddMinEquality`/`AddMaxEquality` bei (nur ohne Big-M-Sentinel-Wert). Erst
+eine ZWEITE Variante, die diese Operatoren komplett durch eine
+Präfix/Suffix-OR-Kette (`anyBefore`/`anyAfter`) plus direkte lineare
+Reifikation jeder einzelnen Lücken-PERIODE als eigene BoolVar ersetzt,
+behebt das Problem.
+
+### Nutzerentscheidung
+
+"Einheitliches Kann-Gewicht, aber TeacherGaps in `config.yaml`
+deaktivierbar" - ClassGaps und TeacherGaps werden beide mit `WeightKann`
+(100) statt ihrer bisherigen separaten Gewichte (1000 bzw. 10) gewichtet.
+Das hebt die frühere, in einer noch früheren Session-Runde explizit
+getroffene Priorität "ClassGaps (1000) > Kann (100)" auf "ClassGaps ==
+Kann" auf - eine bewusste, transparent dokumentierte Nebenwirkung, keine
+technische Notwendigkeit (die Experimente zeigen, dass ClassGaps' Gewicht
+nie das Performance-Problem war).
+
+### Umsetzung
+
+- **`TimetableCore/SolveTopObjective.vb`**: neue `BuildGapFlags` (Port der
+  in `SmokeEncoding.vb` mit 6 Handrechnungen live verifizierten
+  Pro-Perioden-`isGap`-Kodierung) ersetzt `BuildGapVars` für Klassen UND
+  Lehrer. `ApplyQualityObjective` gated den Lehrer-Aufruf über das neue
+  `w.IncludeTeacherGaps`-Flag.
+- **`TimetableCore/ScheduleQuality.vb`**: `WeightClassGaps`/
+  `WeightTeacherGaps` Default 1000.0/10.0 → 100.0/100.0 (= `WeightKann`).
+  Neue `QualityWeights.IncludeTeacherGaps As Boolean = True` - schaltet
+  bei `False` die Hilfsvariablen/-Constraints STRUKTURELL aus dem Modell
+  aus (nicht nur Gewicht 0 - ein reines Gewicht-0 hätte die Konstrukte
+  weiterhin gebaut, siehe Phase 2.25a's Befund dazu).
+- **`SchoolTestRunner/Run.vb`**: `QualityWeightsConfig.IncludeTeacherGaps
+  As Boolean? = Nothing` (Default True), durchgereicht in
+  `BuildQualityWeights`. `tests/README.md` dokumentiert
+  `quality_weights.include_teacher_gaps`.
+- **Tests**: `ScheduleQualityTests.ClassGapsKannAndTeacherGapsContributeEquallyAfterUnification`
+  ersetzt die frühere Dominanz-Hierarchie-Prüfung (1 ClassGap == 1 Kann ==
+  1 TeacherGap, alle 100). Neuer
+  `SolveTopTests.IncludeTeacherGapsControlsWhetherSolverSteersAroundTeacherGaps`
+  beweist die STEUERUNGS-Wirkung (nicht nur einen Anzeige-Unterschied):
+  ein geteilter Lehrer T1 (Klasse 5a frei wählbar zwischen Periode 1 [Edge,
+  kein Lehrer-Gap] und Periode 4 [kein Edge, 1 Lehrer-Gap], Klasse 5b fix
+  auf Periode 2) - mit `IncludeTeacherGaps:=True` wählt der Solver Periode
+  1 (vermeidet die teurere Lehrer-Lücke), mit `:=False` Periode 4 (blind
+  für die Lücke, vermeidet stattdessen die Randstunde) - die
+  nachträgliche `Quality.Total`-Anzeige sieht die echte Lücke in BEIDEN
+  Fällen (100 vs. 5), nur die SUCHE selbst war im zweiten Fall blind dafür.
+
+### Live-Ergebnis (`bw-grundschule-beispiel`, unveränderte `config.yaml`: 120s Budget, `num_workers:=4`)
+
+| | Objective | Bound | Gap% | Status |
+|---|---|---|---|---|
+| Vorher (Phase 2.25a-Baseline, andere Konfiguration: 150s/numWorkers=1) | 17688 | 51 | 99.7% | Feasible |
+| Nachher (dieser Nachtrag, Produktionskonfiguration: 120s/numWorkers=4) | 205.0 | 52.0 | **74.6%** | Feasible |
+
+Kein direkter 1:1-Vergleich (unterschiedliches Zeitbudget/`num_workers`),
+aber beide Kennzahlen (absolute Objective-Größenordnung UND
+Optimalitäts-Lücke) sind deutlich besser. Ehrlich zu berichten: die Lücke
+ist noch nicht geschlossen (74.6%, weiterhin `Feasible` statt `Optimal`
+nach 120s) - `BestObjectiveBound` bleibt bei ~52 (praktisch unverändert
+gegenüber allen vorherigen Experimenten), das strukturelle Bound-Proving-
+Problem ist also nur TEILWEISE behoben (die riesige `ClassGaps=1000`-
+Verstärkung eines schwachen Bounds ist weg, die zugrunde liegende
+LP-Relaxations-Schwäche selbst bleibt). 0 Verifier-Verstöße, 0
+Kann-Verstöße.
+
+### Nebenwirkung: bestehender Stagnations-Test musste neu abgestimmt werden
+
+Die neue `BuildGapFlags`-Kodierung ist strukturell deutlich schneller/
+straffer als die alte Sentinel-Variante - das machte den bereits
+bestehenden Test `SolveTopTests.StagnationCutoffFiresAndReturnsEarly`
+(aus Phase 2.25b, unverändert seit dessen Commit) instabil: sein bisheriges
+Szenario (`ThreeClassLooseScenario` - 3 Klassen mit je einem eigenen,
+unabhängigen Lehrer, keine echte `no_overlap(teacher)`-Konkurrenz) löste
+jetzt in nur noch ~0.6s statt vorher deutlich länger, mit einem
+Stagnationsfenster von nur ~55-180ms - zu kurz und zu ungünstig zum
+500ms-Poll-Zyklus von `SolveWithStagnationCutoff` ausgerichtet, um
+zuverlässig zu feuern (reines Timing-/Poll-Granularitäts-Artefakt, kein
+Korrektheitsfehler der neuen Kodierung).
+
+**Fix:** `ThreeClassLooseScenario` wurde durch `CoupledTeacherContentionScenario`
+ersetzt (9 Klassen, aber nur 3 geteilte Lehrer - je 3 Klassen pro Lehrer,
+echte `no_overlap(teacher)`-Konkurrenz statt trivial unabhängiger
+Teilprobleme), live per Scratch-Experiment (`/tmp/.../scratchpad/
+stagtiming/`) auf ein robustes, ~1.4s breites Stagnationsfenster
+kalibriert (3/3 manuelle Wiederholungen: `StagnationTriggeredCount=1`,
+`Status=Feasible`, `ElapsedS`≈1.0-1.3s mit `stagnationTimeoutS:=0.5`,
+gegenüber `ElapsedS`≈3.0-3.2s bis bewiesen `Optimal` ohne Cutoff - deutlich
+mehr Sicherheitsabstand zur 500ms-Poll-Granularität als das alte Szenario).
+Die beiden Begleit-Tests (`StagnationTimeoutNothingNeverTriggersAndReachesOptimal`,
+`StagnationTimeoutLargerThanBudgetNeverTriggers`) nutzen dasselbe neue
+Szenario und bleiben unverändert grün.
+
+### Definition of Done (Nachtrag 2)
+
+- [x] `dotnet test TimetableCore.Tests` bleibt vollständig grün (siehe
+      Testlauf-Protokoll unten).
+- [x] `BuildGapFlags` ersetzt `BuildGapVars` für Klassen UND Lehrer,
+      `IncludeTeacherGaps`-Flag strukturell (nicht nur gewichtsbasiert)
+      wirksam - bewiesen durch einen echten Steuerungs-Unterschied im
+      Solver-Verhalten, nicht nur eine Anzeige-Differenz.
+- [x] Gewichts-Vereinheitlichung (`ClassGaps`/`TeacherGaps` = `Kann` =
+      100) umgesetzt, die dadurch aufgehobene frühere Priorität
+      transparent dokumentiert.
+- [x] `bw-grundschule-beispiel` live mit der Produktions-`config.yaml`
+      neu durchlaufen, Ergebnis oben ehrlich dokumentiert (deutliche
+      Verbesserung, aber Lücke nicht vollständig geschlossen).
+- [x] Committet und gepusht auf `claude/qwen-3.5-sandbox-test-ubfhmo`.

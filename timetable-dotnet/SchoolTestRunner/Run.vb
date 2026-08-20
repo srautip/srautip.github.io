@@ -78,6 +78,12 @@ Public NotInheritable Class QualityWeightsConfig
     Public Property AfternoonDayCount As Double? = Nothing
     Public Property ClassLoadVariance As Double? = Nothing
     Public Property TeacherLoadVariance As Double? = Nothing
+    ''' <summary>Phase 2.25-Nachtrag-2: Nothing -&gt; Default True (unveraendertes
+    ''' Verhalten). `false` schaltet TeacherGaps strukturell aus SolveTops
+    ''' Zielfunktion aus (keine Hilfsvariablen/-Constraints, nicht nur
+    ''' Gewicht 0) - Sicherheitsventil fuer Schulen, bei denen selbst die
+    ''' gefixte Kodierung noch zu teuer ist.</summary>
+    Public Property IncludeTeacherGaps As Boolean? = Nothing
 End Class
 
 Public Module Run
@@ -109,6 +115,7 @@ Public Module Run
         If cfg.AfternoonDayCount.HasValue Then w.AfternoonDayCount = cfg.AfternoonDayCount.Value
         If cfg.ClassLoadVariance.HasValue Then w.ClassLoadVariance = cfg.ClassLoadVariance.Value
         If cfg.TeacherLoadVariance.HasValue Then w.TeacherLoadVariance = cfg.TeacherLoadVariance.Value
+        If cfg.IncludeTeacherGaps.HasValue Then w.IncludeTeacherGaps = cfg.IncludeTeacherGaps.Value
         Return w
     End Function
 

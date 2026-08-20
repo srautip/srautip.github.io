@@ -65,46 +65,81 @@ Friend Module SolveTopObjective
         Next
     End Sub
 
-    ''' <summary>Per (entity, day): "span of occupied periods minus count
-    ''' of occupied periods" ("Springstunden"), via the sentinel-
-    ''' substitution Min/Max trick - live-verified against the actual
-    ''' installed OrTools build during planning (a solved smoke model with
-    ''' occupied={0,2} on a 3-period day produced firstOccupied=0,
-    ''' lastOccupied=2, gapVar=1, matching hand computation exactly).</summary>
-    Private Sub BuildGapVars(model As CpModel, entities As List(Of String), days As List(Of String), periods As List(Of Integer), tag As String,
-                              occupied As Dictionary(Of (Entity As String, Day As String, Period As Integer), BoolVar),
-                              hasAny As Dictionary(Of (Entity As String, Day As String), BoolVar),
-                              gapVars As List(Of IntVar))
-        Dim maxPeriod = periods.Max()
-        Dim bigPeriod = CLng(maxPeriod) + 1L
+    ''' <summary>Per (entity, day): one Big-M-free BoolVar per INTERIOR
+    ''' period that is a "Springstunde" (occupied periods exist both
+    ''' strictly before AND strictly after it, but it itself is free) -
+    ''' replaces the former sentinel-substitution Min/Max encoding
+    ''' (`BuildGapVars`, removed in the Phase-2.25-Nachtrag-2 fix below).
+    ''' Edge periods (first/last of the day) can never be a gap by
+    ''' construction and get no variable at all.
+    '''
+    ''' Built from two Big-M-free prefix/suffix-OR chains: `anyBefore(p) =
+    ''' OR(occupied(1..p))` for p=1..maxP-1, `anyAfter(p) =
+    ''' OR(occupied(p..maxP))` for p=2..maxP (each step a plain
+    ''' AddMaxEquality of two BoolVars, no sentinel value ever enters the
+    ''' domain). For an interior period p, `before(p) = anyBefore(p-1)`
+    ''' (strictly before p) and `after(p) = anyAfter(p+1)` (strictly after
+    ''' p); `isGap(p)` is then a direct linear reification of
+    ''' `Not(occupied(p)) And before(p) And after(p)` - no AddMinEquality/
+    ''' AddMaxEquality/sentinel anywhere in the final gap variable itself.
+    ''' `hasAny` is not needed either: on an empty day every `anyBefore`/
+    ''' `anyAfter` is false, so every `isGap` is structurally false too.
+    '''
+    ''' Empirically motivated (Phase 2.25-Nachtrag-2, live against the real
+    ''' `bw-grundschule-beispiel` fixture): the OLD `BuildGapVars` for
+    ''' TEACHERS alone (isolated, `Kann+TeacherGaps` only, original modest
+    ''' weight 10) left `BestObjectiveBound` stuck at 0 for the FULL 300s
+    ''' budget - the encoding, not the weight, was the problem (the same
+    ''' isolated test for CLASSES solved to a proven optimum in ~5s at
+    ''' ANY tested weight, including the much larger 1000). This THIS
+    ''' encoding fixed it: the same Kann+ClassGaps+TeacherGaps combination
+    ''' solved to a proven optimum in ~12s. A first attempt at a "sentinel-
+    ''' free" fix during Phase 2.25c that kept AddMinEquality/AddMaxEquality
+    ''' (just without a literal Big-M value) did NOT help - it is
+    ''' specifically the Min/Max operators themselves, not merely large
+    ''' sentinel constants, that weaken the LP relaxation here.</summary>
+    Private Sub BuildGapFlags(model As CpModel, entities As List(Of String), days As List(Of String), periods As List(Of Integer), tag As String,
+                               occupied As Dictionary(Of (Entity As String, Day As String, Period As Integer), BoolVar),
+                               gapFlags As List(Of BoolVar))
+        Dim maxP = periods.Count
+        If maxP < 3 Then Return ' no interior period possible with <=2 periods/day
         For Each entity In entities
             For Each d In days
-                Dim fcList As New List(Of LinearExpr)
-                Dim lcList As New List(Of LinearExpr)
-                Dim occList As New List(Of BoolVar)
-                For Each p In periods
-                    Dim occ = occupied((entity, d, p))
-                    occList.Add(occ)
-                    Dim fc = model.NewIntVar(0L, bigPeriod, $"fc[{tag},{entity},{d},{p}]")
-                    model.Add(fc = CLng(p)).OnlyEnforceIf(occ)
-                    model.Add(fc = bigPeriod).OnlyEnforceIf(occ.Not())
-                    fcList.Add(fc)
-                    Dim lc = model.NewIntVar(0L, CLng(maxPeriod), $"lc[{tag},{entity},{d},{p}]")
-                    model.Add(lc = CLng(p)).OnlyEnforceIf(occ)
-                    model.Add(lc = 0L).OnlyEnforceIf(occ.Not())
-                    lcList.Add(lc)
-                Next
-                Dim firstOccupied = model.NewIntVar(0L, bigPeriod, $"first[{tag},{entity},{d}]")
-                model.AddMinEquality(firstOccupied, fcList)
-                Dim lastOccupied = model.NewIntVar(0L, CLng(maxPeriod), $"last[{tag},{entity},{d}]")
-                model.AddMaxEquality(lastOccupied, lcList)
+                Dim occList = periods.Select(Function(p) occupied((entity, d, p))).ToList()
 
-                Dim occSum As LinearExpr = LinearExpr.Sum(occList)
-                Dim ha = hasAny((entity, d))
-                Dim gapVar = model.NewIntVar(0L, CLng(periods.Count), $"gap[{tag},{entity},{d}]")
-                model.Add(gapVar = (lastOccupied - firstOccupied + 1L) - occSum).OnlyEnforceIf(ha)
-                model.Add(gapVar = 0L).OnlyEnforceIf(ha.Not())
-                gapVars.Add(gapVar)
+                Dim anyBefore(maxP - 1) As BoolVar ' index p-1, defined for p=1..maxP-1
+                For p = 1 To maxP - 1
+                    Dim v = model.NewBoolVar($"anyBefore[{tag},{entity},{d},{p}]")
+                    If p = 1 Then
+                        model.Add(v = occList(0))
+                    Else
+                        model.AddMaxEquality(v, {CType(anyBefore(p - 2), LinearExpr), CType(occList(p - 1), LinearExpr)})
+                    End If
+                    anyBefore(p - 1) = v
+                Next
+
+                Dim anyAfter(maxP - 1) As BoolVar ' index p-2, defined for p=2..maxP
+                For p = maxP To 2 Step -1
+                    Dim v = model.NewBoolVar($"anyAfter[{tag},{entity},{d},{p}]")
+                    If p = maxP Then
+                        model.Add(v = occList(maxP - 1))
+                    Else
+                        model.AddMaxEquality(v, {CType(anyAfter(p - 1), LinearExpr), CType(occList(p - 1), LinearExpr)})
+                    End If
+                    anyAfter(p - 2) = v
+                Next
+
+                For p = 2 To maxP - 1
+                    Dim beforeP = anyBefore(p - 2) ' anyBefore(p-1)
+                    Dim afterP = anyAfter(p - 1)   ' anyAfter(p+1)
+                    Dim occP = occList(p - 1)
+                    Dim isGap = model.NewBoolVar($"isGap[{tag},{entity},{d},{p}]")
+                    model.Add(isGap <= 1L - occP)
+                    model.Add(isGap <= beforeP)
+                    model.Add(isGap <= afterP)
+                    model.Add(isGap >= beforeP + afterP + (1L - occP) - 2L)
+                    gapFlags.Add(isGap)
+                Next
             Next
         Next
     End Sub
@@ -230,10 +265,12 @@ Friend Module SolveTopObjective
         Dim dailyCountTeacher As New Dictionary(Of (Entity As String, Day As String), LinearExpr)
         BuildScaffolding(model, teacherNames, built.Days, built.Periods, byTeacher, "T", occupiedTeacher, hasAnyTeacher, dailyCountTeacher)
 
-        Dim classGapVars As New List(Of IntVar)
-        BuildGapVars(model, classNames, built.Days, built.Periods, "C", occupiedClass, hasAnyClass, classGapVars)
-        Dim teacherGapVars As New List(Of IntVar)
-        BuildGapVars(model, teacherNames, built.Days, built.Periods, "T", occupiedTeacher, hasAnyTeacher, teacherGapVars)
+        Dim classGapFlags As New List(Of BoolVar)
+        BuildGapFlags(model, classNames, built.Days, built.Periods, "C", occupiedClass, classGapFlags)
+        Dim teacherGapFlags As New List(Of BoolVar)
+        If w.IncludeTeacherGaps Then
+            BuildGapFlags(model, teacherNames, built.Days, built.Periods, "T", occupiedTeacher, teacherGapFlags)
+        End If
 
         Dim classAfternoonDayVars As New List(Of BoolVar)
         BuildAfternoonDayVars(model, classNames, built.Days, built.Periods, occupiedClass, classAfternoonDayVars)
@@ -252,8 +289,8 @@ Friend Module SolveTopObjective
         If built.KannVars.Count > 0 Then
             terms.Add(CLng(w.Kann) * LinearExpr.Sum(built.KannVars.Values.Select(Function(kv) kv.Var)))
         End If
-        If classGapVars.Count > 0 Then terms.Add(CLng(w.ClassGaps) * LinearExpr.Sum(classGapVars))
-        If teacherGapVars.Count > 0 Then terms.Add(CLng(w.TeacherGaps) * LinearExpr.Sum(teacherGapVars))
+        If classGapFlags.Count > 0 Then terms.Add(CLng(w.ClassGaps) * LinearExpr.Sum(classGapFlags))
+        If teacherGapFlags.Count > 0 Then terms.Add(CLng(w.TeacherGaps) * LinearExpr.Sum(teacherGapFlags))
         terms.Add(CLng(w.EdgePeriod) * edgeTerm)
         If classAfternoonDayVars.Count > 0 Then terms.Add(CLng(w.AfternoonDayCount) * LinearExpr.Sum(classAfternoonDayVars))
         If classRangeVars.Count > 0 Then terms.Add(CLng(w.ClassLoadVariance) * LinearExpr.Sum(classRangeVars))

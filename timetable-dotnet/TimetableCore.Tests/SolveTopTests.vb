@@ -359,16 +359,20 @@ Public Class SolveTopTests
         Assert.AreEqual(0, Verifier.VerifySchedule(data, customResult.Solutions(0).Schedule).Count)
     End Sub
 
-    ''' <summary>Phase 2.25: a 3-class/3-teacher, 5-day/8-period scenario
-    ''' (weekly_hours=15 each - loose enough to have multiple genuine
-    ''' improving incumbents before reaching the optimum) with a
-    ''' deliberately tiny stagnationTimeoutS - live-observed to reliably
-    ''' find its first incumbent within ~0.06s and NOT improve again for
-    ''' well over 0.1s afterward, so the cutoff fires at the very next
-    ''' 500ms poll tick (8/8 manual repeats during test development:
-    ''' StagnationTriggeredCount=1, Status=Feasible, ElapsedS~0.62s -
-    ''' noticeably short of the ~0.89s this same scenario needs to reach
-    ''' proven-Optimal without a cutoff, see the companion test below).
+    ''' <summary>Phase 2.25 (Nachtrag 2 timing fix): a 9-class/3-teacher,
+    ''' 5-day/8-period scenario (weekly_hours=15 each, 3 classes sharing
+    ''' each teacher - real no_overlap(teacher) contention) with a
+    ''' stagnationTimeoutS well above the 500ms poll granularity but well
+    ''' below the scenario's live-observed ~1.4s mid-search stall (3/3
+    ''' manual repeats during test development: StagnationTriggeredCount=1,
+    ''' Status=Feasible, ElapsedS~1.0-1.3s - noticeably short of the ~3.0-
+    ''' 3.2s this same scenario needs to reach proven-Optimal without a
+    ''' cutoff, see the companion test below). The previous 3-class/3-
+    ''' teacher scenario here (independent teachers, no real contention)
+    ''' became too fast after the Phase-2.25-Nachtrag-2 BuildGapFlags
+    ''' encoding change (~0.6s total) for its ~0.05-0.18s stall to reliably
+    ''' survive the 500ms poll-granularity race - see the "current work"
+    ''' investigation notes in docs/phase2-25-stagnation-heuristik.md.
     ''' Proves: (a) the cutoff actually fires (StagnationTriggeredCount
     ''' &gt;= 1), (b) it returns the best-so-far incumbent rather than
     ''' nothing (Solutions.Count = 1, Status=Feasible since optimality was
@@ -376,23 +380,23 @@ Public Class SolveTopTests
     ''' (0 Verifier violations) despite being cut short mid-search.</summary>
     <TestMethod>
     Public Sub StagnationCutoffFiresAndReturnsEarly()
-        Dim data = ThreeClassLooseScenario()
-        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=20, perSolveTimeLimitS:=20, stagnationTimeoutS:=0.1, numWorkers:=1)
+        Dim data = CoupledTeacherContentionScenario()
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=20, perSolveTimeLimitS:=20, stagnationTimeoutS:=0.5, numWorkers:=1)
         Assert.AreEqual(1, result.Solutions.Count)
         Assert.IsTrue(result.StagnationTriggeredCount >= 1, "Stagnation cutoff should have fired at least once.")
         Assert.AreEqual(CpSolverStatus.Feasible, result.Solutions(0).Status,
             "A stagnation-cut-off iteration must not claim Optimal - it never finished proving that.")
-        Assert.IsTrue(result.ElapsedS < 5.0, $"ElapsedS={result.ElapsedS} - cutoff should keep this well under the 20s budget.")
+        Assert.IsTrue(result.ElapsedS < 10.0, $"ElapsedS={result.ElapsedS} - cutoff should keep this well under the 20s budget.")
         Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Solutions(0).Schedule).Count)
     End Sub
 
     ''' <summary>Companion to the test above, same scenario: `stagnationTimeoutS:=
     ''' Nothing` must reproduce the pre-Phase-2.25 behavior byte-for-byte -
-    ''' no cutoff ever fires, and the (small, quickly provable) scenario
-    ''' reaches genuine Optimal with 0 gap.</summary>
+    ''' no cutoff ever fires, and the scenario reaches genuine Optimal with
+    ''' 0 gap.</summary>
     <TestMethod>
     Public Sub StagnationTimeoutNothingNeverTriggersAndReachesOptimal()
-        Dim data = ThreeClassLooseScenario()
+        Dim data = CoupledTeacherContentionScenario()
         Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=20, perSolveTimeLimitS:=20, stagnationTimeoutS:=Nothing, numWorkers:=1)
         Assert.AreEqual(1, result.Solutions.Count)
         Assert.AreEqual(0, result.StagnationTriggeredCount)
@@ -406,22 +410,91 @@ Public Class SolveTopTests
     ''' fire before the iteration would have finished on its own anyway.</summary>
     <TestMethod>
     Public Sub StagnationTimeoutLargerThanBudgetNeverTriggers()
-        Dim data = ThreeClassLooseScenario()
+        Dim data = CoupledTeacherContentionScenario()
         Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=20, perSolveTimeLimitS:=20, stagnationTimeoutS:=100.0, numWorkers:=1)
         Assert.AreEqual(1, result.Solutions.Count)
         Assert.AreEqual(0, result.StagnationTriggeredCount)
         Assert.AreEqual(CpSolverStatus.Optimal, result.Solutions(0).Status)
     End Sub
 
-    Private Function ThreeClassLooseScenario() As JsonObject
-        Return Scenario(Mini({"5a", "5b", "5c"}, {"T1", "T2", "T3"}, {"Mathe"}, {}, {"Mo", "Di", "Mi", "Do", "Fr"}, 8), {
-            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 15}},
-            New JsonObject From {{"type", "weekly_hours"}, {"class", "5b"}, {"subject", "Mathe"}, {"hours_per_week", 15}},
-            New JsonObject From {{"type", "weekly_hours"}, {"class", "5c"}, {"subject", "Mathe"}, {"hours_per_week", 15}},
+    ''' <summary>Phase 2.25-Nachtrag-2: proves `QualityWeights.IncludeTeacherGaps`
+    ''' actually changes the SOLVER's search, not just whether a display
+    ''' field is populated (`ScheduleQuality.Score`'s own TeacherGapCount is
+    ''' always independently recomputed from whatever schedule comes back,
+    ''' regardless of this flag - see its own doc comment - so a test must
+    ''' show a genuine STEERING difference, not merely a number appearing).
+    '''
+    ''' Shared teacher T1 teaches 5a (Mathe, free choice) and 5b (Deutsch,
+    ''' pinned to period 2 via a hard forbidden_slot). 5a is restricted to
+    ''' EXACTLY periods {1, 4} (forbidding 2/3 - 2 is already taken by 5b
+    ''' via no_overlap(teacher) anyway). Single day, non-afternoon periods
+    ''' only, so ClassLoadVariance/TeacherLoadVariance/AfternoonDayCount are
+    ''' all 0 no matter what - EdgePeriod and TeacherGaps are the only two
+    ''' criteria left standing, and they pull in OPPOSITE directions:
+    ''' - 5a@1: T1 occupied={1,2} -&gt; TeacherGap=0, but period 1 is an edge
+    '''   period -&gt; EdgePeriod cost = 5.
+    ''' - 5a@4: T1 occupied={2,4} -&gt; span=3,count=2-&gt;TeacherGap=1 (cost 100
+    '''   at the unified weight), but period 4 is not an edge -&gt; EdgePeriod
+    '''   cost = 0.
+    ''' With IncludeTeacherGaps:=True (default): 5(edge) &lt; 100(teachergap)
+    ''' -&gt; solver picks 5a@1. With IncludeTeacherGaps:=False: the
+    ''' TeacherGaps term is not even built into the objective, so 5a@4's
+    ''' true cost of 0 beats 5a@1's cost of 5 -&gt; solver switches to 5a@4,
+    ''' even though that schedule's POST-HOC Quality.Total (still computed
+    ''' with the full, unmodified weights) is worse (100 vs 5) - proof the
+    ''' solver was genuinely blind to it during search, not just that the
+    ''' display happens to differ.</summary>
+    <TestMethod>
+    Public Sub IncludeTeacherGapsControlsWhetherSolverSteersAroundTeacherGaps()
+        Dim data = Scenario(Mini({"5a", "5b"}, {"T1"}, {"Mathe", "Deutsch"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5b"}, {"subject", "Deutsch"}, {"hours_per_week", 1}},
             New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
-            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T2"}, {"class", "5b"}, {"subject", "Mathe"}},
-            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T3"}, {"class", "5c"}, {"subject", "Mathe"}}
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5b"}, {"subject", "Deutsch"}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5b"}, {"day", "Mo"}, {"period", 1}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5b"}, {"day", "Mo"}, {"period", 3}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5b"}, {"day", "Mo"}, {"period", 4}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 2}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 3}}
         })
+
+        Dim withTeacherGaps = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1)
+        Assert.AreEqual(CpSolverStatus.Optimal, withTeacherGaps.Solutions(0).Status)
+        Dim periodA = withTeacherGaps.Solutions(0).Schedule.Single(Function(l) l.ClassName = "5a").Period
+        Assert.AreEqual(1, periodA, "With IncludeTeacherGaps (default True), the solver should avoid the teacher gap even at the cost of an edge period.")
+        Assert.AreEqual(0, withTeacherGaps.Solutions(0).Quality.TeacherGapCount)
+        Assert.AreEqual(5.0, withTeacherGaps.Solutions(0).Quality.Total, 0.0000001)
+
+        Dim noTeacherGapsWeights As New QualityWeights With {.IncludeTeacherGaps = False}
+        Dim withoutTeacherGaps = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1, qualityWeights:=noTeacherGapsWeights)
+        Assert.AreEqual(CpSolverStatus.Optimal, withoutTeacherGaps.Solutions(0).Status)
+        Dim periodB = withoutTeacherGaps.Solutions(0).Schedule.Single(Function(l) l.ClassName = "5a").Period
+        Assert.AreEqual(4, periodB, "With IncludeTeacherGaps:=False, the solver must be blind to the teacher gap and prefer avoiding the edge period instead.")
+        Assert.AreEqual(1, withoutTeacherGaps.Solutions(0).Quality.TeacherGapCount,
+            "The post-hoc score still sees the real teacher gap - only the SOLVER's search was blind to it.")
+        Assert.AreEqual(100.0, withoutTeacherGaps.Solutions(0).Quality.Total, 0.0000001)
+
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, withTeacherGaps.Solutions(0).Schedule).Count)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, withoutTeacherGaps.Solutions(0).Schedule).Count)
+    End Sub
+
+    ''' <summary>9 classes sharing only 3 teachers (3 classes per teacher -
+    ''' real no_overlap(teacher) contention, not the trivially-independent
+    ''' per-class-own-teacher shape the old ThreeClassLooseScenario used),
+    ''' 15h/week each - live-observed (scratch experiments,
+    ''' /tmp/.../scratchpad/stagtiming/) to reliably produce a genuine
+    ''' ~1.4s mid-search stagnation window well clear of the 500ms poll
+    ''' granularity used by SolveWithStagnationCutoff.</summary>
+    Private Function CoupledTeacherContentionScenario() As JsonObject
+        Dim classes = Enumerable.Range(0, 9).Select(Function(i) $"C{i}").ToArray()
+        Dim teachers = {"T1", "T2", "T3"}
+        Dim cons As New List(Of JsonObject)
+        For i = 0 To classes.Length - 1
+            Dim teacher = teachers(i Mod teachers.Length)
+            cons.Add(New JsonObject From {{"type", "weekly_hours"}, {"class", classes(i)}, {"subject", "Mathe"}, {"hours_per_week", 15}})
+            cons.Add(New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", teacher}, {"class", classes(i)}, {"subject", "Mathe"}})
+        Next
+        Return Scenario(Mini(classes, teachers, {"Mathe"}, {}, {"Mo", "Di", "Mi", "Do", "Fr"}, 8), cons)
     End Function
 
 End Class

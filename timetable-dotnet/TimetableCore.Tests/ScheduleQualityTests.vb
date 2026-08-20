@@ -163,7 +163,7 @@ Public Class ScheduleQualityTests
     ''' liefern, siehe z.B. ClassLoadVariance bei mehrtaegigen Datensaetzen
     ''' mit ungleichmaessiger Belegung).</summary>
     <TestMethod>
-    Public Sub ClassGapsOutweighKannWhichStillOutweighsOtherSecondaryCriteria()
+    Public Sub ClassGapsKannAndTeacherGapsContributeEquallyAfterUnification()
         Dim singleDayData = BuildData({"Mo"}, 6)
 
         ' Genau 1 Klassen-Luecke (3 verschiedene Lehrer je 1 Stunde auf
@@ -178,31 +178,35 @@ Public Class ScheduleQualityTests
         Dim scoreOneClassGap = ScheduleQuality.Score(singleDayData, oneClassGapSchedule, 0)
         Assert.AreEqual(1, scoreOneClassGap.ClassGapCount)
         Assert.AreEqual(0, scoreOneClassGap.TeacherGapCount)
-        Assert.AreEqual(1000.0, scoreOneClassGap.Total, 0.0000001)
+        Assert.AreEqual(100.0, scoreOneClassGap.Total, 0.0000001)
 
-        Dim scoreNineKann = ScheduleQuality.Score(singleDayData, New List(Of ScheduleEntry)(), 9)
-        Assert.AreEqual(900.0, scoreNineKann.Total, 0.0000001)
+        Dim scoreOneKann = ScheduleQuality.Score(singleDayData, New List(Of ScheduleEntry)(), 1)
+        Assert.AreEqual(100.0, scoreOneKann.Total, 0.0000001)
 
-        Assert.IsTrue(scoreOneClassGap.Total > scoreNineKann.Total,
-            $"1 Klassen-Luecke ({scoreOneClassGap.Total}) sollte schwerer wiegen als 9 Kann-Verstoesse ({scoreNineKann.Total})")
-
-        ' Kann dominiert weiterhin TeacherGaps (10): ein Lehrer, der zwei
-        ' VERSCHIEDENE Klassen an je nur 1 Stunde derselben Tag unterrichtet
-        ' (Perioden 2 und 4), hat selbst eine Luecke (Spanne 3, 2 belegt),
-        ' waehrend jede der beiden Klassen einzeln nur 1 Stunde diesen Tag
-        ' hat - 0 ClassGapCount.
+        ' Ein Lehrer, der zwei VERSCHIEDENE Klassen an je nur 1 Stunde
+        ' desselben Tages unterrichtet (Perioden 2 und 4), hat selbst eine
+        ' Luecke (Spanne 3, 2 belegt), waehrend jede der beiden Klassen
+        ' einzeln nur 1 Stunde diesen Tag hat - 0 ClassGapCount.
         Dim oneTeacherGapSchedule As New List(Of ScheduleEntry) From {
             Entry("5b", "Fach1", "T2", "Mo", 2),
             Entry("5c", "Fach1", "T2", "Mo", 4)
         }
-        Dim scoreOneKann = ScheduleQuality.Score(singleDayData, New List(Of ScheduleEntry)(), 1)
         Dim scoreOneTeacherGap = ScheduleQuality.Score(singleDayData, oneTeacherGapSchedule, 0)
         Assert.AreEqual(0, scoreOneTeacherGap.ClassGapCount)
         Assert.AreEqual(1, scoreOneTeacherGap.TeacherGapCount)
-        Assert.AreEqual(100.0, scoreOneKann.Total, 0.0000001)
-        Assert.AreEqual(10.0, scoreOneTeacherGap.Total, 0.0000001)
-        Assert.IsTrue(scoreOneKann.Total > scoreOneTeacherGap.Total * 9,
-            $"1 Kann-Verstoss ({scoreOneKann.Total}) sollte schwerer wiegen als 9 Lehrer-Luecken ({scoreOneTeacherGap.Total * 9})")
+        Assert.AreEqual(100.0, scoreOneTeacherGap.Total, 0.0000001)
+
+        ' Phase 2.25-Nachtrag-2: ersetzt die fruehere Dominanz-Hierarchie
+        ' (ClassGaps=1000 > Kann=100 > TeacherGaps=10) - Live-Experimente
+        ' gegen die reale bw-grundschule-beispiel-Fixture zeigten, dass das
+        ' Gewicht selbst nie der eigentliche Treiber von CP-SATs frueherer
+        ' Bound-Proving-Schwaeche war (siehe docs/phase2-25-stagnation-
+        ' heuristik.md, Nachtrag 2) - ClassGaps/TeacherGaps wurden deshalb
+        ' auf Kanns Gewicht (100) vereinheitlicht statt eine kuenstliche
+        ' Hierarchie beizubehalten. 1 Klassen-Luecke, 1 Kann-Verstoss und 1
+        ' Lehrer-Luecke tragen jetzt IDENTISCH bei.
+        Assert.AreEqual(scoreOneClassGap.Total, scoreOneKann.Total, 0.0000001)
+        Assert.AreEqual(scoreOneKann.Total, scoreOneTeacherGap.Total, 0.0000001)
     End Sub
 
     ''' <summary>Phase 2.24: Score's new optional `weights` parameter must
