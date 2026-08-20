@@ -293,8 +293,8 @@ seed: 42
 num_workers: 1   # Default: Anzahl CPU-Kerne - 1 (mindestens 1)
 max_solutions: 1   # Default 1 (Phase 2.21) - siehe unten
 quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe unten
-  kann: 100000.0
-  class_gaps: 10.0
+  kann: 100.0
+  class_gaps: 1000.0
   teacher_gaps: 10.0
   edge_period: 5.0
   afternoon_day_count: 5.0
@@ -348,8 +348,8 @@ Solver tatsächlich gesucht hat:
 
 | Feld | Bedeutet |
 |---|---|
-| `kann` | Verletzte "Kann"-Regeln (`priority: should`) - bewusst riesig, damit sie praktisch nie zugunsten der übrigen 6 Kriterien gebrochen werden |
-| `class_gaps` / `teacher_gaps` | Springstunden (Lücken zwischen belegten Stunden an einem Tag) für Klassen bzw. Lehrkräfte |
+| `kann` | Verletzte "Kann"-Regeln (`priority: should`) - dominiert `teacher_gaps`/`edge_period`/`afternoon_day_count`/`*_load_variance`, wird aber selbst von `class_gaps` überstimmt (Nutzerentscheidung: eine einzelne Springstunde bei einer Klasse zählt schwerer als 9 Kann-Verstöße) |
+| `class_gaps` / `teacher_gaps` | Springstunden (Lücken zwischen belegten Stunden an einem Tag) für Klassen bzw. Lehrkräfte - `class_gaps` ist per Default das mit Abstand höchste der 7 Gewichte |
 | `edge_period` | Randstunden: 1. Stunde oder Nachmittag (Periode ≥ 7) |
 | `afternoon_day_count` | Anzahl unterschiedlicher Tage mit Nachmittagsunterricht pro Klasse (nicht die Stundenanzahl - 4 Nachmittagsstunden an 1 Tag zählen als 1, an 4 Tagen verteilt als 4) |
 | `class_load_variance` / `teacher_load_variance` | Ausgewogenheit der täglichen Stundenzahl (Lehrkräfte nur über ihre tatsächlichen Arbeitstage) |

@@ -148,29 +148,61 @@ Public Class ScheduleQualityTests
         Assert.AreEqual(1.0, result.TeacherLoadVariance, 0.0000001)
     End Sub
 
+    ''' <summary>Nutzerentscheidung (nach der urspruenglichen "Kann
+    ''' dominiert IMMER alles"-Heuristik aus Phase 2.8): WeightClassGaps
+    ''' (1000) liegt jetzt ueber WeightKann (100) - eine einzelne
+    ''' Springstunde bei einer Klasse wiegt schwerer als 9 einzelne Kann-
+    ''' Verstoesse zusammen. Kann-Verstoesse dominieren aber weiterhin die
+    ''' UEBRIGEN Sekundaerkriterien (hier: TeacherGaps) - das bleibt
+    ''' unveraendert wahr. Alle vier Szenarien wurden vor dem Schreiben
+    ''' live gegen ScheduleQuality.Score gegengerechnet (Score.ClassGapCount/
+    ''' TeacherGapCount/etc. einzeln geprueft), NICHT nur von Hand
+    ''' geschaetzt - ein einzelner Tag/wenige Perioden pro Szenario haelt
+    ''' jeweils GENAU EINEN der 7 Terme ungleich 0 (die uebrigen 6 muessen
+    ''' bei mehrdeutigeren Aufbauten sonst leicht uebersehene Beitraege
+    ''' liefern, siehe z.B. ClassLoadVariance bei mehrtaegigen Datensaetzen
+    ''' mit ungleichmaessiger Belegung).</summary>
     <TestMethod>
-    Public Sub KannViolationsDominateSecondaryCriteria()
-        Dim data = BuildData({"Mo", "Di", "Mi", "Do", "Fr"}, 10)
+    Public Sub ClassGapsOutweighKannWhichStillOutweighsOtherSecondaryCriteria()
+        Dim singleDayData = BuildData({"Mo"}, 6)
 
-        ' Deliberately bad schedule: several classes/teachers, each with
-        ' widely-spread periods on several days, to rack up large
-        ' gap/edge/variance sub-scores - but zero Kann violations.
-        Dim badSchedule As New List(Of ScheduleEntry)
-        For Each cls In {"5a", "5b", "5c"}
-            For Each d In {"Mo", "Di"}
-                badSchedule.Add(Entry(cls, "Fach1", cls & "-Lehrer", d, 1))
-                badSchedule.Add(Entry(cls, "Fach2", cls & "-Lehrer", d, 10))
-            Next
-        Next
-        Dim scoreBad = ScheduleQuality.Score(data, badSchedule, 0)
+        ' Genau 1 Klassen-Luecke (3 verschiedene Lehrer je 1 Stunde auf
+        ' Perioden 2/3/5 -> Spanne 4, 3 belegt, Luecke 1) - je EIN eigener
+        ' Lehrer pro Lektion haelt TeacherGapCount bei 0 (kein Lehrer
+        ' unterrichtet mehr als 1 Stunde, also auch keine eigene Luecke).
+        Dim oneClassGapSchedule As New List(Of ScheduleEntry) From {
+            Entry("5a", "Fach1", "T1", "Mo", 2),
+            Entry("5a", "Fach2", "T2", "Mo", 3),
+            Entry("5a", "Fach3", "T3", "Mo", 5)
+        }
+        Dim scoreOneClassGap = ScheduleQuality.Score(singleDayData, oneClassGapSchedule, 0)
+        Assert.AreEqual(1, scoreOneClassGap.ClassGapCount)
+        Assert.AreEqual(0, scoreOneClassGap.TeacherGapCount)
+        Assert.AreEqual(1000.0, scoreOneClassGap.Total, 0.0000001)
 
-        ' "Perfect" schedule (empty - no gaps/edges/variance possible) but
-        ' with a single Kann violation.
-        Dim scoreGood = ScheduleQuality.Score(data, New List(Of ScheduleEntry)(), 1)
+        Dim scoreNineKann = ScheduleQuality.Score(singleDayData, New List(Of ScheduleEntry)(), 9)
+        Assert.AreEqual(900.0, scoreNineKann.Total, 0.0000001)
 
-        Assert.IsTrue(scoreBad.Total < scoreGood.Total,
-            $"Bad-secondary/0-Kann Total ({scoreBad.Total}) should be less than perfect-secondary/1-Kann Total ({scoreGood.Total})")
-        Assert.AreEqual(ScheduleQuality.WeightKann, scoreGood.Total)
+        Assert.IsTrue(scoreOneClassGap.Total > scoreNineKann.Total,
+            $"1 Klassen-Luecke ({scoreOneClassGap.Total}) sollte schwerer wiegen als 9 Kann-Verstoesse ({scoreNineKann.Total})")
+
+        ' Kann dominiert weiterhin TeacherGaps (10): ein Lehrer, der zwei
+        ' VERSCHIEDENE Klassen an je nur 1 Stunde derselben Tag unterrichtet
+        ' (Perioden 2 und 4), hat selbst eine Luecke (Spanne 3, 2 belegt),
+        ' waehrend jede der beiden Klassen einzeln nur 1 Stunde diesen Tag
+        ' hat - 0 ClassGapCount.
+        Dim oneTeacherGapSchedule As New List(Of ScheduleEntry) From {
+            Entry("5b", "Fach1", "T2", "Mo", 2),
+            Entry("5c", "Fach1", "T2", "Mo", 4)
+        }
+        Dim scoreOneKann = ScheduleQuality.Score(singleDayData, New List(Of ScheduleEntry)(), 1)
+        Dim scoreOneTeacherGap = ScheduleQuality.Score(singleDayData, oneTeacherGapSchedule, 0)
+        Assert.AreEqual(0, scoreOneTeacherGap.ClassGapCount)
+        Assert.AreEqual(1, scoreOneTeacherGap.TeacherGapCount)
+        Assert.AreEqual(100.0, scoreOneKann.Total, 0.0000001)
+        Assert.AreEqual(10.0, scoreOneTeacherGap.Total, 0.0000001)
+        Assert.IsTrue(scoreOneKann.Total > scoreOneTeacherGap.Total * 9,
+            $"1 Kann-Verstoss ({scoreOneKann.Total}) sollte schwerer wiegen als 9 Lehrer-Luecken ({scoreOneTeacherGap.Total * 9})")
     End Sub
 
     ''' <summary>Phase 2.24: Score's new optional `weights` parameter must

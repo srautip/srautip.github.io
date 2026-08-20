@@ -46,17 +46,21 @@ End Class
 
 Public Module ScheduleQuality
 
-    ' Kann-Verstoesse must dominate the ranking - chosen large enough that
-    ' even a pathologically bad secondary-criteria score (bounded by total
-    ' lesson count, which stays orders of magnitude below this constant for
-    ' realistic school sizes) can never outweigh a single additional Kann
-    ' violation. Static, documented heuristic - not a scenario-derived proof.
-    Public Const WeightKann As Double = 100000.0
+    ' Nutzerentscheidung: Kann-Verstoesse dominieren NICHT mehr automatisch
+    ' die gesamte Rangfolge (anders als in der urspruenglichen, hier
+    ' bewusst verworfenen Heuristik "100000, damit nichts es je aufwiegen
+    ' kann") - WeightClassGaps (siehe unten) liegt jetzt hoeher als dieses
+    ' Gewicht. Kann-Verstoesse dominieren weiterhin die UEBRIGEN
+    ' Sekundaerkriterien (TeacherGaps/EdgePeriod/AfternoonDayCount/
+    ' LoadVariance), nur nicht mehr Springstunden bei Klassen.
+    Public Const WeightKann As Double = 100.0
 
-    ' Springstunden (mid-day gaps) are the most disruptive secondary factor
-    ' in practice (unusable dead time for classes/teachers alike), so they
-    ' get the highest secondary weight.
-    Public Const WeightClassGaps As Double = 10.0
+    ' Springstunden (mid-day gaps) sind der stoerendste Sekundaerfaktor in
+    ' der Praxis (ungenutzte Wartezeit fuer Klassen/Lehrkraefte) - per
+    ' Nutzerentscheidung bewusst sogar hoeher als WeightKann gewichtet
+    ' (siehe dessen Kommentar oben), nicht nur das hoechste der uebrigen
+    ' Sekundaergewichte.
+    Public Const WeightClassGaps As Double = 1000.0
     Public Const WeightTeacherGaps As Double = 10.0
 
     ' Randstunden-Vermeidung: mildly disruptive, weighted below gaps.

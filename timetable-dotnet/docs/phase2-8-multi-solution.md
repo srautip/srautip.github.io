@@ -34,12 +34,22 @@ Alternativen wählen kann.
 `TeacherGapCount`, `EdgePeriodCount`, `ClassLoadVariance`,
 `TeacherLoadVariance`, `Total`). Gewichte:
 
-| Kriterium | Gewicht | Begründung |
+| Kriterium | Gewicht (Phase 2.8, urspünglich) | Begründung |
 |---|---|---|
 | Kann-Verstöße | 100000 | muss dominieren - selbst ein extrem schlechtes Sekundär-Ergebnis bleibt weit darunter (siehe Dominanz-Test) |
 | Lücken Klassen/Lehrer | je 10 | "Springstunden" sind am störendsten in der Praxis |
 | Randstunden | 5 | störend, aber weniger als Lücken |
 | Tagesausgewogenheit Klassen/Lehrer | je 3 | "nice to have"-Glättung |
+
+**Nachtrag (nach Phase 2.24):** diese Werte sind seit Phase 2.24 nur noch
+die DEFAULTS (per `config.yaml`s `quality_weights`-Block pro Schule
+überschreibbar, siehe `tests/README.md`) - und wurden auf explizite
+Nutzerentscheidung inzwischen selbst angepasst: `Kann` auf 100, `Klassen-
+Lücken` auf 1000 (die aktuell gültigen Default-Werte stehen in
+`TimetableCore/ScheduleQuality.vb` bzw. `tests/README.md`). Springstunden
+bei Klassen dominieren dadurch jetzt sogar Kann-Verstöße - eine bewusste
+Umkehrung der urspünglichen "Kann dominiert immer alles"-Heuristik dieser
+Phase.
 
 Lehrerbelastung-Ausgewogenheit wird bewusst nur über die tatsächlichen
 Arbeitstage eines Lehrers berechnet (Tage, an denen er im Schedule
