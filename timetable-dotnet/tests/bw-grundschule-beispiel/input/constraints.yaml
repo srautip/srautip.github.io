@@ -25,13 +25,6 @@
   scope: class
   entity: 1a
   day: Mo
-  period: 6
-  priority: should
-  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
-- type: forbidden_slot
-  scope: class
-  entity: 1a
-  day: Mo
   period: 7
   priority: must
   reason: "1. Klasse: nur Vormittagsunterricht"
@@ -53,13 +46,6 @@
   scope: class
   entity: 1a
   day: Di
-  period: 6
-  priority: should
-  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
-- type: forbidden_slot
-  scope: class
-  entity: 1a
-  day: Di
   period: 7
   priority: must
   reason: "1. Klasse: nur Vormittagsunterricht"
@@ -81,13 +67,6 @@
   scope: class
   entity: 1a
   day: Mi
-  period: 6
-  priority: should
-  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
-- type: forbidden_slot
-  scope: class
-  entity: 1a
-  day: Mi
   period: 7
   priority: must
   reason: "1. Klasse: nur Vormittagsunterricht"
@@ -105,13 +84,6 @@
   period: 1
   priority: must
   reason: "1. Klasse: kein Unterricht in der 1. Stunde"
-- type: forbidden_slot
-  scope: class
-  entity: 1a
-  day: Do
-  period: 6
-  priority: should
-  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
 - type: forbidden_slot
   scope: class
   entity: 1a
@@ -137,13 +109,6 @@
   scope: class
   entity: 1a
   day: Fr
-  period: 6
-  priority: should
-  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
-- type: forbidden_slot
-  scope: class
-  entity: 1a
-  day: Fr
   period: 7
   priority: must
   reason: "1. Klasse: nur Vormittagsunterricht"
@@ -165,13 +130,6 @@
   scope: class
   entity: 1b
   day: Mo
-  period: 6
-  priority: should
-  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
-- type: forbidden_slot
-  scope: class
-  entity: 1b
-  day: Mo
   period: 7
   priority: must
   reason: "1. Klasse: nur Vormittagsunterricht"
@@ -193,13 +151,6 @@
   scope: class
   entity: 1b
   day: Di
-  period: 6
-  priority: should
-  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
-- type: forbidden_slot
-  scope: class
-  entity: 1b
-  day: Di
   period: 7
   priority: must
   reason: "1. Klasse: nur Vormittagsunterricht"
@@ -221,13 +172,6 @@
   scope: class
   entity: 1b
   day: Mi
-  period: 6
-  priority: should
-  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
-- type: forbidden_slot
-  scope: class
-  entity: 1b
-  day: Mi
   period: 7
   priority: must
   reason: "1. Klasse: nur Vormittagsunterricht"
@@ -249,13 +193,6 @@
   scope: class
   entity: 1b
   day: Do
-  period: 6
-  priority: should
-  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
-- type: forbidden_slot
-  scope: class
-  entity: 1b
-  day: Do
   period: 7
   priority: must
   reason: "1. Klasse: nur Vormittagsunterricht"
@@ -273,13 +210,6 @@
   period: 1
   priority: must
   reason: "1. Klasse: kein Unterricht in der 1. Stunde"
-- type: forbidden_slot
-  scope: class
-  entity: 1b
-  day: Fr
-  period: 6
-  priority: should
-  reason: "1. Klasse: moeglichst keine 6. Stunde (Ausnahme: Chor donnerstags, siehe required_slot)"
 - type: forbidden_slot
   scope: class
   entity: 1b

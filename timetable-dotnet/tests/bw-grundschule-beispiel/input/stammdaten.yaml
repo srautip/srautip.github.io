@@ -19,23 +19,33 @@ klassenstufen:
   bezeichnung: Klasse 4
 faecher:
 - name: Deutsch
-  block_length: 
+  block_length:
   unbeliebt: false
   klassenstufen:
   - klassenstufe: 1
     wochenstunden_soll: 6
     max_pro_tag: 2
   - klassenstufe: 2
-    wochenstunden_soll: 6
+    wochenstunden_soll: 7
     max_pro_tag: 2
   - klassenstufe: 3
-    wochenstunden_soll: 5
+    wochenstunden_soll: 8
     max_pro_tag: 2
   - klassenstufe: 4
-    wochenstunden_soll: 5
+    wochenstunden_soll: 7
     max_pro_tag: 2
+- name: Deutsch-Förderstunde
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 1
+    max_pro_tag: 1
 - name: Mathematik
-  block_length: 
+  block_length:
   unbeliebt: false
   klassenstufen:
   - klassenstufe: 1
@@ -48,8 +58,18 @@ faecher:
     wochenstunden_soll: 5
     max_pro_tag: 2
   - klassenstufe: 4
-    wochenstunden_soll: 5
+    wochenstunden_soll: 6
     max_pro_tag: 2
+- name: Mathe-Förderstunde
+  block_length:
+  unbeliebt: false
+  klassenstufen:
+  - klassenstufe: 1
+    wochenstunden_soll: 1
+    max_pro_tag: 1
+  - klassenstufe: 2
+    wochenstunden_soll: 1
+    max_pro_tag: 1
 - name: Sachunterricht
   block_length: 
   unbeliebt: false
@@ -83,27 +103,27 @@ faecher:
     wochenstunden_soll: 3
     max_pro_tag: 1
 - name: Musik
-  block_length: 
+  block_length:
   unbeliebt: false
   klassenstufen:
   - klassenstufe: 1
     wochenstunden_soll: 2
     max_pro_tag: 1
   - klassenstufe: 2
-    wochenstunden_soll: 2
+    wochenstunden_soll: 1
     max_pro_tag: 1
   - klassenstufe: 3
-    wochenstunden_soll: 2
+    wochenstunden_soll: 1
     max_pro_tag: 1
   - klassenstufe: 4
     wochenstunden_soll: 2
     max_pro_tag: 1
 - name: Kunst
-  block_length: 
+  block_length:
   unbeliebt: false
   klassenstufen:
   - klassenstufe: 1
-    wochenstunden_soll: 2
+    wochenstunden_soll: 1
     max_pro_tag: 1
   - klassenstufe: 2
     wochenstunden_soll: 2
@@ -359,6 +379,12 @@ fach_lehrer_zuordnungen:
 - lehrer_name: Klassenlehrer-1
   fach_name: Kunst
   fachfremd: false
+- lehrer_name: Klassenlehrer-1
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-1
+  fach_name: Mathe-Förderstunde
+  fachfremd: false
 - lehrer_name: Klassenlehrer-2
   fach_name: Deutsch
   fachfremd: false
@@ -376,6 +402,12 @@ fach_lehrer_zuordnungen:
   fachfremd: false
 - lehrer_name: Klassenlehrer-2
   fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-2
+  fach_name: Mathe-Förderstunde
   fachfremd: false
 - lehrer_name: Klassenlehrer-3
   fach_name: Deutsch
@@ -395,6 +427,12 @@ fach_lehrer_zuordnungen:
 - lehrer_name: Klassenlehrer-3
   fach_name: Kunst
   fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Mathe-Förderstunde
+  fachfremd: false
 - lehrer_name: Klassenlehrer-4
   fach_name: Deutsch
   fachfremd: false
@@ -413,6 +451,12 @@ fach_lehrer_zuordnungen:
 - lehrer_name: Klassenlehrer-4
   fach_name: Kunst
   fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-4
+  fach_name: Mathe-Förderstunde
+  fachfremd: false
 - lehrer_name: Klassenlehrer-5
   fach_name: Deutsch
   fachfremd: false
@@ -431,6 +475,12 @@ fach_lehrer_zuordnungen:
 - lehrer_name: Klassenlehrer-5
   fach_name: Kunst
   fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-5
+  fach_name: Mathe-Förderstunde
+  fachfremd: false
 - lehrer_name: Klassenlehrer-6
   fach_name: Deutsch
   fachfremd: false
@@ -449,6 +499,12 @@ fach_lehrer_zuordnungen:
 - lehrer_name: Klassenlehrer-6
   fach_name: Kunst
   fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-6
+  fach_name: Mathe-Förderstunde
+  fachfremd: false
 - lehrer_name: Klassenlehrer-7
   fach_name: Deutsch
   fachfremd: false
@@ -467,6 +523,12 @@ fach_lehrer_zuordnungen:
 - lehrer_name: Klassenlehrer-7
   fach_name: Kunst
   fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-7
+  fach_name: Mathe-Förderstunde
+  fachfremd: false
 - lehrer_name: Klassenlehrer-8
   fach_name: Deutsch
   fachfremd: false
@@ -484,6 +546,12 @@ fach_lehrer_zuordnungen:
   fachfremd: false
 - lehrer_name: Klassenlehrer-8
   fach_name: Kunst
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Deutsch-Förderstunde
+  fachfremd: false
+- lehrer_name: Klassenlehrer-8
+  fach_name: Mathe-Förderstunde
   fachfremd: false
 - lehrer_name: Religionslehrer-ev-1
   fach_name: Religion-ev
