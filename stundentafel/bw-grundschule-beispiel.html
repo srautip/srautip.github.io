@@ -187,13 +187,17 @@
         lastTable.style.transform = 'none';
         var natW = lastTable.scrollWidth;
         var natH = lastTable.scrollHeight;
-        var top = container.getBoundingClientRect().top;
-        var availH = Math.max(window.innerHeight - top - 12, 50);
-        container.style.height = availH + 'px';
         var availW = container.clientWidth;
-        var scale = Math.min(availW / natW, availH / natH);
+        // Nur horizontal an die verfuegbare Breite anpassen - eine
+        // zusaetzliche Verkleinerung anhand der Bildschirmhoehe wuerde bei
+        // vielen Perioden/Parallelklassen den Text unnoetig klein machen.
+        // Die Hoehe folgt proportional (gleicher Skalierungsfaktor fuer
+        // beide Achsen, kein Verzerren) - reicht die Bildschirmhoehe nicht,
+        // scrollt die Seite normal statt die Schrift weiter zu schrumpfen.
+        var scale = availW / natW;
         if (!isFinite(scale) || scale <= 0) scale = 1;
         lastTable.style.transform = 'scale(' + scale + ')';
+        container.style.height = (natH * scale) + 'px';
       }
       window.addEventListener('resize', fitTable);
 
