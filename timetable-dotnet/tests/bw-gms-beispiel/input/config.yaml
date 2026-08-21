@@ -24,11 +24,12 @@ lehrereinsatz_time_limit_s: 180.0
 num_workers: 4
 
 # Begrenzt (getrennt von solve_time_limit_s) jede EINZELNE Solve-
-# Iteration in Solver.SolveTop - bewusst deutlich unter dem 5-Min-
-# Gesamtbudget, damit innerhalb der 300s mehrere Iterationen (= mehrere
-# verschiedene Loesungen) Platz haben, statt dass die erste Iteration
-# allein das komplette Budget verbraucht.
-per_solve_time_limit_s: 60.0
+# Iteration in Solver.SolveTop. Kurzauftrag: auf 15 Min hochgesetzt
+# (vorher 60s) - erlaubt jeder Iteration deutlich mehr Zeit, um innerhalb
+# des 60-Min-Gesamtbudgets tatsaechlich einen Optimalitaetsbeweis zu
+# erreichen, auf Kosten weniger Iterationen insgesamt (max. ~4 bei vollem
+# 60-Min-Budget statt bisher bis zu 60).
+per_solve_time_limit_s: 900.0
 
 # Phase 2.25: bricht eine einzelne Solve-Iteration vorzeitig ab, sobald so
 # lange keine neue Verbesserung mehr gefunden wurde - die gesparte Zeit
@@ -42,8 +43,11 @@ stagnation_timeout_s: 20.0
 # Das Gesamt-Zeitbudget bleibt unabhaengig davon durch solve_time_limit_s
 # gedeckelt (Solver.SolveTop prueft das verbleibende Budget vor jeder
 # weiteren Iteration) - ein hoeherer Wert verlangsamt den Lauf also nicht
-# ueber das obige Zeitbudget hinaus.
-max_solutions: 5
+# ueber das obige Zeitbudget hinaus. Kurzauftrag: auf 100 hochgesetzt
+# (vorher 5) - bleibt in der Praxis durch das Zeitbudget begrenzt (bei
+# 15 Min/Iteration passen max. ~4 Iterationen in die 60 Min), macht aber
+# `max_solutions` selbst zu keiner zusaetzlichen Einschraenkung.
+max_solutions: 100
 
 # Phase 2.24/2.25-Nachtrag-2: die vier Sekundaerkriterien Randstunden/
 # Nachmittags-Tage/Klassen-/Lehrer-Tagesausgewogenheit sind fuer dieses
