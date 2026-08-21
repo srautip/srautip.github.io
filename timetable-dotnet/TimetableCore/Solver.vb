@@ -1112,6 +1112,7 @@ Public Module Solver
                               Optional lexicographic As Boolean = True,
                               Optional lexTolerance As Integer = 0,
                               Optional lexTeacherGapsStage As Boolean = False,
+                              Optional lexOccupiedDensityStage As Boolean = False,
                               Optional minDiversity As Integer = 0,
                               Optional rehintFoundSolutions As Boolean = True,
                               Optional laterIterationsGapLimit As Double? = Nothing) As MultiSolveResult
@@ -1155,6 +1156,16 @@ Public Module Solver
             Dim terms = SolveTopObjective.BuildQualityTerms(built, data, weights)
             Dim stageExprs As New List(Of LinearExpr)
             If terms.KannSum IsNot Nothing Then stageExprs.Add(terms.KannSum)
+            ' Dichte-Stufe (opt-in, Antwort auf den P1-Langvergleich): die
+            ' occupied_slot-Batterie dominierte die Fensterabdeckung, weil
+            ' ihre Kann-Stufe der Dichte ein DEDIZIERTES Budget gab und das
+            ' Ergebnis als hartes Band fixierte - diese Stufe gibt dem
+            ' kompakten occupied_window-Kriterium exakt denselben Vorteil,
+            ' ohne zur Batterie zurueckzukehren. Position VOR ClassGaps:
+            ' das entspricht der Batterie-Reihenfolge (Dichte sass dort in
+            ' Stufe 1, ClassGaps folgte) und damit dem Verhalten, gegen das
+            ' der Vergleich gemessen wurde.
+            If lexOccupiedDensityStage AndAlso terms.OccupiedDensitySum IsNot Nothing Then stageExprs.Add(terms.OccupiedDensitySum)
             If terms.ClassGapsSum IsNot Nothing Then stageExprs.Add(terms.ClassGapsSum)
             If lexTeacherGapsStage AndAlso terms.TeacherGapsSum IsNot Nothing Then stageExprs.Add(terms.TeacherGapsSum)
 
@@ -1179,7 +1190,9 @@ Public Module Solver
             ' eingeschraenkte, daher schnell beweisbare) gewichtete
             ' Gesamtsumme - so behaelt jede Iteration eine wohldefinierte
             ' ObjectiveValue/Bound-Semantik.
-            Dim finalObjective = SolveTopObjective.WeightedResidual(terms, weights, teacherGapsInResidual:=Not lexTeacherGapsStage)
+            Dim finalObjective = SolveTopObjective.WeightedResidual(terms, weights,
+                teacherGapsInResidual:=Not lexTeacherGapsStage,
+                occupiedDensityInResidual:=Not lexOccupiedDensityStage)
             If finalObjective Is Nothing Then finalObjective = SolveTopObjective.WeightedTotal(terms, weights)
             If finalObjective IsNot Nothing Then built.Model.Minimize(finalObjective)
         Else

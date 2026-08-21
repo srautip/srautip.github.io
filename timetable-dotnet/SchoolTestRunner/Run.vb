@@ -84,6 +84,14 @@ Public NotInheritable Class RunConfig
     ''' Rest-Zielfunktion ein - Lehrer-Springstunden bleiben so gegen
     ''' Randstunden/Nachmittage/Ausgewogenheit abwaegbar.</summary>
     Public Property LexTeacherGapsStage As Boolean? = Nothing
+    ''' <summary>Dichte-STUFE (opt-in, Nothing -> False): occupied_window-
+    ''' Dichte als eigene lexikografische Stufe zwischen Kann und
+    ''' ClassGaps - dediziertes Budget + hartes Band, exakt der
+    ''' strukturelle Vorteil, mit dem die fruehere occupied_slot-Batterie
+    ''' den P1-Langvergleich auf der Fensterabdeckung gewann. Ohne die
+    ''' Stufe bleibt die Dichte gewichtet in der Rest-Zielfunktion
+    ''' (abwaegbar gegen die uebrigen Restkriterien).</summary>
+    Public Property LexOccupiedDensityStage As Boolean? = Nothing
     ''' <summary>Code-Review-Umsetzung (P3): Mindestanzahl bisher belegter
     ''' Slots, die jede WEITERE Loesung anders belegen muss (echter
     ''' Distanz-Cut statt nur des exakten No-Goods). Nothing/0 = heutiges
@@ -309,6 +317,7 @@ Public Module Run
         Dim lexicographic = If(cfg.Lexicographic, True)
         Dim lexTolerance = If(cfg.LexTolerance, 0)
         Dim lexTeacherGapsStage = If(cfg.LexTeacherGapsStage, False)
+        Dim lexOccupiedDensityStage = If(cfg.LexOccupiedDensityStage, False)
         Dim minDiversity = If(cfg.MinDiversity, 0)
         Dim rehintFoundSolutions = If(cfg.RehintFoundSolutions, True)
         Dim stage1TimeLimitS = If(cfg.Stage1TimeLimitS, 60.0)
@@ -318,6 +327,7 @@ Public Module Run
             stagnationTimeoutS:=stagnationTimeoutS, diversifySeed:=diversifySeed, randomizeSearch:=randomizeSearch,
             relativeGapLimit:=cfg.RelativeGapLimit,
             lexicographic:=lexicographic, lexTolerance:=lexTolerance, lexTeacherGapsStage:=lexTeacherGapsStage,
+            lexOccupiedDensityStage:=lexOccupiedDensityStage,
             minDiversity:=minDiversity, rehintFoundSolutions:=rehintFoundSolutions,
             laterIterationsGapLimit:=cfg.LaterIterationsGapLimit)
         Dim solveOk = topResult.Solutions.Count > 0

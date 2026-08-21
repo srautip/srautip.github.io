@@ -843,6 +843,44 @@ Public Class SolveTopTests
         Next
     End Sub
 
+    ''' <summary>Dichte-STUFE (Antwort auf den P1-Langvergleich): mit
+    ''' lexOccupiedDensityStage wird das Fenster-Defizit als eigene
+    ''' lexikografische Stufe auf sein Optimum fixiert, BEVOR die
+    ''' Gewichte der Rest-Zielfunktion zum Zug kommen - gleiches
+    ''' Beweis-Muster wie LexTeacherGapsStageOverridesWeightsWhenEnabled:
+    ''' invertierte Gewichte (EdgePeriod=100 >> OccupiedDensity=1) lassen
+    ''' die Suche OHNE Stufe die Randstunde meiden (Fenster-Slot 1 bleibt
+    ''' frei, Defizit 1); MIT Stufe ist das Dichte-Optimum 0 hart fixiert
+    ''' und die Randstunde erzwungen, obwohl die Gewichte das Gegenteil
+    ''' verlangen.</summary>
+    <TestMethod>
+    Public Sub LexOccupiedDensityStageOverridesWeightsWhenEnabled()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "occupied_window"}, {"scope", "class"}, {"entity", "5a"}, {"from_period", 1}, {"to_period", 2}, {"priority", "should"}}
+        })
+        Dim invertedWeights As New QualityWeights With {.OccupiedDensity = 1.0, .EdgePeriod = 100.0}
+
+        Dim withoutStage = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1,
+                                            qualityWeights:=invertedWeights)
+        Assert.AreEqual(CpSolverStatus.Optimal, withoutStage.Solutions(0).Status)
+        Assert.IsFalse(withoutStage.Solutions(0).Schedule.Any(Function(l) l.Period = 1),
+            "Ohne Dichte-Stufe entscheidet das Gewicht: die billige unbelegte Fensterstunde (1) schlaegt die teure Randstunde (100).")
+        Assert.IsTrue(withoutStage.Solutions(0).Quality.OccupiedDensityCount >= 1)
+
+        Dim withStage = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1,
+                                         qualityWeights:=invertedWeights, lexOccupiedDensityStage:=True)
+        Assert.AreEqual(CpSolverStatus.Optimal, withStage.Solutions(0).Status)
+        Dim stagePeriods = withStage.Solutions(0).Schedule.Select(Function(l) l.Period).OrderBy(Function(p) p).ToList()
+        CollectionAssert.AreEqual(New List(Of Integer) From {1, 2}, stagePeriods,
+            "Mit Dichte-Stufe ist deren Optimum 0 fixiert, bevor die Gewichte zum Zug kommen - das Fenster ist erzwungen.")
+        Assert.AreEqual(0, withStage.Solutions(0).Quality.OccupiedDensityCount)
+
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, withoutStage.Solutions(0).Schedule).Count)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, withStage.Solutions(0).Schedule).Count)
+    End Sub
+
     ''' <summary>Nutzerentscheidung "TeacherGaps-Stufe opt-in": ohne
     ''' lexTeacherGapsStage bleibt TeacherGaps gewichtet in der
     ''' Rest-Zielfunktion und ist gegen andere Restkriterien abwaegbar;

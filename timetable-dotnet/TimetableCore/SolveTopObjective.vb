@@ -482,12 +482,15 @@ Friend Module SolveTopObjective
     ''' uebrigen Restkriterien abwaegbar statt hart fixiert. Nothing,
     ''' wenn kein einziges Rest-Kriterium aktiv ist.</summary>
     Friend Function WeightedResidual(terms As QualityTerms, w As QualityWeights,
-                                      Optional teacherGapsInResidual As Boolean = False) As LinearExpr
+                                      Optional teacherGapsInResidual As Boolean = False,
+                                      Optional occupiedDensityInResidual As Boolean = True) As LinearExpr
         Dim parts As New List(Of (Weight As Long, Expr As LinearExpr))
         If teacherGapsInResidual AndAlso terms.TeacherGapsSum IsNot Nothing Then
             parts.Add((CLng(w.TeacherGaps), terms.TeacherGapsSum))
         End If
-        If terms.OccupiedDensitySum IsNot Nothing Then parts.Add((CLng(w.OccupiedDensity), terms.OccupiedDensitySum))
+        ' occupiedDensityInResidual=False = "Dichte ist eigene Stufe"
+        ' (lexOccupiedDensityStage): gleiches Muster wie TeacherGaps oben.
+        If occupiedDensityInResidual AndAlso terms.OccupiedDensitySum IsNot Nothing Then parts.Add((CLng(w.OccupiedDensity), terms.OccupiedDensitySum))
         If terms.EdgeSum IsNot Nothing Then parts.Add((CLng(w.EdgePeriod), terms.EdgeSum))
         If terms.AfternoonSum IsNot Nothing Then parts.Add((CLng(w.AfternoonDayCount), terms.AfternoonSum))
         If terms.ClassRangeSum IsNot Nothing Then parts.Add((CLng(w.ClassLoadVariance), terms.ClassRangeSum))

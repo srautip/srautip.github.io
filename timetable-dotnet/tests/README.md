@@ -339,6 +339,7 @@ relative_gap_limit: null   # Optional, Default nicht gesetzt - Phase 2.25, siehe
 lexicographic: true   # Optional, Default TRUE (Nutzerentscheidung) - Code-Review-Umsetzung P2, siehe unten
 lex_tolerance: 0   # Optional, Default 0 - nur wirksam mit lexicographic: true
 lex_teacher_gaps_stage: false   # Optional, Default false - TeacherGaps-Stufe ist opt-in, siehe unten
+lex_occupied_density_stage: false   # Optional, Default false - Dichte-Stufe fuer occupied_window, siehe unten
 min_diversity: 0   # Optional, Default 0 - Code-Review-Umsetzung P3, siehe unten
 rehint_found_solutions: true   # Optional, Default true - Code-Review-Umsetzung P3, siehe unten
 later_iterations_gap_limit: null   # Optional, Default nicht gesetzt - Code-Review-Umsetzung P6, siehe unten
@@ -459,6 +460,19 @@ fixiert - sinnvoll, wenn lückenlose Lehrerpläne für die Schule
 Vorrang vor allen Restkriterien haben. `lex_tolerance` (Default 0)
 weitet das Band je Stufe, z.B. `1` = "eine Springstunde mehr als das
 Optimum ist für zusätzliche Alternativen akzeptabel".
+
+**`lex_occupied_density_stage`** (Default `false`): macht die
+`occupied_window`-Dichte zur eigenen lexikografischen Stufe ZWISCHEN
+Kann und ClassGaps - sie bekommt ein dediziertes Budget
+(`stage1_time_limit_s`) und ihr Optimum wird als hartes Band fixiert.
+Hintergrund: der P1-Langvergleich am `bw-gms-beispiel` zeigte, dass die
+frühere `occupied_slot`-Batterie die Fensterabdeckung genau wegen
+dieses Stufen-Vorteils dominierte (ihre Kann-Stufe optimierte die
+Dichte mit eigenem Budget), nicht wegen ihrer Kodierung - diese Option
+gibt dem kompakten `occupied_window`-Kriterium denselben Vorteil. Mit
+aktiver Stufe steuert `occupied_density` nur noch das nachgelagerte
+Ranking, nicht mehr die Suche; ohne sie bleibt die Dichte gewichtet in
+der Rest-Zielfunktion abwägbar.
 
 **`min_diversity`/`rehint_found_solutions`** (Code-Review-Umsetzung P3):
 Werkzeuge für "möglichst VERSCHIEDENE Alternativen statt
