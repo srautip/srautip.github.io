@@ -135,18 +135,34 @@ abgebildet werden können.
 
 ### `tests/bw-gms-beispiel/` - Gemeinschaftsschule Baden-Württemberg (Sek. I)
 
-Eine 6-stufige, 2-zügige BW-Gemeinschaftsschule (Klassenstufen 5-10,
-Klassen 5a/5b bis 10a/10b - 12 Klassen, 15 Lehrkräfte, 14 Fächer inkl.
-BNT/Physik/Chemie ab der jeweils curricular vorgesehenen Klassenstufe).
-Die 8 Klassenlehrer-Plätze werden hier - anders als in der Grundschule -
-automatisch proportional auf drei verschiedene Zwei-Fächer-Kombinationen
-verteilt (z.B. Deutsch+Geschichte, Mathematik+Physik, Englisch+Erdkunde),
-weil am Fachlehrerprinzip einer weiterführenden Schule realistischerweise
-nicht eine einzige Lehrkraft alle Kernfächer einer Klasse allein abdeckt.
+Eine realitätsnahe, 6-stufige, 4-zügige BW-Gemeinschaftsschule
+(Klassenstufen 5-10, 24 Klassen, ~696 Schüler, 48 Lehrkräfte) nach der
+BW-Kontingentstundentafel Gemeinschaftsschule (gültig ab 1.8.2025) -
+anders als `bw-grundschule-beispiel` NICHT über den `new`-Scaffold
+erzeugt, sondern von Hand nachgebildet, um die volle Bandbreite der
+Gruppen-/Parallelverbund-Mechanik (Phase 2.20/2.23) an einem einzigen,
+in sich konsistenten Referenzfall zu zeigen:
+
+- **Niveaudifferenzierung ab Kl.7** (Deutsch/Mathematik/Englisch): G-/
+  E-Kurs in Kl.7/8, zusätzlich A-Kurs ab Kl.9 - jeder Kurs läuft
+  klassenstufenweit über alle 4 Parallelklassen synchron, zusätzlich in
+  klassengroße Sektionen (max. 35 Schüler) aufgeteilt, sobald die
+  Kursgröße das überschreitet.
+- **Wahlpflichtbereich ab Kl.6** (Technik/AES/Französisch), **Profilfach
+  ab Kl.8** (NwT/IMP/Sport-/Musik-/BK-Profil - laut Vorgabe
+  "Doppelqualifikation vorhandener Fachlehrer", keine eigenen
+  Lehrkräfte) und **Religion-ev/-kath/Ethik** über alle 6 Klassenstufen.
+- **Fachraumbedarf** über `constraints.yaml`/`room_requirement`
+  (Sporthallen, NaWi-/Bio-/Musik-/Kunst-/Technik-/AES-/Computerräume).
+- Lehrkräfte sind bedarfsgenau (statt pauschal an der Klassenzahl)
+  bemessen, da eine klassenstufenweite Gruppe die Nachfrage über alle 4
+  Parallelklassen auf eine Lehrkraft konsolidiert - siehe `tests/README.md`
+  für die vollständige Beschreibung inkl. der Kollisions-Sicherheitsmarge
+  bei zeitgleichen Sektionen.
 
 Dieses Beispiel eignet sich als Vorlage für eine größere, weiterführende
-Schule mit klassischem Fachlehrerprinzip statt des Grundschul-typischen
-Klassenlehrerprinzips.
+Schule mit klassischem Fachlehrerprinzip, echter Niveaudifferenzierung
+und Wahlbereichen statt des Grundschul-typischen Klassenlehrerprinzips.
 
 Beide Beispiele erreichen bei ihrem hinterlegten Zeitbudget `PASS` mit 0
 Verstößen. Die konkreten Zahlen (Wartezeit, wie "gut" der gefundene Plan

@@ -164,6 +164,21 @@ Public NotInheritable Class FachLehrerZuordnung
     Public Property Fachfremd As Boolean = False
 End Class
 
+''' <summary>Phase 2.26: eine explizite, harte Vorgabe "diese Lehrkraft
+''' unterrichtet dieses Fach in dieser Klasse" - additiv zu den
+''' bestehenden weichen Mechanismen (Lehrer.BevorzugteKlassenstufen,
+''' Kontinuitaet-Vorjahreszuordnung). Anders als eine Praeferenz kann eine
+''' FesteZuordnung NICHT durch die Zielfunktion "wegoptimiert" werden -
+''' Lehrereinsatzplanung.SolveLehrereinsatz erzwingt sie als HARTEN
+''' Constraint. Referenziert bewusst nur echte Klassen (kein Gruppen-
+''' gefuehrtes Fach) - Gruppen-Unterstuetzung ist ein dokumentierter,
+''' sauber trennbarer Folgeschritt.</summary>
+Public NotInheritable Class FesteZuordnung
+    Public Property LehrerName As String
+    Public Property KlasseName As String
+    Public Property FachName As String
+End Class
+
 Public NotInheritable Class Stammdatenbestand
     Public Property SchulName As String
     Public Property Bundesland As String = "BW"
@@ -186,6 +201,9 @@ Public NotInheritable Class Stammdatenbestand
     ''' identisch zu seinem eigenen Elementtyp problemlos.</summary>
     Public Property Schueler As New List(Of Schueler)
     Public Property Gruppen As New List(Of Gruppe)
+    ''' <summary>Phase 2.26: optionale, harte Lehrer-Klasse-Fach-Pinnungen -
+    ''' leer = heutiges Verhalten unveraendert (rein additiv).</summary>
+    Public Property FesteZuordnungen As New List(Of FesteZuordnung)
 End Class
 
 Public Module Stammdaten

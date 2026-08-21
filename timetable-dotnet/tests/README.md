@@ -45,9 +45,13 @@ Die Pipeline hat zwei Stufen (siehe `docs/arc42-architecture.md` Abschnitt
    `teacher_subject_assignment`/`weekly_hours`/`consecutive_required`/
    `no_overlap`-Regeln übersetzt. `constraints.yaml` ergänzt NUR
    handverfasste Regeln, die Stufe 1 nicht abdeckt - `teacher_availability`,
-   `forbidden_slot`, `room_requirement` (Raumbindung ist bislang NICHT aus
+   `forbidden_slot`, `required_slot` (Fach-Slot erzwingen/bevorzugen),
+   `occupied_slot` (fach-unabhängig: irgendeine Stunde der Klasse/Lehrkraft
+   soll diesen Slot belegen - z.B. für eine durchgängige zeitliche Belegung
+   ohne Fachbezug), `room_requirement` (Raumbindung ist bislang NICHT aus
    den Stammdaten ableitbar, siehe `Raum`-Kopfkommentar in
-   `TimetableCore/Stammdaten.vb`), und ad-hoc `consecutive_required`.
+   `TimetableCore/Stammdaten.vb`), und ad-hoc `consecutive_required`. Volle
+   Feldreferenz für alle Constraint-Typen: `docs/json-constraints-reference.md`.
    **Nicht** hier hineinschreiben: `teacher_subject_assignment`/
    `weekly_hours.hours_per_week` - die kommen ausschließlich aus Stufe 1.
 
@@ -118,6 +122,8 @@ dann nicht auf die Planung aus.
   nur nötig, wenn `gruppen` genutzt wird.
 - `gruppen` - optional, Liste klassenunabhängiger Schülergruppen (siehe
   unten), z.B. für Religion ev./kath./Ethik.
+- `feste_zuordnungen` - optional, Liste harter Lehrer-Klasse-Fach-
+  Pinnungen (siehe unten).
 
 ### `klassenstufen[]`
 
@@ -243,11 +249,45 @@ verschieden), dieselbe `klassenstufe`, UND dasselbe `wochenstunden_soll`/
 strukturell unlösbar. Details siehe
 `docs/phase2-20-parallelgruppen.md`.
 
+### `feste_zuordnungen[]`
+
+Optional - eine explizite, harte Vorgabe "diese Lehrkraft unterrichtet
+dieses Fach in dieser Klasse", zusätzlich zu den weichen Präferenzen
+(`bevorzugte_klassenstufen`). Additiv: ohne `feste_zuordnungen` verhält
+sich die Planung exakt wie bisher.
+
+- `lehrer_name` - Name der Lehrkraft (muss in `lehrkraefte[]` existieren
+  UND laut `fach_lehrer_zuordnungen` für `fach_name` qualifiziert sein).
+- `klasse_name` - Name einer Klasse (muss in `klassen[]` existieren) ODER
+  seit Phase 2.27 der Name einer aktiven Gruppe (muss in `gruppen[]`
+  existieren, dort `fach_name`/`klassenstufe` gesetzt haben - siehe
+  `gruppen[]` oben). Klassen und Gruppen teilen sich einen Namensraum,
+  welche Variante gemeint ist wird automatisch erkannt.
+- `fach_name` - Name des Fachs (muss für die Klassenstufe dieser Klasse
+  geführt werden; bei einer Gruppe muss `fach_name` exakt dem `fach_name`
+  der Gruppe selbst entsprechen - eine Gruppe führt strukturell immer
+  genau ein Fach).
+
+**Solver-Wirkung:** `Lehrereinsatzplanung.SolveLehrereinsatz` erzwingt für
+jeden Eintrag hart `assign(lehrer,klasse,fach)=1` - die bestehende "genau 1
+Lehrkraft pro Klasse/Fach"-Summe sorgt dabei automatisch dafür, dass kein
+anderer Kandidat für dieselbe (Klasse,Fach)-Kombination aktiv wird. Bei
+einer Gruppen-Pinnung gilt das für die eine Gruppen-Variable, die anschließend
+auf ALLE real von der Gruppe umspannten Klassen expandiert wird (dieselbe
+Lehrkraft erscheint dann in `lehrerzuteilung.md` für jede dieser Klassen).
+Anders als eine Präferenz kann eine feste Zuordnung NICHT durch die
+Zielfunktion "wegoptimiert" werden - ist die Lehrkraft dafür nicht
+qualifiziert oder teilzeit-tage-inkohärent, meldet
+`StammdatenValidation.ValidateStammdaten` das schon VOR dem Solve als
+Fehler statt eines schwer diagnostizierbaren Infeasible.
+
 Vor jedem Lauf prüft `StammdatenValidation.ValidateStammdaten` die Datei
 auf Konsistenz (unbekannte Klassenstufen-Referenzen, Fach ohne
 qualifizierte Lehrkraft, Deputat-Unsinn, Teilzeit-Tage-Kohärenz, unbekannte
-Schüler-/Gruppen-Referenzen, doppelte Schüler-IDs, ...) - Fehler werden mit
-Datei-/Objektbezug in `output/lehrerzuteilung.md` gemeldet.
+Schüler-/Gruppen-Referenzen, doppelte Schüler-IDs, feste Zuordnungen mit
+unbekannten Referenzen/fehlender Qualifikation/Teilzeit-Inkohärenz/
+widersprüchlicher Mehrfachzuordnung, ...) - Fehler werden mit Datei-/
+Objektbezug in `output/lehrerzuteilung.md` gemeldet.
 
 ## `constraints.yaml`
 
@@ -587,14 +627,63 @@ endnutzerorientierter Überblick über beide Beispiele steht außerdem in
   einen `required_slot`-Regel (Chor donnerstags 6. Stunde für alle
   Klassen gleichzeitig, Phase 2.23) sowie (Phase 2.19/2.20) einen
   `schueler:`/`gruppen:`-Block in `stammdaten.yaml` für klassenstufen-
-  übergreifende Religion-ev-/Religion-kath-/Ethik- und Chor-Gruppen.
+  übergreifende Religion-ev-/Religion-kath-/Ethik- und Chor-Gruppen. 140
+  weitere `occupied_slot`-Kann-Regeln sorgen für eine durchgängige
+  zeitliche Belegung (Klasse 1/2 soll täglich Stunde 2-4 belegt sein,
+  Klasse 3/4 Stunde 2-5) - fach-unabhängig, im Gegensatz zum obigen
+  `required_slot`.
 
-- **`tests/bw-gms-beispiel/`** (6 Klassenstufen [5-10], 12 Klassen, 8
-  Klassenlehrer über 3 Zwei-Fächer-Pools verteilt, BW-Gemeinschaftsschule):
+- **`tests/bw-gms-beispiel/`** (6 Klassenstufen [5-10], 24 Klassen [4-zügig],
+  ~696 Schüler, 48 Lehrkräfte, BW-Gemeinschaftsschule) - realitätsnah von
+  Hand nach der BW-Kontingentstundentafel Gemeinschaftsschule (gültig ab
+  1.8.2025) nachgebildet, **nicht** über den `new`-Scaffold erzeugt (der
+  liefert nur ein generisches Grundgerüst ohne Differenzierung/Wahlbereich
+  - dieses Beispiel demonstriert stattdessen bewusst die volle Bandbreite
+  der Gruppen-/Parallelverbund-Mechanik aus Phase 2.20/2.23 an einem
+  einzigen, in sich konsistenten Referenzfall):
+  - **Niveaudifferenzierung ab Kl.7** (Deutsch/Mathematik/Englisch): G-/
+    E-Kurs in Kl.7/8, zusätzlich A-Kurs ab Kl.9 - jeder Kurs läuft
+    klassenstufenweit über alle 4 Parallelklassen synchron (`gruppen[]` +
+    `parallelverbund`), zusätzlich in klassengroße **Sektionen** (max. 35
+    Schüler) aufgeteilt, sobald die Kursgröße das überschreitet (z.B.
+    `Mathematik-E-1`/`Mathematik-E-2` als separate `faecher[]`-Einträge
+    mit identischem Stundenkontingent) - eine einzelne Gruppe mit >35
+    Schülern wäre für klassenraumgebundenen Fachunterricht nicht plausibel
+    (anders als die bewusst großflächige Chor-Gesamtprobe im
+    Grundschulbeispiel).
+  - **Wahlpflichtbereich ab Kl.6** (Technik/AES/Französisch als 2.
+    Fremdsprache), ebenfalls sektioniert (Technik/AES sind Werkstatt-/
+    Küchenräume mit echter Kapazitätsgrenze).
+  - **Profilfach ab Kl.8** (NwT/IMP/Sport-Profil/Musik-Profil/BK-Profil) -
+    laut Nutzervorgabe "i.d.R. Doppelqualifikation vorhandener
+    Fachlehrer": keine eigenen Lehrkräfte, sondern zusätzliche
+    `fach_lehrer_zuordnungen` für bereits bestehende Fachlehrkräfte.
+  - **Religion-ev/-kath/Ethik** über alle 6 Klassenstufen, ebenfalls
+    sektioniert.
+  - **Fachraumbedarf** über `constraints.yaml`/`room_requirement`
+    (`should`-Priorität): Sporthallen, NaWi-/Biologie-Fachräume,
+    Musik-/Kunsträume, Technik-/AES-Räume, Computerraum (IMP) - inkl. je
+    eines Eintrags pro tatsächlich generierter Sektionsvariante.
+  - **Lehrkräfte bedarfsgenau bemessen** (~90% Ziel-Deputatsausschöpfung
+    statt grosszügiger Pauschalgrössen): da eine klassenstufenweite Gruppe
+    (z.B. ein G-Kurs) die Nachfrage über alle 4 Parallelklassen hinweg auf
+    EINE Lehrkraft konsolidiert, wäre ein pauschal an der Klassenzahl
+    bemessener Lehrerpool strukturell überdimensioniert und würde
+    Deputat-Leerlauf erzeugen, den die (rein lineare) Deputat-Abweichungs-
+    Kostenfunktion beliebig auf einzelne Lehrkräfte verteilen kann (siehe
+    Kanarienvogel-Wirkung unten). Zusätzliche Sicherheitsmarge: jeder Pool
+    hat mindestens so viele Köpfe wie die größte Anzahl zeitgleicher
+    Gruppen im selben Parallelverbund (z.B. 2 gleichzeitige
+    Technik-Sektionen brauchen zwingend 2 verschiedene Lehrkräfte -
+    `Lehrereinsatzplanung.vb` prüft das selbst nicht, erst der
+    nachgelagerte `no_overlap(teacher)`-Constraint der Tag/Periode-Stufe
+    würde eine Kollision hart verhindern und das Szenario sonst
+    unlösbar machen).
+  - Erzeugt mit einem projektinternen, nicht committeten Python-
+    Wegwerfskript (gleiche Disziplin wie die 92-Constraint-Generierung in
+    Phase 2.23) - `stammdaten.yaml`/`constraints.yaml` selbst sind
+    normale, direkt im GitHub-Web-Editor bearbeitbare YAML-Dateien wie
+    jedes andere Beispiel.
   ```bash
-  dotnet run --project SchoolTestRunner -- new bw-gms-beispiel \
-    --schulart Gemeinschaftsschule --bundesland BW --klassenstufen 6 --lehrer 8
   dotnet run --project SchoolTestRunner -- run bw-gms-beispiel
   ```
-  Zeigt die proportionale `--lehrer`-Verteilung auf mehrere
-  Klassenlehrer-Pool-Typen (siehe `--lehrer`-Beschreibung oben).

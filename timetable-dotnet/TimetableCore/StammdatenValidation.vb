@@ -229,6 +229,83 @@ Public Module StammdatenValidation
             Next
         Next
 
+        Dim lehrerByName = bestand.Lehrkraefte.ToDictionary(Function(l) l.Name)
+        Dim gruppeByName = bestand.Gruppen.ToDictionary(Function(g) g.Name)
+
+        ' Phase 2.26/2.27: FesteZuordnungen - harte Lehrer-Klasse-Fach-
+        ' Pinnung. Praeconditions fuer Lehrereinsatzplanung.SolveLehrereinsatz's
+        ' defensiven Throw (siehe dortiger Kommentar): jeder Eintrag muss
+        ' eine bekannte Klasse-ODER-Gruppe (KlasseName traegt seit Phase 2.27
+        ' entweder einen echten Klassennamen oder einen Gruppennamen, gleiche
+        ' disjunkte Namensraum-Konvention wie AssignKey.Klasse/.IstGruppe) +
+        ' Fach + Lehrkraft referenzieren, die Lehrkraft muss fuer das Fach
+        ' qualifiziert UND teilzeit-tage-kohaerent sein - sonst waere der
+        ' zugehoerige assign-Key im CP-SAT-Modell gar nicht vorhanden.
+        For i = 0 To bestand.FesteZuordnungen.Count - 1
+            Dim fz = bestand.FesteZuordnungen(i)
+
+            If Not lehrerByName.ContainsKey(fz.LehrerName) Then
+                errors.Add($"feste_zuordnungen[{i}]: lehrer_name={JsonHelpers.PyRepr(fz.LehrerName)} ist keine bekannte Lehrkraft")
+            End If
+
+            Dim klasseBekannt = klasseByName.ContainsKey(fz.KlasseName)
+            Dim gruppeBekannt = Not klasseBekannt AndAlso gruppeByName.ContainsKey(fz.KlasseName)
+            Dim klassenstufeEffektiv As Integer? = Nothing
+
+            If klasseBekannt Then
+                klassenstufeEffektiv = klasseByName(fz.KlasseName).Klassenstufe
+            ElseIf gruppeBekannt Then
+                ' Phase 2.27: Gruppen-Pin - die Gruppe muss aktiv sein (Phase-
+                ' 2.20-Konvention: FachName UND Klassenstufe gesetzt) und
+                ' fz.FachName muss exakt dem Fach entsprechen, das die Gruppe
+                ' selbst fuehrt (eine Gruppe fuehrt strukturell immer genau
+                ' ein Fach - eine Abweichung waere ein Konfigurationsfehler).
+                Dim gruppe = gruppeByName(fz.KlasseName)
+                If gruppe.FachName Is Nothing OrElse Not gruppe.Klassenstufe.HasValue Then
+                    errors.Add($"feste_zuordnungen[{i}]: klasse_name={JsonHelpers.PyRepr(fz.KlasseName)} referenziert eine inaktive Gruppe (kein fach_name/klassenstufe gesetzt) - fuer eine feste Zuordnung muss die Gruppe aktiv sein")
+                ElseIf gruppe.FachName <> fz.FachName Then
+                    errors.Add($"feste_zuordnungen[{i}]: klasse_name={JsonHelpers.PyRepr(fz.KlasseName)} referenziert Gruppe {JsonHelpers.PyRepr(gruppe.Name)}, aber deren fach_name ist {JsonHelpers.PyRepr(gruppe.FachName)}, nicht {JsonHelpers.PyRepr(fz.FachName)}")
+                Else
+                    klassenstufeEffektiv = gruppe.Klassenstufe.Value
+                End If
+            Else
+                errors.Add($"feste_zuordnungen[{i}]: klasse_name={JsonHelpers.PyRepr(fz.KlasseName)} ist keine bekannte Klasse (und auch keine bekannte Gruppe)")
+            End If
+
+            If Not fachByName.ContainsKey(fz.FachName) Then
+                errors.Add($"feste_zuordnungen[{i}]: fach_name={JsonHelpers.PyRepr(fz.FachName)} ist kein bekanntes Fach")
+            End If
+
+            If Not klassenstufeEffektiv.HasValue OrElse Not fachByName.ContainsKey(fz.FachName) Then Continue For ' Folgechecks brauchen beide gueltig
+
+            Dim fach = fachByName(fz.FachName)
+            Dim fk = Stammdaten.WochenstundenFuer(fach, klassenstufeEffektiv.Value)
+            If fk Is Nothing Then
+                errors.Add($"feste_zuordnungen[{i}]: fach {JsonHelpers.PyRepr(fz.FachName)} wird in klassenstufe {klassenstufeEffektiv.Value} (klasse_name {JsonHelpers.PyRepr(fz.KlasseName)}) nicht gefuehrt")
+                Continue For
+            End If
+
+            If Not lehrerByName.ContainsKey(fz.LehrerName) Then Continue For ' bereits oben gemeldet
+            Dim lehrer = lehrerByName(fz.LehrerName)
+            If Not Stammdaten.LehrerFuerFach(bestand, fz.FachName).Any(Function(l) l.Name = fz.LehrerName) Then
+                errors.Add($"feste_zuordnungen[{i}]: lehrkraft {JsonHelpers.PyRepr(fz.LehrerName)} ist fuer fach {JsonHelpers.PyRepr(fz.FachName)} nicht qualifiziert (fehlt in fach_lehrer_zuordnungen)")
+            ElseIf Not Stammdaten.IstTeilzeitKohaerent(lehrer, bestand, fk) Then
+                errors.Add($"feste_zuordnungen[{i}]: lehrkraft {JsonHelpers.PyRepr(fz.LehrerName)} ist fuer {fz.KlasseName}/{fz.FachName} teilzeit-tage-inkohaerent (wochenstunden_soll={fk.WochenstundenSoll} passt nicht in verfuegbare_tage) und kann deshalb nicht fest zugeordnet werden")
+            End If
+        Next
+
+        ' Widerspruchspruefung: zwei FesteZuordnungen fuer dieselbe
+        ' (Klasse,Fach)-Kombination mit UNTERSCHIEDLICHEN Lehrkraeften
+        ' waeren strukturell unloesbar (zwei "= 1"-Constraints auf
+        ' verschiedene Variablen derselben Vollstaendigkeits-Summe, die
+        ' zusammen > 1 erzwingen wuerden).
+        For Each g In bestand.FesteZuordnungen.GroupBy(Function(fz) (fz.KlasseName, fz.FachName))
+            Dim distinctLehrer = g.Select(Function(fz) fz.LehrerName).Distinct().ToList()
+            If distinctLehrer.Count > 1 Then
+                errors.Add($"feste_zuordnungen: klasse {JsonHelpers.PyRepr(g.Key.Item1)}/fach {JsonHelpers.PyRepr(g.Key.Item2)} hat widerspruechliche feste Zuordnungen zu unterschiedlichen Lehrkraeften ({String.Join(", ", distinctLehrer)})")
+            End If
+        Next
+
         Return errors
     End Function
 

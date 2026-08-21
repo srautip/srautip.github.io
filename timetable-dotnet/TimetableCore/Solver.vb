@@ -687,6 +687,49 @@ Public Module Solver
                         End If
                     Next
 
+                Case "occupied_slot"
+                    ' Subject-agnostic sibling of required_slot: "this class/
+                    ' teacher should have SOME lesson (any subject) at this
+                    ' exact (day,period)" - a scheduling-DENSITY preference
+                    ' (e.g. "class 1a should be busy every period 2-4, every
+                    ' day"), not a specific subject placement. required_slot
+                    ' can't express this: it forces ONE named session's own
+                    ' Lesson-BoolVar to exactly 1, whereas this needs "at
+                    ' least one of possibly several sessions is active" - an
+                    ' OR over the class'/teacher's own sessions at that slot,
+                    ' mirroring forbidden_slot's scope/entity fields (its
+                    ' exact negation: forbidden_slot forces the SUM to 0,
+                    ' this forces it to >= 1).
+                    Dim occScope = JsonHelpers.GetString(c, "scope")
+                    Dim occEntity = JsonHelpers.GetString(c, "entity")
+                    Dim occDay = JsonHelpers.GetString(c, "day")
+                    Dim occPeriod = JsonHelpers.GetInt(c, "period").Value
+
+                    Dim occRelevantSessions As List(Of Session)
+                    Select Case occScope
+                        Case "class"
+                            occRelevantSessions = sessionsOfClass(occEntity)
+                        Case "teacher"
+                            occRelevantSessions = sessionsOfTeacher(occEntity)
+                        Case Else
+                            occRelevantSessions = New List(Of Session)
+                    End Select
+
+                    Dim occViolated As BoolVar = Nothing
+                    If priority = JsonHelpers.PriorityShould Then
+                        occViolated = GetOrCreateKannVar(model, kannVars, ci, constraintType, JsonHelpers.GetReason(c))
+                    End If
+
+                    Dim occVars As New List(Of BoolVar)
+                    For Each s In occRelevantSessions
+                        Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, occDay, occPeriod)
+                        If lesson.ContainsKey(key) Then occVars.Add(lesson(key))
+                    Next
+                    If occVars.Count > 0 Then
+                        Dim con = model.Add(LinearExpr.Sum(occVars) >= 1L)
+                        If occViolated IsNot Nothing Then con.OnlyEnforceIf(occViolated.Not())
+                    End If
+
                 Case "consecutive_required"
                     Dim className = JsonHelpers.GetString(c, "class")
                     Dim subject = JsonHelpers.GetString(c, "subject")

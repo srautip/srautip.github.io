@@ -4,7 +4,19 @@
 # mehr Zeit, den gefundenen Plan als OPTIMAL zu beweisen statt nur
 # FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
 # "CP-SAT-Status"-Feld in output/stundenplan.md.
-solve_time_limit_s: 1800.0
+#
+# Kurzauftrag: laengerer Lauf mit 60-Min-Gesamtbudget (vorher 5 Min) -
+# der letzte 5-Min-Testlauf erreichte nur Feasible mit 28 Kann-
+# Verstoessen (occupied_slot-Luecken), mehr Zeit soll pruefen, ob das
+# verbessert werden kann.
+solve_time_limit_s: 3600.0
+
+# Deutlich groesser/komplexer als das vorherige generische Beispiel (24
+# statt 12 Klassen, 114 Gruppen fuer Niveau-/WPF-/Profil-/Religions-
+# differenzierung statt 0) - die vorgelagerte Lehrereinsatzplanung-Stufe
+# braucht dafuer spuerbar mehr als das Default-Budget (30s), um ueber
+# "Feasible" hinaus tatsaechlich "Optimal" zu erreichen.
+lehrereinsatz_time_limit_s: 180.0
 
 # Anzahl paralleler CP-SAT-Suchpfade (Portfolio-Threading). Hoeher kann
 # helfen, ueberhaupt schneller eine erste Loesung zu finden, geht aber zu
@@ -12,14 +24,18 @@ solve_time_limit_s: 1800.0
 num_workers: 4
 
 # Begrenzt (getrennt von solve_time_limit_s) jede EINZELNE Solve-
-# Iteration in Solver.SolveTop. Ohne dieses Feld haette bereits die erste
-# Iteration das komplette solve_time_limit_s-Budget zur Verfuegung -
-# dieses Szenario war dabei bisher nicht schnell genug fuer einen
-# Optimalitaetsbeweis, sodass SolveTop nie zu einer zweiten Iteration kam
-# und trotz max_solutions: 5 nur 1 Loesung fand. Mit 10 Min pro Versuch
-# bleibt innerhalb der 30-Min-Gesamtgrenze (solve_time_limit_s) Raum fuer
-# mehrere Versuche.
-per_solve_time_limit_s: 600.0
+# Iteration in Solver.SolveTop - bewusst deutlich unter dem 5-Min-
+# Gesamtbudget, damit innerhalb der 300s mehrere Iterationen (= mehrere
+# verschiedene Loesungen) Platz haben, statt dass die erste Iteration
+# allein das komplette Budget verbraucht.
+per_solve_time_limit_s: 60.0
+
+# Phase 2.25: bricht eine einzelne Solve-Iteration vorzeitig ab, sobald so
+# lange keine neue Verbesserung mehr gefunden wurde - die gesparte Zeit
+# steht der naechsten Iteration zur Verfuegung (Nutzervorgabe: 20s statt
+# des Defaults 45.0s, damit eine feststeckende Iteration frueher abbricht
+# und die eingesparte Zeit weiteren Versuchen zugutekommt).
+stagnation_timeout_s: 20.0
 
 # Phase 2.21: wie viele vergleichbare Loesungs-Alternativen sollen in
 # output/stundenplan.json + output/stundentafel.html exportiert werden?
@@ -28,3 +44,18 @@ per_solve_time_limit_s: 600.0
 # weiteren Iteration) - ein hoeherer Wert verlangsamt den Lauf also nicht
 # ueber das obige Zeitbudget hinaus.
 max_solutions: 5
+
+# Phase 2.24/2.25-Nachtrag-2: die vier Sekundaerkriterien Randstunden/
+# Nachmittags-Tage/Klassen-/Lehrer-Tagesausgewogenheit sind fuer dieses
+# Beispiel STRUKTURELL abgeschaltet (keine Hilfsvariablen im CP-SAT-
+# Modell, nicht nur Gewicht 0) - reduziert die Modellgroesse fuer dieses
+# ohnehin schon deutlich groessere Szenario (24 Klassen, 114 Gruppen).
+# Nur Kann/ClassGaps/TeacherGaps fliessen noch in die Suche ein.
+# ScheduleQuality.Score zeigt die echten Werte dieser vier Kriterien in
+# stundenplan.md/stundenplan.json trotzdem weiterhin an (nur die SUCHE
+# ist dafuer blind, nicht die Anzeige).
+quality_weights:
+  include_edge_period: false
+  include_afternoon_day_count: false
+  include_class_load_variance: false
+  include_teacher_load_variance: false

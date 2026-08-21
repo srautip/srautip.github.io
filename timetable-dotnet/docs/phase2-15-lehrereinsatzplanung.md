@@ -210,6 +210,8 @@ Kern zuerst" bewusst nicht implementiert:
   "Nachtrag 5" unten.
 - ~~**Gleichmäßige Verteilung unbeliebter Fächer/Randbedingungen**~~ -
   **umgesetzt**, siehe "Nachtrag 5" unten.
+- ~~**Explizite Lehrer-Klasse-Fach-Pinnung**~~ - **umgesetzt**, siehe
+  "Nachtrag 6" unten.
 
 ## Verifikation
 
@@ -523,6 +525,155 @@ löst zusätzlich die bereits bestehende Pro-Lehrkraft-Bündelungsregel aus
 (Nachtrag 3) - beide Effekte sind in den finalen Testkommentaren korrekt
 dokumentiert, kein Hinweis auf einen Fehler in der neuen Logik selbst,
 sondern auf eine anfänglich unvollständige Testisolation.
+
+## Nachtrag 6 (Phase 2.26): `FesteZuordnung` - harte Lehrer-Klasse-Fach-Pinnung
+
+**Kontext:** Nutzerfrage: "Kann mit aktuellem Entwicklungsstand im
+Lehrersolver vorgegeben werden welcher Lehrer welche Klasse unterrichtet?"
+- bis dahin kannte `Lehrereinsatzplanung.SolveLehrereinsatz` nur weiche
+Präferenzen (`bevorzugte_klassenstufen`, die Kontinuitäts-Präferenz
+`vorjahresZuordnung` aus Nachtrag 5) - keine harte Vorgabe.
+
+**Nutzerentscheidung:** Scope v1 = nur echte Klassen (kein Gruppen-geführtes
+Fach wie Religion/Ethik/Chor) - Gruppen-Unterstützung bleibt ein sauber
+dokumentierter, später nachrüstbarer Folgeschritt (dieselbe
+`AssignKey.IstGruppe`-Infrastruktur wäre wiederverwendbar). Deckt sich mit
+dem bereits bestehenden Präzedenzfall `vorjahresZuordnung`, der ebenfalls
+keine Gruppen unterstützt.
+
+**Mechanismus - drei Verteidigungsschichten (gleiches Prinzip wie die
+Teilzeit-Tage-Kohärenz aus Nachtrag 5):**
+1. **`Stammdaten.vb`:** neue additive Klasse `FesteZuordnung`
+   (`LehrerName`/`KlasseName`/`FachName`) + `Stammdatenbestand.
+   FesteZuordnungen`-Liste - reflection-basiert automatisch in
+   `stammdaten.yaml` als `feste_zuordnungen` (de)serialisiert, keine
+   Änderung an `YamlStammdaten.vb` nötig.
+2. **`StammdatenValidation.vb`:** prüft VOR jedem Solve hart: bekannte
+   Klasse/Fach/Lehrkraft, Lehrkraft qualifiziert (`Stammdaten.
+   LehrerFuerFach`) UND teilzeit-tage-kohärent (`Stammdaten.
+   IstTeilzeitKohaerent`) für diese Kombination, Fach wird in der
+   Klassenstufe der Klasse überhaupt geführt, keine widersprüchlichen
+   Mehrfachzuordnungen (zwei verschiedene Lehrkräfte für dieselbe
+   Klasse/Fach), sowie ein klarer Fehler statt stiller
+   Fehlinterpretation, falls `klasse_name` versehentlich eine Gruppe statt
+   einer echten Klasse referenziert.
+3. **`Lehrereinsatzplanung.vb`:** ein neuer harter Constraint-Block direkt
+   nach den beiden Vollständigkeits-Constraints - `model.Add(assign(key) =
+   1)` je `FesteZuordnung`, wobei CP-SAT automatisch herleitet, dass jede
+   andere Variable derselben "genau 1 Lehrkraft"-Summe 0 sein muss (kein
+   manuelles Nullsetzen der Alternativen nötig). Anders als bei
+   `vorjahresZuordnung` (bewusst leises Überspringen bei fehlendem
+   Kandidaten - dort ein legitimer Normalfall) wirft ein nicht auflösbarer
+   `FesteZuordnung`-Eintrag hier defensiv eine `InvalidOperationException`
+   - ein harter Pin, der intern nicht greift, wäre ein stiller
+   Korrektheitsverlust, den niemand bemerken würde.
+4. **`Verifier.VerifyLehrereinsatz`:** unabhängiger Kanarienvogel-Check,
+   der aus `bestand.FesteZuordnungen` + `result.Zuweisungen` re-deriviert
+   bestätigt, dass jeder Pin tatsächlich im Ergebnis honoriert wurde -
+   sollte nie feuern, wenn der Constraint-Block korrekt verdrahtet ist; ein
+   Treffer wäre ein Beweis für einen Solver-Bug, nicht für ein
+   Stammdaten-Problem.
+
+**Live-Verifikation:** 9 neue Tests in `StammdatenValidationTests.vb` (ein
+Test pro Fehlerklasse plus ein positiver Sanity-Test), 2 neue Hand-Smoke-
+Tests in `LehrereinsatzplanungTests.vb` (beweist, dass ein Pin den Solver
+auch gegen die günstigere "natürliche" Alternative zwingt - von Hand
+nachgerechnetes Objective steigt um genau `WeightPraeferenzVerletzt`, UND
+die vorher gewählte Lehrkraft taucht nicht mehr in den Zuweisungen auf;
+plus ein Kanarienvogel-Test für den defensiven Throw), 3 neue Tests in
+`VerifyLehrereinsatzTests.vb` (gehaltener Pin, verletzter Pin, fehlende
+Zuweisung), alle grün.
+
+**Live-Beleg am Referenzbeispiel:** `tests/bw-grundschule-beispiel/input/
+stammdaten.yaml` bekam einen illustrativen Eintrag, der Klassenlehrer-1
+(ohne Pin natürlich Klassenlehrer von 4b) auf `1a/Deutsch-Förderstunde`
+pinnt - statt des vom Solver ohne Pin gewählten Klassenlehrer-5 (bereits
+Klassenlehrer von 1a). Live bestätigt: `Status=Optimal`, 0
+`StammdatenValidation`-Fehler, 0 `VerifyLehrereinsatz`-Verstöße,
+Lehrereinsatzplanung-Objective unverändert bei 1200 (die Fächer-Bündelung
+pro Klassenlehrer - Nachtrag 2/3 - erfordert, dass Klassenlehrer-1
+zwangsläufig ALLE Fächer von 1a übernimmt, nicht nur die eine
+Förderstunde - der Solver löste das ehrlich mit einem sauberen 5er-Zyklus
+unter den Klassenlehrern [4b→1a→1b→2b→3b→4b], jede Klasse behält dabei
+genau einen Klassenlehrer, keine Lücken). Beweist damit sowohl, dass der
+Pin echte Wirkung hat (kein Zufallstreffer - eine klar andere,
+vorher-nicht-gewählte Lehrkraft übernimmt die Klasse), als auch, dass er
+korrekt mit bereits bestehenden weichen Zielen (Bündelung) interagiert,
+statt sie zu brechen.
+
+## Nachtrag 7 (Phase 2.27): `FesteZuordnung`-Erweiterung auf Gruppen-geführte Fächer
+
+**Kontext:** Nachtrag 6 (Phase 2.26) hatte die harte Lehrer-Klasse-Fach-
+Pinnung bewusst auf echte Klassen beschränkt und Gruppen-Unterstützung
+(Religion-ev/kath, Ethik, Chor - Phase 2.20) als dokumentierten,
+nachrüstbaren Folgeschritt vorgemerkt, da dieselbe
+`AssignKey.IstGruppe`-Infrastruktur bereits existiert. Direkter Nutzerauftrag
+im Anschluss an den Phase-2.26-Push, genau diese Erweiterung umzusetzen.
+
+**Design:** kein neues Feld auf `FesteZuordnung` - `KlasseName` trägt seit
+diesem Nachtrag entweder einen echten `Klasse.Name` ODER einen `Gruppe.Name`,
+exakt dieselbe disjunkte-Namensraum-Konvention, die `AssignKey.Klasse`/
+`.IstGruppe` bereits projektweit etabliert. Eine Gruppen-`FesteZuordnung`
+muss zusätzlich `fach_name` exakt gleich dem `Gruppe.FachName` der
+referenzierten Gruppe setzen (eine Gruppe führt strukturell immer genau ein
+Fach).
+
+**Erweiterung der drei Verteidigungsschichten:**
+1. **`StammdatenValidation.vb`:** die Klassen-Referenzprüfung wurde um einen
+   Gruppen-Zweig ergänzt - referenziert `klasse_name` eine Gruppe statt
+   einer Klasse, wird geprüft, dass die Gruppe aktiv ist
+   (`fach_name`/`klassenstufe` gesetzt, Phase-2.20-Konvention) UND
+   `fach_name` exakt übereinstimmt; die anschließenden Qualifikations-/
+   Teilzeit-Kohärenz-Checks werden unverändert wiederverwendet, nur die
+   Klassenstufen-Herkunft wechselt von `Klasse.Klassenstufe` auf
+   `Gruppe.Klassenstufe`.
+2. **`Lehrereinsatzplanung.vb`:** der bestehende harte Constraint-Block
+   prüft jetzt zusätzlich `gruppeByName.ContainsKey(fz.KlasseName)` und baut
+   den `AssignKey` bei Treffer mit `.IstGruppe = True` - identisch zur
+   bestehenden Gruppen-Variablenerzeugung. Der defensive Throw bei
+   fehlendem `assign`-Key bleibt für beide Zweige unverändert.
+3. **`Verifier.VerifyLehrereinsatz`:** der Kanarienvogel-Check erkennt jetzt
+   Gruppen-Pins und iteriert über `Stammdaten.KlassenOfGruppe`, um JEDE real
+   umspannte Klasse zu prüfen (da `result.Zuweisungen` laut bestehender
+   Dokumentation immer Gruppen-EXPANDIERT ist - eine Zeile pro real
+   umspannter Klasse).
+
+**Live-Verifikation:** `FesteZuordnungReferencingGruppeInsteadOfKlasseIsRejected`
+wurde zu `FesteZuordnungOnGruppeIsAcceptedWhenValid` umgebaut (Assertion
+invertiert), plus 2 neue negative Tests
+(`FesteZuordnungOnInactiveGruppeIsRejected`,
+`FesteZuordnungFachNameMismatchesGruppeFachIsRejected`) in
+`StammdatenValidationTests.vb`. Ein neuer Hand-Smoke-Test
+`FesteZuordnungOnGruppeForcesLessPreferredTeacherAndCountsDeputatOnce` in
+`LehrereinsatzplanungTests.vb` (neue Helper-Funktion
+`BestandMitGruppeUndZweiKandidaten`, mit ABSICHTLICH unterschiedlichem
+Deputat für die beiden Kandidaten, damit eine korrekt EINMAL pro Gruppe
+gezählte Deputat-Abweichung rechnerisch von einer fälschlich verdoppelten
+unterscheidbar ist - bei identischem Soll wären beide Fehlerarten
+zufällig betragsgleich) beweist beides zugleich: der Pin zwingt den Solver
+gegen die günstigere Alternative (von Hand nachgerechnetes Objective=541,
+exakt bestätigt), UND das Deputat bleibt korrekt einmal statt zweimal
+gezählt (eine Verdopplung hätte 341 statt 541 ergeben). 3 neue Tests in
+`VerifyLehrereinsatzTests.vb` (gehaltener Gruppen-Pin, durch andere
+Lehrkraft in einer der real umspannten Klassen verletzter Pin, fehlende
+Zuweisung in einer real umspannten Klasse), wiederverwenden die bereits
+bestehende `BestandMitGruppe()`-Helper-Funktion. Volle Regression: 233
+bestanden (+6 gegenüber dem Phase-2.26-Stand), 0 fehlgeschlagen, 11
+übersprungen.
+
+**Live-Beleg am Referenzbeispiel:** `tests/bw-grundschule-beispiel/input/
+stammdaten.yaml` bekam einen zweiten, `fachfremd: true` markierten
+`fach_lehrer_zuordnungen`-Kandidaten (`Klassenlehrer-3` für `Ethik`) sowie
+einen `feste_zuordnungen`-Eintrag, der die Gruppe `Ethik-Kl2` auf
+`Klassenlehrer-3` pinnt. Referenzlauf ohne Pin zeigte den natürlich
+gewählten Kandidaten für `Ethik-Kl2` als `Ethiklehrer-1` (nicht fachfremd,
+daher günstiger); mit Pin übernimmt `Klassenlehrer-3` nachweislich BEIDE
+real umspannten Klassen (`2a/Ethik, 2b/Ethik` erscheinen jetzt bei
+`Klassenlehrer-3` statt bei `Ethiklehrer-1`, siehe `output/
+lehrerzuteilung.md`) - der Beweis, dass der Pin für die gesamte Gruppe
+greift, nicht nur für eine einzelne real umspannte Klasse. `Status=Optimal`,
+`Lehrereinsatzplanung`-Objective=1010, 0 `VerifyLehrereinsatz`-Verstöße, 0
+`Verifier.VerifySchedule`-Verstöße auf der nachgelagerten Stundenplan-Stufe.
 
 ## Definition of Done — Status
 

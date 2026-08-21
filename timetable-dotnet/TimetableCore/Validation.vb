@@ -48,7 +48,20 @@ Public Module Validation
     ' physically/structurally necessary and must always stay "must".
     Private ReadOnly KannCapableTypes As New HashSet(Of String) From {
         "teacher_availability", "forbidden_slot", "room_requirement", "consecutive_required", "weekly_hours",
-        "required_slot"
+        "required_slot", "occupied_slot"
+    }
+
+    ' occupied_slot only supports "class"/"teacher" scope (unlike
+    ' forbidden_slot/no_overlap's ResourceEntityKey, which also allows
+    ' "room") - Solver.vb's Case "occupied_slot" has no room-scope
+    ' handling, so accepting "room" here would validate cleanly but then
+    ' silently build zero constraints (occVars.Count = 0) in Solver.vb -
+    ' exactly the "incomplete schedule solves as OPTIMAL" trap this
+    ' module's header warns about. A dedicated, narrower dictionary keeps
+    ' that trap from being reachable via a valid-looking scope value.
+    Private ReadOnly OccupiedSlotScopeEntityKey As New Dictionary(Of String, String) From {
+        {"teacher", "teachers"},
+        {"class", "classes"}
     }
 
     ''' <summary>Appends the constraint's "reason" (if any) to an error/
@@ -116,6 +129,19 @@ Public Module Validation
                     Dim entityVal = JsonHelpers.GetString(c, "entity")
                     If Not known(entityKey).Contains(entityVal) Then
                         errors.Add(WithReason($"constraints[{i}]: forbidden_slot.entity='{entityVal}' nicht in {entityKey}", c))
+                    End If
+                End If
+            End If
+
+            If constraintType = "occupied_slot" Then
+                Dim scope = JsonHelpers.GetString(c, "scope")
+                If Not OccupiedSlotScopeEntityKey.ContainsKey(scope) Then
+                    errors.Add(WithReason($"constraints[{i}]: occupied_slot.scope={JsonHelpers.PyRepr(scope)} ungueltig (erlaubt: teacher/class)", c))
+                Else
+                    Dim entityKey = OccupiedSlotScopeEntityKey(scope)
+                    Dim entityVal = JsonHelpers.GetString(c, "entity")
+                    If Not known(entityKey).Contains(entityVal) Then
+                        errors.Add(WithReason($"constraints[{i}]: occupied_slot.entity='{entityVal}' nicht in {entityKey}", c))
                     End If
                 End If
             End If

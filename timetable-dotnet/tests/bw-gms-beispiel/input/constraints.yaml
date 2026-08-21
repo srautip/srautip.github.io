@@ -1,9 +1,5492 @@
 # Zusaetzliche, handverfasste Regeln der 2. Solver-Stufe (siehe tests/README.md).
-# Nur Typen, die die Stammdaten NICHT bereits abdecken - z.B. teacher_availability,
-# forbidden_slot, room_requirement. Oberste Ebene ist eine YAML-Liste, ein Mapping
-# pro Constraint. Beispiel (auskommentiert):
-#
-# - type: room_requirement
-#   class: 1a
-#   subject: Sport
-#   allowed_rooms: [Turnhalle1, Turnhalle2]
+# Automatisch aus gen_bw_gms.py miterzeugt (nicht committetes Wegwerf-Skript) -
+# ein room_requirement pro Fach MIT Raumbedarf, inkl. aller sektionierten
+# Technik-/AES-Kursvarianten. Alle priority: should (Raumknappheit darf den
+# Plan hoechstens verschlechtern, nie unloesbar machen).
+- type: room_requirement
+  subject: Sport
+  allowed_rooms:
+  - Sporthalle1
+  - Sporthalle2
+  - Sporthalle3
+  priority: should
+  reason: Sporthalle noetig
+- type: room_requirement
+  subject: Sport-Profil
+  allowed_rooms:
+  - Sporthalle1
+  - Sporthalle2
+  - Sporthalle3
+  priority: should
+  reason: Sporthalle noetig
+- type: room_requirement
+  subject: Physik
+  allowed_rooms:
+  - NaWi1
+  - NaWi2
+  - NaWi3
+  priority: should
+  reason: naturwissenschaftlicher Fachraum noetig
+- type: room_requirement
+  subject: Chemie
+  allowed_rooms:
+  - NaWi1
+  - NaWi2
+  - NaWi3
+  priority: should
+  reason: naturwissenschaftlicher Fachraum noetig
+- type: room_requirement
+  subject: BNT
+  allowed_rooms:
+  - NaWi1
+  - NaWi2
+  - NaWi3
+  priority: should
+  reason: BNT vereint Bio/Physik/Chemie/Technik
+- type: room_requirement
+  subject: Biologie
+  allowed_rooms:
+  - Bio1
+  - Bio2
+  priority: should
+  reason: eigener Biologie-Fachraum
+- type: room_requirement
+  subject: Musik
+  allowed_rooms:
+  - Musikraum1
+  - Musikraum2
+  priority: should
+  reason: Musikraum noetig
+- type: room_requirement
+  subject: Musik-Profil
+  allowed_rooms:
+  - Musikraum1
+  - Musikraum2
+  priority: should
+  reason: Musikraum noetig
+- type: room_requirement
+  subject: Kunst
+  allowed_rooms:
+  - Kunstraum1
+  - Kunstraum2
+  priority: should
+  reason: Kunstraum noetig
+- type: room_requirement
+  subject: BK-Profil
+  allowed_rooms:
+  - Kunstraum1
+  - Kunstraum2
+  priority: should
+  reason: Kunstraum (Bildende Kunst) noetig
+- type: room_requirement
+  subject: Technik-1
+  allowed_rooms: &id001
+  - Technikraum1
+  - Technikraum2
+  priority: should
+  reason: Technik-/Werkraum noetig
+- type: room_requirement
+  subject: Technik-2
+  allowed_rooms: *id001
+  priority: should
+  reason: Technik-/Werkraum noetig
+- type: room_requirement
+  subject: AES
+  allowed_rooms:
+  - AESraum1
+  - AESraum2
+  priority: should
+  reason: AES-Raum inkl. Lehrkueche noetig
+- type: room_requirement
+  subject: NwT
+  allowed_rooms:
+  - NaWi1
+  - NaWi2
+  - NaWi3
+  - Technikraum1
+  - Technikraum2
+  priority: should
+  reason: NwT vereint Naturwissenschaft und Technik
+- type: room_requirement
+  subject: IMP
+  allowed_rooms:
+  - Computerraum1
+  - Computerraum2
+  priority: should
+  reason: Informatik-/Computerraum noetig
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5a
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5b
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5c
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 5d
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6a
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6b
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6c
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 6d
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7a
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7b
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7c
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 7d
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8a
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8b
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8c
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 8d
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9a
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9b
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9c
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 9d
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10a
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10b
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10c
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Mo
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Mo
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Mo
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Mo
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Mo
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Mo
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Di
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Di
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Di
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Di
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Di
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Di
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Mi
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Mi
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Mi
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Mi
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Mi
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Mi
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Do
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Do
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Do
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Do
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Do
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Do
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Fr
+  period: 1
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Fr
+  period: 2
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Fr
+  period: 3
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Fr
+  period: 4
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Fr
+  period: 5
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: occupied_slot
+  scope: class
+  entity: 10d
+  day: Fr
+  period: 6
+  priority: should
+  reason: durchgaengige Vormittagsbelegung (Std. 1-6)
+- type: forbidden_slot
+  scope: class
+  entity: 5a
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 5a
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 5b
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 5b
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 5c
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 5c
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 5d
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 5d
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6a
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6a
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6b
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6b
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6c
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6c
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6d
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6d
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7a
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7a
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7b
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7b
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7c
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7c
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7d
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7d
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8a
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8a
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8b
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8b
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8c
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8c
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8d
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8d
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9a
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9a
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9b
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9b
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9c
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9c
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9d
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9d
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10a
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10a
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10b
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10b
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10c
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10c
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10d
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10d
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei

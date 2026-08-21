@@ -5,10 +5,12 @@
 # FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
 # "CP-SAT-Status"-Feld in output/stundenplan.md.
 #
-# Kurzauftrag: Gesamtbudget auf maximal 3 Min begrenzt - siehe
+# Kurzauftrag: Testlauf mit 2 Min Gesamtbudget (vorher 10 Min) - Test des
+# neu ins Template uebernommenen Stundentafel-Viewers (Lehrerstundenplan
+# + kaskadierender Klassenstufen/Lehrer-Filter) - siehe
 # per_solve_time_limit_s/stagnation_timeout_s unten fuer die Abstimmung
 # auf "moeglichst viele optimale UND unterschiedliche Loesungen".
-solve_time_limit_s: 180.0
+solve_time_limit_s: 120.0
 
 # Anzahl paralleler CP-SAT-Suchpfade (Portfolio-Threading). Hoeher kann
 # helfen, ueberhaupt schneller eine erste Loesung zu finden, geht aber zu
