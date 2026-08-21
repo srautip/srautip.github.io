@@ -128,3 +128,15 @@ Dropdown kann bleiben, die Tabelle wird der primaere Auswahlweg):
 
 Schritte 1+2 als erster Wurf (ein Commit inkl. Regeneration), 3+4 als
 zweiter, 5 nach Bedarf.
+
+## Umsetzungsstand
+
+- **Schritt 1 umgesetzt:** voller Qualitaetsvektor + `quality_weights`
+  (inkl. `include_*`) im JSON-Export; 2 neue `StundentafelJsonTests`.
+- **Schritt 2 umgesetzt:** sortierbare Loesungsuebersicht im Viewer
+  (Zeilenklick waehlt, Spaltenkopf sortiert, gedaempfte Spalten fuer
+  strukturell abgeschaltete Kriterien, defensiv gegen alte JSONs) -
+  per Headless-Chromium-Smoke gegen altes UND neues Schema sowie gegen
+  beide regenerierten Beispiele verifiziert.
+- Schritte 3 (Gewichts-Regler), 4 (Pareto-Filter) und 5 (Loesungs-Diff)
+  offen.

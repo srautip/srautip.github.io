@@ -157,4 +157,15 @@ quality_weights:
 # Stufe - die Stufe schliesst den Dichte-Rueckstand weitgehend und
 # gewinnt die Lehrerseite. Moegliche weitere Hebel: stage1_time_limit_s
 # fuer die Dichte-Stufe erhoehen oder lex_tolerance nutzen.
+#
+# Nachtrag (Regenerationslauf fuer den Viewer-Ausbau, gleiche Config):
+# in diesem Lauf fand die Dichte-Stufe ihr Band bei 8 - Fenster-Defizit
+# KONSTANT 8 ueber alle 28 Loesungen, exakt das Batterie-Niveau. Die
+# Stufen-Ergebnisse streuen bei num_workers=4 also lauf-zu-lauf (11 im
+# ersten Lauf, 8 hier), erreichen die Batterie aber nachweislich.
+# Hinweis zur Metrik: seit dem Viewer-Ausbau exportiert stundenplan.json
+# den ECHTEN TeacherGapCount aus ScheduleQuality (dieser Lauf: best 3) -
+# die 44-68 in den Vergleichs-Kommentaren oben stammen aus einer
+# groeberen, Grid-abgeleiteten Naeherung und sind nur untereinander
+# vergleichbar, nicht mit den neuen exportierten Werten.
 lex_occupied_density_stage: true
