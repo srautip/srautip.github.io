@@ -5,9 +5,11 @@
 # FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
 # "CP-SAT-Status"-Feld in output/stundenplan.md.
 #
-# Erstmal auf 5 Min reduziert (Nutzervorgabe) - fuer einen schnellen
-# Testlauf, spaeter bei Bedarf wieder hochzusetzen.
-solve_time_limit_s: 300.0
+# Kurzauftrag: laengerer Lauf mit 60-Min-Gesamtbudget (vorher 5 Min) -
+# der letzte 5-Min-Testlauf erreichte nur Feasible mit 28 Kann-
+# Verstoessen (occupied_slot-Luecken), mehr Zeit soll pruefen, ob das
+# verbessert werden kann.
+solve_time_limit_s: 3600.0
 
 # Deutlich groesser/komplexer als das vorherige generische Beispiel (24
 # statt 12 Klassen, 114 Gruppen fuer Niveau-/WPF-/Profil-/Religions-
@@ -27,6 +29,13 @@ num_workers: 4
 # verschiedene Loesungen) Platz haben, statt dass die erste Iteration
 # allein das komplette Budget verbraucht.
 per_solve_time_limit_s: 60.0
+
+# Phase 2.25: bricht eine einzelne Solve-Iteration vorzeitig ab, sobald so
+# lange keine neue Verbesserung mehr gefunden wurde - die gesparte Zeit
+# steht der naechsten Iteration zur Verfuegung (Nutzervorgabe: 20s statt
+# des Defaults 45.0s, damit eine feststeckende Iteration frueher abbricht
+# und die eingesparte Zeit weiteren Versuchen zugutekommt).
+stagnation_timeout_s: 20.0
 
 # Phase 2.21: wie viele vergleichbare Loesungs-Alternativen sollen in
 # output/stundenplan.json + output/stundentafel.html exportiert werden?
