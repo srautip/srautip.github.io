@@ -34,10 +34,23 @@
     font-size: 0.9rem;
     color: #000;
   }
-  #table-container {
-    overflow: auto;
-    max-height: 85vh;
+  h2 {
+    font-size: 1.05rem;
+    margin: 1.2rem 0 0.4rem;
+    color: #000;
+  }
+  #lehrer-controls {
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  #table-container, #lehrer-table-container {
+    overflow: hidden;
     border: 1px solid #ccc;
+  }
+  #table-container table, #lehrer-table-container table {
+    transform-origin: top left;
   }
   table {
     border-collapse: collapse;
@@ -156,6 +169,15 @@
   <div id="convergence-panel"></div>
   <div id="table-container"></div>
 
+  <h2>Lehrerstundenplan</h2>
+  <div id="lehrer-controls">
+    <div class="dropdown">
+      <button type="button" id="lehrer-filter-btn" class="dropdown-btn"></button>
+      <div id="lehrer-filter-menu" class="dropdown-menu" hidden></div>
+    </div>
+  </div>
+  <div id="lehrer-table-container"></div>
+
   <script type="application/json" id="stundentafel-data">__STUNDENTAFEL_JSON__</script>
   <script>
     (function () {
@@ -166,10 +188,43 @@
       document.getElementById('meta').textContent =
         data.tage.join(', ') + ' | ' + data.periods_per_day + ' Stunden/Tag | Stop-Grund: ' + data.stop_reason;
 
-      var stufeColors = data.klassenstufen.map(function (_, i) {
-        var hue = Math.round((360 * i) / Math.max(data.klassenstufen.length, 1));
-        return 'hsl(' + hue + ', 65%, 87%)';
-      });
+      // Parallelklassen (gleiche Klassenstufe, unterschiedliche Zeilen-
+      // Position rowIndex) bekommen denselben Farbton (hue), aber
+      // abgestufte Helligkeit (-10 Prozentpunkte je weiterer
+      // Parallelklasse) - so bleiben sie auf einen Blick unterscheidbar,
+      // ohne die Klassenstufen-Zuordnung (hue) zu verlieren.
+      function stufeColor(stufeIndex, rowIndex) {
+        var hue = Math.round((360 * stufeIndex) / Math.max(data.klassenstufen.length, 1));
+        var lightness = 87 - rowIndex * 10;
+        if (lightness < 40) lightness = 40;
+        return 'hsl(' + hue + ', 65%, ' + lightness + '%)';
+      }
+
+      var lastTable = null;
+      var lastLehrerTable = null;
+      // Nur horizontal an die verfuegbare Breite anpassen - eine
+      // zusaetzliche Verkleinerung anhand der Bildschirmhoehe wuerde bei
+      // vielen Perioden/Spalten den Text unnoetig klein machen. Die Hoehe
+      // folgt proportional (gleicher Skalierungsfaktor fuer beide Achsen,
+      // kein Verzerren) - reicht die Bildschirmhoehe nicht, scrollt die
+      // Seite normal statt die Schrift weiter zu schrumpfen. Wird sowohl
+      // fuer den Klassen- als auch den Lehrerstundenplan verwendet.
+      function fitOneTable(table, container) {
+        if (!table) return;
+        table.style.transform = 'none';
+        var natW = table.scrollWidth;
+        var natH = table.scrollHeight;
+        var availW = container.clientWidth;
+        var scale = availW / natW;
+        if (!isFinite(scale) || scale <= 0) scale = 1;
+        table.style.transform = 'scale(' + scale + ')';
+        container.style.height = (natH * scale) + 'px';
+      }
+      function fitTable() {
+        fitOneTable(lastTable, document.getElementById('table-container'));
+        fitOneTable(lastLehrerTable, document.getElementById('lehrer-table-container'));
+      }
+      window.addEventListener('resize', fitTable);
 
       var select = document.getElementById('solution-select');
       data.solutions.forEach(function (sol, i) {
@@ -200,6 +255,7 @@
         checkbox.addEventListener('change', function () {
           stufeVisible[ksIndex] = checkbox.checked;
           updateFilterBtnLabel();
+          syncLehrerFilterToStufen();
           render(parseInt(select.value, 10));
         });
         label.appendChild(checkbox);
@@ -215,6 +271,97 @@
       document.addEventListener('click', function (e) {
         if (!filterMenu.hidden && e.target !== filterBtn && !filterMenu.contains(e.target)) {
           filterMenu.hidden = true;
+        }
+      });
+
+      // Lehrerliste UND Klasse->Lehrer-Zuordnung werden aus ALLEN Loesungen
+      // zusammengefuehrt (nicht nur der aktuell gewaehlten) -
+      // teacher_subject_assignment ist bereits vor SolveTop fest
+      // zugeordnet, die Lehrkraefte-Menge ist deshalb ueber alle Loesungen
+      // identisch; die Union macht das robust auch ohne diese Annahme zu
+      // erzwingen. Zellen mit mehreren gleichzeitig unterrichtenden
+      // Lehrkraeften (Parallelgruppen, z.B. "Ethiklehrer-1 / Religions-
+      // lehrer-ev-1 / ...") werden auf ihre einzelnen Namen aufgeteilt,
+      // damit jede Lehrkraft im Filter einzeln waehlbar ist UND korrekt
+      // ihrer jeweiligen Klasse zugeordnet wird (classTeachers).
+      var teacherSet = {};
+      var classTeachers = {};
+      data.solutions.forEach(function (sol) {
+        Object.keys(sol.classes).forEach(function (klasse) {
+          var perClass = sol.classes[klasse];
+          if (!classTeachers[klasse]) classTeachers[klasse] = {};
+          data.tage.forEach(function (tag) {
+            for (var p = 1; p <= data.periods_per_day; p++) {
+              var cell = perClass[tag] ? perClass[tag][String(p)] : null;
+              if (cell && cell.teacher) {
+                cell.teacher.split(' / ').forEach(function (t) {
+                  teacherSet[t] = true;
+                  classTeachers[klasse][t] = true;
+                });
+              }
+            }
+          });
+        });
+      });
+      var allTeachers = Object.keys(teacherSet).sort();
+
+      var lehrerVisible = {};
+      var lehrerCheckboxes = {};
+      allTeachers.forEach(function (t) { lehrerVisible[t] = true; });
+      var lehrerFilterBtn = document.getElementById('lehrer-filter-btn');
+      var lehrerFilterMenu = document.getElementById('lehrer-filter-menu');
+
+      function updateLehrerFilterBtnLabel() {
+        var count = allTeachers.filter(function (t) { return lehrerVisible[t]; }).length;
+        lehrerFilterBtn.textContent = 'Lehrkraefte (' + count + '/' + allTeachers.length + ') ▾';
+      }
+
+      // Wird vom Klassenstufen-Filter aufgerufen (siehe Checkbox-Handler
+      // oben): setzt die Lehrer-Auswahl komplett neu auf genau die
+      // Lehrkraefte, die in einer der aktuell sichtbaren Klassenstufen
+      // unterrichten - ueberschreibt eine vorherige manuelle
+      // Lehrer-Auswahl bewusst, wie angefragt ("Lehrer auf alle in den
+      // gefilterten Klassenstufen enthaltenen Lehrer gefiltert").
+      function syncLehrerFilterToStufen() {
+        var relevant = {};
+        visibleKlassenstufen().forEach(function (entry) {
+          entry.ks.klassen.forEach(function (klasse) {
+            if (klasse === null || !classTeachers[klasse]) return;
+            Object.keys(classTeachers[klasse]).forEach(function (t) { relevant[t] = true; });
+          });
+        });
+        allTeachers.forEach(function (t) {
+          var visible = !!relevant[t];
+          lehrerVisible[t] = visible;
+          if (lehrerCheckboxes[t]) lehrerCheckboxes[t].checked = visible;
+        });
+        updateLehrerFilterBtnLabel();
+      }
+
+      allTeachers.forEach(function (t) {
+        var label = document.createElement('label');
+        var checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = true;
+        checkbox.addEventListener('change', function () {
+          lehrerVisible[t] = checkbox.checked;
+          updateLehrerFilterBtnLabel();
+          render(parseInt(select.value, 10));
+        });
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(t));
+        lehrerFilterMenu.appendChild(label);
+        lehrerCheckboxes[t] = checkbox;
+      });
+      updateLehrerFilterBtnLabel();
+
+      lehrerFilterBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        lehrerFilterMenu.hidden = !lehrerFilterMenu.hidden;
+      });
+      document.addEventListener('click', function (e) {
+        if (!lehrerFilterMenu.hidden && e.target !== lehrerFilterBtn && !lehrerFilterMenu.contains(e.target)) {
+          lehrerFilterMenu.hidden = true;
         }
       });
 
@@ -309,6 +456,106 @@
         return '<span' + title + '>' + badge + '<div class="subject">' + cell.subject + '</div>' + teacher + '</span>';
       }
 
+      // Der Lehrerstundenplan wird NICHT vom Solver/Formatting.vb geliefert
+      // (nur klassenweise Grids sind eingebettet) - er wird hier rein
+      // clientseitig aus denselben sol.classes-Daten abgeleitet, die auch
+      // der Klassenstundenplan verwendet (also garantiert dieselbe
+      // Loesung). Bei einer Parallelgruppen-Zelle (mehrere gleichzeitig
+      // unterrichtende Lehrkraefte, subject/teacher als " / "-Liste in
+      // MATCHENDER Reihenfolge, siehe Formatting.vb GridToJsonObject)
+      // werden alle Klassen, die zur selben Zeit vom selben Lehrer
+      // unterrichtet werden, zu einer Zelle zusammengefasst.
+      function teacherSlotEntries(sol, teacherName, day, period) {
+        var subjectToClasses = {};
+        Object.keys(sol.classes).forEach(function (klasse) {
+          var perClass = sol.classes[klasse];
+          var cell = perClass && perClass[day] ? perClass[day][String(period)] : null;
+          if (!cell || !cell.teacher) return;
+          var subjects = cell.subject.split(' / ');
+          var teachers = cell.teacher.split(' / ');
+          teachers.forEach(function (t, idx) {
+            if (t === teacherName) {
+              var subj = subjects[idx] !== undefined ? subjects[idx] : cell.subject;
+              if (!subjectToClasses[subj]) subjectToClasses[subj] = [];
+              subjectToClasses[subj].push(klasse);
+            }
+          });
+        });
+        return Object.keys(subjectToClasses).map(function (s) {
+          return { subject: s, classes: subjectToClasses[s] };
+        });
+      }
+
+      function renderLehrerTable(sol) {
+        var container = document.getElementById('lehrer-table-container');
+        var visibleTeachers = allTeachers.filter(function (t) { return lehrerVisible[t]; });
+        if (visibleTeachers.length === 0) {
+          lastLehrerTable = null;
+          container.style.height = '';
+          container.innerHTML = '';
+          var msg = document.createElement('div');
+          msg.style.padding = '1rem';
+          msg.textContent = 'Keine Lehrkraft ausgewaehlt.';
+          container.appendChild(msg);
+          return;
+        }
+
+        var table = document.createElement('table');
+        var thead = document.createElement('thead');
+
+        var headRow1 = document.createElement('tr');
+        var stdTh = document.createElement('th');
+        stdTh.textContent = 'Std.';
+        stdTh.rowSpan = 2;
+        headRow1.appendChild(stdTh);
+        data.tage.forEach(function (tag) {
+          var th = document.createElement('th');
+          th.textContent = tag;
+          th.colSpan = visibleTeachers.length;
+          headRow1.appendChild(th);
+        });
+        thead.appendChild(headRow1);
+
+        var headRow2 = document.createElement('tr');
+        data.tage.forEach(function () {
+          visibleTeachers.forEach(function (t) {
+            var th = document.createElement('th');
+            th.textContent = t;
+            headRow2.appendChild(th);
+          });
+        });
+        thead.appendChild(headRow2);
+        table.appendChild(thead);
+
+        var tbody = document.createElement('tbody');
+        for (var period = 1; period <= data.periods_per_day; period++) {
+          var tr = document.createElement('tr');
+          var periodTh = document.createElement('th');
+          periodTh.textContent = period;
+          tr.appendChild(periodTh);
+          data.tage.forEach(function (tag) {
+            visibleTeachers.forEach(function (t) {
+              var td = document.createElement('td');
+              var entries = teacherSlotEntries(sol, t, tag, period);
+              if (entries.length === 0) {
+                td.className = 'leer';
+              } else {
+                td.innerHTML = entries.map(function (e) {
+                  return '<div class="subject">' + e.subject + '</div><div class="teacher">' + e.classes.join(', ') + '</div>';
+                }).join('');
+              }
+              tr.appendChild(td);
+            });
+          });
+          tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+
+        container.innerHTML = '';
+        container.appendChild(table);
+        lastLehrerTable = table;
+      }
+
       function render(solIndex) {
         var sol = data.solutions[solIndex];
         document.getElementById('solution-summary').textContent =
@@ -319,11 +566,15 @@
         var container = document.getElementById('table-container');
         var vks = visibleKlassenstufen();
         if (vks.length === 0) {
+          lastTable = null;
+          container.style.height = '';
           container.innerHTML = '';
           var msg = document.createElement('div');
           msg.style.padding = '1rem';
           msg.textContent = 'Keine Klassenstufe ausgewaehlt.';
           container.appendChild(msg);
+          renderLehrerTable(sol);
+          fitTable();
           return;
         }
 
@@ -348,7 +599,7 @@
           vks.forEach(function (entry) {
             var th = document.createElement('th');
             th.textContent = entry.ks.bezeichnung;
-            th.style.backgroundColor = stufeColors[entry.index];
+            th.style.backgroundColor = stufeColor(entry.index, 0);
             th.style.color = '#000';
             headRow2.appendChild(th);
           });
@@ -378,7 +629,7 @@
                 if (klasse === null || !cell) {
                   td.className = 'leer';
                 } else {
-                  td.style.backgroundColor = stufeColors[entry.index];
+                  td.style.backgroundColor = stufeColor(entry.index, rowIndex);
                   td.innerHTML = cellContentHtml(klasse, cell);
                 }
                 tr.appendChild(td);
@@ -391,6 +642,9 @@
 
         container.innerHTML = '';
         container.appendChild(table);
+        lastTable = table;
+        renderLehrerTable(sol);
+        fitTable();
       }
 
       if (data.solutions.length > 0) {
@@ -398,6 +652,7 @@
         render(0);
       } else {
         document.getElementById('table-container').textContent = 'Keine Loesungen vorhanden.';
+        document.getElementById('lehrer-table-container').textContent = 'Keine Loesungen vorhanden.';
       }
     })();
   </script>
