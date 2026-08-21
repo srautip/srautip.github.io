@@ -352,10 +352,22 @@ Doc-Kommentaren der betroffenen Module):
   60s scheiterte die Fenster-Variante teils komplett an der ersten
   Feasibility (Kaltstart ohne Stufen-Hint) - daher das neue
   config-Feld `stage1_time_limit_s` und 120s-Fenster fuer dieses
-  Szenario. Konsequenz: die opt-in-Dichte-STUFE (dediziertes Budget +
-  Band fuer das kompakte Kriterium) ist der klar priorisierte
-  Folgeschritt; bis dahin ist fuer Dichte-kritische Schulen auch die
-  Batterie (occupied_slot bleibt erhalten) legitim. Alle Messwerte im
+  Szenario.
+
+  **Dichte-Stufe umgesetzt und gemessen** (`lexOccupiedDensityStage`/
+  `lex_occupied_density_stage`, opt-in - OccupiedDensity als eigene
+  Stufe zwischen Kann und ClassGaps, Batterie-Reihenfolge; Test
+  `LexOccupiedDensityStageOverridesWeightsWhenEnabled`). Testlauf
+  (1200s, identische Config wie der Vergleich): 32 Loesungen,
+  Fenster-Defizit KONSTANT 11 (Band wirkt; ohne Stufe streute es
+  12-22), TeacherGaps 44-53 - besser als Batterie (50-60) UND Fenster
+  ohne Stufe (50-68), ClassGaps ueberall 0. Die Batterie-8 wird nicht
+  ganz erreicht (beide Stufen-Ergebnisse sind unbewiesene
+  120s-Fenster-Funde; Rest-Abstand moeglicherweise Stufen-Zufall bei
+  num_workers=4 oder Folge der vorgelagerten Kann-Fixierung) - im
+  Gesamtbild ist die kompakte Variante MIT Stufe der Batterie jetzt
+  ebenbuertig: leicht schlechtere Dichte, durchweg bessere
+  Lehrerplaene, 720 eingesparte Kann-BoolVars. Alle Messwerte im
   Kommentar der GMS-config.yaml.
 
 - **P4** - Scaffolding nachfragegesteuert: `occupied`/`dailyCount`/

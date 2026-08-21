@@ -142,4 +142,19 @@ quality_weights:
 # Vorteil, mit dem die Batterie den Vergleich gewann. Das
 # occupied_density-Gewicht steuert damit nur noch das nachgelagerte
 # Quality-Ranking, nicht mehr die Suche.
+#
+# Testlauf mit dieser Stufe (1200s, identische Config wie der
+# 20-Min-Vergleich): 32 Loesungen, Fenster-Defizit KONSTANT 11 (das
+# Band wirkt wie bei der Batterie - vorher ohne Stufe 12-22 streuend),
+# TeacherGaps 44-53 (BESSER als beide Vergleichsvarianten: Batterie
+# 50-60, Fenster ohne Stufe 50-68), ClassGaps ueberall 0. Ehrliche
+# Einordnung: die Batterie-8 wird nicht ganz erreicht (ihr
+# Stufen-Ergebnis ist wie unseres NICHT bewiesen, nur das beste im
+# 120s-Stufenfenster gefundene - der Rest-Abstand 8 vs. 11 kann
+# Stufen-Zufall bei num_workers=4 sein oder an der vorgelagerten
+# Kann-Fixierung der 15 Raumwuensche liegen); dafuer sind die
+# Lehrerplaene durchweg besser. Weder dominiert die Batterie noch die
+# Stufe - die Stufe schliesst den Dichte-Rueckstand weitgehend und
+# gewinnt die Lehrerseite. Moegliche weitere Hebel: stage1_time_limit_s
+# fuer die Dichte-Stufe erhoehen oder lex_tolerance nutzen.
 lex_occupied_density_stage: true
