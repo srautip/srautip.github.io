@@ -133,6 +133,53 @@
     cursor: pointer;
     color: #000;
   }
+  /* Viewer-Ausbau Schritt 2 (docs/viewer-ausbau-plan.md): sortierbare
+     Loesungsuebersicht - eine Zeile pro Loesung, Spalten = voller
+     Qualitaetsvektor. Eigenstaendiger Scroll-Container; die globalen
+     table/th/td-Regeln oben (min-width, sticky) werden hier gezielt
+     zurueckgesetzt. */
+  #solutions-overview {
+    margin-bottom: 1rem;
+    overflow-x: auto;
+    border: 1px solid #ccc;
+    max-height: 22rem;
+    overflow-y: auto;
+  }
+  #solutions-overview table {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8rem;
+    width: 100%;
+  }
+  #solutions-overview th, #solutions-overview td {
+    min-width: 0;
+    padding: 3px 8px;
+    text-align: right;
+    white-space: nowrap;
+  }
+  #solutions-overview th.txt, #solutions-overview td.txt {
+    text-align: left;
+  }
+  #solutions-overview thead th {
+    cursor: pointer;
+    user-select: none;
+  }
+  #solutions-overview tbody tr {
+    cursor: pointer;
+  }
+  #solutions-overview tbody tr:hover {
+    background: #f2f2f2;
+  }
+  #solutions-overview tbody tr.active {
+    background: #dcebff;
+  }
+  #solutions-overview .muted-col {
+    color: #999;
+  }
+  #solutions-overview .overview-note {
+    font-size: 0.75rem;
+    color: #555;
+    padding: 3px 8px;
+  }
   #convergence-panel {
     margin-bottom: 1rem;
     font-size: 0.85rem;
@@ -166,6 +213,7 @@
     </div>
     <span id="solution-summary"></span>
   </div>
+  <div id="solutions-overview"></div>
   <div id="convergence-panel"></div>
   <div id="table-container"></div>
 
@@ -237,6 +285,139 @@
       select.addEventListener('change', function () {
         render(parseInt(select.value, 10));
       });
+
+      // ---- Loesungsuebersicht (Viewer-Ausbau Schritt 2) ----------------
+      // Eine Zeile pro Loesung mit dem vollen Qualitaetsvektor; Klick auf
+      // eine Zeile waehlt die Loesung, Klick auf einen Spaltenkopf
+      // sortiert. Aeltere stundenplan.json ohne die neuen Felder bleiben
+      // oeffenbar: fehlende Werte erscheinen als "-" und sortieren ans
+      // Ende. Kriterien, die per include_*-Flag strukturell aus der SUCHE
+      // ausgeschlossen waren, werden gedaempft dargestellt - ihr Wert ist
+      // nur nachgelagert gezaehlt.
+      var qw = data.quality_weights || {};
+      function isMuted(includeKey) {
+        return qw[includeKey] === false;
+      }
+      var overviewColumns = [
+        { key: '__nr', label: 'Nr.', txt: true },
+        { key: 'status', label: 'Status', txt: true },
+        { key: 'muss_violation_count', label: 'Muss' },
+        { key: 'kann_violation_count', label: 'Kann' },
+        { key: 'occupied_density_count', label: 'Fenster frei', muted: isMuted('include_occupied_density') },
+        { key: 'class_gap_count', label: 'Springstd. Kl.', muted: isMuted('include_class_gaps') },
+        { key: 'teacher_gap_count', label: 'Springstd. Lehrer', muted: isMuted('include_teacher_gaps') },
+        { key: 'edge_period_count', label: 'Randstd.', muted: isMuted('include_edge_period') },
+        { key: 'afternoon_day_count', label: 'Nachm.-Tage', muted: isMuted('include_afternoon_day_count') },
+        { key: 'class_load_variance', label: 'Var. Klassen', digits: 2, muted: isMuted('include_class_load_variance') },
+        { key: 'teacher_load_variance', label: 'Var. Lehrer', digits: 2, muted: isMuted('include_teacher_load_variance') },
+        { key: 'quality_total', label: 'Total', digits: 1 }
+      ];
+      var mutedTitle = 'Suche war fuer dieses Kriterium blind (include-Flag aus) - Wert nur nachgelagert gezaehlt';
+      var overviewSort = { key: 'quality_total', dir: 1 };
+
+      function overviewValue(sol, col) {
+        if (col.key === '__nr') return sol.__nr;
+        return sol[col.key];
+      }
+      function formatOverviewValue(v, col) {
+        if (v === undefined || v === null) return '-';
+        if (col.digits !== undefined && typeof v === 'number') return v.toFixed(col.digits);
+        return String(v);
+      }
+
+      function renderOverview() {
+        var container = document.getElementById('solutions-overview');
+        container.innerHTML = '';
+        if (data.solutions.length === 0) return;
+
+        var rows = data.solutions.map(function (sol, i) {
+          sol.__nr = i + 1;
+          return sol;
+        }).slice();
+        var sortCol = null;
+        overviewColumns.forEach(function (c) { if (c.key === overviewSort.key) sortCol = c; });
+        if (sortCol) {
+          rows.sort(function (a, b) {
+            var va = overviewValue(a, sortCol);
+            var vb = overviewValue(b, sortCol);
+            if (va === undefined || va === null) return 1;
+            if (vb === undefined || vb === null) return -1;
+            if (va < vb) return -overviewSort.dir;
+            if (va > vb) return overviewSort.dir;
+            return a.__nr - b.__nr;
+          });
+        }
+
+        var table = document.createElement('table');
+        var thead = document.createElement('thead');
+        var headRow = document.createElement('tr');
+        overviewColumns.forEach(function (col) {
+          var th = document.createElement('th');
+          var arrow = '';
+          if (overviewSort.key === col.key) arrow = overviewSort.dir === 1 ? ' ▲' : ' ▼';
+          th.textContent = col.label + arrow;
+          if (col.txt) th.className = 'txt';
+          if (col.muted) {
+            th.className = (th.className ? th.className + ' ' : '') + 'muted-col';
+            th.title = mutedTitle;
+          }
+          th.addEventListener('click', function () {
+            if (overviewSort.key === col.key) {
+              overviewSort.dir = -overviewSort.dir;
+            } else {
+              overviewSort.key = col.key;
+              overviewSort.dir = 1;
+            }
+            renderOverview();
+          });
+          headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        var tbody = document.createElement('tbody');
+        rows.forEach(function (sol) {
+          var tr = document.createElement('tr');
+          tr.setAttribute('data-sol-index', sol.__nr - 1);
+          overviewColumns.forEach(function (col) {
+            var td = document.createElement('td');
+            td.textContent = formatOverviewValue(overviewValue(sol, col), col);
+            if (col.txt) td.className = 'txt';
+            if (col.muted) {
+              td.className = (td.className ? td.className + ' ' : '') + 'muted-col';
+              td.title = mutedTitle;
+            }
+            tr.appendChild(td);
+          });
+          tr.addEventListener('click', function () {
+            var idx = sol.__nr - 1;
+            select.value = idx;
+            render(idx);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+
+        var note = document.createElement('div');
+        note.className = 'overview-note';
+        note.textContent = 'Zeile anklicken = Loesung waehlen; Spaltenkopf anklicken = sortieren. Gedaempfte Spalten waren fuer die Suche strukturell abgeschaltet.';
+        container.appendChild(note);
+        updateOverviewActive(parseInt(select.value, 10) || 0);
+      }
+
+      function updateOverviewActive(solIndex) {
+        var trs = document.getElementById('solutions-overview').querySelectorAll('tbody tr');
+        for (var i = 0; i < trs.length; i++) {
+          var idx = parseInt(trs[i].getAttribute('data-sol-index'), 10);
+          if (idx === solIndex) {
+            trs[i].className = 'active';
+          } else {
+            trs[i].className = '';
+          }
+        }
+      }
+      // ------------------------------------------------------------------
 
       var stufeVisible = data.klassenstufen.map(function () { return true; });
       var filterBtn = document.getElementById('stufe-filter-btn');
@@ -561,6 +742,7 @@
         document.getElementById('solution-summary').textContent =
           'Muss-Verstoesse: ' + sol.muss_violation_count + ' | Kann-Verstoesse: ' + sol.kann_violation_count +
           ' | Quality (Total): ' + sol.quality_total.toFixed(1);
+        updateOverviewActive(solIndex);
         renderConvergence(sol);
 
         var container = document.getElementById('table-container');
@@ -649,6 +831,7 @@
 
       if (data.solutions.length > 0) {
         select.value = 0;
+        renderOverview();
         render(0);
       } else {
         document.getElementById('table-container').textContent = 'Keine Loesungen vorhanden.';

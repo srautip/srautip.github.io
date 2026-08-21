@@ -185,4 +185,69 @@ Public Class StundentafelJsonTests
         Assert.IsTrue(JsonHelpers.GetInt(solutions(1).AsObject(), "muss_violation_count").Value > 0)
     End Sub
 
+    ''' <summary>Viewer-Ausbau Schritt 1: pro Loesung wird der VOLLE
+    ''' Qualitaetsvektor exportiert (nicht nur quality_total) - jedes
+    ''' Feld mit einem eindeutigen, hand-gesetzten Wert, damit eine
+    ''' Feld-Verwechslung im Export auffliegt.</summary>
+    <TestMethod>
+    Public Sub ExportsFullQualityVectorPerSolution()
+        Dim b As New Stammdatenbestand With {.SchulName = "Test"}
+        b.Klassenstufen.Add(New Klassenstufe With {.Nummer = 1, .Bezeichnung = "Klasse 1"})
+        b.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1})
+        Dim quality As New QualityScore With {
+            .KannViolationCount = 1, .ClassGapCount = 2, .TeacherGapCount = 3,
+            .EdgePeriodCount = 4, .AfternoonDayCount = 5,
+            .ClassLoadVariance = 6.25, .TeacherLoadVariance = 7.5,
+            .OccupiedDensityCount = 8, .Total = 9.75}
+        Dim sol As New ScoredSolution With {
+            .Schedule = New List(Of ScheduleEntry), .KannConstraintFlags = New List(Of KannConstraintFlag),
+            .Quality = quality, .Status = CpSolverStatus.Optimal}
+        Dim multiResult As New MultiSolveResult With {
+            .Solutions = New List(Of ScoredSolution) From {sol},
+            .StopReason = MultiSolveStopReason.MaxSolutionsReached, .IterationsRun = 1, .ElapsedS = 1}
+
+        Dim json = Formatting.ToStundentafelJson(b, Scenario(Mini({"1a"}, {}, {}, {}, {"Mo"}, 1), {}), multiResult)
+        Dim s0 = json("solutions").AsArray()(0).AsObject()
+        Assert.AreEqual(1, JsonHelpers.GetInt(s0, "kann_violation_count").Value)
+        Assert.AreEqual(2, JsonHelpers.GetInt(s0, "class_gap_count").Value)
+        Assert.AreEqual(3, JsonHelpers.GetInt(s0, "teacher_gap_count").Value)
+        Assert.AreEqual(4, JsonHelpers.GetInt(s0, "edge_period_count").Value)
+        Assert.AreEqual(5, JsonHelpers.GetInt(s0, "afternoon_day_count").Value)
+        Assert.AreEqual(6.25, s0("class_load_variance").GetValue(Of Double)(), 0.0001)
+        Assert.AreEqual(7.5, s0("teacher_load_variance").GetValue(Of Double)(), 0.0001)
+        Assert.AreEqual(8, JsonHelpers.GetInt(s0, "occupied_density_count").Value)
+        Assert.AreEqual(9.75, s0("quality_total").GetValue(Of Double)(), 0.0001)
+    End Sub
+
+    ''' <summary>Viewer-Ausbau Schritt 1: top-level werden die effektiven
+    ''' quality_weights inkl. Include*-Flags exportiert - Grundlage fuer
+    ''' Gewichts-Regler und die gedaempften Spalten der
+    ''' Vergleichstabelle. Ohne uebergebene Gewichte gelten die
+    ''' Default-Konstanten.</summary>
+    <TestMethod>
+    Public Sub ExportsEffectiveQualityWeights()
+        Dim b As New Stammdatenbestand With {.SchulName = "Test"}
+        b.Klassenstufen.Add(New Klassenstufe With {.Nummer = 1, .Bezeichnung = "Klasse 1"})
+        b.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1})
+        Dim weights As New QualityWeights With {
+            .ClassGaps = 1000.0, .TeacherGaps = 50.0, .OccupiedDensity = 500.0,
+            .IncludeEdgePeriod = False, .IncludeTeacherLoadVariance = False}
+
+        Dim json = Formatting.ToStundentafelJson(b, EmptyData(), LeeresMultiResult(), weights)
+        Dim qw = json("quality_weights").AsObject()
+        Assert.AreEqual(1000.0, qw("class_gaps").GetValue(Of Double)(), 0.0001)
+        Assert.AreEqual(50.0, qw("teacher_gaps").GetValue(Of Double)(), 0.0001)
+        Assert.AreEqual(500.0, qw("occupied_density").GetValue(Of Double)(), 0.0001)
+        Assert.IsFalse(qw("include_edge_period").GetValue(Of Boolean)())
+        Assert.IsFalse(qw("include_teacher_load_variance").GetValue(Of Boolean)())
+        Assert.IsTrue(qw("include_class_gaps").GetValue(Of Boolean)())
+
+        ' Ohne uebergebene Gewichte: Default-Konstanten.
+        Dim jsonDefaults = Formatting.ToStundentafelJson(b, EmptyData(), LeeresMultiResult())
+        Dim qwDefaults = jsonDefaults("quality_weights").AsObject()
+        Assert.AreEqual(ScheduleQuality.WeightKann, qwDefaults("kann").GetValue(Of Double)(), 0.0001)
+        Assert.AreEqual(ScheduleQuality.WeightOccupiedDensity, qwDefaults("occupied_density").GetValue(Of Double)(), 0.0001)
+        Assert.IsTrue(qwDefaults("include_occupied_density").GetValue(Of Boolean)())
+    End Sub
+
 End Class

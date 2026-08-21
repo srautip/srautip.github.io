@@ -427,7 +427,7 @@ Public Module Run
         ' JS-Viewer-HTML, die dieselben Daten inline eingebettet enthaelt
         ' (kein fetch() noetig, funktioniert daher auch bei direktem
         ' Doeffnen per Doppelklick ohne lokalen Webserver).
-        Dim stundentafelJson = Formatting.ToStundentafelJson(bestand, data, topResult)
+        Dim stundentafelJson = Formatting.ToStundentafelJson(bestand, data, topResult, qualityWeights)
         Dim stundentafelJsonText = stundentafelJson.ToJsonString(New JsonSerializerOptions With {.WriteIndented = True})
         IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.json"), stundentafelJsonText)
         IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundentafel.html"),
