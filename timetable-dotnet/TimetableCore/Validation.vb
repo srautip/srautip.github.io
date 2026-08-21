@@ -73,6 +73,25 @@ Public Module Validation
         Return $"{message} (Regel-Herkunft: '{reason}')"
     End Function
 
+    ''' <summary>R2-Helfer: prueft das day/period-Feld eines Slot-Constraints
+    ''' gegen das entities.timeslots-Raster - ein Slot ausserhalb des
+    ''' Rasters existiert als Lesson-Variable nicht und die Regel wuerde im
+    ''' Solver wirkungslos fallengelassen. Leere Liste, wenn kein Raster
+    ''' bekannt ist (kein timeslots-Objekt) oder die Felder passen.</summary>
+    Private Function SlotRangeErrors(c As JsonObject, i As Integer, constraintType As String,
+                                      knownDays As HashSet(Of String), periodsPerDay As Integer?) As List(Of String)
+        Dim errors As New List(Of String)
+        Dim day = JsonHelpers.GetString(c, "day")
+        Dim period = JsonHelpers.GetInt(c, "period")
+        If knownDays IsNot Nothing AndAlso day IsNot Nothing AndAlso Not knownDays.Contains(day) Then
+            errors.Add(WithReason($"constraints[{i}] (type={constraintType}): day='{day}' ist kein Tag aus entities.timeslots.days", c))
+        End If
+        If periodsPerDay.HasValue AndAlso period.HasValue AndAlso (period.Value < 1 OrElse period.Value > periodsPerDay.Value) Then
+            errors.Add(WithReason($"constraints[{i}] (type={constraintType}): period={period.Value} liegt ausserhalb von 1..{periodsPerDay.Value}", c))
+        End If
+        Return errors
+    End Function
+
     ''' <summary>Cross-references every class/teacher/subject/room value
     ''' used in `constraints` against `entities`. Returns a list of
     ''' error strings (empty = all references are valid).</summary>
@@ -89,6 +108,45 @@ Public Module Validation
 
         Dim errors As New List(Of String)
         Dim constraints = JsonHelpers.Constraints(data)
+
+        ' Code-Review-Umsetzung (R1/R2): Vorab-Pass ueber alle
+        ' teacher_subject_assignment-Constraints - liefert (a) exakte
+        ' Duplikate als harten Fehler (Solver.SessionsFromAssignments
+        ' ueberschrieb frueher stillschweigend die Lesson-Variablen des
+        ' ersten Duplikats) und (b) die Treffermengen, gegen die
+        ' occupied_slot/required_slot unten auf "referenziert ueberhaupt
+        ' eine existierende Session" geprueft werden (vorher stille No-Ops
+        ' im Solver, selbst mit priority=must - exakt die "incomplete
+        ' schedule solves as OPTIMAL"-Falle aus dem Modulkopf).
+        Dim assignmentTriples As New HashSet(Of (ClassName As String, Subject As String, Teacher As String))
+        Dim classSubjectPairs As New HashSet(Of (ClassName As String, Subject As String))
+        Dim classesWithSessions As New HashSet(Of String)
+        Dim teachersWithSessions As New HashSet(Of String)
+        For i = 0 To constraints.Count - 1
+            Dim c = constraints(i)
+            If JsonHelpers.GetString(c, "type") <> "teacher_subject_assignment" Then Continue For
+            Dim triple = (JsonHelpers.GetString(c, "class"), JsonHelpers.GetString(c, "subject"), JsonHelpers.GetString(c, "teacher"))
+            If Not assignmentTriples.Add(triple) Then
+                errors.Add(WithReason(
+                    $"constraints[{i}] (type=teacher_subject_assignment): doppelte Zuweisung " &
+                    $"(class='{triple.Item1}', subject='{triple.Item2}', teacher='{triple.Item3}') - " &
+                    "dasselbe Tripel existiert bereits weiter oben", c))
+            End If
+            classSubjectPairs.Add((triple.Item1, triple.Item2))
+            classesWithSessions.Add(triple.Item1)
+            teachersWithSessions.Add(triple.Item3)
+        Next
+
+        ' Tag-/Perioden-Raster fuer die Slot-Existenzpruefungen unten -
+        ' nur gelesen, wenn entities.timeslots existiert (defensive Guard:
+        ' ValidateEntities selbst brauchte das Raster bisher nicht).
+        Dim knownDays As HashSet(Of String) = Nothing
+        Dim periodsPerDay As Integer? = Nothing
+        If ent.ContainsKey("timeslots") AndAlso ent("timeslots") IsNot Nothing Then
+            Dim timeslots = JsonHelpers.Timeslots(ent)
+            knownDays = New HashSet(Of String)(JsonHelpers.AsStringList(timeslots, "days"))
+            periodsPerDay = JsonHelpers.GetInt(timeslots, "periods_per_day")
+        End If
 
         For i = 0 To constraints.Count - 1
             Dim c = constraints(i)
@@ -142,8 +200,32 @@ Public Module Validation
                     Dim entityVal = JsonHelpers.GetString(c, "entity")
                     If Not known(entityKey).Contains(entityVal) Then
                         errors.Add(WithReason($"constraints[{i}]: occupied_slot.entity='{entityVal}' nicht in {entityKey}", c))
+                    Else
+                        ' R2: eine occupied_slot-Regel ohne eine einzige
+                        ' Session der Entity waere im Solver ein stiller
+                        ' No-Op (occVars.Count = 0), selbst als Muss.
+                        Dim hasSessions = If(scope = "class", classesWithSessions.Contains(entityVal), teachersWithSessions.Contains(entityVal))
+                        If Not hasSessions Then
+                            errors.Add(WithReason($"constraints[{i}]: occupied_slot.entity='{entityVal}' hat keine einzige teacher_subject_assignment-Session - die Regel wuerde im Solver wirkungslos fallengelassen", c))
+                        End If
                     End If
                 End If
+                errors.AddRange(SlotRangeErrors(c, i, "occupied_slot", knownDays, periodsPerDay))
+            End If
+
+            ' R2: required_slot referenziert eine konkrete (Klasse,Fach)-
+            ' Session auf einem konkreten Slot - existiert die Session oder
+            ' der Slot nicht, wuerde der Solver die Regel wirkungslos
+            ' fallenlassen (lesson.ContainsKey-Guard), selbst als Muss.
+            If constraintType = "required_slot" Then
+                Dim reqClass = JsonHelpers.GetString(c, "class")
+                Dim reqSubject = JsonHelpers.GetString(c, "subject")
+                If reqClass IsNot Nothing AndAlso reqSubject IsNot Nothing AndAlso
+                   known("classes").Contains(reqClass) AndAlso known("subjects").Contains(reqSubject) AndAlso
+                   Not classSubjectPairs.Contains((reqClass, reqSubject)) Then
+                    errors.Add(WithReason($"constraints[{i}]: required_slot referenziert (class='{reqClass}', subject='{reqSubject}') ohne zugehoerige teacher_subject_assignment - die Regel wuerde im Solver wirkungslos fallengelassen", c))
+                End If
+                errors.AddRange(SlotRangeErrors(c, i, "required_slot", knownDays, periodsPerDay))
             End If
 
             ' Phase 2.5: Muss/Kann priority validation.

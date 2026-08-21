@@ -336,6 +336,10 @@ stagnation_timeout_s: 45.0   # Optional, Default 45.0 - Phase 2.25, siehe unten
 diversify_seed: true   # Optional, Default true - Phase 2.25
 randomize_search: true   # Optional, Default true - Phase 2.25
 relative_gap_limit: null   # Optional, Default nicht gesetzt - Phase 2.25, siehe unten
+lexicographic: false   # Optional, Default false - Code-Review-Umsetzung P2, siehe unten
+lex_tolerance: 0   # Optional, Default 0 - nur wirksam mit lexicographic: true
+min_diversity: 0   # Optional, Default 0 - Code-Review-Umsetzung P3, siehe unten
+rehint_found_solutions: true   # Optional, Default true - Code-Review-Umsetzung P3, siehe unten
 quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe unten
   kann: 100.0
   class_gaps: 100.0
@@ -344,6 +348,7 @@ quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe un
   afternoon_day_count: 5.0
   class_load_variance: 3.0
   teacher_load_variance: 3.0
+  include_class_gaps: true   # Optional, Default true - Code-Review-Umsetzung R3
   include_teacher_gaps: true   # Optional, Default true - Phase 2.25-Nachtrag-2, siehe unten
   include_edge_period: true   # Optional, Default true - siehe unten
   include_afternoon_day_count: true   # Optional, Default true - siehe unten
@@ -412,6 +417,44 @@ Felder oben ändert es, WANN CP-SAT eine Lösung als bewiesen optimal
 akzeptiert (eine Lücke bis zu diesem Prozentsatz wird toleriert statt
 weiter nach Beweis gesucht), eine stärkere Verhaltensänderung, die diese
 Phase nicht für jede Schule ungefragt erzwingt.
+
+**`lexicographic`/`lex_tolerance`** (Code-Review-Umsetzung P2, siehe
+`docs/code-review-cpsat-performance.md`): `lexicographic: true` ersetzt
+die eine große gewichtete Zielfunktion durch drei nacheinander einzeln
+optimierte Stufen - Kann-Verstöße, dann Klassen-Springstunden
+(ClassGaps), dann Lehrer-Springstunden (TeacherGaps). Das Optimum jeder
+Stufe wird als Constraint fixiert (`<= Optimum + lex_tolerance`), erst
+danach laufen die normalen Iterationen über die gewichtete
+REST-Zielfunktion (Randstunden/Nachmittags-Tage/Ausgewogenheit, soweit
+per `include_*` aktiv). Vorteil: jede Stufe ist klein genug, dass CP-SAT
+ihr Optimum in der Regel BEWEISEN kann (die Phase-2.25-Messungen zeigten
+0,2s für Kann-only gegen 97-99% Restlücke beim Summenmodell) - alle
+gefundenen Alternativen sind dann garantiert stufen-optimal statt
+"irgendwo im Band einer nie geschlossenen Lücke". Zu beachten: in diesem
+Modus legt die STUFENREIHENFOLGE die Priorität Kann > ClassGaps >
+TeacherGaps fest - die `quality_weights` dieser drei Kriterien steuern
+nur noch das nachgelagerte Ranking, nicht mehr die Suche (wer die
+Priorität frei über Gewichte tauschen will, bleibt beim Default
+`lexicographic: false`). `lex_tolerance` (Default 0) weitet das Band je
+Stufe, z.B. `1` = "eine Springstunde mehr als das Optimum ist für
+zusätzliche Alternativen akzeptabel".
+
+**`min_diversity`/`rehint_found_solutions`** (Code-Review-Umsetzung P3):
+Werkzeuge für "möglichst VERSCHIEDENE Alternativen statt
+Ein-Slot-Nachbarn". `min_diversity` (Default 0 = bisheriges Verhalten)
+verlangt, dass jede weitere Lösung mindestens so viele der bisher
+belegten (Klasse,Fach,Lehrer,Tag,Stunde)-Slots ANDERS belegt - ein
+echter Distanz-Cut gegen jede bereits gefundene Lösung, statt nur deren
+exakte Wiederholung zu verbieten. Sinnvolle Werte: grob 5-10% der
+Gesamt-Wochenstunden aller Klassen; zu hohe Werte erschöpfen den
+Suchraum bewusst früher (`SearchSpaceExhausted` = "keine ausreichend
+verschiedene Lösung existiert mehr"). `rehint_found_solutions: false`
+schaltet zusätzlich ab, dass jede Iteration auf die soeben gefundene
+Lösung "gehintet" wird - dieses Re-Hinting beschleunigt das Finden
+IRGENDEINER nächsten Lösung, zieht die Suche aber systematisch zum
+nächstgelegenen Nachbarn der Vorlösung; für Diversitäts-Läufe gehören
+beide Hebel zusammen (`min_diversity` > 0 und `rehint_found_solutions:
+false`).
 
 **`quality_weights`** (Phase 2.24, komplett optional - fehlt der Block
 oder ein einzelnes Unterfeld darin, gilt unverändert der jeweils oben

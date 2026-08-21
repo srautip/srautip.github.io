@@ -19,6 +19,25 @@
 Imports System.Text.Json.Nodes
 Imports Google.OrTools.Sat
 
+''' <summary>Code-Review-Umsetzung (P2): die 7 Qualitaetskriterien als
+''' EINZELNE, ungewichtete LinearExpr-Summen statt nur als fertige
+''' gewichtete Gesamtzielfunktion - Solver.SolveTops lexikografischer
+''' Modus optimiert damit Kann/ClassGaps/TeacherGaps als eigene Stufen
+''' (Optimum je Stufe als Constraint fixiert), waehrend der klassische
+''' gewichtete Modus dieselben Summen unveraendert zu ApplyQualityObjectives
+''' bisheriger Zielfunktion kombiniert. Ein Property ist Nothing, wenn das
+''' Kriterium strukturell ausgeschlossen wurde (Include*-Flag) oder keine
+''' Variablen beitraegt.</summary>
+Friend NotInheritable Class QualityTerms
+    Public Property KannSum As LinearExpr
+    Public Property ClassGapsSum As LinearExpr
+    Public Property TeacherGapsSum As LinearExpr
+    Public Property EdgeSum As LinearExpr
+    Public Property AfternoonSum As LinearExpr
+    Public Property ClassRangeSum As LinearExpr
+    Public Property TeacherRangeSum As LinearExpr
+End Class
+
 Friend Module SolveTopObjective
 
     Private Function IndexLessonByEntityDayPeriod(lesson As Dictionary(Of LessonKey, BoolVar),
@@ -244,7 +263,8 @@ Friend Module SolveTopObjective
     ''' (Nothing) to `New ScheduleQuality.QualityWeights()` (today's
     ''' hardcoded constants) - see that class's doc comment for the
     ''' backward-compatibility guarantee. Each of the 5 secondary criteria
-    ''' (everything but Kann/ClassGaps) can be structurally excluded from
+    ''' (everything but Kann - seit der Review-Umsetzung inklusive
+    ''' ClassGaps, siehe R3) can be structurally excluded from
     ''' the model via its own QualityWeights.Include*=False flag - the
     ''' corresponding auxiliary variables are never built at all (not just
     ''' weighted 0), for schools where the extra model size is not worth
@@ -252,6 +272,21 @@ Friend Module SolveTopObjective
     ''' BuiltModel from BuildCoreModel (NOT BuildModel - this replaces,
     ''' rather than adds to, BuildModel's own Kann-only Minimize).</summary>
     Friend Sub ApplyQualityObjective(built As BuiltModel, data As JsonObject, Optional weights As QualityWeights = Nothing)
+        Dim w = If(weights, New QualityWeights())
+        Dim terms = BuildQualityTerms(built, data, w)
+        Dim total = WeightedTotal(terms, w)
+        If total IsNot Nothing Then built.Model.Minimize(total)
+    End Sub
+
+    ''' <summary>Baut alle per Include*-Flag aktiven Hilfsvariablen/
+    ''' -Constraints der Qualitaetskriterien ins Modell (identische
+    ''' Variablen-Erzeugungsreihenfolge wie ApplyQualityObjective vor der
+    ''' Review-Umsetzung - CP-SATs random_seed-Verhalten ist darauf
+    ''' sensibel) und liefert die UNGEWICHTETEN Summen je Kriterium
+    ''' zurueck. Setzt selbst KEINE Zielfunktion - das entscheidet der
+    ''' Aufrufer (gewichtete Summe via WeightedTotal, oder Solver.SolveTops
+    ''' lexikografische Stufen).</summary>
+    Friend Function BuildQualityTerms(built As BuiltModel, data As JsonObject, weights As QualityWeights) As QualityTerms
         Dim w = If(weights, New QualityWeights())
         Dim model = built.Model
         Dim classNames = built.Sessions.Select(Function(s) s.ClassName).Distinct().ToList()
@@ -271,7 +306,9 @@ Friend Module SolveTopObjective
         BuildScaffolding(model, teacherNames, built.Days, built.Periods, byTeacher, "T", occupiedTeacher, hasAnyTeacher, dailyCountTeacher)
 
         Dim classGapFlags As New List(Of BoolVar)
-        BuildGapFlags(model, classNames, built.Days, built.Periods, "C", occupiedClass, classGapFlags)
+        If w.IncludeClassGaps Then
+            BuildGapFlags(model, classNames, built.Days, built.Periods, "C", occupiedClass, classGapFlags)
+        End If
         Dim teacherGapFlags As New List(Of BoolVar)
         If w.IncludeTeacherGaps Then
             BuildGapFlags(model, teacherNames, built.Days, built.Periods, "T", occupiedTeacher, teacherGapFlags)
@@ -292,23 +329,54 @@ Friend Module SolveTopObjective
             BuildTeacherRangeVars(model, teacherNames, built.Days, built.Periods, built.Lesson, dailyCountTeacher, hasAnyTeacher, teacherRangeVars)
         End If
 
-        Dim terms As New List(Of LinearExpr)
+        Dim result As New QualityTerms()
         If built.KannVars.Count > 0 Then
-            terms.Add(CLng(w.Kann) * LinearExpr.Sum(built.KannVars.Values.Select(Function(kv) kv.Var)))
+            result.KannSum = LinearExpr.Sum(built.KannVars.Values.Select(Function(kv) kv.Var))
         End If
-        If classGapFlags.Count > 0 Then terms.Add(CLng(w.ClassGaps) * LinearExpr.Sum(classGapFlags))
-        If teacherGapFlags.Count > 0 Then terms.Add(CLng(w.TeacherGaps) * LinearExpr.Sum(teacherGapFlags))
+        If classGapFlags.Count > 0 Then result.ClassGapsSum = LinearExpr.Sum(classGapFlags)
+        If teacherGapFlags.Count > 0 Then result.TeacherGapsSum = LinearExpr.Sum(teacherGapFlags)
         If w.IncludeEdgePeriod Then
-            Dim edgeTerm As LinearExpr = LinearExpr.Sum(
+            result.EdgeSum = LinearExpr.Sum(
                 built.Lesson.Where(Function(kv) kv.Key.Period = 1 OrElse kv.Key.Period >= ScheduleQuality.AfternoonThresholdPeriod).
                              Select(Function(kv) kv.Value))
-            terms.Add(CLng(w.EdgePeriod) * edgeTerm)
         End If
-        If classAfternoonDayVars.Count > 0 Then terms.Add(CLng(w.AfternoonDayCount) * LinearExpr.Sum(classAfternoonDayVars))
-        If classRangeVars.Count > 0 Then terms.Add(CLng(w.ClassLoadVariance) * LinearExpr.Sum(classRangeVars))
-        If teacherRangeVars.Count > 0 Then terms.Add(CLng(w.TeacherLoadVariance) * LinearExpr.Sum(teacherRangeVars))
+        If classAfternoonDayVars.Count > 0 Then result.AfternoonSum = LinearExpr.Sum(classAfternoonDayVars)
+        If classRangeVars.Count > 0 Then result.ClassRangeSum = LinearExpr.Sum(classRangeVars)
+        If teacherRangeVars.Count > 0 Then result.TeacherRangeSum = LinearExpr.Sum(teacherRangeVars)
+        Return result
+    End Function
 
-        If terms.Count > 0 Then model.Minimize(terms.Aggregate(Function(a, b) a + b))
-    End Sub
+    ''' <summary>Die klassische gewichtete Gesamtzielfunktion ueber ALLE
+    ''' vorhandenen Terme - identische Gewichtung/Termreihenfolge wie
+    ''' ApplyQualityObjective vor der Review-Umsetzung. Nothing, wenn kein
+    ''' einziger Term existiert.</summary>
+    Friend Function WeightedTotal(terms As QualityTerms, w As QualityWeights) As LinearExpr
+        Dim parts As New List(Of LinearExpr)
+        If terms.KannSum IsNot Nothing Then parts.Add(CLng(w.Kann) * terms.KannSum)
+        If terms.ClassGapsSum IsNot Nothing Then parts.Add(CLng(w.ClassGaps) * terms.ClassGapsSum)
+        If terms.TeacherGapsSum IsNot Nothing Then parts.Add(CLng(w.TeacherGaps) * terms.TeacherGapsSum)
+        If terms.EdgeSum IsNot Nothing Then parts.Add(CLng(w.EdgePeriod) * terms.EdgeSum)
+        If terms.AfternoonSum IsNot Nothing Then parts.Add(CLng(w.AfternoonDayCount) * terms.AfternoonSum)
+        If terms.ClassRangeSum IsNot Nothing Then parts.Add(CLng(w.ClassLoadVariance) * terms.ClassRangeSum)
+        If terms.TeacherRangeSum IsNot Nothing Then parts.Add(CLng(w.TeacherLoadVariance) * terms.TeacherRangeSum)
+        If parts.Count = 0 Then Return Nothing
+        Return parts.Aggregate(Function(a, b) a + b)
+    End Function
+
+    ''' <summary>P2: die gewichtete Summe NUR der nicht lexikografisch
+    ''' gestuften Kriterien (EdgePeriod/AfternoonDayCount/Class-/
+    ''' TeacherLoadVariance) - Solver.SolveTops lexikografischer Modus
+    ''' minimiert sie als letzte Rest-Zielfunktion, nachdem Kann/ClassGaps/
+    ''' TeacherGaps stufenweise fixiert wurden. Nothing, wenn keines der
+    ''' vier Rest-Kriterien aktiv ist.</summary>
+    Friend Function WeightedResidual(terms As QualityTerms, w As QualityWeights) As LinearExpr
+        Dim parts As New List(Of LinearExpr)
+        If terms.EdgeSum IsNot Nothing Then parts.Add(CLng(w.EdgePeriod) * terms.EdgeSum)
+        If terms.AfternoonSum IsNot Nothing Then parts.Add(CLng(w.AfternoonDayCount) * terms.AfternoonSum)
+        If terms.ClassRangeSum IsNot Nothing Then parts.Add(CLng(w.ClassLoadVariance) * terms.ClassRangeSum)
+        If terms.TeacherRangeSum IsNot Nothing Then parts.Add(CLng(w.TeacherLoadVariance) * terms.TeacherRangeSum)
+        If parts.Count = 0 Then Return Nothing
+        Return parts.Aggregate(Function(a, b) a + b)
+    End Function
 
 End Module

@@ -269,6 +269,58 @@ an die Stelle, an der sie exakt berechenbar, erklaerbar und vom
 Anwender gewichtbar sind. Der Solver behaelt nur, was er beweisen
 kann.
 
+## Umsetzungsstand
+
+In derselben Session umgesetzt (Details in den Commit-Messages und den
+Doc-Kommentaren der betroffenen Module):
+
+- **P2** - `Solver.SolveTop` hat einen lexikografischen Modus
+  (`lexicographic:=True`, opt-in): Kann -> ClassGaps -> TeacherGaps als
+  einzeln beweisbare Stufen, Stufenoptimum als Constraint fixiert
+  (`lexTolerance` weitet das Band), Iterationen danach ueber die
+  gewichtete Rest-Zielfunktion. `SolveTopObjective` liefert dafuer die
+  Kriterien als einzelne ungewichtete Summen (`BuildQualityTerms`/
+  `WeightedTotal`/`WeightedResidual`); der gewichtete Modus bleibt
+  Default, weil die Stufenreihenfolge fix ist und sonst den per
+  `quality_weights` frei waehlbaren Prioritaetentausch aushebeln wuerde
+  (garantiert durch `SolveTopQualityWeightsInfluenceChosenSchedule`).
+- **P3** - `BlockSolution` setzt bei `minDiversity >= 1` zusaetzlich zum
+  exakten No-Good einen echten Distanz-Cut (`Sum(bisher wahre Vars) <=
+  Anzahl - d`); `rehintFoundSolutions:=False` schaltet das Re-Hinting
+  auf die jeweils letzte Loesung ab. Beide als `config.yaml`-Felder
+  (`min_diversity`/`rehint_found_solutions`) verfuegbar.
+- **R1** - doppelte `teacher_subject_assignment`-Tripel sind jetzt ein
+  harter `Validation.ValidateEntities`-Fehler; `SessionsFromAssignments`
+  dedupliziert zusaetzlich defensiv.
+- **R2** - `occupied_slot`/`required_slot` mit leerer Treffermenge
+  (Entity ohne Sessions, fehlende Zuweisung, Tag/Periode ausserhalb des
+  Rasters) sind jetzt Validierungsfehler statt stiller No-Ops.
+- **R3** - `QualityWeights.IncludeClassGaps` ergaenzt (strukturelles
+  Flag wie bei den uebrigen Kriterien), inkl. `config.yaml`-Feld.
+- **R4** - `ApplyConstraints` ist ein reiner Dispatcher; jeder
+  Constraint-Typ lebt in einer eigenen `ApplyXxx`-Methode.
+
+Offen aus der Empfehlungsliste bleiben P1 (occupied_slot-Batterien),
+P4/P5 (Scaffolding/Extraktion) und der Viewer-Ausbau (Empfehlung 6).
+
+**Live-Beleg** (`bw-grundschule-beispiel`, identisches 2-Min-Budget,
+`lexicographic: true`, `min_diversity: 8`, `rehint_found_solutions:
+false`):
+
+| | Vorher (Summenmodell, committeter Stand) | Nachher (lexikografisch + Distanz-Cuts) |
+|---|---|---|
+| CP-SAT-Status | Feasible, 71-74 % Luecke | Kann/ClassGaps/TeacherGaps **bewiesen optimal (0/0/0)** |
+| Gefundene Loesungen | 1-2 | **15** (Restkriterien aktiv) bzw. **30** (Restkriterien aus) |
+| Diversitaet | exakter No-Good (Ein-Slot-Nachbarn moeglich) | jede Loesung >= 8 Slots von jeder anderen entfernt |
+| Beste Quality.Total | 167-187 | 183.6 |
+| Muss-/Kann-Verstoesse | 0 / 0 | 0 / 0 |
+
+Der frueher zentrale Befund "Bound bewegt sich nicht" (Objective 178-199
+gegen Bound 51) ist damit fuer die drei gestuften Kriterien vollstaendig
+aufgeloest; eine (deutlich kleinere) unbewiesene Luecke verbleibt nur
+noch in der Rest-Zielfunktion der vier schwachen Kriterien. Testsuite:
+242 bestanden / 0 Regressionen (9 neue Tests fuer P2/P3/R1-R3).
+
 ## Priorisierte Empfehlungen
 
 | # | Massnahme | Aufwand | Wirkung |

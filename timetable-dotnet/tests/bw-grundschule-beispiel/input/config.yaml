@@ -5,11 +5,11 @@
 # FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
 # "CP-SAT-Status"-Feld in output/stundenplan.md.
 #
-# Kurzauftrag: Testlauf mit 2 Min Gesamtbudget (vorher 10 Min) - Test des
-# neu ins Template uebernommenen Stundentafel-Viewers (Lehrerstundenplan
-# + kaskadierender Klassenstufen/Lehrer-Filter) - siehe
-# per_solve_time_limit_s/stagnation_timeout_s unten fuer die Abstimmung
-# auf "moeglichst viele optimale UND unterschiedliche Loesungen".
+# Kurzauftrag (Code-Review-Umsetzung P2/P3): Live-Beleg fuer den neuen
+# lexikografischen Modus + echte Diversitaets-Cuts (siehe
+# lexicographic/min_diversity/rehint_found_solutions unten und
+# docs/code-review-cpsat-performance.md) - gleiches 2-Min-Gesamtbudget
+# wie der vorherige Lauf, damit die Ergebnisse vergleichbar bleiben.
 solve_time_limit_s: 120.0
 
 # Anzahl paralleler CP-SAT-Suchpfade (Portfolio-Threading). Hoeher kann
@@ -52,6 +52,26 @@ stagnation_timeout_s: 4.0
 # Feld (sondern das Zeitbudget) die begrenzende Groesse ist.
 max_solutions: 30
 
+# Code-Review-Umsetzung P2: lexikografischer Modus - Kann, ClassGaps und
+# TeacherGaps werden als einzeln beweisbare Stufen nacheinander optimiert
+# und ihr jeweiliges Optimum als Constraint fixiert; erst danach
+# enumerieren die Iterationen Alternativen innerhalb dieses Bands. Die
+# quality_weights der drei gestuften Kriterien steuern in diesem Modus
+# nur noch das nachgelagerte Ranking (die Stufenreihenfolge ist fix:
+# Kann > ClassGaps > TeacherGaps - fuer dieses Beispiel deckungsgleich
+# mit der bisherigen Gewichts-Prioritaet class_gaps >> teacher_gaps).
+# lex_tolerance 0 = jede exportierte Alternative ist exakt stufen-optimal.
+lexicographic: true
+lex_tolerance: 0
+
+# Code-Review-Umsetzung P3: jede weitere Loesung muss mindestens 8 der
+# bisher belegten Slots anders belegen (~5% der Gesamt-Wochenstunden) -
+# echte Alternativen statt Ein-Slot-Nachbarn. Dazu passend das
+# Re-Hinting auf die jeweils letzte Loesung aus (das ist eine
+# Aehnlichkeits-, keine Diversitaetsheuristik).
+min_diversity: 8
+rehint_found_solutions: false
+
 # Phase 2.24/2.25-Nachtrag-2: Springstunden (Luecken zwischen belegten
 # Stunden an einem Tag) fuer Klassen deutlich staerker gewichtet als fuer
 # Lehrkraefte - Nutzerentscheidung fuer dieses Beispiel, ClassGaps auf das
@@ -61,17 +81,27 @@ max_solutions: 30
 # einzelne Luecken-Variable berechnet wird, nicht wie die beiden Summen
 # gewichtet in die Zielfunktion einfliessen).
 #
-# Nutzerentscheidung: die vier verbleibenden Sekundaerkriterien
-# (Randstunden, Nachmittags-Tage, Klassen-/Lehrer-Tagesausgewogenheit)
-# sind fuer dieses Beispiel STRUKTURELL abgeschaltet (keine Hilfsvariablen
-# im CP-SAT-Modell, nicht nur Gewicht 0) - nur Kann/ClassGaps/TeacherGaps
-# fliessen noch in die Suche ein. ScheduleQuality.Score zeigt die echten
-# Werte dieser vier Kriterien in stundenplan.md/stundenplan.json trotzdem
-# weiterhin an (nur die SUCHE ist dafuer blind, nicht die Anzeige).
+# Code-Review-Umsetzung P2: die vier Sekundaerkriterien (Randstunden,
+# Nachmittags-Tage, Klassen-/Lehrer-Tagesausgewogenheit) sind im
+# lexikografischen Modus wieder AKTIV - sie bilden dort die
+# REST-Zielfunktion, die innerhalb des fixierten Stufen-Optimums
+# (Kann=0/ClassGaps=0/TeacherGaps=0) jede Iteration steuert. Unter dem
+# frueheren Summenmodell waren sie strukturell abgeschaltet, weil sie
+# die Bound-Beweise verwaesserten.
+#
+# Live gemessen (je volles 2-Min-Budget, ehrlicher Vergleich):
+# - Vorher (Summenmodell, committeter Stand): Feasible mit 71-74%
+#   Luecke, 1-2 Loesungen, beste Quality.Total 167-187.
+# - Lexikografisch, Restkriterien AUS: alle 3 Stufen bewiesen optimal
+#   (Objective=Bound=0), 30 disjunkt-diverse Loesungen - aber
+#   Quality.Total 312-345, komplett getrieben von den vier dann voellig
+#   ungesteuerten Kriterien.
+# - Lexikografisch, Restkriterien AN (dieser Stand): Stufen weiterhin
+#   fixiert auf 0/0/0, 15 diverse Loesungen, beste Quality.Total 183.6 -
+#   die Rest-Zielfunktion selbst bleibt pro Iteration Feasible (ihr
+#   eigenes Optimum im Band ist im 4s-Stagnation-Fenster nicht beweisbar),
+#   was aber nur noch die vier schwachen Kriterien betrifft, nie mehr
+#   Kann/ClassGaps/TeacherGaps.
 quality_weights:
   class_gaps: 1000.0
   teacher_gaps: 50.0
-  include_edge_period: false
-  include_afternoon_day_count: false
-  include_class_load_variance: false
-  include_teacher_load_variance: false

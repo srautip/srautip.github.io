@@ -55,6 +55,14 @@ Public NotInheritable Class QualityWeights
     ''' still sees the true count regardless of whether the solver
     ''' searched for it).</summary>
     Public Property IncludeTeacherGaps As Boolean = True
+    ''' <summary>Code-Review-Umsetzung (R3): dasselbe strukturelle An/Aus-
+    ''' Muster wie IncludeTeacherGaps, jetzt auch fuer ClassGaps - vorher
+    ''' das einzige Sekundaerkriterium OHNE Flag (es wurde immer gebaut).
+    ''' Default True - unveraendertes Verhalten fuer jede bestehende
+    ''' Schule ohne explizites Override. Beeinflusst wie alle Include*-
+    ''' Flags NICHT ScheduleQuality.Scores immer berechneten
+    ''' ClassGapCount.</summary>
+    Public Property IncludeClassGaps As Boolean = True
     ''' <summary>Same structural on/off pattern as IncludeTeacherGaps above,
     ''' extended to the remaining four secondary criteria (requested to let
     ''' a school opt out of ALL of them, e.g. when only Kann/ClassGaps/

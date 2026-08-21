@@ -62,6 +62,29 @@ Public NotInheritable Class RunConfig
     ''' changes WHEN a solution is accepted as proven-final, not just how
     ''' long a stagnant search runs.</summary>
     Public Property RelativeGapLimit As Double? = Nothing
+    ''' <summary>Code-Review-Umsetzung (P2): `true` aktiviert Solver.SolveTops
+    ''' lexikografischen Modus (Kann -> ClassGaps -> TeacherGaps als einzeln
+    ''' beweisbare Stufen, Optimum je Stufe als Constraint fixiert, danach
+    ''' Iterationen ueber die gewichtete Rest-Zielfunktion). Nothing/false =
+    ''' heutiger gewichteter Summenmodus. In diesem Modus steuern
+    ''' quality_weights nur noch Rest-Zielfunktion und Ranking, nicht mehr
+    ''' die relative Prioritaet der drei Stufen (deren Reihenfolge fix ist).</summary>
+    Public Property Lexicographic As Boolean? = Nothing
+    ''' <summary>P2: Toleranzband je fixierter Stufe (`<= Stufenoptimum +
+    ''' lex_tolerance`) - 0 (Default) haelt jede Stufe exakt auf ihrem
+    ''' gefundenen Optimum, ein kleiner Wert (z.B. 1) erlaubt den
+    ''' Folgestufen/der Diversitaets-Enumeration mehr Spielraum.</summary>
+    Public Property LexTolerance As Integer? = Nothing
+    ''' <summary>Code-Review-Umsetzung (P3): Mindestanzahl bisher belegter
+    ''' Slots, die jede WEITERE Loesung anders belegen muss (echter
+    ''' Distanz-Cut statt nur des exakten No-Goods). Nothing/0 = heutiges
+    ''' Verhalten; sinnvolle Werte liegen bei ~5-10% der Wochenstunden.</summary>
+    Public Property MinDiversity As Integer? = Nothing
+    ''' <summary>P3: `false` schaltet das Re-Hinting jeder Iteration auf die
+    ''' soeben gefundene Loesung ab (das ist eine Aehnlichkeits-Heuristik -
+    ''' fuer Laeufe, deren Ziel moeglichst VERSCHIEDENE Alternativen sind,
+    ''' abschalten). Nothing/true = heutiges Verhalten.</summary>
+    Public Property RehintFoundSolutions As Boolean? = Nothing
 End Class
 
 ''' <summary>Phase 2.24: die sieben Gewichte aus ScheduleQuality.
@@ -84,6 +107,9 @@ Public NotInheritable Class QualityWeightsConfig
     ''' Gewicht 0) - Sicherheitsventil fuer Schulen, bei denen selbst die
     ''' gefixte Kodierung noch zu teuer ist.</summary>
     Public Property IncludeTeacherGaps As Boolean? = Nothing
+    ''' <summary>Code-Review-Umsetzung (R3): gleiches Muster jetzt auch fuer
+    ''' ClassGaps - vorher das einzige Kriterium ohne strukturelles Flag.</summary>
+    Public Property IncludeClassGaps As Boolean? = Nothing
     ''' <summary>Gleiches strukturelles An/Aus-Muster wie IncludeTeacherGaps
     ''' oben, auf die verbleibenden vier Sekundaerkriterien erweitert -
     ''' Nothing -&gt; Default True (unveraendertes Verhalten) je Feld.</summary>
@@ -123,6 +149,7 @@ Public Module Run
         If cfg.ClassLoadVariance.HasValue Then w.ClassLoadVariance = cfg.ClassLoadVariance.Value
         If cfg.TeacherLoadVariance.HasValue Then w.TeacherLoadVariance = cfg.TeacherLoadVariance.Value
         If cfg.IncludeTeacherGaps.HasValue Then w.IncludeTeacherGaps = cfg.IncludeTeacherGaps.Value
+        If cfg.IncludeClassGaps.HasValue Then w.IncludeClassGaps = cfg.IncludeClassGaps.Value
         If cfg.IncludeEdgePeriod.HasValue Then w.IncludeEdgePeriod = cfg.IncludeEdgePeriod.Value
         If cfg.IncludeAfternoonDayCount.HasValue Then w.IncludeAfternoonDayCount = cfg.IncludeAfternoonDayCount.Value
         If cfg.IncludeClassLoadVariance.HasValue Then w.IncludeClassLoadVariance = cfg.IncludeClassLoadVariance.Value
@@ -245,10 +272,20 @@ Public Module Run
         Dim stagnationTimeoutS = If(cfg.StagnationTimeoutS.HasValue, cfg.StagnationTimeoutS, New Double?(45.0))
         Dim diversifySeed = If(cfg.DiversifySeed, True)
         Dim randomizeSearch = If(cfg.RandomizeSearch, True)
+        ' Code-Review-Umsetzung (P2/P3): Nothing loest jeweils zu SolveTops
+        ' eigenem Default auf (lexicographic=False, lex_tolerance=0,
+        ' min_diversity=0, rehint_found_solutions=True) - keine bestehende
+        ' Schule ohne diese config.yaml-Felder aendert ihr Verhalten.
+        Dim lexicographic = If(cfg.Lexicographic, False)
+        Dim lexTolerance = If(cfg.LexTolerance, 0)
+        Dim minDiversity = If(cfg.MinDiversity, 0)
+        Dim rehintFoundSolutions = If(cfg.RehintFoundSolutions, True)
         Dim topResult = Solver.SolveTop(data, maxSolutions:=cfg.MaxSolutions, totalTimeLimitS:=cfg.SolveTimeLimitS,
             perSolveTimeLimitS:=perSolveLimit, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers, qualityWeights:=qualityWeights,
             stagnationTimeoutS:=stagnationTimeoutS, diversifySeed:=diversifySeed, randomizeSearch:=randomizeSearch,
-            relativeGapLimit:=cfg.RelativeGapLimit)
+            relativeGapLimit:=cfg.RelativeGapLimit,
+            lexicographic:=lexicographic, lexTolerance:=lexTolerance,
+            minDiversity:=minDiversity, rehintFoundSolutions:=rehintFoundSolutions)
         Dim solveOk = topResult.Solutions.Count > 0
         If Not solveOk Then
             IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.md"),
