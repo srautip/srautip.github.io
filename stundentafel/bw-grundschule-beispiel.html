@@ -35,9 +35,11 @@
     color: #000;
   }
   #table-container {
-    overflow: auto;
-    max-height: 85vh;
+    overflow: hidden;
     border: 1px solid #ccc;
+  }
+  #table-container table {
+    transform-origin: top left;
   }
   table {
     border-collapse: collapse;
@@ -166,10 +168,34 @@
       document.getElementById('meta').textContent =
         data.tage.join(', ') + ' | ' + data.periods_per_day + ' Stunden/Tag | Stop-Grund: ' + data.stop_reason;
 
-      var stufeColors = data.klassenstufen.map(function (_, i) {
-        var hue = Math.round((360 * i) / Math.max(data.klassenstufen.length, 1));
-        return 'hsl(' + hue + ', 65%, 87%)';
-      });
+      // Parallelklassen (gleiche Klassenstufe, unterschiedliche Zeilen-
+      // Position rowIndex) bekommen denselben Farbton (hue), aber
+      // abgestufte Helligkeit (-10 Prozentpunkte je weiterer
+      // Parallelklasse) - so bleiben sie auf einen Blick unterscheidbar,
+      // ohne die Klassenstufen-Zuordnung (hue) zu verlieren.
+      function stufeColor(stufeIndex, rowIndex) {
+        var hue = Math.round((360 * stufeIndex) / Math.max(data.klassenstufen.length, 1));
+        var lightness = 87 - rowIndex * 10;
+        if (lightness < 40) lightness = 40;
+        return 'hsl(' + hue + ', 65%, ' + lightness + '%)';
+      }
+
+      var lastTable = null;
+      function fitTable() {
+        if (!lastTable) return;
+        var container = document.getElementById('table-container');
+        lastTable.style.transform = 'none';
+        var natW = lastTable.scrollWidth;
+        var natH = lastTable.scrollHeight;
+        var top = container.getBoundingClientRect().top;
+        var availH = Math.max(window.innerHeight - top - 12, 50);
+        container.style.height = availH + 'px';
+        var availW = container.clientWidth;
+        var scale = Math.min(availW / natW, availH / natH);
+        if (!isFinite(scale) || scale <= 0) scale = 1;
+        lastTable.style.transform = 'scale(' + scale + ')';
+      }
+      window.addEventListener('resize', fitTable);
 
       var select = document.getElementById('solution-select');
       data.solutions.forEach(function (sol, i) {
@@ -319,6 +345,8 @@
         var container = document.getElementById('table-container');
         var vks = visibleKlassenstufen();
         if (vks.length === 0) {
+          lastTable = null;
+          container.style.height = '';
           container.innerHTML = '';
           var msg = document.createElement('div');
           msg.style.padding = '1rem';
@@ -348,7 +376,7 @@
           vks.forEach(function (entry) {
             var th = document.createElement('th');
             th.textContent = entry.ks.bezeichnung;
-            th.style.backgroundColor = stufeColors[entry.index];
+            th.style.backgroundColor = stufeColor(entry.index, 0);
             th.style.color = '#000';
             headRow2.appendChild(th);
           });
@@ -378,7 +406,7 @@
                 if (klasse === null || !cell) {
                   td.className = 'leer';
                 } else {
-                  td.style.backgroundColor = stufeColors[entry.index];
+                  td.style.backgroundColor = stufeColor(entry.index, rowIndex);
                   td.innerHTML = cellContentHtml(klasse, cell);
                 }
                 tr.appendChild(td);
@@ -391,6 +419,8 @@
 
         container.innerHTML = '';
         container.appendChild(table);
+        lastTable = table;
+        fitTable();
       }
 
       if (data.solutions.length > 0) {
