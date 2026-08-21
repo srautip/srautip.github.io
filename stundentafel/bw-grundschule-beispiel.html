@@ -255,6 +255,7 @@
         checkbox.addEventListener('change', function () {
           stufeVisible[ksIndex] = checkbox.checked;
           updateFilterBtnLabel();
+          syncLehrerFilterToStufen();
           render(parseInt(select.value, 10));
         });
         label.appendChild(checkbox);
@@ -273,23 +274,30 @@
         }
       });
 
-      // Lehrerliste wird aus ALLEN Loesungen zusammengefuehrt (nicht nur
-      // der aktuell gewaehlten) - teacher_subject_assignment ist bereits
-      // vor SolveTop fest zugeordnet, die Lehrkraefte-Menge ist deshalb
-      // ueber alle Loesungen identisch; die Union macht das robust auch
-      // ohne diese Annahme zu erzwingen. Zellen mit mehreren gleichzeitig
-      // unterrichtenden Lehrkraeften (Parallelgruppen, z.B. "Ethiklehrer-1
-      // / Religionslehrer-ev-1 / ...") werden auf ihre einzelnen Namen
-      // aufgeteilt, damit jede Lehrkraft im Filter einzeln waehlbar ist.
+      // Lehrerliste UND Klasse->Lehrer-Zuordnung werden aus ALLEN Loesungen
+      // zusammengefuehrt (nicht nur der aktuell gewaehlten) -
+      // teacher_subject_assignment ist bereits vor SolveTop fest
+      // zugeordnet, die Lehrkraefte-Menge ist deshalb ueber alle Loesungen
+      // identisch; die Union macht das robust auch ohne diese Annahme zu
+      // erzwingen. Zellen mit mehreren gleichzeitig unterrichtenden
+      // Lehrkraeften (Parallelgruppen, z.B. "Ethiklehrer-1 / Religions-
+      // lehrer-ev-1 / ...") werden auf ihre einzelnen Namen aufgeteilt,
+      // damit jede Lehrkraft im Filter einzeln waehlbar ist UND korrekt
+      // ihrer jeweiligen Klasse zugeordnet wird (classTeachers).
       var teacherSet = {};
+      var classTeachers = {};
       data.solutions.forEach(function (sol) {
         Object.keys(sol.classes).forEach(function (klasse) {
           var perClass = sol.classes[klasse];
+          if (!classTeachers[klasse]) classTeachers[klasse] = {};
           data.tage.forEach(function (tag) {
             for (var p = 1; p <= data.periods_per_day; p++) {
               var cell = perClass[tag] ? perClass[tag][String(p)] : null;
               if (cell && cell.teacher) {
-                cell.teacher.split(' / ').forEach(function (t) { teacherSet[t] = true; });
+                cell.teacher.split(' / ').forEach(function (t) {
+                  teacherSet[t] = true;
+                  classTeachers[klasse][t] = true;
+                });
               }
             }
           });
@@ -298,6 +306,7 @@
       var allTeachers = Object.keys(teacherSet).sort();
 
       var lehrerVisible = {};
+      var lehrerCheckboxes = {};
       allTeachers.forEach(function (t) { lehrerVisible[t] = true; });
       var lehrerFilterBtn = document.getElementById('lehrer-filter-btn');
       var lehrerFilterMenu = document.getElementById('lehrer-filter-menu');
@@ -305,6 +314,28 @@
       function updateLehrerFilterBtnLabel() {
         var count = allTeachers.filter(function (t) { return lehrerVisible[t]; }).length;
         lehrerFilterBtn.textContent = 'Lehrkraefte (' + count + '/' + allTeachers.length + ') ▾';
+      }
+
+      // Wird vom Klassenstufen-Filter aufgerufen (siehe Checkbox-Handler
+      // oben): setzt die Lehrer-Auswahl komplett neu auf genau die
+      // Lehrkraefte, die in einer der aktuell sichtbaren Klassenstufen
+      // unterrichten - ueberschreibt eine vorherige manuelle
+      // Lehrer-Auswahl bewusst, wie angefragt ("Lehrer auf alle in den
+      // gefilterten Klassenstufen enthaltenen Lehrer gefiltert").
+      function syncLehrerFilterToStufen() {
+        var relevant = {};
+        visibleKlassenstufen().forEach(function (entry) {
+          entry.ks.klassen.forEach(function (klasse) {
+            if (klasse === null || !classTeachers[klasse]) return;
+            Object.keys(classTeachers[klasse]).forEach(function (t) { relevant[t] = true; });
+          });
+        });
+        allTeachers.forEach(function (t) {
+          var visible = !!relevant[t];
+          lehrerVisible[t] = visible;
+          if (lehrerCheckboxes[t]) lehrerCheckboxes[t].checked = visible;
+        });
+        updateLehrerFilterBtnLabel();
       }
 
       allTeachers.forEach(function (t) {
@@ -320,6 +351,7 @@
         label.appendChild(checkbox);
         label.appendChild(document.createTextNode(t));
         lehrerFilterMenu.appendChild(label);
+        lehrerCheckboxes[t] = checkbox;
       });
       updateLehrerFilterBtnLabel();
 
