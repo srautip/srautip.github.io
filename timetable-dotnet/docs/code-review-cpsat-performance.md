@@ -327,12 +327,29 @@ Doc-Kommentaren der betroffenen Module):
   140 eingesparten reifizierten Constraints und einer kompletten
   eingesparten Stufe; die Dichte ist jetzt abwaegbar statt hart (1/21
   spaete Cutoff-Iteration mit Defizit 6 landete als Rang 21/21 am
-  Listenende, die ClassGaps-Stufe hielt auch dort). Der eigentliche
-  Bound-Gewinn wird bei der ~5x groesseren GMS-Batterie erwartet -
-  deren Umstellung steht noch aus.
+  Listenende, die ClassGaps-Stufe hielt auch dort).
 
-Offen aus der Empfehlungsliste bleiben die Umstellung der
-GMS-occupied_slot-Batterie auf `occupied_window`, P4/P5
+  **GMS-Umstellung (720 -> 24 Regeln, 5-Min-Vergleich)** - ehrliches,
+  differenzierteres Ergebnis als an der Grundschule: der Modell-/
+  Datengewinn ist real (720 Kann-BoolVars + 720 reifizierte Constraints
+  entfallen, constraints.yaml 5492 -> 622 Zeilen, ~30-60s weniger
+  Laufzeit pro Runde), aber (1) die Bound-Schwaeche des Szenarios blieb
+  bei diesem Budget in BEIDEN Varianten identisch (Bound 0, 100%
+  Luecke) - sie lag also nicht primaer an der Batterie-Kodierung,
+  sondern an der grossen gewichteten Rest-Zielfunktion des Szenarios
+  selbst - und (2) die Batterie profitierte von ihrer eigenen
+  Kann-STUFE (dediziertes 60s-Budget + hartes Band): 8 unbelegte
+  Fenster-Slots gegen 26-35 (Dichte-Gewicht 100) bzw. 13-19 (500) ohne
+  eigene Stufe. Der P1-Hypothese "Batterie = Bound-Killer" haelt der
+  GMS-Kurztest damit nicht stand; bestaetigt ist der Kompaktheits- und
+  Wartbarkeitsgewinn. Naheliegender Folgeschritt: eine opt-in
+  Dichte-STUFE analog `lex_teacher_gaps_stage` (dediziertes Budget +
+  Band fuer die Fensterdichte, ohne zur Batterie zurueckzukehren) plus
+  ein langer Lauf (>= 30 Min) mit der neuen Kodierung. Alle Messwerte
+  im Kommentar der GMS-config.yaml.
+
+Offen aus der Empfehlungsliste bleiben die opt-in-Dichte-Stufe samt
+langem GMS-Lauf (siehe P1-GMS-Befund oben), P4/P5
 (Scaffolding/Extraktion) und der Viewer-Ausbau (Empfehlung 6).
 
 **Live-Beleg** (`bw-grundschule-beispiel`, identisches 2-Min-Budget,
