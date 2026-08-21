@@ -233,6 +233,27 @@ Public Module Verifier
                             $"{requiredClassName}/{requiredSubject} findet nicht im geforderten Slot {requiredDay}/{requiredPeriod} statt", c)))
                     End If
 
+                Case "occupied_slot"
+                    ' Unabhaengig re-derivierte Gegenpruefung zum Solver.vb-
+                    ' Case "occupied_slot" (teilt keinen Code) - genau die
+                    ' Negation von forbidden_slot's Pruefung oben: statt
+                    ' "hat der/die Entity dort Unterricht?" (Verstoss wenn
+                    ' JA) hier "hat der/die Entity dort KEINEN Unterricht?"
+                    ' (Verstoss wenn KEINE passende Zeile existiert).
+                    Dim occScope = JsonHelpers.GetString(c, "scope")
+                    Dim occEntity = JsonHelpers.GetString(c, "entity")
+                    Dim occDay = JsonHelpers.GetString(c, "day")
+                    Dim occPeriod = JsonHelpers.GetInt(c, "period").Value
+                    Dim occFound As Boolean
+                    Select Case occScope
+                        Case "class" : occFound = Find(schedule, cls:=occEntity, day:=occDay, period:=occPeriod).Any()
+                        Case "teacher" : occFound = Find(schedule, teacher:=occEntity, day:=occDay, period:=occPeriod).Any()
+                        Case Else : occFound = True ' unbekannter scope -> nichts zu pruefen, kein falscher Verstoss
+                    End Select
+                    If Not occFound Then
+                        violations.Add((i, t, WithReason($"{occEntity} ({occScope}) hat KEINEN Unterricht im geforderten Slot {occDay}/{occPeriod}", c)))
+                    End If
+
                 Case "consecutive_required"
                     Dim className = JsonHelpers.GetString(c, "class")
                     Dim subject = JsonHelpers.GetString(c, "subject")

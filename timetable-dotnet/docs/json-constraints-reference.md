@@ -73,10 +73,10 @@ Optionales Feld `"priority"` auf einem Constraint-Objekt:
 | `"must"` (Default, auch wenn das Feld ganz fehlt) | Hart - darf im Ergebnis nie verletzt sein; eine unerfüllbare Kombination aus Muss-Constraints macht das gesamte Szenario `Infeasible`. |
 | `"should"` | Weich ("Kann") - der Solver versucht, die Regel einzuhalten, darf sie aber verletzen, um überhaupt einen Plan zu finden. Die Anzahl verletzter `should`-Constraints wird minimiert (jede verletzte Regel zählt gleich 1, unabhängig davon, wie viele Slots sie betrifft). |
 
-**Nur diese sechs Typen dürfen `"should"` sein:**
+**Nur diese sieben Typen dürfen `"should"` sein:**
 `teacher_availability`, `forbidden_slot`, `required_slot` (Phase 2.23),
-`room_requirement`, `consecutive_required`, sowie **nur der
-`max_per_day`-Teil** von `weekly_hours` (die `hours_per_week`-Exaktzahl
+`occupied_slot`, `room_requirement`, `consecutive_required`, sowie **nur
+der `max_per_day`-Teil** von `weekly_hours` (die `hours_per_week`-Exaktzahl
 bleibt immer hart - ein Fach mit z.B. `"should"` aber ohne gesetztes
 `max_per_day` ist ein Validierungsfehler, da es dann nichts gäbe, das
 gelockert werden könnte).
@@ -348,6 +348,43 @@ Lehrkraft/Raum ab) adressiert `required_slot` ausschließlich eine
 (Klasse,Fach)-Session - Feldnamen `class`/`subject` wie bei den meisten
 übrigen Constraint-Typen, damit die bestehende generische
 Cross-Reference-Validierung automatisch greift.
+
+---
+
+### `occupied_slot`
+
+Das fachunabhängige Geschwister von `required_slot`: erzwingt (statt einer
+konkreten (Klasse,Fach)-Session) nur, dass IRGENDEINE Unterrichtsstunde
+der Klasse oder Lehrkraft an diesem Tag+Periode-Slot stattfindet - welches
+Fach das ist, bleibt dem Solver überlassen. Typischer Anwendungsfall:
+eine durchgängige zeitliche Belegung ohne Bezug auf ein bestimmtes Fach
+(z.B. "Klasse 1a soll täglich in der 2.-4. Stunde belegt sein").
+`required_slot` kann das nicht ausdrücken - es pinnt genau EINE benannte
+Session, während hier "mindestens eine von möglicherweise mehreren
+Sessions" gemeint ist (eine ODER-Verknüpfung über alle Sessions der
+Klasse/Lehrkraft an diesem Slot).
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `scope` | `"class"`\|`"teacher"` | ja |
+| `entity` | string | ja |
+| `day` | string | ja |
+| `period` | int | ja |
+| `priority` | `"must"`\|`"should"` | nein |
+| `reason` | string | nein |
+
+```json
+{ "type": "occupied_slot", "scope": "class", "entity": "1a", "day": "Mo", "period": 2, "priority": "should" }
+```
+
+Anders als `forbidden_slot`/`no_overlap` unterstützt `occupied_slot`
+bewusst KEIN `scope: "room"` - "ein Raum soll belegt sein" ist kein
+sinnvoll äquivalenter Anwendungsfall, und ein akzeptierter, aber
+wirkungsloser Wert würde den Constraint dort stillschweigend zu keiner
+Wirkung im Modell führen (die generische "unbekannte Entity"-Falle, die
+`Validation.vb`s Kopfkommentar an anderer Stelle bereits warnt) - deshalb
+ist `room` hier ein harter Validierungsfehler statt eines akzeptierten,
+aber leeren Werts.
 
 ---
 

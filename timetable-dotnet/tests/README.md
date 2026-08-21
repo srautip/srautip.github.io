@@ -45,9 +45,13 @@ Die Pipeline hat zwei Stufen (siehe `docs/arc42-architecture.md` Abschnitt
    `teacher_subject_assignment`/`weekly_hours`/`consecutive_required`/
    `no_overlap`-Regeln übersetzt. `constraints.yaml` ergänzt NUR
    handverfasste Regeln, die Stufe 1 nicht abdeckt - `teacher_availability`,
-   `forbidden_slot`, `room_requirement` (Raumbindung ist bislang NICHT aus
+   `forbidden_slot`, `required_slot` (Fach-Slot erzwingen/bevorzugen),
+   `occupied_slot` (fach-unabhängig: irgendeine Stunde der Klasse/Lehrkraft
+   soll diesen Slot belegen - z.B. für eine durchgängige zeitliche Belegung
+   ohne Fachbezug), `room_requirement` (Raumbindung ist bislang NICHT aus
    den Stammdaten ableitbar, siehe `Raum`-Kopfkommentar in
-   `TimetableCore/Stammdaten.vb`), und ad-hoc `consecutive_required`.
+   `TimetableCore/Stammdaten.vb`), und ad-hoc `consecutive_required`. Volle
+   Feldreferenz für alle Constraint-Typen: `docs/json-constraints-reference.md`.
    **Nicht** hier hineinschreiben: `teacher_subject_assignment`/
    `weekly_hours.hours_per_week` - die kommen ausschließlich aus Stufe 1.
 
@@ -587,7 +591,11 @@ endnutzerorientierter Überblick über beide Beispiele steht außerdem in
   einen `required_slot`-Regel (Chor donnerstags 6. Stunde für alle
   Klassen gleichzeitig, Phase 2.23) sowie (Phase 2.19/2.20) einen
   `schueler:`/`gruppen:`-Block in `stammdaten.yaml` für klassenstufen-
-  übergreifende Religion-ev-/Religion-kath-/Ethik- und Chor-Gruppen.
+  übergreifende Religion-ev-/Religion-kath-/Ethik- und Chor-Gruppen. 140
+  weitere `occupied_slot`-Kann-Regeln sorgen für eine durchgängige
+  zeitliche Belegung (Klasse 1/2 soll täglich Stunde 2-4 belegt sein,
+  Klasse 3/4 Stunde 2-5) - fach-unabhängig, im Gegensatz zum obigen
+  `required_slot`.
 
 - **`tests/bw-gms-beispiel/`** (6 Klassenstufen [5-10], 12 Klassen, 8
   Klassenlehrer über 3 Zwei-Fächer-Pools verteilt, BW-Gemeinschaftsschule):

@@ -594,3 +594,988 @@
   day: Do
   period: 6
   reason: Chor-Gesamtprobe donnerstags 6. Stunde fuer alle Klassenstufen (ueber parallel_group synchronisiert)
+
+# Kann-Constraints (priority: should) fuer konsistente, durchgaengige
+# zeitliche Belegung: Klasse 1/2 soll taeglich die 2.-4. Stunde belegt
+# sein, Klasse 3/4 die 2.-5. Stunde - unabhaengig vom jeweiligen Fach
+# (occupied_slot, im Gegensatz zu required_slot fach-unabhaengig).
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Mo
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Mo
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Mo
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Di
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Di
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Di
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Mi
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Mi
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Mi
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Do
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Do
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Do
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Fr
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Fr
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1a
+  day: Fr
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Mo
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Mo
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Mo
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Di
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Di
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Di
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Mi
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Mi
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Mi
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Do
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Do
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Do
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Fr
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Fr
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 1b
+  day: Fr
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Mo
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Mo
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Mo
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Di
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Di
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Di
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Mi
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Mi
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Mi
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Do
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Do
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Do
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Fr
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Fr
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2a
+  day: Fr
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Mo
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Mo
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Mo
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Di
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Di
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Di
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Mi
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Mi
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Mi
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Do
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Do
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Do
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Fr
+  period: 2
+  priority: should
+  reason: "1./2. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Fr
+  period: 3
+  priority: should
+  reason: "1./2. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 2b
+  day: Fr
+  period: 4
+  priority: should
+  reason: "1./2. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Mo
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Mo
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Mo
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Mo
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Di
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Di
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Di
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Di
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Mi
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Mi
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Mi
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Mi
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Do
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Do
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Do
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Do
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Fr
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Fr
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Fr
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3a
+  day: Fr
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Mo
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Mo
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Mo
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Mo
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Di
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Di
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Di
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Di
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Mi
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Mi
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Mi
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Mi
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Do
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Do
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Do
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Do
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Fr
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Fr
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Fr
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 3b
+  day: Fr
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Mo
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Mo
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Mo
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Mo
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Di
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Di
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Di
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Di
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Mi
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Mi
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Mi
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Mi
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Do
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Do
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Do
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Do
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Fr
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Fr
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Fr
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4a
+  day: Fr
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Mo
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Mo
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Mo
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Mo
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Di
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Di
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Di
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Di
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Mi
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Mi
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Mi
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Mi
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Do
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Do
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Do
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Do
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Fr
+  period: 2
+  priority: should
+  reason: "3./4. Klasse soll 2. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Fr
+  period: 3
+  priority: should
+  reason: "3./4. Klasse soll 3. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Fr
+  period: 4
+  priority: should
+  reason: "3./4. Klasse soll 4. Stunde taeglich belegt sein"
+- type: occupied_slot
+  scope: class
+  entity: 4b
+  day: Fr
+  period: 5
+  priority: should
+  reason: "3./4. Klasse soll 5. Stunde taeglich belegt sein"

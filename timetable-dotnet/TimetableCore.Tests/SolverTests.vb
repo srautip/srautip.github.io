@@ -188,6 +188,74 @@ Public Class SolverTests
         Assert.AreEqual(reasonText, r.KannConstraintFlags(0).Reason)
     End Sub
 
+    ''' <summary>occupied_slot is the subject-agnostic sibling of
+    ''' required_slot: it forces SOME session of a class/teacher (any
+    ''' subject) onto an exact (day,period), instead of pinning one named
+    ''' (class,subject) session like required_slot does. 2 subjects share
+    ''' class "5a" here - occupied_slot only cares that SOME lesson lands
+    ''' on Mo/period1, not which one.</summary>
+    <TestMethod>
+    Public Sub OccupiedSlotForcesAnySessionOntoExactSlot()
+        Dim ent = Mini({"5a"}, {"T1"}, {"Mathe", "Deutsch"}, {}, {"Mo", "Di"}, 2)
+        Dim data = Scenario(ent, {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Deutsch"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "no_overlap"}, {"resource", "class"}, {"entity", "5a"}},
+            New JsonObject From {{"type", "occupied_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Deutsch"}}
+        })
+        Dim r = Solver.Solve(data)
+        Assert.IsTrue(IsFeasibleOrOptimal(r.Status), Solver.StatusName(r.Status))
+        Assert.AreEqual(2, r.Schedule.Count)
+        Assert.IsTrue(r.Schedule.Any(Function(l) l.Day = "Mo" AndAlso l.Period = 1),
+            "Some lesson of 5a should occupy Mo/period1 - occupied_slot doesn't care which subject.")
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, r.Schedule).Count)
+    End Sub
+
+    ''' <summary>An occupied_slot that directly contradicts a Muss
+    ''' forbidden_slot on the same slot is Infeasible - marking the
+    ''' occupied_slot "should" relaxes it to Optimal, with the session
+    ''' placed on the only remaining open slot and exactly 1 Kann violation
+    ''' carrying the constraint's reason.</summary>
+    <TestMethod>
+    Public Sub KannOccupiedSlotRelaxesConflictWithMussForbiddenSlot()
+        Dim mustData = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}},
+            New JsonObject From {{"type", "occupied_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim rMust = Solver.Solve(mustData)
+        Assert.AreEqual(CpSolverStatus.Infeasible, rMust.Status, Solver.StatusName(rMust.Status))
+
+        Dim reasonText = "1./2. Klasse soll Stunde 2-4 taeglich belegt sein"
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}},
+            New JsonObject From {{"type", "occupied_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1},
+                {"priority", "should"}, {"reason", reasonText}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim r = Solver.Solve(data)
+        Assert.IsTrue(IsFeasibleOrOptimal(r.Status), Solver.StatusName(r.Status))
+        Assert.AreEqual(1, r.Schedule.Count)
+        Assert.AreEqual(2, r.Schedule(0).Period)
+
+        Dim detail = Verifier.VerifyScheduleDetailed(data, r.Schedule)
+        Assert.AreEqual(0, detail.MussViolations.Count, String.Join(vbLf, detail.MussViolations))
+        Assert.AreEqual(1, detail.KannViolations.Count)
+        Assert.AreEqual("occupied_slot", detail.KannViolations(0).ConstraintType)
+        Assert.AreEqual(reasonText, detail.KannViolations(0).Reason)
+        StringAssert.Contains(detail.KannViolations(0).Message, "Regel-Herkunft")
+        StringAssert.Contains(detail.KannViolations(0).Message, reasonText)
+
+        Assert.IsNotNull(r.KannConstraintFlags)
+        Assert.AreEqual(1, r.KannConstraintFlags.Count)
+        Assert.IsTrue(r.KannConstraintFlags(0).Relaxed)
+        Assert.AreEqual(reasonText, r.KannConstraintFlags(0).Reason)
+    End Sub
+
     <TestMethod>
     Public Sub ConsecutiveRequiredFormsABlock()
         Dim ent = Mini({"5a"}, {"T1"}, {"Chemie"}, {}, {"Mo"}, 3)
@@ -670,6 +738,35 @@ Public Class SolverTests
         Dim dataChecked = DirectCast(data.DeepClone(), JsonObject)
         dataChecked("constraints").AsArray().Add(
             New JsonObject From {{"type", "required_slot"}, {"class", "5a"}, {"subject", "Mathe"}, {"day", "Di"}, {"period", 1}, {"reason", reasonText}})
+
+        Dim violations = Verifier.VerifySchedule(dataChecked, r.Schedule)
+        Assert.AreEqual(1, violations.Count, String.Join(vbLf, violations))
+        StringAssert.Contains(violations(0), "Regel-Herkunft")
+        StringAssert.Contains(violations(0), reasonText)
+    End Sub
+
+    ''' <summary>Same independence proof as
+    ''' VerifierDetectsRequiredSlotViolationIndependently, for the new
+    ''' "occupied_slot" Case - a solved schedule the Solver was never told
+    ''' needs occupancy on a specific slot, then an occupied_slot appended
+    ''' afterward to a DeepClone'd data copy (never seen by Solver.Solve)
+    ''' is independently detected as unmet.</summary>
+    <TestMethod>
+    Public Sub VerifierDetectsOccupiedSlotViolationIndependently()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 1), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim r = Solver.Solve(data)
+        Assert.IsTrue(IsFeasibleOrOptimal(r.Status), Solver.StatusName(r.Status))
+        Assert.AreEqual(1, r.Schedule.Count)
+        Assert.AreEqual("Mo", r.Schedule(0).Day)
+        Assert.AreEqual(1, r.Schedule(0).Period)
+
+        Dim reasonText = "1./2. Klasse soll Stunde 2-4 taeglich belegt sein"
+        Dim dataChecked = DirectCast(data.DeepClone(), JsonObject)
+        dataChecked("constraints").AsArray().Add(
+            New JsonObject From {{"type", "occupied_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Di"}, {"period", 1}, {"reason", reasonText}})
 
         Dim violations = Verifier.VerifySchedule(dataChecked, r.Schedule)
         Assert.AreEqual(1, violations.Count, String.Join(vbLf, violations))
