@@ -193,4 +193,61 @@ Public Class VerifyLehrereinsatzTests
         Assert.IsTrue(violations.Any(Function(v) v.Contains("Lehrer A/1a/Deutsch") AndAlso v.Contains("keine Zuweisung fuer 1a/Deutsch im Ergebnis gefunden")), String.Join(vbLf, violations))
     End Sub
 
+    ' Phase 2.27: FesteZuordnung-Erweiterung auf Gruppen-gefuehrte Faecher -
+    ' klasse_name traegt hier den Gruppennamen; result.Zuweisungen ist laut
+    ' bestehender Dokumentation IMMER Gruppen-EXPANDIERT (eine Zeile pro real
+    ' umspannter Klasse), der Kanarienvogel muss deshalb ALLE von
+    ' Stammdaten.KlassenOfGruppe gelieferten Klassen pruefen. Wiederverwendet
+    ' die bereits bestehende BestandMitGruppe()-Helper-Funktion (1a+1b,
+    ' Gruppe "Deutsch-Gruppe-Kl1", Lehrer A UND B beide fuer Deutsch
+    ' qualifiziert).
+
+    <TestMethod>
+    Public Sub FesteZuordnungOnGruppeHonoredProducesNoViolation()
+        Dim b = BestandMitGruppe()
+        b.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Lehrer A", .KlasseName = "Deutsch-Gruppe-Kl1", .FachName = "Deutsch"})
+        Dim result As New LehrereinsatzResult With {
+            .Zuweisungen = New List(Of LehrereinsatzZuweisung) From {
+                New LehrereinsatzZuweisung With {.Lehrer = "Lehrer A", .Klasse = "1a", .Fach = "Deutsch"},
+                New LehrereinsatzZuweisung With {.Lehrer = "Lehrer A", .Klasse = "1b", .Fach = "Deutsch"}
+            },
+            .Klassenlehrer = New Dictionary(Of String, String)
+        }
+        Assert.AreEqual(0, Verifier.VerifyLehrereinsatz(b, result).Count)
+    End Sub
+
+    ''' <summary>Simuliert einen Bug: der Gruppen-Pin verlangt Lehrer A fuer
+    ''' ALLE real umspannten Klassen, das Ergebnis weist aber fuer 1b Lehrer
+    ''' B zu.</summary>
+    <TestMethod>
+    Public Sub FesteZuordnungOnGruppeViolatedByDifferentTeacherIsDetected()
+        Dim b = BestandMitGruppe()
+        b.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Lehrer A", .KlasseName = "Deutsch-Gruppe-Kl1", .FachName = "Deutsch"})
+        Dim result As New LehrereinsatzResult With {
+            .Zuweisungen = New List(Of LehrereinsatzZuweisung) From {
+                New LehrereinsatzZuweisung With {.Lehrer = "Lehrer A", .Klasse = "1a", .Fach = "Deutsch"},
+                New LehrereinsatzZuweisung With {.Lehrer = "Lehrer B", .Klasse = "1b", .Fach = "Deutsch"}
+            },
+            .Klassenlehrer = New Dictionary(Of String, String)
+        }
+        Dim violations = Verifier.VerifyLehrereinsatz(b, result)
+        Assert.IsTrue(violations.Any(Function(v) v.Contains("Lehrer A/Deutsch-Gruppe-Kl1/Deutsch") AndAlso v.Contains("tatsaechlich zugewiesen ist 'Lehrer B'") AndAlso v.Contains("1b")), String.Join(vbLf, violations))
+    End Sub
+
+    ''' <summary>Gruppen-Pin existiert, aber das Ergebnis enthaelt fuer eine
+    ''' der real umspannten Klassen (1b) gar keine Zuweisung.</summary>
+    <TestMethod>
+    Public Sub FesteZuordnungOnGruppeWithMissingAssignmentIsDetected()
+        Dim b = BestandMitGruppe()
+        b.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Lehrer A", .KlasseName = "Deutsch-Gruppe-Kl1", .FachName = "Deutsch"})
+        Dim result As New LehrereinsatzResult With {
+            .Zuweisungen = New List(Of LehrereinsatzZuweisung) From {
+                New LehrereinsatzZuweisung With {.Lehrer = "Lehrer A", .Klasse = "1a", .Fach = "Deutsch"}
+            },
+            .Klassenlehrer = New Dictionary(Of String, String)
+        }
+        Dim violations = Verifier.VerifyLehrereinsatz(b, result)
+        Assert.IsTrue(violations.Any(Function(v) v.Contains("Lehrer A/Deutsch-Gruppe-Kl1/Deutsch") AndAlso v.Contains("keine Zuweisung fuer 1b/Deutsch im Ergebnis gefunden")), String.Join(vbLf, violations))
+    End Sub
+
 End Class

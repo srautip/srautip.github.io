@@ -258,21 +258,28 @@ sich die Planung exakt wie bisher.
 
 - `lehrer_name` - Name der Lehrkraft (muss in `lehrkraefte[]` existieren
   UND laut `fach_lehrer_zuordnungen` für `fach_name` qualifiziert sein).
-- `klasse_name` - Name der Klasse (muss in `klassen[]` existieren -
-  Gruppen-geführte Fächer werden in dieser Version noch nicht
-  unterstützt).
+- `klasse_name` - Name einer Klasse (muss in `klassen[]` existieren) ODER
+  seit Phase 2.27 der Name einer aktiven Gruppe (muss in `gruppen[]`
+  existieren, dort `fach_name`/`klassenstufe` gesetzt haben - siehe
+  `gruppen[]` oben). Klassen und Gruppen teilen sich einen Namensraum,
+  welche Variante gemeint ist wird automatisch erkannt.
 - `fach_name` - Name des Fachs (muss für die Klassenstufe dieser Klasse
-  geführt werden).
+  geführt werden; bei einer Gruppe muss `fach_name` exakt dem `fach_name`
+  der Gruppe selbst entsprechen - eine Gruppe führt strukturell immer
+  genau ein Fach).
 
 **Solver-Wirkung:** `Lehrereinsatzplanung.SolveLehrereinsatz` erzwingt für
 jeden Eintrag hart `assign(lehrer,klasse,fach)=1` - die bestehende "genau 1
 Lehrkraft pro Klasse/Fach"-Summe sorgt dabei automatisch dafür, dass kein
-anderer Kandidat für dieselbe (Klasse,Fach)-Kombination aktiv wird. Anders
-als eine Präferenz kann eine feste Zuordnung NICHT durch die Zielfunktion
-"wegoptimiert" werden - ist die Lehrkraft dafür nicht qualifiziert oder
-teilzeit-tage-inkohärent, meldet `StammdatenValidation.ValidateStammdaten`
-das schon VOR dem Solve als Fehler statt eines schwer diagnostizierbaren
-Infeasible.
+anderer Kandidat für dieselbe (Klasse,Fach)-Kombination aktiv wird. Bei
+einer Gruppen-Pinnung gilt das für die eine Gruppen-Variable, die anschließend
+auf ALLE real von der Gruppe umspannten Klassen expandiert wird (dieselbe
+Lehrkraft erscheint dann in `lehrerzuteilung.md` für jede dieser Klassen).
+Anders als eine Präferenz kann eine feste Zuordnung NICHT durch die
+Zielfunktion "wegoptimiert" werden - ist die Lehrkraft dafür nicht
+qualifiziert oder teilzeit-tage-inkohärent, meldet
+`StammdatenValidation.ValidateStammdaten` das schon VOR dem Solve als
+Fehler statt eines schwer diagnostizierbaren Infeasible.
 
 Vor jedem Lauf prüft `StammdatenValidation.ValidateStammdaten` die Datei
 auf Konsistenz (unbekannte Klassenstufen-Referenzen, Fach ohne

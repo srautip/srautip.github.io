@@ -228,12 +228,13 @@ Public Module Lehrereinsatzplanung
             model.Add(LinearExpr.Sum(vars) = 1)
         Next
 
-        ' --- Hart: FesteZuordnungen (Phase 2.26) - explizite Lehrer-Klasse-
-        ' Fach-Pinnung aus den Stammdaten. Precondition: StammdatenValidation.
-        ' ValidateStammdaten muss VOR diesem Aufruf 0 Fehler bestaetigt haben -
-        ' das garantiert bereits, dass klasse_name/fach_name/lehrer_name
-        ' bekannt sind, die Lehrkraft fuer das Fach qualifiziert UND
-        ' teilzeit-tage-kohaerent ist, der zugehoerige assign-Key also
+        ' --- Hart: FesteZuordnungen (Phase 2.26, Gruppen-Erweiterung Phase
+        ' 2.27) - explizite Lehrer-Klasse/Gruppe-Fach-Pinnung aus den
+        ' Stammdaten. Precondition: StammdatenValidation.ValidateStammdaten
+        ' muss VOR diesem Aufruf 0 Fehler bestaetigt haben - das garantiert
+        ' bereits, dass klasse_name (Klasse ODER Gruppe)/fach_name/
+        ' lehrer_name bekannt sind, die Lehrkraft fuer das Fach qualifiziert
+        ' UND teilzeit-tage-kohaerent ist, der zugehoerige assign-Key also
         ' existieren MUSS. Trotzdem defensiv per Throw statt stillem
         ' Ueberspringen abgesichert (anders als vorjahresZuordnung unten, wo
         ' ein nicht aufloesbarer Eintrag ein legitimer, erwartbarer Fall
@@ -246,7 +247,8 @@ Public Module Lehrereinsatzplanung
         ' automatisch her, dass jede andere Variable derselben Summe 0 sein
         ' muss.
         For Each fz In bestand.FesteZuordnungen
-            Dim key As New AssignKey With {.Lehrer = fz.LehrerName, .Klasse = fz.KlasseName, .Fach = fz.FachName}
+            Dim istGruppe = gruppeByName.ContainsKey(fz.KlasseName)
+            Dim key As New AssignKey With {.Lehrer = fz.LehrerName, .Klasse = fz.KlasseName, .Fach = fz.FachName, .IstGruppe = istGruppe}
             If Not assign.ContainsKey(key) Then
                 Throw New InvalidOperationException(
                     $"feste_zuordnungen: {fz.LehrerName}/{fz.KlasseName}/{fz.FachName} hat keinen Kandidaten im Modell - " &

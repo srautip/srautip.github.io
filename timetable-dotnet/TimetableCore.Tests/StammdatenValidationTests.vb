@@ -329,13 +329,36 @@ Public Class StammdatenValidationTests
         Assert.IsTrue(errors.Any(Function(e) e.Contains("'Herr Unbekannt'") AndAlso e.Contains("keine bekannte Lehrkraft")), String.Join(vbLf, errors))
     End Sub
 
+    ' Phase 2.27: FesteZuordnung-Erweiterung auf Gruppen-gefuehrte Faecher -
+    ' klasse_name kann jetzt auch einen Gruppennamen tragen, wenn die Gruppe
+    ' aktiv ist (fach_name/klassenstufe gesetzt) UND fz.FachName exakt dem
+    ' Gruppe.FachName entspricht.
+
     <TestMethod>
-    Public Sub FesteZuordnungReferencingGruppeInsteadOfKlasseIsRejected()
+    Public Sub FesteZuordnungOnGruppeIsAcceptedWhenValid()
         Dim bestand = CleanBestand()
-        bestand.Gruppen.Add(New Gruppe With {.Name = "Religion-Kl1", .Typ = "Fachgruppe"})
+        bestand.Gruppen.Add(New Gruppe With {.Name = "Religion-Kl1", .Typ = "Fachgruppe", .FachName = "Deutsch", .Klassenstufe = 1})
         bestand.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Frau Müller", .KlasseName = "Religion-Kl1", .FachName = "Deutsch"})
         Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
-        Assert.IsTrue(errors.Any(Function(e) e.Contains("referenziert eine Gruppe")), String.Join(vbLf, errors))
+        Assert.AreEqual(0, errors.Count, String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub FesteZuordnungOnInactiveGruppeIsRejected()
+        Dim bestand = CleanBestand()
+        bestand.Gruppen.Add(New Gruppe With {.Name = "Religion-Kl1", .Typ = "Fachgruppe"}) ' kein fach_name/klassenstufe -> inaktiv
+        bestand.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Frau Müller", .KlasseName = "Religion-Kl1", .FachName = "Deutsch"})
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("inaktive Gruppe")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub FesteZuordnungFachNameMismatchesGruppeFachIsRejected()
+        Dim bestand = CleanBestand()
+        bestand.Gruppen.Add(New Gruppe With {.Name = "Religion-Kl1", .Typ = "Fachgruppe", .FachName = "Deutsch", .Klassenstufe = 1})
+        bestand.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Frau Müller", .KlasseName = "Religion-Kl1", .FachName = "Mathe"})
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("deren fach_name ist") AndAlso e.Contains("'Deutsch'") AndAlso e.Contains("'Mathe'")), String.Join(vbLf, errors))
     End Sub
 
     <TestMethod>

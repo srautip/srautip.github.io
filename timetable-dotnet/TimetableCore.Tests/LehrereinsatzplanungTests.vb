@@ -765,6 +765,85 @@ Public Class LehrereinsatzplanungTests
         Assert.AreNotEqual(lehrer1a, lehrer1b, "Faire Verteilung sollte das unbeliebte Fach auf beide Lehrkraefte aufteilen.")
     End Sub
 
+    ''' <summary>Phase 2.27: 1 Klassenstufe, 2 Klassen (1a,1b), 1 Gruppen-
+    ''' gefuehrtes Fach (Religion-ev, WochenstundenSoll=2, spannt beide
+    ''' Klassen), 2 qualifizierte Kandidaten mit ABSICHTLICH unterschiedlichem
+    ''' Deputat (A=2h passend/bevorzugt, B=5h/nie-erfuellbare Praeferenz) -
+    ''' die Asymmetrie macht eine korrekt EINMAL pro Gruppe gezaehlte
+    ''' Deputat-Abweichung (bei Pin auf B) rechnerisch von einer faelschlich
+    ''' VERDOPPELTEN (einmal pro real umspannter Klasse) unterscheidbar (bei
+    ''' identischem Soll waeren beide Fehlerarten zufaellig betragsgleich -
+    ''' siehe Testkommentar unten fuer die Herleitung).</summary>
+    Private Function BestandMitGruppeUndZweiKandidaten() As Stammdatenbestand
+        Dim b As New Stammdatenbestand With {.SchulName = "Test", .Schulart = "Grundschule"}
+        b.Klassenstufen.Add(New Klassenstufe With {.Nummer = 1, .Bezeichnung = "Klasse 1"})
+        b.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1})
+        b.Klassen.Add(New Klasse With {.Name = "1b", .Klassenstufe = 1})
+
+        Dim religion As New Fach With {.Name = "Religion-ev"}
+        religion.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 1, .WochenstundenSoll = 2})
+        b.Faecher.Add(religion)
+
+        b.Schueler.Add(New Schueler With {.Id = "S1", .Klasse = "1a"})
+        b.Schueler.Add(New Schueler With {.Id = "S2", .Klasse = "1b"})
+        b.Gruppen.Add(New Gruppe With {
+            .Name = "Religion-ev-Kl1", .FachName = "Religion-ev", .Klassenstufe = 1,
+            .MitgliederSchuelerIds = New List(Of String) From {"S1", "S2"}
+        })
+
+        Dim lehrerA As New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 2}
+        lehrerA.BevorzugteKlassenstufen.Add(1)
+        Dim lehrerB As New Lehrer With {.Name = "Lehrer B", .DeputatSollstunden = 5}
+        lehrerB.BevorzugteKlassenstufen.Add(9) ' nie erfuellbar
+        b.Lehrkraefte.Add(lehrerA)
+        b.Lehrkraefte.Add(lehrerB)
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = "Religion-ev"})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer B", .FachName = "Religion-ev"})
+
+        Return b
+    End Function
+
+    ''' <summary>Phase 2.27: beweist, dass eine FesteZuordnung auch fuer ein
+    ''' Gruppen-gefuehrtes Fach greift (klasse_name traegt hier den
+    ''' Gruppennamen), UND dass das Deputat dabei weiterhin korrekt EINMAL
+    ''' pro Gruppe gezaehlt wird - nicht einmal pro real umspannter Klasse
+    ''' (Phase-2.20-Korrektheitspunkt, hier fuer den neuen Gruppen-Pin-Pfad
+    ''' erneut bestaetigt). Von Hand nachgerechnet (deputatToleranzStunden:=0,
+    ''' bei Pin auf Lehrer B):
+    ''' - "fehlt Klassenlehrer" ist fuer BEIDE Klassen unvermeidbar (kein
+    '''   klassenlehrerfaehiger Kandidat existiert ueberhaupt) = 2*20 = 40.
+    ''' - Lehrer A (unbenutzt): Ist=0h vs Soll=2h -> Abweichung 2h*100=200.
+    ''' - Lehrer B (gepinnt, KORREKT einmal gezaehlt): Ist=2h vs Soll=5h ->
+    '''   Abweichung 3h*100=300.
+    ''' - Praeferenz: B's Praeferenz (Klassenstufe 9) bleibt unerfuellt = 1.
+    ''' Summe = 40+200+300+1 = 541. Waere das Deputat faelschlich VERDOPPELT
+    ''' worden (Ist=4h statt 2h fuer B), ergaebe sich stattdessen Abweichung
+    ''' 1h*100=100 statt 300h -> Summe 341 (Unterschied nur SICHTBAR, weil A
+    ''' und B bewusst verschiedenes Soll-Deputat haben - bei identischem Soll
+    ''' waeren beide Fehlerarten zufaellig betragsgleich).</summary>
+    <TestMethod>
+    Public Sub FesteZuordnungOnGruppeForcesLessPreferredTeacherAndCountsDeputatOnce()
+        Dim b = BestandMitGruppeUndZweiKandidaten()
+
+        ' Gegenprobe ohne Pin: Solver waehlt A (guenstiger: Praeferenz erfuellt
+        ' UND kleinere Deputat-Abweichung, siehe Kommentar oben).
+        Dim ohnePin = Lehrereinsatzplanung.SolveLehrereinsatz(b, deputatToleranzStunden:=0.0, timeLimitS:=10)
+        Assert.IsTrue(ohnePin.Status = CpSolverStatus.Optimal OrElse ohnePin.Status = CpSolverStatus.Feasible, ohnePin.Status.ToString())
+        Assert.IsTrue(ohnePin.Zuweisungen.All(Function(z) z.Lehrer = "Lehrer A"))
+
+        b.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Lehrer B", .KlasseName = "Religion-ev-Kl1", .FachName = "Religion-ev"})
+        Assert.AreEqual(0, StammdatenValidation.ValidateStammdaten(b).Count)
+
+        Dim result = Lehrereinsatzplanung.SolveLehrereinsatz(b, deputatToleranzStunden:=0.0, timeLimitS:=10)
+        Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible, result.Status.ToString())
+        Assert.AreEqual(541.0, result.Solver.ObjectiveValue, 0.001,
+            "Abweichung von 541 deutet auf eine falsche (z.B. verdoppelte) Deputat-Zaehlung fuer den Gruppen-Pin hin.")
+
+        Assert.AreEqual(2, result.Zuweisungen.Where(Function(z) z.Lehrer = "Lehrer B").Count(), "1a UND 1b muessen expandiert auf Lehrer B zeigen")
+        Assert.IsFalse(result.Zuweisungen.Any(Function(z) z.Lehrer = "Lehrer A"), "Lehrer A haette durch die Vollstaendigkeits-Constraint ausgeschlossen sein muessen.")
+        Assert.AreEqual(0, Verifier.VerifyLehrereinsatz(b, result).Count)
+    End Sub
+
     ''' <summary>Phase 2.26: beweist, dass eine FesteZuordnung den Solver
     ''' auch GEGEN die guenstigere, "natuerliche" Alternative zwingt.
     ''' Lehrer A hat eine erfuellte Klassenstufen-Praeferenz (Kosten 0),

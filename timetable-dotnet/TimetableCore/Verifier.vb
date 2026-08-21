@@ -470,21 +470,42 @@ Public Module Verifier
             End If
         Next
 
-        ' Phase 2.26: Kanarienvogel-Pruefung fuer die harte FesteZuordnung-
-        ' Pinnung - unabhaengig aus bestand.FesteZuordnungen + result.
-        ' Zuweisungen re-derivert (kein geteilter Code mit dem CP-SAT-
-        ' Constraint). Sollte NIE feuern, wenn der Constraint-Block in
+        ' Phase 2.26/2.27: Kanarienvogel-Pruefung fuer die harte
+        ' FesteZuordnung-Pinnung - unabhaengig aus bestand.FesteZuordnungen +
+        ' result.Zuweisungen re-derivert (kein geteilter Code mit dem
+        ' CP-SAT-Constraint). Sollte NIE feuern, wenn der Constraint-Block in
         ' Lehrereinsatzplanung.vb korrekt verdrahtet ist - ein Treffer hier
         ' ist ein Beweis fuer einen SOLVER-Bug, nicht fuer ein Stammdaten-
         ' Problem (das faengt StammdatenValidation bereits VOR dem Solve ab).
+        ' Phase 2.27: fz.KlasseName kann seit der Gruppen-Erweiterung auch
+        ' einen Gruppennamen tragen - result.Zuweisungen ist dabei laut
+        ' bestehender Dokumentation IMMER Gruppen-EXPANDIERT (eine Zeile pro
+        ' real gespannter Klasse), daher wird hier unabhaengig ueber
+        ' Stammdaten.KlassenOfGruppe re-derivert statt sich auf den Solver-
+        ' internen AssignKey zu verlassen.
+        Dim gruppeByNameCanary = bestand.Gruppen.ToDictionary(Function(g) g.Name)
         For Each fz In bestand.FesteZuordnungen
-            Dim tatsaechlicherLehrer = result.Zuweisungen.
-                Where(Function(z) z.Klasse = fz.KlasseName AndAlso z.Fach = fz.FachName).
-                Select(Function(z) z.Lehrer).FirstOrDefault()
-            If tatsaechlicherLehrer Is Nothing Then
-                violations.Add($"feste_zuordnung {fz.LehrerName}/{fz.KlasseName}/{fz.FachName}: keine Zuweisung fuer {fz.KlasseName}/{fz.FachName} im Ergebnis gefunden")
-            ElseIf tatsaechlicherLehrer <> fz.LehrerName Then
-                violations.Add($"feste_zuordnung {fz.LehrerName}/{fz.KlasseName}/{fz.FachName}: tatsaechlich zugewiesen ist '{tatsaechlicherLehrer}' statt der fest zugeordneten Lehrkraft")
+            If gruppeByNameCanary.ContainsKey(fz.KlasseName) Then
+                Dim gruppe = gruppeByNameCanary(fz.KlasseName)
+                For Each realeKlasse In Stammdaten.KlassenOfGruppe(bestand, gruppe)
+                    Dim tatsaechlicherLehrer = result.Zuweisungen.
+                        Where(Function(z) z.Klasse = realeKlasse AndAlso z.Fach = fz.FachName).
+                        Select(Function(z) z.Lehrer).FirstOrDefault()
+                    If tatsaechlicherLehrer Is Nothing Then
+                        violations.Add($"feste_zuordnung {fz.LehrerName}/{fz.KlasseName}/{fz.FachName}: keine Zuweisung fuer {realeKlasse}/{fz.FachName} im Ergebnis gefunden")
+                    ElseIf tatsaechlicherLehrer <> fz.LehrerName Then
+                        violations.Add($"feste_zuordnung {fz.LehrerName}/{fz.KlasseName}/{fz.FachName}: tatsaechlich zugewiesen ist '{tatsaechlicherLehrer}' statt der fest zugeordneten Lehrkraft (klasse {realeKlasse})")
+                    End If
+                Next
+            Else
+                Dim tatsaechlicherLehrer = result.Zuweisungen.
+                    Where(Function(z) z.Klasse = fz.KlasseName AndAlso z.Fach = fz.FachName).
+                    Select(Function(z) z.Lehrer).FirstOrDefault()
+                If tatsaechlicherLehrer Is Nothing Then
+                    violations.Add($"feste_zuordnung {fz.LehrerName}/{fz.KlasseName}/{fz.FachName}: keine Zuweisung fuer {fz.KlasseName}/{fz.FachName} im Ergebnis gefunden")
+                ElseIf tatsaechlicherLehrer <> fz.LehrerName Then
+                    violations.Add($"feste_zuordnung {fz.LehrerName}/{fz.KlasseName}/{fz.FachName}: tatsaechlich zugewiesen ist '{tatsaechlicherLehrer}' statt der fest zugeordneten Lehrkraft")
+                End If
             End If
         Next
 

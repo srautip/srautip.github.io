@@ -601,6 +601,80 @@ vorher-nicht-gewählte Lehrkraft übernimmt die Klasse), als auch, dass er
 korrekt mit bereits bestehenden weichen Zielen (Bündelung) interagiert,
 statt sie zu brechen.
 
+## Nachtrag 7 (Phase 2.27): `FesteZuordnung`-Erweiterung auf Gruppen-geführte Fächer
+
+**Kontext:** Nachtrag 6 (Phase 2.26) hatte die harte Lehrer-Klasse-Fach-
+Pinnung bewusst auf echte Klassen beschränkt und Gruppen-Unterstützung
+(Religion-ev/kath, Ethik, Chor - Phase 2.20) als dokumentierten,
+nachrüstbaren Folgeschritt vorgemerkt, da dieselbe
+`AssignKey.IstGruppe`-Infrastruktur bereits existiert. Direkter Nutzerauftrag
+im Anschluss an den Phase-2.26-Push, genau diese Erweiterung umzusetzen.
+
+**Design:** kein neues Feld auf `FesteZuordnung` - `KlasseName` trägt seit
+diesem Nachtrag entweder einen echten `Klasse.Name` ODER einen `Gruppe.Name`,
+exakt dieselbe disjunkte-Namensraum-Konvention, die `AssignKey.Klasse`/
+`.IstGruppe` bereits projektweit etabliert. Eine Gruppen-`FesteZuordnung`
+muss zusätzlich `fach_name` exakt gleich dem `Gruppe.FachName` der
+referenzierten Gruppe setzen (eine Gruppe führt strukturell immer genau ein
+Fach).
+
+**Erweiterung der drei Verteidigungsschichten:**
+1. **`StammdatenValidation.vb`:** die Klassen-Referenzprüfung wurde um einen
+   Gruppen-Zweig ergänzt - referenziert `klasse_name` eine Gruppe statt
+   einer Klasse, wird geprüft, dass die Gruppe aktiv ist
+   (`fach_name`/`klassenstufe` gesetzt, Phase-2.20-Konvention) UND
+   `fach_name` exakt übereinstimmt; die anschließenden Qualifikations-/
+   Teilzeit-Kohärenz-Checks werden unverändert wiederverwendet, nur die
+   Klassenstufen-Herkunft wechselt von `Klasse.Klassenstufe` auf
+   `Gruppe.Klassenstufe`.
+2. **`Lehrereinsatzplanung.vb`:** der bestehende harte Constraint-Block
+   prüft jetzt zusätzlich `gruppeByName.ContainsKey(fz.KlasseName)` und baut
+   den `AssignKey` bei Treffer mit `.IstGruppe = True` - identisch zur
+   bestehenden Gruppen-Variablenerzeugung. Der defensive Throw bei
+   fehlendem `assign`-Key bleibt für beide Zweige unverändert.
+3. **`Verifier.VerifyLehrereinsatz`:** der Kanarienvogel-Check erkennt jetzt
+   Gruppen-Pins und iteriert über `Stammdaten.KlassenOfGruppe`, um JEDE real
+   umspannte Klasse zu prüfen (da `result.Zuweisungen` laut bestehender
+   Dokumentation immer Gruppen-EXPANDIERT ist - eine Zeile pro real
+   umspannter Klasse).
+
+**Live-Verifikation:** `FesteZuordnungReferencingGruppeInsteadOfKlasseIsRejected`
+wurde zu `FesteZuordnungOnGruppeIsAcceptedWhenValid` umgebaut (Assertion
+invertiert), plus 2 neue negative Tests
+(`FesteZuordnungOnInactiveGruppeIsRejected`,
+`FesteZuordnungFachNameMismatchesGruppeFachIsRejected`) in
+`StammdatenValidationTests.vb`. Ein neuer Hand-Smoke-Test
+`FesteZuordnungOnGruppeForcesLessPreferredTeacherAndCountsDeputatOnce` in
+`LehrereinsatzplanungTests.vb` (neue Helper-Funktion
+`BestandMitGruppeUndZweiKandidaten`, mit ABSICHTLICH unterschiedlichem
+Deputat für die beiden Kandidaten, damit eine korrekt EINMAL pro Gruppe
+gezählte Deputat-Abweichung rechnerisch von einer fälschlich verdoppelten
+unterscheidbar ist - bei identischem Soll wären beide Fehlerarten
+zufällig betragsgleich) beweist beides zugleich: der Pin zwingt den Solver
+gegen die günstigere Alternative (von Hand nachgerechnetes Objective=541,
+exakt bestätigt), UND das Deputat bleibt korrekt einmal statt zweimal
+gezählt (eine Verdopplung hätte 341 statt 541 ergeben). 3 neue Tests in
+`VerifyLehrereinsatzTests.vb` (gehaltener Gruppen-Pin, durch andere
+Lehrkraft in einer der real umspannten Klassen verletzter Pin, fehlende
+Zuweisung in einer real umspannten Klasse), wiederverwenden die bereits
+bestehende `BestandMitGruppe()`-Helper-Funktion. Volle Regression: 233
+bestanden (+6 gegenüber dem Phase-2.26-Stand), 0 fehlgeschlagen, 11
+übersprungen.
+
+**Live-Beleg am Referenzbeispiel:** `tests/bw-grundschule-beispiel/input/
+stammdaten.yaml` bekam einen zweiten, `fachfremd: true` markierten
+`fach_lehrer_zuordnungen`-Kandidaten (`Klassenlehrer-3` für `Ethik`) sowie
+einen `feste_zuordnungen`-Eintrag, der die Gruppe `Ethik-Kl2` auf
+`Klassenlehrer-3` pinnt. Referenzlauf ohne Pin zeigte den natürlich
+gewählten Kandidaten für `Ethik-Kl2` als `Ethiklehrer-1` (nicht fachfremd,
+daher günstiger); mit Pin übernimmt `Klassenlehrer-3` nachweislich BEIDE
+real umspannten Klassen (`2a/Ethik, 2b/Ethik` erscheinen jetzt bei
+`Klassenlehrer-3` statt bei `Ethiklehrer-1`, siehe `output/
+lehrerzuteilung.md`) - der Beweis, dass der Pin für die gesamte Gruppe
+greift, nicht nur für eine einzelne real umspannte Klasse. `Status=Optimal`,
+`Lehrereinsatzplanung`-Objective=1010, 0 `VerifyLehrereinsatz`-Verstöße, 0
+`Verifier.VerifySchedule`-Verstöße auf der nachgelagerten Stundenplan-Stufe.
+
 ## Definition of Done — Status
 
 - [x] `dotnet test TimetableCore.Tests` bleibt vollständig grün, 0

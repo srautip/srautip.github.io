@@ -562,6 +562,9 @@ fach_lehrer_zuordnungen:
 - lehrer_name: Ethiklehrer-1
   fach_name: Ethik
   fachfremd: false
+- lehrer_name: Klassenlehrer-3
+  fach_name: Ethik
+  fachfremd: true
 - lehrer_name: Englischlehrer-1
   fach_name: Englisch
   fachfremd: false
@@ -1242,3 +1245,6 @@ feste_zuordnungen:
 - lehrer_name: Klassenlehrer-1
   klasse_name: 1a
   fach_name: Deutsch-Förderstunde
+- lehrer_name: Klassenlehrer-3
+  klasse_name: Ethik-Kl2
+  fach_name: Ethik
