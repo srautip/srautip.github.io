@@ -62,19 +62,28 @@ Public NotInheritable Class RunConfig
     ''' changes WHEN a solution is accepted as proven-final, not just how
     ''' long a stagnant search runs.</summary>
     Public Property RelativeGapLimit As Double? = Nothing
-    ''' <summary>Code-Review-Umsetzung (P2): `true` aktiviert Solver.SolveTops
-    ''' lexikografischen Modus (Kann -> ClassGaps -> TeacherGaps als einzeln
-    ''' beweisbare Stufen, Optimum je Stufe als Constraint fixiert, danach
-    ''' Iterationen ueber die gewichtete Rest-Zielfunktion). Nothing/false =
-    ''' heutiger gewichteter Summenmodus. In diesem Modus steuern
-    ''' quality_weights nur noch Rest-Zielfunktion und Ranking, nicht mehr
-    ''' die relative Prioritaet der drei Stufen (deren Reihenfolge fix ist).</summary>
+    ''' <summary>Code-Review-Umsetzung (P2): Solver.SolveTops
+    ''' lexikografischer Modus (Kann -> ClassGaps als einzeln beweisbare
+    ''' Stufen, Optimum je Stufe als Constraint fixiert, danach Iterationen
+    ''' ueber die gewichtete Rest-Zielfunktion). Nothing -> True: seit der
+    ''' expliziten Nutzerentscheidung dieser Review-Runde DEFAULT (bewusste
+    ''' Ausnahme vom "fehlt das Feld, bleibt das Verhalten unveraendert"-
+    ''' Prinzip, wie zuvor stagnation_timeout_s). `false` liefert den
+    ''' frueheren gewichteten Summenmodus, in dem quality_weights auch die
+    ''' relative Prioritaet von Kann/ClassGaps/TeacherGaps frei steuern.</summary>
     Public Property Lexicographic As Boolean? = Nothing
     ''' <summary>P2: Toleranzband je fixierter Stufe (`<= Stufenoptimum +
     ''' lex_tolerance`) - 0 (Default) haelt jede Stufe exakt auf ihrem
     ''' gefundenen Optimum, ein kleiner Wert (z.B. 1) erlaubt den
     ''' Folgestufen/der Diversitaets-Enumeration mehr Spielraum.</summary>
     Public Property LexTolerance As Integer? = Nothing
+    ''' <summary>P2 (Nutzerentscheidung): TeacherGaps als DRITTE
+    ''' lexikografische Stufe ist opt-in (Nothing -> False). Ohne die
+    ''' Stufe wird TeacherGaps nicht hart auf sein Optimum fixiert,
+    ''' sondern flieSSt mit seinem quality_weights-Gewicht in die
+    ''' Rest-Zielfunktion ein - Lehrer-Springstunden bleiben so gegen
+    ''' Randstunden/Nachmittage/Ausgewogenheit abwaegbar.</summary>
+    Public Property LexTeacherGapsStage As Boolean? = Nothing
     ''' <summary>Code-Review-Umsetzung (P3): Mindestanzahl bisher belegter
     ''' Slots, die jede WEITERE Loesung anders belegen muss (echter
     ''' Distanz-Cut statt nur des exakten No-Goods). Nothing/0 = heutiges
@@ -273,18 +282,19 @@ Public Module Run
         Dim diversifySeed = If(cfg.DiversifySeed, True)
         Dim randomizeSearch = If(cfg.RandomizeSearch, True)
         ' Code-Review-Umsetzung (P2/P3): Nothing loest jeweils zu SolveTops
-        ' eigenem Default auf (lexicographic=False, lex_tolerance=0,
-        ' min_diversity=0, rehint_found_solutions=True) - keine bestehende
-        ' Schule ohne diese config.yaml-Felder aendert ihr Verhalten.
-        Dim lexicographic = If(cfg.Lexicographic, False)
+        ' eigenem Default auf (lexicographic=True per Nutzerentscheidung,
+        ' lex_tolerance=0, lex_teacher_gaps_stage=False, min_diversity=0,
+        ' rehint_found_solutions=True).
+        Dim lexicographic = If(cfg.Lexicographic, True)
         Dim lexTolerance = If(cfg.LexTolerance, 0)
+        Dim lexTeacherGapsStage = If(cfg.LexTeacherGapsStage, False)
         Dim minDiversity = If(cfg.MinDiversity, 0)
         Dim rehintFoundSolutions = If(cfg.RehintFoundSolutions, True)
         Dim topResult = Solver.SolveTop(data, maxSolutions:=cfg.MaxSolutions, totalTimeLimitS:=cfg.SolveTimeLimitS,
             perSolveTimeLimitS:=perSolveLimit, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers, qualityWeights:=qualityWeights,
             stagnationTimeoutS:=stagnationTimeoutS, diversifySeed:=diversifySeed, randomizeSearch:=randomizeSearch,
             relativeGapLimit:=cfg.RelativeGapLimit,
-            lexicographic:=lexicographic, lexTolerance:=lexTolerance,
+            lexicographic:=lexicographic, lexTolerance:=lexTolerance, lexTeacherGapsStage:=lexTeacherGapsStage,
             minDiversity:=minDiversity, rehintFoundSolutions:=rehintFoundSolutions)
         Dim solveOk = topResult.Solutions.Count > 0
         If Not solveOk Then

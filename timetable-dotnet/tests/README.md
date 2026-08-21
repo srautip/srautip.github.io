@@ -336,8 +336,9 @@ stagnation_timeout_s: 45.0   # Optional, Default 45.0 - Phase 2.25, siehe unten
 diversify_seed: true   # Optional, Default true - Phase 2.25
 randomize_search: true   # Optional, Default true - Phase 2.25
 relative_gap_limit: null   # Optional, Default nicht gesetzt - Phase 2.25, siehe unten
-lexicographic: false   # Optional, Default false - Code-Review-Umsetzung P2, siehe unten
+lexicographic: true   # Optional, Default TRUE (Nutzerentscheidung) - Code-Review-Umsetzung P2, siehe unten
 lex_tolerance: 0   # Optional, Default 0 - nur wirksam mit lexicographic: true
+lex_teacher_gaps_stage: false   # Optional, Default false - TeacherGaps-Stufe ist opt-in, siehe unten
 min_diversity: 0   # Optional, Default 0 - Code-Review-Umsetzung P3, siehe unten
 rehint_found_solutions: true   # Optional, Default true - Code-Review-Umsetzung P3, siehe unten
 quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe unten
@@ -418,26 +419,42 @@ akzeptiert (eine Lücke bis zu diesem Prozentsatz wird toleriert statt
 weiter nach Beweis gesucht), eine stärkere Verhaltensänderung, die diese
 Phase nicht für jede Schule ungefragt erzwingt.
 
-**`lexicographic`/`lex_tolerance`** (Code-Review-Umsetzung P2, siehe
-`docs/code-review-cpsat-performance.md`): `lexicographic: true` ersetzt
-die eine große gewichtete Zielfunktion durch drei nacheinander einzeln
-optimierte Stufen - Kann-Verstöße, dann Klassen-Springstunden
-(ClassGaps), dann Lehrer-Springstunden (TeacherGaps). Das Optimum jeder
-Stufe wird als Constraint fixiert (`<= Optimum + lex_tolerance`), erst
-danach laufen die normalen Iterationen über die gewichtete
-REST-Zielfunktion (Randstunden/Nachmittags-Tage/Ausgewogenheit, soweit
-per `include_*` aktiv). Vorteil: jede Stufe ist klein genug, dass CP-SAT
-ihr Optimum in der Regel BEWEISEN kann (die Phase-2.25-Messungen zeigten
-0,2s für Kann-only gegen 97-99% Restlücke beim Summenmodell) - alle
-gefundenen Alternativen sind dann garantiert stufen-optimal statt
-"irgendwo im Band einer nie geschlossenen Lücke". Zu beachten: in diesem
-Modus legt die STUFENREIHENFOLGE die Priorität Kann > ClassGaps >
-TeacherGaps fest - die `quality_weights` dieser drei Kriterien steuern
-nur noch das nachgelagerte Ranking, nicht mehr die Suche (wer die
-Priorität frei über Gewichte tauschen will, bleibt beim Default
-`lexicographic: false`). `lex_tolerance` (Default 0) weitet das Band je
-Stufe, z.B. `1` = "eine Springstunde mehr als das Optimum ist für
-zusätzliche Alternativen akzeptabel".
+**`lexicographic`/`lex_tolerance`/`lex_teacher_gaps_stage`**
+(Code-Review-Umsetzung P2, siehe `docs/code-review-cpsat-performance.md`):
+der lexikografische Modus ersetzt die eine große gewichtete Zielfunktion
+durch nacheinander einzeln optimierte Stufen - Kann-Verstöße, dann
+Klassen-Springstunden (ClassGaps). Das Optimum jeder Stufe wird als
+Constraint fixiert (`<= Optimum + lex_tolerance`), erst danach laufen
+die normalen Iterationen über die gewichtete REST-Zielfunktion
+(Lehrer-Springstunden, Randstunden, Nachmittags-Tage, Ausgewogenheit -
+soweit per `include_*` aktiv). Vorteil: jede Stufe ist klein genug, dass
+CP-SAT ihr Optimum in der Regel BEWEISEN kann (die Phase-2.25-Messungen
+zeigten 0,2s für Kann-only gegen 97-99% Restlücke beim Summenmodell) -
+alle gefundenen Alternativen sind dann garantiert stufen-optimal statt
+"irgendwo im Band einer nie geschlossenen Lücke".
+
+Dieser Modus ist seit der Review-Runde **standardmäßig aktiv**
+(explizite Nutzerentscheidung - wie bei `stagnation_timeout_s` eine
+bewusste Ausnahme vom "fehlt das Feld, bleibt das Verhalten
+unverändert"-Prinzip). Zu beachten: die STUFENREIHENFOLGE legt die
+Priorität Kann > ClassGaps fest - die `quality_weights` der gestuften
+Kriterien steuern nur noch das nachgelagerte Ranking, nicht mehr die
+Suche. Wer die Priorität frei über Gewichte tauschen will (z.B.
+Randstunden wichtiger als Springstunden), setzt `lexicographic: false`
+und erhält den früheren gewichteten Summenmodus unverändert.
+
+**`lex_teacher_gaps_stage`** (Default `false`, ebenfalls
+Nutzerentscheidung): Lehrer-Springstunden (TeacherGaps) sind
+standardmäßig KEINE eigene Stufe, sondern bleiben mit ihrem
+`quality_weights`-Gewicht Teil der Rest-Zielfunktion - so bleiben sie
+gegen Randstunden/Nachmittage/Ausgewogenheit abwägbar, statt die
+Klassenpläne dem hart fixierten Lehrerplan-Optimum unterzuordnen.
+`true` hängt TeacherGaps als dritte Stufe an (Kann > ClassGaps >
+TeacherGaps): sein Optimum wird dann VOR jeder Gewichtsabwägung
+fixiert - sinnvoll, wenn lückenlose Lehrerpläne für die Schule
+Vorrang vor allen Restkriterien haben. `lex_tolerance` (Default 0)
+weitet das Band je Stufe, z.B. `1` = "eine Springstunde mehr als das
+Optimum ist für zusätzliche Alternativen akzeptabel".
 
 **`min_diversity`/`rehint_found_solutions`** (Code-Review-Umsetzung P3):
 Werkzeuge für "möglichst VERSCHIEDENE Alternativen statt

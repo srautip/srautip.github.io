@@ -274,16 +274,24 @@ kann.
 In derselben Session umgesetzt (Details in den Commit-Messages und den
 Doc-Kommentaren der betroffenen Module):
 
-- **P2** - `Solver.SolveTop` hat einen lexikografischen Modus
-  (`lexicographic:=True`, opt-in): Kann -> ClassGaps -> TeacherGaps als
-  einzeln beweisbare Stufen, Stufenoptimum als Constraint fixiert
-  (`lexTolerance` weitet das Band), Iterationen danach ueber die
+- **P2** - `Solver.SolveTop` hat einen lexikografischen Modus: Kann ->
+  ClassGaps als einzeln beweisbare Stufen, Stufenoptimum als Constraint
+  fixiert (`lexTolerance` weitet das Band), Iterationen danach ueber die
   gewichtete Rest-Zielfunktion. `SolveTopObjective` liefert dafuer die
   Kriterien als einzelne ungewichtete Summen (`BuildQualityTerms`/
-  `WeightedTotal`/`WeightedResidual`); der gewichtete Modus bleibt
-  Default, weil die Stufenreihenfolge fix ist und sonst den per
-  `quality_weights` frei waehlbaren Prioritaetentausch aushebeln wuerde
-  (garantiert durch `SolveTopQualityWeightsInfluenceChosenSchedule`).
+  `WeightedTotal`/`WeightedResidual`). Seit einer expliziten
+  Nutzerentscheidung im Anschluss an die Erstumsetzung ist dieser Modus
+  **Default** (`lexicographic:=True` - bewusste Ausnahme von der
+  "Default = altes Verhalten"-Konvention, wie zuvor
+  `stagnationTimeoutS`); die **TeacherGaps-Stufe ist dabei opt-in**
+  (`lexTeacherGapsStage`, Default False - TeacherGaps bleibt sonst mit
+  seinem Gewicht in der Rest-Zielfunktion und damit gegen die uebrigen
+  Restkriterien abwaegbar, statt Klassenplaene dem hart fixierten
+  Lehrerplan-Optimum unterzuordnen; `LexTeacherGapsStageOverridesWeightsWhenEnabled`
+  testet genau diese Semantik). Der fruehere gewichtete Summenmodus
+  bleibt per `lexicographic:=False` unveraendert erreichbar - die
+  Gewichts-Tausch-Garantie (`SolveTopQualityWeightsInfluenceChosenSchedule`)
+  laeuft jetzt explizit auf diesem Pfad.
 - **P3** - `BlockSolution` setzt bei `minDiversity >= 1` zusaetzlich zum
   exakten No-Good einen echten Distanz-Cut (`Sum(bisher wahre Vars) <=
   Anzahl - d`); `rehintFoundSolutions:=False` schaltet das Re-Hinting

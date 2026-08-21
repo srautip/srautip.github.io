@@ -363,14 +363,22 @@ Friend Module SolveTopObjective
         Return parts.Aggregate(Function(a, b) a + b)
     End Function
 
-    ''' <summary>P2: die gewichtete Summe NUR der nicht lexikografisch
+    ''' <summary>P2: die gewichtete Summe der nicht lexikografisch
     ''' gestuften Kriterien (EdgePeriod/AfternoonDayCount/Class-/
     ''' TeacherLoadVariance) - Solver.SolveTops lexikografischer Modus
-    ''' minimiert sie als letzte Rest-Zielfunktion, nachdem Kann/ClassGaps/
-    ''' TeacherGaps stufenweise fixiert wurden. Nothing, wenn keines der
-    ''' vier Rest-Kriterien aktiv ist.</summary>
-    Friend Function WeightedResidual(terms As QualityTerms, w As QualityWeights) As LinearExpr
+    ''' minimiert sie als letzte Rest-Zielfunktion, nachdem die Stufen
+    ''' fixiert wurden. `teacherGapsInResidual` nimmt TeacherGaps mit
+    ''' seinem konfigurierten Gewicht zusaetzlich auf - der Fall
+    ''' "TeacherGaps ist KEINE eigene Stufe" (lexTeacherGapsStage=False,
+    ''' der Default): Lehrer-Springstunden bleiben dann gegen die
+    ''' uebrigen Restkriterien abwaegbar statt hart fixiert. Nothing,
+    ''' wenn kein einziges Rest-Kriterium aktiv ist.</summary>
+    Friend Function WeightedResidual(terms As QualityTerms, w As QualityWeights,
+                                      Optional teacherGapsInResidual As Boolean = False) As LinearExpr
         Dim parts As New List(Of LinearExpr)
+        If teacherGapsInResidual AndAlso terms.TeacherGapsSum IsNot Nothing Then
+            parts.Add(CLng(w.TeacherGaps) * terms.TeacherGapsSum)
+        End If
         If terms.EdgeSum IsNot Nothing Then parts.Add(CLng(w.EdgePeriod) * terms.EdgeSum)
         If terms.AfternoonSum IsNot Nothing Then parts.Add(CLng(w.AfternoonDayCount) * terms.AfternoonSum)
         If terms.ClassRangeSum IsNot Nothing Then parts.Add(CLng(w.ClassLoadVariance) * terms.ClassRangeSum)

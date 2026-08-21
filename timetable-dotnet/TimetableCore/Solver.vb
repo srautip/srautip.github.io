@@ -1006,12 +1006,17 @@ Public Module Solver
     ''' CP-SAT accepts a solution as proven-final, a stronger behavioral
     ''' change this phase deliberately does not force on every caller.
     '''
-    ''' Code-Review-Umsetzung (P2/P3): `lexicographic` (opt-in, Default
-    ''' False - der gewichtete Modus bleibt unveraendert der Default, siehe
-    ''' den Begruendungskommentar im Funktionskoerper) optimiert Kann ->
-    ''' ClassGaps -> TeacherGaps als einzeln beweisbare Stufen und fixiert
-    ''' jedes Stufenoptimum als Constraint (`lexTolerance` weitet das Band
-    ''' pro Stufe). `minDiversity` (Default 0 = heutiges Verhalten)
+    ''' Code-Review-Umsetzung (P2/P3): `lexicographic` (Default True seit
+    ''' der expliziten Nutzerentscheidung dieser Review-Runde - eine
+    ''' bewusste Ausnahme von der "Default = altes Verhalten"-Konvention,
+    ''' wie zuvor schon stagnationTimeoutS) optimiert Kann -> ClassGaps
+    ''' als einzeln beweisbare Stufen und fixiert jedes Stufenoptimum als
+    ''' Constraint (`lexTolerance` weitet das Band pro Stufe);
+    ''' `lexTeacherGapsStage` (opt-in, Default False) haengt TeacherGaps
+    ''' als dritte Stufe an - ohne sie bleibt TeacherGaps gewichtet in der
+    ''' Rest-Zielfunktion. `lexicographic:=False` liefert den frueheren
+    ''' gewichteten Summenmodus unveraendert. `minDiversity` (Default 0 =
+    ''' heutiges Verhalten)
     ''' erzwingt pro bereits gefundener Loesung einen echten Distanz-Cut
     ''' statt nur des exakten No-Goods (siehe BlockSolution).
     ''' `rehintFoundSolutions` (Default True = heutiges Verhalten) steuert,
@@ -1030,8 +1035,9 @@ Public Module Solver
                               Optional diversifySeed As Boolean = True,
                               Optional randomizeSearch As Boolean = True,
                               Optional relativeGapLimit As Double? = Nothing,
-                              Optional lexicographic As Boolean = False,
+                              Optional lexicographic As Boolean = True,
                               Optional lexTolerance As Integer = 0,
+                              Optional lexTeacherGapsStage As Boolean = False,
                               Optional minDiversity As Integer = 0,
                               Optional rehintFoundSolutions As Boolean = True) As MultiSolveResult
         Dim weights = If(qualityWeights, New QualityWeights())
@@ -1054,18 +1060,28 @@ Public Module Solver
             ' Stage 1 -> ApplyQualityObjective; das dokumentierte Fehlen
             ' von ClearObjective() auf der installierten DLL ist deshalb
             ' kein Hindernis). Die Stufenreihenfolge ist FIX (Kann vor
-            ' ClassGaps vor TeacherGaps) - die konfigurierten Gewichte
-            ' steuern in diesem Modus nur noch die Rest-Zielfunktion und
-            ' das nachgelagerte Quality-Ranking, nicht mehr die relative
-            ' Prioritaet der drei Stufen. Deshalb bewusst opt-in
-            ' (Default False): der gewichtete Modus bleibt fuer Schulen,
-            ' die ihre Prioritaeten frei ueber Gewichte tauschen wollen
-            ' (siehe SolveTopQualityWeightsInfluenceChosenSchedule-Test).
+            ' ClassGaps, optional gefolgt von TeacherGaps) - die
+            ' konfigurierten Gewichte steuern in diesem Modus nur noch die
+            ' Rest-Zielfunktion und das nachgelagerte Quality-Ranking,
+            ' nicht mehr die relative Prioritaet der Stufen. Seit der
+            ' expliziten Nutzerentscheidung dieser Review-Runde ist dieser
+            ' Modus DEFAULT (lexicographic:=True) - der gewichtete Modus
+            ' bleibt per lexicographic:=False fuer Aufrufer erreichbar, die
+            ' ihre Prioritaeten frei ueber Gewichte tauschen wollen (siehe
+            ' SolveTopQualityWeightsInfluenceChosenSchedule-Test, der
+            ' genau deshalb explizit False setzt). Die TeacherGaps-Stufe
+            ' ist dabei OPT-IN (lexTeacherGapsStage, Default False -
+            ' ebenfalls Nutzerentscheidung): ohne sie wird TeacherGaps
+            ' nicht hart auf sein Optimum fixiert, sondern wandert mit
+            ' seinem konfigurierten Gewicht in die Rest-Zielfunktion -
+            ' Lehrer-Springstunden bleiben so gegen die uebrigen
+            ' Restkriterien abwaegbar, statt Klassenplaene dem
+            ' Lehrerplan-Optimum unterzuordnen.
             Dim terms = SolveTopObjective.BuildQualityTerms(built, data, weights)
             Dim stageExprs As New List(Of LinearExpr)
             If terms.KannSum IsNot Nothing Then stageExprs.Add(terms.KannSum)
             If terms.ClassGapsSum IsNot Nothing Then stageExprs.Add(terms.ClassGapsSum)
-            If terms.TeacherGapsSum IsNot Nothing Then stageExprs.Add(terms.TeacherGapsSum)
+            If lexTeacherGapsStage AndAlso terms.TeacherGapsSum IsNot Nothing Then stageExprs.Add(terms.TeacherGapsSum)
 
             For Each stageExpr In stageExprs
                 Dim stageLimit = Math.Min(stage1TimeLimitS, Math.Max(totalTimeLimitS - sw.Elapsed.TotalSeconds, 0.0))
@@ -1088,7 +1104,7 @@ Public Module Solver
             ' eingeschraenkte, daher schnell beweisbare) gewichtete
             ' Gesamtsumme - so behaelt jede Iteration eine wohldefinierte
             ' ObjectiveValue/Bound-Semantik.
-            Dim finalObjective = SolveTopObjective.WeightedResidual(terms, weights)
+            Dim finalObjective = SolveTopObjective.WeightedResidual(terms, weights, teacherGapsInResidual:=Not lexTeacherGapsStage)
             If finalObjective Is Nothing Then finalObjective = SolveTopObjective.WeightedTotal(terms, weights)
             If finalObjective IsNot Nothing Then built.Model.Minimize(finalObjective)
         Else

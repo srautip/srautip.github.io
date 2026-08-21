@@ -52,17 +52,20 @@ stagnation_timeout_s: 4.0
 # Feld (sondern das Zeitbudget) die begrenzende Groesse ist.
 max_solutions: 30
 
-# Code-Review-Umsetzung P2: lexikografischer Modus - Kann, ClassGaps und
-# TeacherGaps werden als einzeln beweisbare Stufen nacheinander optimiert
-# und ihr jeweiliges Optimum als Constraint fixiert; erst danach
-# enumerieren die Iterationen Alternativen innerhalb dieses Bands. Die
-# quality_weights der drei gestuften Kriterien steuern in diesem Modus
-# nur noch das nachgelagerte Ranking (die Stufenreihenfolge ist fix:
-# Kann > ClassGaps > TeacherGaps - fuer dieses Beispiel deckungsgleich
-# mit der bisherigen Gewichts-Prioritaet class_gaps >> teacher_gaps).
+# Code-Review-Umsetzung P2: der lexikografische Modus (Kann und
+# ClassGaps als einzeln beweisbare Stufen, Optimum je Stufe als
+# Constraint fixiert, danach Enumeration ueber die gewichtete
+# Rest-Zielfunktion) ist inzwischen PROJEKTWEITER DEFAULT
+# (Nutzerentscheidung) - hier nur noch explizit gesetzt, damit die
+# Kalibrierung dieses Referenzbeispiels selbsterklaerend bleibt.
+# TeacherGaps ist per Default KEINE eigene Stufe
+# (lex_teacher_gaps_stage: false), sondern wirkt mit seinem
+# quality_weights-Gewicht (50) in der Rest-Zielfunktion - abwaegbar
+# gegen Randstunden/Nachmittage/Ausgewogenheit.
 # lex_tolerance 0 = jede exportierte Alternative ist exakt stufen-optimal.
 lexicographic: true
 lex_tolerance: 0
+lex_teacher_gaps_stage: false
 
 # Code-Review-Umsetzung P3: jede weitere Loesung muss mindestens 8 der
 # bisher belegten Slots anders belegen (~5% der Gesamt-Wochenstunden) -
@@ -96,12 +99,17 @@ rehint_found_solutions: false
 #   (Objective=Bound=0), 30 disjunkt-diverse Loesungen - aber
 #   Quality.Total 312-345, komplett getrieben von den vier dann voellig
 #   ungesteuerten Kriterien.
-# - Lexikografisch, Restkriterien AN (dieser Stand): Stufen weiterhin
-#   fixiert auf 0/0/0, 15 diverse Loesungen, beste Quality.Total 183.6 -
-#   die Rest-Zielfunktion selbst bleibt pro Iteration Feasible (ihr
-#   eigenes Optimum im Band ist im 4s-Stagnation-Fenster nicht beweisbar),
-#   was aber nur noch die vier schwachen Kriterien betrifft, nie mehr
-#   Kann/ClassGaps/TeacherGaps.
+# - Lexikografisch, Restkriterien AN, TeacherGaps als Stufe: Stufen
+#   fixiert auf 0/0/0, 15 diverse Loesungen, beste Quality.Total 183.6,
+#   Streuung bis 210.8.
+# - Lexikografisch, Restkriterien AN, TeacherGaps in der
+#   Rest-Zielfunktion (dieser Stand, jetzt projektweiter Default):
+#   Kann/ClassGaps fixiert auf 0/0, 16 diverse Loesungen, beste
+#   Quality.Total ebenfalls 183.6 bei deutlich ENGERER Streuung
+#   (183.6-185.5) - die Rest-Zielfunktion (inkl. TeacherGaps, Gewicht 50)
+#   bleibt pro Iteration Feasible (ihr eigenes Optimum im Band ist im
+#   4s-Stagnation-Fenster nicht beweisbar), was aber nur noch die
+#   Restkriterien betrifft, nie mehr Kann/ClassGaps.
 quality_weights:
   class_gaps: 1000.0
   teacher_gaps: 50.0
