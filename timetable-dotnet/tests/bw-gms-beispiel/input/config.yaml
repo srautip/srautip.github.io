@@ -100,17 +100,35 @@ quality_weights:
   #
   # Nachtrag (P4-P6-Umsetzung, erneuter 300s-Lauf): die Rest-Zielfunktion
   # rechnet jetzt GCD-normalisiert (Koeffizienten 100/500 -> 1/5,
-  # objective_value entsprechend ~Faktor 100 kleiner - z.B. 149 statt
-  # 14900; Quality.Total bleibt auf der vollen Gewichtsskala). Die
-  # Bound blieb bei diesem Budget trotzdem 0 - die GCD-Normalisierung
-  # allein knackt den GMS-Residual-Beweis nicht. Ergebnisqualitaet
-  # (beste Loesung: 14 unbelegte Fenster-Slots, Total 21073) liegt im
-  # Streuband der Vorlaeufe - bei num_workers=4 sind Laeufe trotz
-  # fixem Seed NICHT deterministisch (CP-SAT-Portfolio-Threading);
-  # in einem von zwei Kontrolllaeufen fand die erste Iteration binnen
-  # ihres 60s-Fensters gar keine Loesung (TimeLimitReached ohne
-  # Kandidaten) - bei Bedarf Budget erhoehen oder num_workers: 1 fuer
-  # Determinismus.
+  # objective_value entsprechend ~Faktor 100 kleiner; Quality.Total
+  # bleibt auf der vollen Gewichtsskala). Die Bound blieb bei diesem
+  # Budget trotzdem 0. Bei num_workers=4 sind Laeufe trotz fixem Seed
+  # NICHT deterministisch (CP-SAT-Portfolio-Threading).
+  #
+  # 20-MIN-LANGVERGLEICH (je exakt 1200s SolveTop-Budget, max_solutions
+  # 40, per_solve/stage 120s, Stagnation 20s, direkt nacheinander):
+  # - Variante A (720 occupied_slot-Kann-Regeln): 33 Loesungen,
+  #   Fenster-Defizit KONSTANT 8 ueber alle Loesungen (die Kann-Stufe
+  #   fixiert ihr Optimum als hartes Band), TeacherGaps 50-60,
+  #   ClassGaps ueberall 0, beste Quality.Total 9062.
+  # - Variante B (24 occupied_window, dieser Stand): 22 Loesungen,
+  #   Fenster-Defizit 12-22 (bestes 12), TeacherGaps 50-68, ClassGaps
+  #   ueberall 0. Ein frueherer B-Lauf mit per_solve 60s scheiterte
+  #   komplett (erste Iteration ohne Feasibility) - die 120s-Fenster
+  #   beheben das.
+  # Ehrliches Fazit nach 20 Min: auf der Zielmetrik Fensterabdeckung
+  # DOMINIERT die Batterie-Variante (8 ueberall vs. bestenfalls 12)
+  # bei gleichem besten TeacherGaps-Wert (50) - ihr struktureller
+  # Vorteil ist die dedizierte Kann-Stufe (eigenes Budget + hartes
+  # Band), nicht die Kodierung selbst; die Bound blieb in BEIDEN
+  # Varianten 0. Der Kompaktheitsgewinn von occupied_window (keine 720
+  # Kann-BoolVars, constraints.yaml 5492 -> 622 Zeilen) steht damit
+  # weiterhin gegen einen realen Qualitaetsrueckstand auf der
+  # Dichte-Metrik. Vorgesehene Abhilfe (offen): opt-in-Dichte-STUFE
+  # analog lex_teacher_gaps_stage - sie gaebe dem kompakten Kriterium
+  # exakt den Stufen-Vorteil der Batterie zurueck. Bis dahin bleibt
+  # fuer diese Schule auch die Rueckkehr zur Batterie eine legitime
+  # Option (occupied_slot ist als Typ vollstaendig erhalten).
   occupied_density: 500.0
   include_edge_period: false
   include_afternoon_day_count: false

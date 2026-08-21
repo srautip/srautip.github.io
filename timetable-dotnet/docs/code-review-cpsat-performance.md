@@ -342,11 +342,21 @@ Doc-Kommentaren der betroffenen Module):
   Fenster-Slots gegen 26-35 (Dichte-Gewicht 100) bzw. 13-19 (500) ohne
   eigene Stufe. Der P1-Hypothese "Batterie = Bound-Killer" haelt der
   GMS-Kurztest damit nicht stand; bestaetigt ist der Kompaktheits- und
-  Wartbarkeitsgewinn. Naheliegender Folgeschritt: eine opt-in
-  Dichte-STUFE analog `lex_teacher_gaps_stage` (dediziertes Budget +
-  Band fuer die Fensterdichte, ohne zur Batterie zurueckzukehren) plus
-  ein langer Lauf (>= 30 Min) mit der neuen Kodierung. Alle Messwerte
-  im Kommentar der GMS-config.yaml.
+  Wartbarkeitsgewinn.
+
+  **20-Min-Langvergleich** (je 1200s, max_solutions 40, per_solve/stage
+  120s): das 5-Min-Bild bestaetigt sich - Batterie 33 Loesungen mit
+  Fenster-Defizit KONSTANT 8 (Kann-Stufe als hartes Band), Fenster 22
+  Loesungen mit Defizit 12-22, TeacherGaps in beiden best 50, ClassGaps
+  ueberall 0, Bound in beiden 0. Zusaetzlicher Befund: mit per_solve
+  60s scheiterte die Fenster-Variante teils komplett an der ersten
+  Feasibility (Kaltstart ohne Stufen-Hint) - daher das neue
+  config-Feld `stage1_time_limit_s` und 120s-Fenster fuer dieses
+  Szenario. Konsequenz: die opt-in-Dichte-STUFE (dediziertes Budget +
+  Band fuer das kompakte Kriterium) ist der klar priorisierte
+  Folgeschritt; bis dahin ist fuer Dichte-kritische Schulen auch die
+  Batterie (occupied_slot bleibt erhalten) legitim. Alle Messwerte im
+  Kommentar der GMS-config.yaml.
 
 - **P4** - Scaffolding nachfragegesteuert: `occupied`/`dailyCount`/
   `hasAny` werden je Seite (Klassen/Lehrer) nur noch gebaut, wenn ein
