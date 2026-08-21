@@ -380,9 +380,10 @@ Alles-oder-Nichts bei einem Abbruch in einer späteren Stufe). Der Runner
 gibt pro Schule eine `PASS`/`FAIL`-Zeile aus und liefert Exitcode 0 nur,
 wenn ALLE Stufen sauber durchlaufen - macht eine spätere CI-Anbindung
 trivial nachrüstbar, ohne dass diese Phase selbst einen Workflow anlegt.
-Zwei tatsächlich per CLI erzeugte und ausgeführte Referenzbeispiele sind
-committet: `tests/bw-grundschule-beispiel/` (BW-Grundschule) und
-`tests/bw-gms-beispiel/` (BW-Gemeinschaftsschule) - siehe
+Zwei tatsächlich ausgeführte Referenzbeispiele sind committet:
+`tests/bw-grundschule-beispiel/` (BW-Grundschule, per CLI-Scaffold
+erzeugt) und `tests/bw-gms-beispiel/` (BW-Gemeinschaftsschule, realitätsnah
+von Hand nach der Kontingentstundentafel nachgebildet) - siehe
 `docs/schooltestrunner-benutzerhandbuch.md` für eine kurze Beschreibung
 beider.
 

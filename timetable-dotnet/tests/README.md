@@ -633,12 +633,57 @@ endnutzerorientierter Überblick über beide Beispiele steht außerdem in
   Klasse 3/4 Stunde 2-5) - fach-unabhängig, im Gegensatz zum obigen
   `required_slot`.
 
-- **`tests/bw-gms-beispiel/`** (6 Klassenstufen [5-10], 12 Klassen, 8
-  Klassenlehrer über 3 Zwei-Fächer-Pools verteilt, BW-Gemeinschaftsschule):
+- **`tests/bw-gms-beispiel/`** (6 Klassenstufen [5-10], 24 Klassen [4-zügig],
+  ~696 Schüler, 48 Lehrkräfte, BW-Gemeinschaftsschule) - realitätsnah von
+  Hand nach der BW-Kontingentstundentafel Gemeinschaftsschule (gültig ab
+  1.8.2025) nachgebildet, **nicht** über den `new`-Scaffold erzeugt (der
+  liefert nur ein generisches Grundgerüst ohne Differenzierung/Wahlbereich
+  - dieses Beispiel demonstriert stattdessen bewusst die volle Bandbreite
+  der Gruppen-/Parallelverbund-Mechanik aus Phase 2.20/2.23 an einem
+  einzigen, in sich konsistenten Referenzfall):
+  - **Niveaudifferenzierung ab Kl.7** (Deutsch/Mathematik/Englisch): G-/
+    E-Kurs in Kl.7/8, zusätzlich A-Kurs ab Kl.9 - jeder Kurs läuft
+    klassenstufenweit über alle 4 Parallelklassen synchron (`gruppen[]` +
+    `parallelverbund`), zusätzlich in klassengroße **Sektionen** (max. 35
+    Schüler) aufgeteilt, sobald die Kursgröße das überschreitet (z.B.
+    `Mathematik-E-1`/`Mathematik-E-2` als separate `faecher[]`-Einträge
+    mit identischem Stundenkontingent) - eine einzelne Gruppe mit >35
+    Schülern wäre für klassenraumgebundenen Fachunterricht nicht plausibel
+    (anders als die bewusst großflächige Chor-Gesamtprobe im
+    Grundschulbeispiel).
+  - **Wahlpflichtbereich ab Kl.6** (Technik/AES/Französisch als 2.
+    Fremdsprache), ebenfalls sektioniert (Technik/AES sind Werkstatt-/
+    Küchenräume mit echter Kapazitätsgrenze).
+  - **Profilfach ab Kl.8** (NwT/IMP/Sport-Profil/Musik-Profil/BK-Profil) -
+    laut Nutzervorgabe "i.d.R. Doppelqualifikation vorhandener
+    Fachlehrer": keine eigenen Lehrkräfte, sondern zusätzliche
+    `fach_lehrer_zuordnungen` für bereits bestehende Fachlehrkräfte.
+  - **Religion-ev/-kath/Ethik** über alle 6 Klassenstufen, ebenfalls
+    sektioniert.
+  - **Fachraumbedarf** über `constraints.yaml`/`room_requirement`
+    (`should`-Priorität): Sporthallen, NaWi-/Biologie-Fachräume,
+    Musik-/Kunsträume, Technik-/AES-Räume, Computerraum (IMP) - inkl. je
+    eines Eintrags pro tatsächlich generierter Sektionsvariante.
+  - **Lehrkräfte bedarfsgenau bemessen** (~90% Ziel-Deputatsausschöpfung
+    statt grosszügiger Pauschalgrössen): da eine klassenstufenweite Gruppe
+    (z.B. ein G-Kurs) die Nachfrage über alle 4 Parallelklassen hinweg auf
+    EINE Lehrkraft konsolidiert, wäre ein pauschal an der Klassenzahl
+    bemessener Lehrerpool strukturell überdimensioniert und würde
+    Deputat-Leerlauf erzeugen, den die (rein lineare) Deputat-Abweichungs-
+    Kostenfunktion beliebig auf einzelne Lehrkräfte verteilen kann (siehe
+    Kanarienvogel-Wirkung unten). Zusätzliche Sicherheitsmarge: jeder Pool
+    hat mindestens so viele Köpfe wie die größte Anzahl zeitgleicher
+    Gruppen im selben Parallelverbund (z.B. 2 gleichzeitige
+    Technik-Sektionen brauchen zwingend 2 verschiedene Lehrkräfte -
+    `Lehrereinsatzplanung.vb` prüft das selbst nicht, erst der
+    nachgelagerte `no_overlap(teacher)`-Constraint der Tag/Periode-Stufe
+    würde eine Kollision hart verhindern und das Szenario sonst
+    unlösbar machen).
+  - Erzeugt mit einem projektinternen, nicht committeten Python-
+    Wegwerfskript (gleiche Disziplin wie die 92-Constraint-Generierung in
+    Phase 2.23) - `stammdaten.yaml`/`constraints.yaml` selbst sind
+    normale, direkt im GitHub-Web-Editor bearbeitbare YAML-Dateien wie
+    jedes andere Beispiel.
   ```bash
-  dotnet run --project SchoolTestRunner -- new bw-gms-beispiel \
-    --schulart Gemeinschaftsschule --bundesland BW --klassenstufen 6 --lehrer 8
   dotnet run --project SchoolTestRunner -- run bw-gms-beispiel
   ```
-  Zeigt die proportionale `--lehrer`-Verteilung auf mehrere
-  Klassenlehrer-Pool-Typen (siehe `--lehrer`-Beschreibung oben).
