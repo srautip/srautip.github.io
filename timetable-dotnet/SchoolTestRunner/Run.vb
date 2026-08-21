@@ -101,6 +101,14 @@ Public NotInheritable Class RunConfig
     ''' Verhalten). Ueberstimmt ab Iteration 2 ein gesetztes
     ''' relative_gap_limit.</summary>
     Public Property LaterIterationsGapLimit As Double? = Nothing
+    ''' <summary>Budget je lexikografischer Stufe bzw. (im gewichteten
+    ''' Modus) fuer den Kann-Warm-Start - Nothing faellt auf SolveTops
+    ''' eigenen Default (60s) zurueck. Relevant fuer grosse Szenarien,
+    ''' bei denen eine Stufe in 60s nicht einmal Feasibility erreicht
+    ''' und die Folge-Iterationen dann ohne Warm-Start-Hint kalt
+    ''' starten (live beobachteter GMS-Fehlermodus: TimeLimitReached
+    ''' ohne eine einzige Loesung).</summary>
+    Public Property Stage1TimeLimitS As Double? = Nothing
 End Class
 
 ''' <summary>Phase 2.24: die sieben Gewichte aus ScheduleQuality.
@@ -303,8 +311,10 @@ Public Module Run
         Dim lexTeacherGapsStage = If(cfg.LexTeacherGapsStage, False)
         Dim minDiversity = If(cfg.MinDiversity, 0)
         Dim rehintFoundSolutions = If(cfg.RehintFoundSolutions, True)
+        Dim stage1TimeLimitS = If(cfg.Stage1TimeLimitS, 60.0)
         Dim topResult = Solver.SolveTop(data, maxSolutions:=cfg.MaxSolutions, totalTimeLimitS:=cfg.SolveTimeLimitS,
             perSolveTimeLimitS:=perSolveLimit, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers, qualityWeights:=qualityWeights,
+            stage1TimeLimitS:=stage1TimeLimitS,
             stagnationTimeoutS:=stagnationTimeoutS, diversifySeed:=diversifySeed, randomizeSearch:=randomizeSearch,
             relativeGapLimit:=cfg.RelativeGapLimit,
             lexicographic:=lexicographic, lexTolerance:=lexTolerance, lexTeacherGapsStage:=lexTeacherGapsStage,

@@ -24,26 +24,37 @@ lehrereinsatz_time_limit_s: 180.0
 num_workers: 4
 
 # Begrenzt (getrennt von solve_time_limit_s) jede EINZELNE Solve-
-# Iteration in Solver.SolveTop - bewusst deutlich unter dem 5-Min-
-# Gesamtbudget, damit innerhalb der 300s mehrere Iterationen (= mehrere
-# verschiedene Loesungen) Platz haben, statt dass die erste Iteration
-# allein das komplette Budget verbraucht.
-per_solve_time_limit_s: 60.0
+# Iteration in Solver.SolveTop. Nutzervorgabe fuer den 20-Min-Vergleich:
+# 120s statt 60s - der Langvergleich zeigte, dass die erste Iteration
+# der occupied_window-Variante im 60s-Fenster teils gar keine Loesung
+# fand (TimeLimitReached ohne Kandidaten, 2 von 4 Laeufen); das
+# groessere Fenster gibt der ersten Feasibility-Suche Luft, waehrend
+# die Stagnationserkennung (unten) bereits konvergierte Iterationen
+# weiterhin frueh beendet.
+per_solve_time_limit_s: 120.0
+
+# Budget je lexikografischer Stufe (Kann/ClassGaps) - gleiche
+# Begruendung wie per_solve_time_limit_s: eine Stufe, die in 60s keine
+# Loesung findet, hinterlaesst den Folge-Iterationen keinen
+# Warm-Start-Hint (kalter Start = der beobachtete Fehlermodus).
+stage1_time_limit_s: 120.0
 
 # Phase 2.25: bricht eine einzelne Solve-Iteration vorzeitig ab, sobald so
 # lange keine neue Verbesserung mehr gefunden wurde - die gesparte Zeit
-# steht der naechsten Iteration zur Verfuegung (Nutzervorgabe: 20s statt
-# des Defaults 45.0s, damit eine feststeckende Iteration frueher abbricht
-# und die eingesparte Zeit weiteren Versuchen zugutekommt).
+# steht der naechsten Iteration zur Verfuegung (20s: eine feststeckende
+# Iteration bricht frueh ab, die eingesparte Zeit kommt weiteren
+# Versuchen zugute; greift erst, sobald mindestens eine Loesung der
+# Iteration existiert - die erste Feasibility-Suche bekommt also die
+# vollen 120s).
 stagnation_timeout_s: 20.0
 
 # Phase 2.21: wie viele vergleichbare Loesungs-Alternativen sollen in
 # output/stundenplan.json + output/stundentafel.html exportiert werden?
-# Das Gesamt-Zeitbudget bleibt unabhaengig davon durch solve_time_limit_s
-# gedeckelt (Solver.SolveTop prueft das verbleibende Budget vor jeder
-# weiteren Iteration) - ein hoeherer Wert verlangsamt den Lauf also nicht
-# ueber das obige Zeitbudget hinaus.
-max_solutions: 5
+# Nutzervorgabe fuer den 20-Min-Vergleich: hoch genug, dass das
+# ZEITBUDGET (nicht dieses Feld) die begrenzende Groesse ist - der
+# erste 20-Min-Batterie-Lauf erreichte max_solutions=5 bereits nach
+# 432s und liess den Rest des Budgets ungenutzt.
+max_solutions: 40
 
 # Phase 2.24/2.25-Nachtrag-2: die vier Sekundaerkriterien Randstunden/
 # Nachmittags-Tage/Klassen-/Lehrer-Tagesausgewogenheit sind fuer dieses

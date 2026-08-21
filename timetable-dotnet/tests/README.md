@@ -342,6 +342,7 @@ lex_teacher_gaps_stage: false   # Optional, Default false - TeacherGaps-Stufe is
 min_diversity: 0   # Optional, Default 0 - Code-Review-Umsetzung P3, siehe unten
 rehint_found_solutions: true   # Optional, Default true - Code-Review-Umsetzung P3, siehe unten
 later_iterations_gap_limit: null   # Optional, Default nicht gesetzt - Code-Review-Umsetzung P6, siehe unten
+stage1_time_limit_s: 60.0   # Optional, Default 60.0 - Budget je lexikografischer Stufe bzw. Kann-Warm-Start; bei grossen Szenarien erhoehen, wenn eine Stufe in 60s keine Loesung findet (Folge-Iterationen starten sonst ohne Warm-Start-Hint kalt)
 quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe unten
   kann: 100.0
   class_gaps: 100.0
