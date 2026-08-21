@@ -470,6 +470,24 @@ Public Module Verifier
             End If
         Next
 
+        ' Phase 2.26: Kanarienvogel-Pruefung fuer die harte FesteZuordnung-
+        ' Pinnung - unabhaengig aus bestand.FesteZuordnungen + result.
+        ' Zuweisungen re-derivert (kein geteilter Code mit dem CP-SAT-
+        ' Constraint). Sollte NIE feuern, wenn der Constraint-Block in
+        ' Lehrereinsatzplanung.vb korrekt verdrahtet ist - ein Treffer hier
+        ' ist ein Beweis fuer einen SOLVER-Bug, nicht fuer ein Stammdaten-
+        ' Problem (das faengt StammdatenValidation bereits VOR dem Solve ab).
+        For Each fz In bestand.FesteZuordnungen
+            Dim tatsaechlicherLehrer = result.Zuweisungen.
+                Where(Function(z) z.Klasse = fz.KlasseName AndAlso z.Fach = fz.FachName).
+                Select(Function(z) z.Lehrer).FirstOrDefault()
+            If tatsaechlicherLehrer Is Nothing Then
+                violations.Add($"feste_zuordnung {fz.LehrerName}/{fz.KlasseName}/{fz.FachName}: keine Zuweisung fuer {fz.KlasseName}/{fz.FachName} im Ergebnis gefunden")
+            ElseIf tatsaechlicherLehrer <> fz.LehrerName Then
+                violations.Add($"feste_zuordnung {fz.LehrerName}/{fz.KlasseName}/{fz.FachName}: tatsaechlich zugewiesen ist '{tatsaechlicherLehrer}' statt der fest zugeordneten Lehrkraft")
+            End If
+        Next
+
         ' Phase 2.17: Kanarienvogel-Pruefung fuer den harten Teilzeit-Tage-
         ' Kohaerenz-Vorfilter in Lehrereinsatzplanung.SolveLehrereinsatz -
         ' unabhaengig aus den rohen Stammdaten re-derivert (kein geteilter

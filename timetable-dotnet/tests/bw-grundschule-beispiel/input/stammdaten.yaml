@@ -1226,3 +1226,19 @@ gruppen:
   - S-4b-02
   - S-4b-03
   - S-4b-04
+
+# Phase 2.26: illustrative harte Lehrer-Klasse-Fach-Pinnung - Klassenlehrer-1
+# (ohne Pin natuerlich Klassenlehrer von 4b) wird statt Klassenlehrer-5 (der
+# vom Solver ohne Pin gewaehlte "natuerliche" Kandidat, siehe
+# output/lehrerzuteilung.md) auf 1a/Deutsch-Foerderstunde gepinnt. Live
+# bestaetigt: der Pin greift tatsaechlich, aber mit groesserer Wirkung als
+# der Fach-Umfang allein vermuten laesst - die bestehende Faecher-Buendelung
+# pro Klassenlehrer (Nachtrag 2/3) zwingt Klassenlehrer-1 dazu, gleich ALLE
+# Faecher von 1a zu uebernehmen, was einen saubereren 5er-Rotationszyklus
+# unter den Klassenlehrern ausloest (4b->1a->1b->2b->3b->4b) - jede Klasse
+# behaelt dabei weiterhin genau einen Klassenlehrer, 0 Verstoesse, Objective
+# unveraendert bei 1200.
+feste_zuordnungen:
+- lehrer_name: Klassenlehrer-1
+  klasse_name: 1a
+  fach_name: Deutsch-Förderstunde

@@ -765,4 +765,64 @@ Public Class LehrereinsatzplanungTests
         Assert.AreNotEqual(lehrer1a, lehrer1b, "Faire Verteilung sollte das unbeliebte Fach auf beide Lehrkraefte aufteilen.")
     End Sub
 
+    ''' <summary>Phase 2.26: beweist, dass eine FesteZuordnung den Solver
+    ''' auch GEGEN die guenstigere, "natuerliche" Alternative zwingt.
+    ''' Lehrer A hat eine erfuellte Klassenstufen-Praeferenz (Kosten 0),
+    ''' Lehrer B eine nie erfuellbare (Kosten WeightPraeferenzVerletzt) -
+    ''' ohne Pin waehlt der Solver deterministisch A. Mit einer
+    ''' FesteZuordnung auf Lehrer B MUSS der Solver B waehlen, trotz des
+    ''' Praeferenz-Mehrpreises - von Hand nachgerechnet: Objective = genau
+    ''' 1 * WeightPraeferenzVerletzt (0 fehlender Klassenlehrer, da B
+    ''' klassenlehrerfaehig ist). deputatToleranzStunden bewusst grosszuegig
+    ''' gesetzt, damit der jeweils NICHT gewaehlte, aber weiterhin
+    ''' kandidatenfaehige Lehrer (0h tatsaechlich vs. 4h Deputat-Soll) keine
+    ''' Deputat-Abweichungs-Strafe beitraegt - der Test soll ausschliesslich
+    ''' den Praeferenz-Effekt isolieren. Beweist gleichzeitig, dass
+    ''' Vollstaendigkeit weiterhin exakt 1 Zuweisung liefert (Lehrer A
+    ''' taucht NICHT mehr in den Zuweisungen fuer 1a/Deutsch auf).</summary>
+    <TestMethod>
+    Public Sub FesteZuordnungForcesLessPreferredTeacherOverCheaperAlternative()
+        Dim b = Bestand(zweiteKlasse:=False)
+        Dim lehrerA As New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 4, .KlassenlehrerFaehig = True}
+        lehrerA.BevorzugteKlassenstufen.Add(1)
+        Dim lehrerB As New Lehrer With {.Name = "Lehrer B", .DeputatSollstunden = 4, .KlassenlehrerFaehig = True}
+        lehrerB.BevorzugteKlassenstufen.Add(9) ' nie erfuellbar
+        b.Lehrkraefte.Add(lehrerA)
+        b.Lehrkraefte.Add(lehrerB)
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = "Deutsch"})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer B", .FachName = "Deutsch"})
+
+        ' Gegenprobe ohne Pin: Solver waehlt A (Objective 0).
+        Dim ohnePin = Lehrereinsatzplanung.SolveLehrereinsatz(b, deputatToleranzStunden:=10.0, timeLimitS:=10)
+        Assert.AreEqual(0.0, ohnePin.Solver.ObjectiveValue, 0.001)
+        Assert.AreEqual("Lehrer A", ohnePin.Zuweisungen.Single().Lehrer)
+
+        b.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Lehrer B", .KlasseName = "1a", .FachName = "Deutsch"})
+        Assert.AreEqual(0, StammdatenValidation.ValidateStammdaten(b).Count)
+
+        Dim result = Lehrereinsatzplanung.SolveLehrereinsatz(b, deputatToleranzStunden:=10.0, timeLimitS:=10)
+        Assert.IsTrue(result.Status = CpSolverStatus.Optimal OrElse result.Status = CpSolverStatus.Feasible, result.Status.ToString())
+        Assert.AreEqual(CDbl(Lehrereinsatzplanung.WeightPraeferenzVerletzt), result.Solver.ObjectiveValue, 0.001)
+
+        Assert.AreEqual(1, result.Zuweisungen.Where(Function(z) z.Klasse = "1a" AndAlso z.Fach = "Deutsch").Count())
+        Assert.AreEqual("Lehrer B", result.Zuweisungen.Single().Lehrer)
+        Assert.IsFalse(result.Zuweisungen.Any(Function(z) z.Lehrer = "Lehrer A"), "Lehrer A haette durch die Vollstaendigkeits-Constraint ausgeschlossen sein muessen.")
+    End Sub
+
+    ''' <summary>Phase 2.26: Kanarienvogel - bestaetigt, dass der defensive
+    ''' Throw in SolveLehrereinsatz tatsaechlich feuert, wenn eine
+    ''' FesteZuordnung (bewusst unter Umgehung von StammdatenValidation
+    ''' konstruiert) keinen Kandidaten im Modell hat.</summary>
+    <TestMethod>
+    Public Sub FesteZuordnungWithoutResolvableCandidateThrows()
+        Dim b = Bestand(zweiteKlasse:=False)
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 4})
+        ' Bewusst KEINE FachLehrerZuordnung fuer Lehrer A/Deutsch -
+        ' StammdatenValidation wuerde das eigentlich schon vorher stoppen;
+        ' dieser Test simuliert einen umgangenen/fehlerhaften Aufrufer
+        ' direkt gegen SolveLehrereinsatz.
+        b.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Lehrer A", .KlasseName = "1a", .FachName = "Deutsch"})
+        Assert.ThrowsException(Of InvalidOperationException)(Sub() Lehrereinsatzplanung.SolveLehrereinsatz(b, timeLimitS:=10))
+    End Sub
+
 End Class

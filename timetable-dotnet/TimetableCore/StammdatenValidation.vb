@@ -229,6 +229,65 @@ Public Module StammdatenValidation
             Next
         Next
 
+        Dim lehrerByName = bestand.Lehrkraefte.ToDictionary(Function(l) l.Name)
+        Dim gruppeNamen As New HashSet(Of String)(bestand.Gruppen.Select(Function(g) g.Name))
+
+        ' Phase 2.26: FesteZuordnungen - harte Lehrer-Klasse-Fach-Pinnung.
+        ' Praeconditions fuer Lehrereinsatzplanung.SolveLehrereinsatz's
+        ' defensiven Throw (siehe dortiger Kommentar): jeder Eintrag muss
+        ' eine bekannte Klasse/Fach/Lehrkraft referenzieren, die Lehrkraft
+        ' muss fuer das Fach qualifiziert UND teilzeit-tage-kohaerent sein -
+        ' sonst waere der zugehoerige assign-Key im CP-SAT-Modell gar nicht
+        ' vorhanden.
+        For i = 0 To bestand.FesteZuordnungen.Count - 1
+            Dim fz = bestand.FesteZuordnungen(i)
+
+            If Not lehrerByName.ContainsKey(fz.LehrerName) Then
+                errors.Add($"feste_zuordnungen[{i}]: lehrer_name={JsonHelpers.PyRepr(fz.LehrerName)} ist keine bekannte Lehrkraft")
+            End If
+
+            Dim klasseBekannt = klasseByName.ContainsKey(fz.KlasseName)
+            If Not klasseBekannt AndAlso gruppeNamen.Contains(fz.KlasseName) Then
+                errors.Add($"feste_zuordnungen[{i}]: klasse_name={JsonHelpers.PyRepr(fz.KlasseName)} referenziert eine Gruppe, keine Klasse - feste Zuordnungen fuer Gruppen-gefuehrte Faecher werden in dieser Version noch nicht unterstuetzt")
+            ElseIf Not klasseBekannt Then
+                errors.Add($"feste_zuordnungen[{i}]: klasse_name={JsonHelpers.PyRepr(fz.KlasseName)} ist keine bekannte Klasse")
+            End If
+
+            If Not fachByName.ContainsKey(fz.FachName) Then
+                errors.Add($"feste_zuordnungen[{i}]: fach_name={JsonHelpers.PyRepr(fz.FachName)} ist kein bekanntes Fach")
+            End If
+
+            If Not klasseBekannt OrElse Not fachByName.ContainsKey(fz.FachName) Then Continue For ' Folgechecks brauchen beide gueltig
+
+            Dim klasse = klasseByName(fz.KlasseName)
+            Dim fach = fachByName(fz.FachName)
+            Dim fk = Stammdaten.WochenstundenFuer(fach, klasse.Klassenstufe)
+            If fk Is Nothing Then
+                errors.Add($"feste_zuordnungen[{i}]: fach {JsonHelpers.PyRepr(fz.FachName)} wird in klassenstufe {klasse.Klassenstufe} (klasse {JsonHelpers.PyRepr(fz.KlasseName)}) nicht gefuehrt")
+                Continue For
+            End If
+
+            If Not lehrerByName.ContainsKey(fz.LehrerName) Then Continue For ' bereits oben gemeldet
+            Dim lehrer = lehrerByName(fz.LehrerName)
+            If Not Stammdaten.LehrerFuerFach(bestand, fz.FachName).Any(Function(l) l.Name = fz.LehrerName) Then
+                errors.Add($"feste_zuordnungen[{i}]: lehrkraft {JsonHelpers.PyRepr(fz.LehrerName)} ist fuer fach {JsonHelpers.PyRepr(fz.FachName)} nicht qualifiziert (fehlt in fach_lehrer_zuordnungen)")
+            ElseIf Not Stammdaten.IstTeilzeitKohaerent(lehrer, bestand, fk) Then
+                errors.Add($"feste_zuordnungen[{i}]: lehrkraft {JsonHelpers.PyRepr(fz.LehrerName)} ist fuer {fz.KlasseName}/{fz.FachName} teilzeit-tage-inkohaerent (wochenstunden_soll={fk.WochenstundenSoll} passt nicht in verfuegbare_tage) und kann deshalb nicht fest zugeordnet werden")
+            End If
+        Next
+
+        ' Widerspruchspruefung: zwei FesteZuordnungen fuer dieselbe
+        ' (Klasse,Fach)-Kombination mit UNTERSCHIEDLICHEN Lehrkraeften
+        ' waeren strukturell unloesbar (zwei "= 1"-Constraints auf
+        ' verschiedene Variablen derselben Vollstaendigkeits-Summe, die
+        ' zusammen > 1 erzwingen wuerden).
+        For Each g In bestand.FesteZuordnungen.GroupBy(Function(fz) (fz.KlasseName, fz.FachName))
+            Dim distinctLehrer = g.Select(Function(fz) fz.LehrerName).Distinct().ToList()
+            If distinctLehrer.Count > 1 Then
+                errors.Add($"feste_zuordnungen: klasse {JsonHelpers.PyRepr(g.Key.Item1)}/fach {JsonHelpers.PyRepr(g.Key.Item2)} hat widerspruechliche feste Zuordnungen zu unterschiedlichen Lehrkraeften ({String.Join(", ", distinctLehrer)})")
+            End If
+        Next
+
         Return errors
     End Function
 

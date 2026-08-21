@@ -56,6 +56,8 @@ Public Class StammdatenTests
             .MitgliederSchuelerIds = New List(Of String) From {"S-1a-01"}
         })
 
+        bestand.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Frau Müller", .KlasseName = "1a", .FachName = "Deutsch"})
+
         Return bestand
     End Function
 
@@ -102,6 +104,12 @@ Public Class StammdatenTests
         Assert.AreEqual("Religion-ev-Kl1", gruppe.Name)
         Assert.AreEqual("Fachgruppe", gruppe.Typ)
         CollectionAssert.AreEqual(New List(Of String) From {"S-1a-01"}, gruppe.MitgliederSchuelerIds)
+
+        Assert.AreEqual(1, restored.FesteZuordnungen.Count)
+        Dim fz = restored.FesteZuordnungen(0)
+        Assert.AreEqual("Frau Müller", fz.LehrerName)
+        Assert.AreEqual("1a", fz.KlasseName)
+        Assert.AreEqual("Deutsch", fz.FachName)
     End Sub
 
     <TestMethod>
@@ -114,6 +122,7 @@ Public Class StammdatenTests
             Assert.AreEqual(original.SchulName, restored.SchulName)
             Assert.AreEqual(original.Klassen.Count, restored.Klassen.Count)
             Assert.AreEqual(original.Lehrkraefte.Count, restored.Lehrkraefte.Count)
+            Assert.AreEqual(original.FesteZuordnungen.Count, restored.FesteZuordnungen.Count)
         Finally
             If File.Exists(filePath) Then File.Delete(filePath)
         End Try

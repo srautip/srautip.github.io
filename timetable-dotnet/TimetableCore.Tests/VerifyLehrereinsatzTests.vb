@@ -150,4 +150,47 @@ Public Class VerifyLehrereinsatzTests
         Assert.IsTrue(violations.Any(Function(v) v.Contains("1b") AndAlso v.Contains("unterrichtet dort laut Zuweisungen kein Fach")), String.Join(vbLf, violations))
     End Sub
 
+    ' Phase 2.26: Kanarienvogel-Pruefung fuer die harte FesteZuordnung-
+    ' Pinnung - unabhaengig von Lehrereinsatzplanung.vb's Constraint-Code.
+
+    <TestMethod>
+    Public Sub FesteZuordnungHonoredProducesNoViolation()
+        Dim b = Bestand()
+        b.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Lehrer A", .KlasseName = "1a", .FachName = "Deutsch"})
+        Assert.AreEqual(0, Verifier.VerifyLehrereinsatz(b, CleanResult()).Count)
+    End Sub
+
+    ''' <summary>Simuliert einen Bug in Lehrereinsatzplanung.vb: die
+    ''' FesteZuordnung verlangt Lehrer A, das Ergebnis weist aber Lehrer B
+    ''' zu - unabhaengig aus bestand.FesteZuordnungen + result.Zuweisungen
+    ''' erkannt, kein geteilter Code mit dem Solver.</summary>
+    <TestMethod>
+    Public Sub FesteZuordnungViolatedByDifferentTeacherIsDetected()
+        Dim b = Bestand()
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer B", .FachName = "Deutsch"})
+        b.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Lehrer A", .KlasseName = "1a", .FachName = "Deutsch"})
+        Dim result As New LehrereinsatzResult With {
+            .Zuweisungen = New List(Of LehrereinsatzZuweisung) From {
+                New LehrereinsatzZuweisung With {.Lehrer = "Lehrer B", .Klasse = "1a", .Fach = "Deutsch"}
+            },
+            .Klassenlehrer = New Dictionary(Of String, String)
+        }
+        Dim violations = Verifier.VerifyLehrereinsatz(b, result)
+        Assert.IsTrue(violations.Any(Function(v) v.Contains("Lehrer A/1a/Deutsch") AndAlso v.Contains("tatsaechlich zugewiesen ist 'Lehrer B'")), String.Join(vbLf, violations))
+    End Sub
+
+    ''' <summary>FesteZuordnung existiert, aber das Ergebnis enthaelt gar
+    ''' keine Zuweisung fuer diese (Klasse,Fach)-Kombination.</summary>
+    <TestMethod>
+    Public Sub FesteZuordnungWithMissingAssignmentIsDetected()
+        Dim b = Bestand()
+        b.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Lehrer A", .KlasseName = "1a", .FachName = "Deutsch"})
+        Dim result As New LehrereinsatzResult With {
+            .Zuweisungen = New List(Of LehrereinsatzZuweisung),
+            .Klassenlehrer = New Dictionary(Of String, String)
+        }
+        Dim violations = Verifier.VerifyLehrereinsatz(b, result)
+        Assert.IsTrue(violations.Any(Function(v) v.Contains("Lehrer A/1a/Deutsch") AndAlso v.Contains("keine Zuweisung fuer 1a/Deutsch im Ergebnis gefunden")), String.Join(vbLf, violations))
+    End Sub
+
 End Class

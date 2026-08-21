@@ -228,6 +228,33 @@ Public Module Lehrereinsatzplanung
             model.Add(LinearExpr.Sum(vars) = 1)
         Next
 
+        ' --- Hart: FesteZuordnungen (Phase 2.26) - explizite Lehrer-Klasse-
+        ' Fach-Pinnung aus den Stammdaten. Precondition: StammdatenValidation.
+        ' ValidateStammdaten muss VOR diesem Aufruf 0 Fehler bestaetigt haben -
+        ' das garantiert bereits, dass klasse_name/fach_name/lehrer_name
+        ' bekannt sind, die Lehrkraft fuer das Fach qualifiziert UND
+        ' teilzeit-tage-kohaerent ist, der zugehoerige assign-Key also
+        ' existieren MUSS. Trotzdem defensiv per Throw statt stillem
+        ' Ueberspringen abgesichert (anders als vorjahresZuordnung unten, wo
+        ' ein nicht aufloesbarer Eintrag ein legitimer, erwartbarer Fall
+        ' ist): ein harter Pin, der intern nicht greift, waere ein stiller
+        ' Korrektheitsverlust, den niemand bemerken wuerde. Gleiches
+        ' Verteidigungs-in-die-Tiefe-Prinzip wie der Teilzeit-Kohaerenz-
+        ' Vorfilter (Phase 2.17). Da die "genau 1 Lehrkraft pro (Klasse,
+        ' Fach)"-Summe oben bereits alle Kandidaten dieser Kombination
+        ' enthaelt, genuegt model.Add(assign(key) = 1) - CP-SAT leitet
+        ' automatisch her, dass jede andere Variable derselben Summe 0 sein
+        ' muss.
+        For Each fz In bestand.FesteZuordnungen
+            Dim key As New AssignKey With {.Lehrer = fz.LehrerName, .Klasse = fz.KlasseName, .Fach = fz.FachName}
+            If Not assign.ContainsKey(key) Then
+                Throw New InvalidOperationException(
+                    $"feste_zuordnungen: {fz.LehrerName}/{fz.KlasseName}/{fz.FachName} hat keinen Kandidaten im Modell - " &
+                    "StammdatenValidation.ValidateStammdaten haette das VOR diesem Aufruf abfangen muessen.")
+            End If
+            model.Add(assign(key) = 1)
+        Next
+
         ' --- Weich: Deputat-Korridor (hinge-loss ueber die Toleranzgrenze
         ' hinaus, sowohl bei Ueber- als auch bei Unterdeckung) ---
         Dim deputatToleranz = CInt(Math.Round(deputatToleranzStunden))

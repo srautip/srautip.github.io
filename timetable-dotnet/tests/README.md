@@ -122,6 +122,8 @@ dann nicht auf die Planung aus.
   nur nötig, wenn `gruppen` genutzt wird.
 - `gruppen` - optional, Liste klassenunabhängiger Schülergruppen (siehe
   unten), z.B. für Religion ev./kath./Ethik.
+- `feste_zuordnungen` - optional, Liste harter Lehrer-Klasse-Fach-
+  Pinnungen (siehe unten).
 
 ### `klassenstufen[]`
 
@@ -247,11 +249,38 @@ verschieden), dieselbe `klassenstufe`, UND dasselbe `wochenstunden_soll`/
 strukturell unlösbar. Details siehe
 `docs/phase2-20-parallelgruppen.md`.
 
+### `feste_zuordnungen[]`
+
+Optional - eine explizite, harte Vorgabe "diese Lehrkraft unterrichtet
+dieses Fach in dieser Klasse", zusätzlich zu den weichen Präferenzen
+(`bevorzugte_klassenstufen`). Additiv: ohne `feste_zuordnungen` verhält
+sich die Planung exakt wie bisher.
+
+- `lehrer_name` - Name der Lehrkraft (muss in `lehrkraefte[]` existieren
+  UND laut `fach_lehrer_zuordnungen` für `fach_name` qualifiziert sein).
+- `klasse_name` - Name der Klasse (muss in `klassen[]` existieren -
+  Gruppen-geführte Fächer werden in dieser Version noch nicht
+  unterstützt).
+- `fach_name` - Name des Fachs (muss für die Klassenstufe dieser Klasse
+  geführt werden).
+
+**Solver-Wirkung:** `Lehrereinsatzplanung.SolveLehrereinsatz` erzwingt für
+jeden Eintrag hart `assign(lehrer,klasse,fach)=1` - die bestehende "genau 1
+Lehrkraft pro Klasse/Fach"-Summe sorgt dabei automatisch dafür, dass kein
+anderer Kandidat für dieselbe (Klasse,Fach)-Kombination aktiv wird. Anders
+als eine Präferenz kann eine feste Zuordnung NICHT durch die Zielfunktion
+"wegoptimiert" werden - ist die Lehrkraft dafür nicht qualifiziert oder
+teilzeit-tage-inkohärent, meldet `StammdatenValidation.ValidateStammdaten`
+das schon VOR dem Solve als Fehler statt eines schwer diagnostizierbaren
+Infeasible.
+
 Vor jedem Lauf prüft `StammdatenValidation.ValidateStammdaten` die Datei
 auf Konsistenz (unbekannte Klassenstufen-Referenzen, Fach ohne
 qualifizierte Lehrkraft, Deputat-Unsinn, Teilzeit-Tage-Kohärenz, unbekannte
-Schüler-/Gruppen-Referenzen, doppelte Schüler-IDs, ...) - Fehler werden mit
-Datei-/Objektbezug in `output/lehrerzuteilung.md` gemeldet.
+Schüler-/Gruppen-Referenzen, doppelte Schüler-IDs, feste Zuordnungen mit
+unbekannten Referenzen/fehlender Qualifikation/Teilzeit-Inkohärenz/
+widersprüchlicher Mehrfachzuordnung, ...) - Fehler werden mit Datei-/
+Objektbezug in `output/lehrerzuteilung.md` gemeldet.
 
 ## `constraints.yaml`
 

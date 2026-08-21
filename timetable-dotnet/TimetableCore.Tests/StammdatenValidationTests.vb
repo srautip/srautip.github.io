@@ -303,4 +303,89 @@ Public Class StammdatenValidationTests
         Assert.IsTrue(errors.Any(Function(e) e.Contains("'Religion-Kl1'") AndAlso e.Contains("'S-1a-01'") AndAlso e.Contains("mehr als einer Gruppe")), String.Join(vbLf, errors))
     End Sub
 
+    ' Phase 2.26: FesteZuordnung - harte Lehrer-Klasse-Fach-Pinnung.
+
+    <TestMethod>
+    Public Sub FesteZuordnungWithUnknownKlasseIsRejected()
+        Dim bestand = CleanBestand()
+        bestand.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Frau Müller", .KlasseName = "9z", .FachName = "Deutsch"})
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'9z'") AndAlso e.Contains("keine bekannte Klasse")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub FesteZuordnungWithUnknownFachIsRejected()
+        Dim bestand = CleanBestand()
+        bestand.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Frau Müller", .KlasseName = "1a", .FachName = "Chemie"})
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'Chemie'") AndAlso e.Contains("kein bekanntes Fach")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub FesteZuordnungWithUnknownLehrerIsRejected()
+        Dim bestand = CleanBestand()
+        bestand.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Herr Unbekannt", .KlasseName = "1a", .FachName = "Deutsch"})
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("'Herr Unbekannt'") AndAlso e.Contains("keine bekannte Lehrkraft")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub FesteZuordnungReferencingGruppeInsteadOfKlasseIsRejected()
+        Dim bestand = CleanBestand()
+        bestand.Gruppen.Add(New Gruppe With {.Name = "Religion-Kl1", .Typ = "Fachgruppe"})
+        bestand.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Frau Müller", .KlasseName = "Religion-Kl1", .FachName = "Deutsch"})
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("referenziert eine Gruppe")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub FesteZuordnungForUnqualifiedTeacherIsRejected()
+        Dim bestand = CleanBestand()
+        bestand.Lehrkraefte.Add(New Lehrer With {.Name = "Herr Ohne-Deutsch", .DeputatSollstunden = 28})
+        bestand.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Herr Ohne-Deutsch", .KlasseName = "1a", .FachName = "Deutsch"})
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("nicht qualifiziert")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub FesteZuordnungForFachNotOfferedInKlassenstufeIsRejected()
+        Dim bestand = CleanBestand()
+        Dim englisch As New Fach With {.Name = "Englisch"}
+        englisch.Klassenstufen.Add(New FachKlassenstufe With {.Klassenstufe = 2, .WochenstundenSoll = 2})
+        bestand.Faecher.Add(englisch)
+        bestand.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Frau Müller", .KlasseName = "1a", .FachName = "Englisch"})
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("wird in klassenstufe 1") AndAlso e.Contains("nicht gefuehrt")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub FesteZuordnungWithTeilzeitInkohaerenterLehrerIsRejected()
+        Dim bestand = CleanBestand()
+        bestand.Faecher(0).Klassenstufen(0).MaxProTag = 2 ' effectiveMaxProTag=2, WochenstundenSoll=6
+        bestand.Lehrkraefte.Add(New Lehrer With {.Name = "Teilzeit-Lehrer", .DeputatSollstunden = 10, .VerfuegbareTage = New List(Of String) From {"Mo", "Di"}}) ' 2 Tage * 2 = 4 < 6
+        bestand.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Teilzeit-Lehrer", .FachName = "Deutsch"})
+        bestand.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Teilzeit-Lehrer", .KlasseName = "1a", .FachName = "Deutsch"})
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("teilzeit-tage-inkohaerent")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub FesteZuordnungenWithConflictingTeachersForSameKlasseFachAreRejected()
+        Dim bestand = CleanBestand()
+        bestand.Lehrkraefte.Add(New Lehrer With {.Name = "Zweite Lehrkraft", .DeputatSollstunden = 28})
+        bestand.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Zweite Lehrkraft", .FachName = "Deutsch"})
+        bestand.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Frau Müller", .KlasseName = "1a", .FachName = "Deutsch"})
+        bestand.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Zweite Lehrkraft", .KlasseName = "1a", .FachName = "Deutsch"})
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.IsTrue(errors.Any(Function(e) e.Contains("widerspruechliche feste Zuordnungen")), String.Join(vbLf, errors))
+    End Sub
+
+    <TestMethod>
+    Public Sub FesteZuordnungForValidQualifiedTeacherIsAccepted()
+        Dim bestand = CleanBestand()
+        bestand.FesteZuordnungen.Add(New FesteZuordnung With {.LehrerName = "Frau Müller", .KlasseName = "1a", .FachName = "Deutsch"})
+        Dim errors = StammdatenValidation.ValidateStammdaten(bestand)
+        Assert.AreEqual(0, errors.Count, String.Join(vbLf, errors))
+    End Sub
+
 End Class
