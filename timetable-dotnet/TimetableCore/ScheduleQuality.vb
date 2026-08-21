@@ -55,6 +55,20 @@ Public NotInheritable Class QualityWeights
     ''' still sees the true count regardless of whether the solver
     ''' searched for it).</summary>
     Public Property IncludeTeacherGaps As Boolean = True
+    ''' <summary>Same structural on/off pattern as IncludeTeacherGaps above,
+    ''' extended to the remaining four secondary criteria (requested to let
+    ''' a school opt out of ALL of them, e.g. when only Kann/ClassGaps/
+    ''' TeacherGaps matter and the extra CP-SAT variables for these are not
+    ''' worth their cost at that school's scale). Each Default True -
+    ''' unchanged behavior for every existing school without an explicit
+    ''' override. None of these affect ScheduleQuality.Score's own
+    ''' independent, always-computed counts (display/ranking still sees
+    ''' the true values regardless of whether the solver searched for
+    ''' them).</summary>
+    Public Property IncludeEdgePeriod As Boolean = True
+    Public Property IncludeAfternoonDayCount As Boolean = True
+    Public Property IncludeClassLoadVariance As Boolean = True
+    Public Property IncludeTeacherLoadVariance As Boolean = True
 End Class
 
 Public Module ScheduleQuality

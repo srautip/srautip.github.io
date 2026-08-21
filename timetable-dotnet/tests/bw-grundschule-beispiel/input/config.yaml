@@ -53,11 +53,23 @@ max_solutions: 30
 # Phase 2.24/2.25-Nachtrag-2: Springstunden (Luecken zwischen belegten
 # Stunden an einem Tag) fuer Klassen deutlich staerker gewichtet als fuer
 # Lehrkraefte - Nutzerentscheidung fuer dieses Beispiel, ClassGaps auf das
-# 10-fache von TeacherGaps zu setzen (unabhaengig konfigurierbar, siehe
+# 20-fache von TeacherGaps zu setzen (unabhaengig konfigurierbar, siehe
 # tests/README.md "quality_weights" - die Big-M-freie Kodierung aus Phase
 # 2.25-Nachtrag-2 aendert daran nichts, sie betrifft nur, WIE eine
 # einzelne Luecken-Variable berechnet wird, nicht wie die beiden Summen
 # gewichtet in die Zielfunktion einfliessen).
+#
+# Nutzerentscheidung: die vier verbleibenden Sekundaerkriterien
+# (Randstunden, Nachmittags-Tage, Klassen-/Lehrer-Tagesausgewogenheit)
+# sind fuer dieses Beispiel STRUKTURELL abgeschaltet (keine Hilfsvariablen
+# im CP-SAT-Modell, nicht nur Gewicht 0) - nur Kann/ClassGaps/TeacherGaps
+# fliessen noch in die Suche ein. ScheduleQuality.Score zeigt die echten
+# Werte dieser vier Kriterien in stundenplan.md/stundenplan.json trotzdem
+# weiterhin an (nur die SUCHE ist dafuer blind, nicht die Anzeige).
 quality_weights:
   class_gaps: 1000.0
   teacher_gaps: 50.0
+  include_edge_period: false
+  include_afternoon_day_count: false
+  include_class_load_variance: false
+  include_teacher_load_variance: false

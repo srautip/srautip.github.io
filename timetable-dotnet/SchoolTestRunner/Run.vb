@@ -84,6 +84,13 @@ Public NotInheritable Class QualityWeightsConfig
     ''' Gewicht 0) - Sicherheitsventil fuer Schulen, bei denen selbst die
     ''' gefixte Kodierung noch zu teuer ist.</summary>
     Public Property IncludeTeacherGaps As Boolean? = Nothing
+    ''' <summary>Gleiches strukturelles An/Aus-Muster wie IncludeTeacherGaps
+    ''' oben, auf die verbleibenden vier Sekundaerkriterien erweitert -
+    ''' Nothing -&gt; Default True (unveraendertes Verhalten) je Feld.</summary>
+    Public Property IncludeEdgePeriod As Boolean? = Nothing
+    Public Property IncludeAfternoonDayCount As Boolean? = Nothing
+    Public Property IncludeClassLoadVariance As Boolean? = Nothing
+    Public Property IncludeTeacherLoadVariance As Boolean? = Nothing
 End Class
 
 Public Module Run
@@ -116,6 +123,10 @@ Public Module Run
         If cfg.ClassLoadVariance.HasValue Then w.ClassLoadVariance = cfg.ClassLoadVariance.Value
         If cfg.TeacherLoadVariance.HasValue Then w.TeacherLoadVariance = cfg.TeacherLoadVariance.Value
         If cfg.IncludeTeacherGaps.HasValue Then w.IncludeTeacherGaps = cfg.IncludeTeacherGaps.Value
+        If cfg.IncludeEdgePeriod.HasValue Then w.IncludeEdgePeriod = cfg.IncludeEdgePeriod.Value
+        If cfg.IncludeAfternoonDayCount.HasValue Then w.IncludeAfternoonDayCount = cfg.IncludeAfternoonDayCount.Value
+        If cfg.IncludeClassLoadVariance.HasValue Then w.IncludeClassLoadVariance = cfg.IncludeClassLoadVariance.Value
+        If cfg.IncludeTeacherLoadVariance.HasValue Then w.IncludeTeacherLoadVariance = cfg.IncludeTeacherLoadVariance.Value
         Return w
     End Function
 

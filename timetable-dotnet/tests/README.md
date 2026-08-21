@@ -305,6 +305,10 @@ quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe un
   class_load_variance: 3.0
   teacher_load_variance: 3.0
   include_teacher_gaps: true   # Optional, Default true - Phase 2.25-Nachtrag-2, siehe unten
+  include_edge_period: true   # Optional, Default true - siehe unten
+  include_afternoon_day_count: true   # Optional, Default true - siehe unten
+  include_class_load_variance: true   # Optional, Default true - siehe unten
+  include_teacher_load_variance: true   # Optional, Default true - siehe unten
 ```
 
 Fehlt die Datei komplett, gelten diese Defaults unverändert. `solve_time_limit_s`
@@ -385,6 +389,7 @@ Solver tatsächlich gesucht hat:
 | `afternoon_day_count` | Anzahl unterschiedlicher Tage mit Nachmittagsunterricht pro Klasse (nicht die Stundenanzahl - 4 Nachmittagsstunden an 1 Tag zählen als 1, an 4 Tagen verteilt als 4) |
 | `class_load_variance` / `teacher_load_variance` | Ausgewogenheit der täglichen Stundenzahl (Lehrkräfte nur über ihre tatsächlichen Arbeitstage) |
 | `include_teacher_gaps` | `false` schaltet `teacher_gaps` STRUKTURELL aus der Zielfunktion aus (keine Hilfsvariablen im Modell, nicht nur Gewicht 0) - Sicherheitsventil für Schulen, bei denen selbst die gefixte Kodierung (Phase 2.25-Nachtrag-2) noch zu teuer ist. Default `true`. |
+| `include_edge_period` / `include_afternoon_day_count` / `include_class_load_variance` / `include_teacher_load_variance` | Gleiches strukturelles An/Aus-Muster wie `include_teacher_gaps` für die verbleibenden vier Sekundärkriterien - `false` entfernt das jeweilige Kriterium komplett aus `Solver.SolveTop`s CP-SAT-Modell (keine Hilfsvariablen, nicht nur Gewicht 0), z.B. für Schulen, bei denen nur Kann/`class_gaps`/`teacher_gaps` überhaupt eine Rolle spielen sollen. Beeinflusst NICHT `ScheduleQuality.Score`s unabhängig berechnete, immer angezeigte Werte in `stundenplan.md`/`stundenplan.json` (nur die SUCHE wird dafür blind, nicht die Anzeige). Jeweils Default `true`. |
 
 Nur explizit gesetzte Unterfelder überschreiben ihren Default - eine
 Schule kann also z.B. nur `edge_period` anpassen, ohne die übrigen 6
