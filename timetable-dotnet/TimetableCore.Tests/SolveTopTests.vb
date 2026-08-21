@@ -392,7 +392,14 @@ Public Class SolveTopTests
     ''' (0 Verifier violations) despite being cut short mid-search.</summary>
     <TestMethod>
     Public Sub StagnationCutoffFiresAndReturnsEarly()
-        Dim data = CoupledTeacherContentionScenario()
+        ' classCount:=15 statt des geteilten 9er-Defaults: die P4-Umsetzung
+        ' (kein totes hasAnyClass-Scaffolding mehr) machte das 9er-Szenario
+        ' erneut zu schnell fuer die 500ms-Poll-Granularitaet - derselbe
+        ' live dokumentierte Timing-Effekt wie schon beim Phase-2.25-
+        ' Nachtrag-2-Encoding-Wechsel (siehe Methoden-Doc oben). Die
+        ' Companion-Tests behalten bewusst das kleinere Szenario, da sie
+        ' echtes Optimal im 20s-Budget brauchen.
+        Dim data = CoupledTeacherContentionScenario(classCount:=15)
         Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=20, perSolveTimeLimitS:=20, stagnationTimeoutS:=0.5, numWorkers:=1)
         Assert.AreEqual(1, result.Solutions.Count)
         Assert.IsTrue(result.StagnationTriggeredCount >= 1, "Stagnation cutoff should have fired at least once.")
@@ -759,6 +766,83 @@ Public Class SolveTopTests
         Assert.AreEqual(0, Verifier.VerifySchedule(data, blind.Solutions(0).Schedule).Count)
     End Sub
 
+    ''' <summary>Code-Review-Umsetzung (P6): die gewichtete Zielfunktion
+    ''' wird GCD-normalisiert - Gewichte 50/50/250 (GCD 50) ergeben
+    ''' effektive Koeffizienten 1/1/5. Das aendert weder Optimum noch
+    ''' Ranking (reine positive Skalierung), aber der vom Solver
+    ''' berichtete ObjectiveValue liegt auf der KLEINEREN Skala:
+    ''' Optimum {2,4} kostet roh 1 Klassen- + 1 Lehrer-Luecke = 100,
+    ''' normalisiert 2. Quality.Total (nachgelagert, unnormalisiert)
+    ''' bleibt 100 - genau diese Diskrepanz beweist die Normalisierung.</summary>
+    <TestMethod>
+    Public Sub WeightedObjectiveIsGcdNormalized()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 3}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim weights As New QualityWeights With {
+            .ClassGaps = 50.0, .TeacherGaps = 50.0, .EdgePeriod = 250.0,
+            .IncludeAfternoonDayCount = False, .IncludeClassLoadVariance = False, .IncludeTeacherLoadVariance = False}
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1,
+                                      qualityWeights:=weights, lexicographic:=False)
+        Assert.AreEqual(CpSolverStatus.Optimal, result.Solutions(0).Status)
+        Dim periods = result.Solutions(0).Schedule.Select(Function(l) l.Period).OrderBy(Function(p) p).ToList()
+        CollectionAssert.AreEqual(New List(Of Integer) From {2, 4}, periods,
+            "Bei 50/50/250 (Randstunde teurer als beide Luecken zusammen) muss der Solver die Luecke waehlen.")
+        Assert.AreEqual(2.0, result.Solutions(0).ObjectiveValue, 0.0000001,
+            "In-Modell-Objective muss GCD-normalisiert sein (roh 100, GCD 50).")
+        Assert.AreEqual(100.0, result.Solutions(0).Quality.Total, 0.0000001,
+            "Die nachgelagerte Quality.Total-Skala bleibt unnormalisiert.")
+    End Sub
+
+    ''' <summary>P6: `laterIterationsGapLimit` setzt CP-SATs
+    ''' relative_gap_limit erst ab der ZWEITEN Iteration - Korrektheits-/
+    ''' Vollstaendigkeits-Smoke (Gap-Limits aendern nur, WANN eine Loesung
+    ''' als final akzeptiert wird, nie die Zulaessigkeit): Enumeration
+    ''' bleibt distinct und verifier-clean.</summary>
+    <TestMethod>
+    Public Sub LaterIterationsGapLimitStillEnumeratesValidDistinctSolutions()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di", "Mi", "Do", "Fr"}, 1), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim result = Solver.SolveTop(data, maxSolutions:=3, totalTimeLimitS:=60, perSolveTimeLimitS:=10, numWorkers:=1,
+                                      laterIterationsGapLimit:=0.5)
+        Assert.AreEqual(3, result.Solutions.Count)
+        Assert.AreEqual(3, result.Solutions.Select(Function(s) s.Schedule(0).Day).Distinct().Count())
+        For Each s In result.Solutions
+            Assert.AreEqual(0, Verifier.VerifySchedule(data, s.Schedule).Count)
+        Next
+    End Sub
+
+    ''' <summary>Code-Review-Umsetzung (P4): sind ALLE Qualitaetskriterien
+    ''' strukturell abgeschaltet und existiert kein Kann-Constraint, wird
+    ''' seit P4 gar kein Scaffolding mehr gebaut und das Modell hat KEINE
+    ''' Zielfunktion - SolveTop muss dann als reine (deterministische)
+    ''' Feasibility-Enumeration weiterlaufen. Vorher entstanden in dieser
+    ''' Konstellation trotzdem occupied/hasAny/dailyCount-Variablen fuer
+    ''' jede Klasse und Lehrkraft (tote Modellmasse).</summary>
+    <TestMethod>
+    Public Sub AllCriteriaOffEnumeratesWithoutAnyObjective()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di", "Mi", "Do", "Fr"}, 1), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim weights As New QualityWeights With {
+            .IncludeClassGaps = False, .IncludeTeacherGaps = False,
+            .IncludeEdgePeriod = False, .IncludeAfternoonDayCount = False,
+            .IncludeClassLoadVariance = False, .IncludeTeacherLoadVariance = False,
+            .IncludeOccupiedDensity = False}
+        Dim result = Solver.SolveTop(data, maxSolutions:=3, totalTimeLimitS:=60, perSolveTimeLimitS:=10, numWorkers:=1,
+                                      qualityWeights:=weights)
+        Assert.AreEqual(3, result.Solutions.Count)
+        For Each s In result.Solutions
+            Assert.AreEqual(0.0, s.ObjectiveValue, 0.0000001, "Ohne einen einzigen Zielfunktionsterm meldet CP-SAT Objective 0.")
+            Assert.AreEqual(0, Verifier.VerifySchedule(data, s.Schedule).Count)
+        Next
+    End Sub
+
     ''' <summary>Nutzerentscheidung "TeacherGaps-Stufe opt-in": ohne
     ''' lexTeacherGapsStage bleibt TeacherGaps gewichtet in der
     ''' Rest-Zielfunktion und ist gegen andere Restkriterien abwaegbar;
@@ -812,8 +896,8 @@ Public Class SolveTopTests
     ''' /tmp/.../scratchpad/stagtiming/) to reliably produce a genuine
     ''' ~1.4s mid-search stagnation window well clear of the 500ms poll
     ''' granularity used by SolveWithStagnationCutoff.</summary>
-    Private Function CoupledTeacherContentionScenario() As JsonObject
-        Dim classes = Enumerable.Range(0, 9).Select(Function(i) $"C{i}").ToArray()
+    Private Function CoupledTeacherContentionScenario(Optional classCount As Integer = 9) As JsonObject
+        Dim classes = Enumerable.Range(0, classCount).Select(Function(i) $"C{i}").ToArray()
         Dim teachers = {"T1", "T2", "T3"}
         Dim cons As New List(Of JsonObject)
         For i = 0 To classes.Length - 1

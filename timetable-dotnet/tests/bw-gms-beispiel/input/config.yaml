@@ -88,6 +88,20 @@ quality_weights:
   # opt-in-Dichte-Stufe analog lex_teacher_gaps_stage, die der Dichte
   # wieder ein dediziertes Budget + hartes Band gibt; dazu ein langer
   # Lauf (>= 30 Min) mit der neuen Kodierung.
+  #
+  # Nachtrag (P4-P6-Umsetzung, erneuter 300s-Lauf): die Rest-Zielfunktion
+  # rechnet jetzt GCD-normalisiert (Koeffizienten 100/500 -> 1/5,
+  # objective_value entsprechend ~Faktor 100 kleiner - z.B. 149 statt
+  # 14900; Quality.Total bleibt auf der vollen Gewichtsskala). Die
+  # Bound blieb bei diesem Budget trotzdem 0 - die GCD-Normalisierung
+  # allein knackt den GMS-Residual-Beweis nicht. Ergebnisqualitaet
+  # (beste Loesung: 14 unbelegte Fenster-Slots, Total 21073) liegt im
+  # Streuband der Vorlaeufe - bei num_workers=4 sind Laeufe trotz
+  # fixem Seed NICHT deterministisch (CP-SAT-Portfolio-Threading);
+  # in einem von zwei Kontrolllaeufen fand die erste Iteration binnen
+  # ihres 60s-Fensters gar keine Loesung (TimeLimitReached ohne
+  # Kandidaten) - bei Bedarf Budget erhoehen oder num_workers: 1 fuer
+  # Determinismus.
   occupied_density: 500.0
   include_edge_period: false
   include_afternoon_day_count: false

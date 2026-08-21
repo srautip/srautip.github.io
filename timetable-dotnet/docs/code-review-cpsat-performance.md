@@ -348,9 +348,31 @@ Doc-Kommentaren der betroffenen Module):
   ein langer Lauf (>= 30 Min) mit der neuen Kodierung. Alle Messwerte
   im Kommentar der GMS-config.yaml.
 
+- **P4** - Scaffolding nachfragegesteuert: `occupied`/`dailyCount`/
+  `hasAny` werden je Seite (Klassen/Lehrer) nur noch gebaut, wenn ein
+  Abnehmer aktiv ist (Include*-Flags bzw. should-occupied_window der
+  jeweiligen Scope); das nie gelesene `hasAnyClass` entfaellt ersatzlos,
+  `hasAnyTeacher` entsteht nur noch fuer BuildTeacherRangeVars.
+- **P5** - `ExtractSchedule` gruppiert das Room-Dictionary einmal nach
+  dem Lesson-Schluessel: Extraktion faellt von O(Lessons x Rooms) auf
+  O(Lessons + Rooms).
+- **P6** (ohne den EdgePeriod-Default, der durch die lexikografische
+  Architektur ueberholt ist - die vier schwachen Kriterien sind als
+  Rest-Zielfunktion wieder nuetzlich):
+  - GCD-Normalisierung der gewichteten Zielfunktionen (`WeightedTotal`/
+    `WeightedResidual`): Koeffizienten wie 100/500 rechnen intern als
+    1/5 - reine positive Skalierung (Optimum/Ranking identisch,
+    Luecken-% invariant), entlastet den Bound-Beweis; `objective_value`/
+    `best_objective_bound` liegen dadurch auf der kleineren Skala,
+    `Quality.Total` unveraendert.
+  - `later_iterations_gap_limit` (config.yaml / `laterIterationsGapLimit`):
+    relatives Gap-Limit erst ab Iteration 2 - die erste Iteration beweist
+    sorgfaeltig, Folge-Iterationen (Zweck: Alternativen) akzeptieren
+    frueher. Opt-in, Default unveraendert.
+
 Offen aus der Empfehlungsliste bleiben die opt-in-Dichte-Stufe samt
-langem GMS-Lauf (siehe P1-GMS-Befund oben), P4/P5
-(Scaffolding/Extraktion) und der Viewer-Ausbau (Empfehlung 6).
+langem GMS-Lauf (siehe P1-GMS-Befund oben) und der Viewer-Ausbau
+(Empfehlung 6).
 
 **Live-Beleg** (`bw-grundschule-beispiel`, identisches 2-Min-Budget,
 `lexicographic: true`, `min_diversity: 8`, `rehint_found_solutions:

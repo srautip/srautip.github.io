@@ -341,6 +341,7 @@ lex_tolerance: 0   # Optional, Default 0 - nur wirksam mit lexicographic: true
 lex_teacher_gaps_stage: false   # Optional, Default false - TeacherGaps-Stufe ist opt-in, siehe unten
 min_diversity: 0   # Optional, Default 0 - Code-Review-Umsetzung P3, siehe unten
 rehint_found_solutions: true   # Optional, Default true - Code-Review-Umsetzung P3, siehe unten
+later_iterations_gap_limit: null   # Optional, Default nicht gesetzt - Code-Review-Umsetzung P6, siehe unten
 quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe unten
   kann: 100.0
   class_gaps: 100.0
@@ -474,6 +475,28 @@ IRGENDEINER nächsten Lösung, zieht die Suche aber systematisch zum
 nächstgelegenen Nachbarn der Vorlösung; für Diversitäts-Läufe gehören
 beide Hebel zusammen (`min_diversity` > 0 und `rehint_found_solutions:
 false`).
+
+**`later_iterations_gap_limit`** (Code-Review-Umsetzung P6): setzt
+CP-SATs `relative_gap_limit` erst AB DER ZWEITEN Solve-Iteration - die
+erste Iteration darf weiterhin sorgfältig ein Optimum beweisen, während
+Folge-Iterationen (deren Zweck zusätzliche ALTERNATIVEN sind, nie ein
+besseres Optimum) eine Lösung innerhalb dieser relativen Lücke früher
+als final akzeptieren; so passen mehr Kandidaten ins selbe
+Gesamtbudget. Sinnvolle Werte ~0.05-0.2. Überstimmt ab Iteration 2 ein
+gesetztes `relative_gap_limit`; Default nicht gesetzt = unverändertes
+Verhalten.
+
+**Hinweis zur Objective-Skala (P6):** die gewichteten Zielfunktionen
+(Gesamtsumme bzw. Rest-Zielfunktion im lexikografischen Modus) werden
+intern GCD-normalisiert - haben z.B. alle aktiven Gewichte den
+gemeinsamen Teiler 100, rechnet der Solver mit den Koeffizienten /100.
+Das ändert weder Optimum noch Ranking, entlastet aber CP-SATs
+Optimalitätsbeweis bei großen Gewichten. Sichtbare Folge: die in
+`stundenplan.md`/`stundenplan.json` ausgewiesenen `objective_value`/
+`best_objective_bound` liegen dann auf der kleineren Skala, während
+`Quality.Total` unverändert die volle Gewichtsskala nutzt - die
+Optimalitäts-LÜCKE in Prozent ist von der Skalierung unabhängig und
+bleibt über Läufe vergleichbar.
 
 **`quality_weights`** (Phase 2.24, komplett optional - fehlt der Block
 oder ein einzelnes Unterfeld darin, gilt unverändert der jeweils oben

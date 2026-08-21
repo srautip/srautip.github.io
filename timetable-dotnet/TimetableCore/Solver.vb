@@ -864,20 +864,39 @@ Public Module Solver
     ''' of its multi-solution loop without duplicating it.</summary>
     Private Function ExtractSchedule(built As BuiltModel, solver As CpSolver, status As CpSolverStatus) As List(Of ScheduleEntry)
         If status <> CpSolverStatus.Optimal AndAlso status <> CpSolverStatus.Feasible Then Return Nothing
+
+        ' Code-Review-Umsetzung (P5): das Room-Dictionary EINMAL nach dem
+        ' Lesson-Schluessel gruppieren statt es fuer jede wahre Lesson-Var
+        ' komplett linear zu durchsuchen - die Extraktion faellt damit von
+        ' O(Lessons x Rooms) auf O(Lessons + Rooms), spuerbar bei
+        ' Szenarien mit room_requirement und vielen max_solutions-
+        ' Iterationen (die Extraktion laeuft einmal pro Iteration).
+        Dim roomsByLesson As New Dictionary(Of LessonKey, List(Of (Room As String, Var As BoolVar)))
+        For Each rkvp In built.Room
+            Dim rk = rkvp.Key
+            Dim lessonKey As New LessonKey(rk.ClassName, rk.Subject, rk.Teacher, rk.Day, rk.Period)
+            Dim candidates As List(Of (Room As String, Var As BoolVar)) = Nothing
+            If Not roomsByLesson.TryGetValue(lessonKey, candidates) Then
+                candidates = New List(Of (Room As String, Var As BoolVar))
+                roomsByLesson(lessonKey) = candidates
+            End If
+            candidates.Add((rk.Room, rkvp.Value))
+        Next
+
         Dim schedule As New List(Of ScheduleEntry)
         For Each kvp In built.Lesson
             If solver.BooleanValue(kvp.Value) Then
                 Dim key = kvp.Key
                 Dim assignedRoom As String = Nothing
-                For Each rkvp In built.Room
-                    Dim rk = rkvp.Key
-                    If rk.ClassName = key.ClassName AndAlso rk.Subject = key.Subject AndAlso
-                       rk.Teacher = key.Teacher AndAlso rk.Day = key.Day AndAlso rk.Period = key.Period AndAlso
-                       solver.BooleanValue(rkvp.Value) Then
-                        assignedRoom = rk.Room
-                        Exit For
-                    End If
-                Next
+                Dim candidates As List(Of (Room As String, Var As BoolVar)) = Nothing
+                If roomsByLesson.TryGetValue(key, candidates) Then
+                    For Each candidate In candidates
+                        If solver.BooleanValue(candidate.Var) Then
+                            assignedRoom = candidate.Room
+                            Exit For
+                        End If
+                    Next
+                End If
                 schedule.Add(New ScheduleEntry With {
                     .ClassName = key.ClassName, .Subject = key.Subject, .Teacher = key.Teacher,
                     .Day = key.Day, .Period = key.Period, .Room = assignedRoom
@@ -1094,7 +1113,8 @@ Public Module Solver
                               Optional lexTolerance As Integer = 0,
                               Optional lexTeacherGapsStage As Boolean = False,
                               Optional minDiversity As Integer = 0,
-                              Optional rehintFoundSolutions As Boolean = True) As MultiSolveResult
+                              Optional rehintFoundSolutions As Boolean = True,
+                              Optional laterIterationsGapLimit As Double? = Nothing) As MultiSolveResult
         Dim weights = If(qualityWeights, New QualityWeights())
         Dim built = BuildCoreModel(data)
         Dim sw = Stopwatch.StartNew()
@@ -1200,7 +1220,15 @@ Public Module Solver
             Dim effectiveSeed = If(diversifySeed, seed + iterations, seed)
             Dim paramsStr = $"max_time_in_seconds:{thisLimit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{effectiveSeed},num_search_workers:{numWorkers}"
             If randomizeSearch Then paramsStr &= ",randomize_search:true"
-            If relativeGapLimit.HasValue Then paramsStr &= $",relative_gap_limit:{relativeGapLimit.Value.ToString(Globalization.CultureInfo.InvariantCulture)}"
+            ' P6: laterIterationsGapLimit gilt ab der ZWEITEN Iteration und
+            ' ueberstimmt dort ein gesetztes relativeGapLimit - die erste
+            ' Iteration darf weiterhin sorgfaeltig beweisen, waehrend
+            ' Folge-Iterationen (deren Zweck ALTERNATIVEN sind, kein
+            ' besseres Optimum) eine Loesung innerhalb dieser relativen
+            ' Luecke frueher akzeptieren und so mehr Kandidaten ins selbe
+            ' Gesamtbudget passen. Nothing = unveraendertes Verhalten.
+            Dim effectiveGapLimit = If(iterations >= 1 AndAlso laterIterationsGapLimit.HasValue, laterIterationsGapLimit, relativeGapLimit)
+            If effectiveGapLimit.HasValue Then paramsStr &= $",relative_gap_limit:{effectiveGapLimit.Value.ToString(Globalization.CultureInfo.InvariantCulture)}"
 
             Dim solver As New CpSolver()
             solver.StringParameters = paramsStr

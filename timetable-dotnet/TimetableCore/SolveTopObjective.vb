@@ -63,14 +63,20 @@ Friend Module SolveTopObjective
     ''' <summary>Builds, per (entity, day, period): an `occupied` BoolVar
     ''' reified against the sum of matching Lesson vars; and per (entity,
     ''' day): a `dailyCount` LinearExpr (Sum of that day's occupied vars)
-    ''' and a `hasAny` BoolVar reified against it. Shared scaffolding reused
-    ''' by both the gaps and the balance/range encodings below - built once
-    ''' per entity kind (classes or teachers), not duplicated.</summary>
+    ''' and - nur bei `buildHasAny` - a `hasAny` BoolVar reified against
+    ''' it. Shared scaffolding reused by the gaps/balance/density
+    ''' encodings below - built once per entity kind (classes or
+    ''' teachers), not duplicated. Code-Review-Umsetzung (P4): `hasAny`
+    ''' hat nur EINEN Abnehmer (BuildTeacherRangeVars' Sentinel-Guard) -
+    ''' fuer Klassen wurde es frueher immer mitgebaut und nie gelesen
+    ''' (eine tote reifizierte BoolVar pro Klasse x Tag), deshalb ist es
+    ''' jetzt explizit zuschaltbar statt unbedingt.</summary>
     Private Sub BuildScaffolding(model As CpModel, entities As List(Of String), days As List(Of String), periods As List(Of Integer),
                                   lookup As Dictionary(Of (Entity As String, Day As String, Period As Integer), List(Of BoolVar)), tag As String,
                                   occupied As Dictionary(Of (Entity As String, Day As String, Period As Integer), BoolVar),
                                   hasAny As Dictionary(Of (Entity As String, Day As String), BoolVar),
-                                  dailyCount As Dictionary(Of (Entity As String, Day As String), LinearExpr))
+                                  dailyCount As Dictionary(Of (Entity As String, Day As String), LinearExpr),
+                                  buildHasAny As Boolean)
         For Each entity In entities
             For Each d In days
                 Dim occList As New List(Of BoolVar)
@@ -84,10 +90,12 @@ Friend Module SolveTopObjective
                 Next
                 Dim dc As LinearExpr = LinearExpr.Sum(occList)
                 dailyCount((entity, d)) = dc
-                Dim ha = model.NewBoolVar($"hasAny[{tag},{entity},{d}]")
-                model.Add(dc >= 1).OnlyEnforceIf(ha)
-                model.Add(dc = 0).OnlyEnforceIf(ha.Not())
-                hasAny((entity, d)) = ha
+                If buildHasAny Then
+                    Dim ha = model.NewBoolVar($"hasAny[{tag},{entity},{d}]")
+                    model.Add(dc >= 1).OnlyEnforceIf(ha)
+                    model.Add(dc = 0).OnlyEnforceIf(ha.Not())
+                    hasAny((entity, d)) = ha
+                End If
             Next
         Next
     End Sub
@@ -300,18 +308,47 @@ Friend Module SolveTopObjective
         Dim classNames = built.Sessions.Select(Function(s) s.ClassName).Distinct().ToList()
         Dim teacherNames = built.Sessions.Select(Function(s) s.Teacher).Distinct().ToList()
 
-        Dim byClass = IndexLessonByEntityDayPeriod(built.Lesson, Function(k) k.ClassName)
-        Dim byTeacher = IndexLessonByEntityDayPeriod(built.Lesson, Function(k) k.Teacher)
+        ' P4: Scaffolding nur noch nachfragegesteuert bauen - vorher wurden
+        ' occupied/dailyCount/hasAny fuer Klassen UND Lehrer immer
+        ' vollstaendig erzeugt, auch wenn saemtliche Abnehmer per
+        ' Include*-Flag abgeschaltet waren (tote reifizierte Variablen,
+        ' die nur Presolve-Zeit kosteten). Abnehmer je Seite:
+        ' Klassen: ClassGaps, AfternoonDayCount, ClassLoadVariance,
+        '          occupied_window(scope=class);
+        ' Lehrer:  TeacherGaps, TeacherLoadVariance,
+        '          occupied_window(scope=teacher).
+        Dim shouldWindows As New List(Of JsonObject)
+        If w.IncludeOccupiedDensity Then
+            shouldWindows = JsonHelpers.Constraints(data).
+                Where(Function(c) JsonHelpers.GetString(c, "type") = "occupied_window" AndAlso
+                                  JsonHelpers.GetPriority(c) = JsonHelpers.PriorityShould).ToList()
+        End If
+        Dim hasClassWindows = shouldWindows.Any(Function(c) JsonHelpers.GetString(c, "scope") <> "teacher")
+        Dim hasTeacherWindows = shouldWindows.Any(Function(c) JsonHelpers.GetString(c, "scope") = "teacher")
+        Dim needClassScaffolding = w.IncludeClassGaps OrElse w.IncludeAfternoonDayCount OrElse
+                                   w.IncludeClassLoadVariance OrElse hasClassWindows
+        Dim needTeacherScaffolding = w.IncludeTeacherGaps OrElse w.IncludeTeacherLoadVariance OrElse hasTeacherWindows
 
         Dim occupiedClass As New Dictionary(Of (Entity As String, Day As String, Period As Integer), BoolVar)
-        Dim hasAnyClass As New Dictionary(Of (Entity As String, Day As String), BoolVar)
         Dim dailyCountClass As New Dictionary(Of (Entity As String, Day As String), LinearExpr)
-        BuildScaffolding(model, classNames, built.Days, built.Periods, byClass, "C", occupiedClass, hasAnyClass, dailyCountClass)
+        If needClassScaffolding Then
+            ' buildHasAny:=False - hasAny hatte klassenseitig nie einen
+            ' Abnehmer (P4-Befund), die Variablen entfallen ersatzlos.
+            BuildScaffolding(model, classNames, built.Days, built.Periods,
+                             IndexLessonByEntityDayPeriod(built.Lesson, Function(k) k.ClassName), "C",
+                             occupiedClass, Nothing, dailyCountClass, buildHasAny:=False)
+        End If
 
         Dim occupiedTeacher As New Dictionary(Of (Entity As String, Day As String, Period As Integer), BoolVar)
         Dim hasAnyTeacher As New Dictionary(Of (Entity As String, Day As String), BoolVar)
         Dim dailyCountTeacher As New Dictionary(Of (Entity As String, Day As String), LinearExpr)
-        BuildScaffolding(model, teacherNames, built.Days, built.Periods, byTeacher, "T", occupiedTeacher, hasAnyTeacher, dailyCountTeacher)
+        If needTeacherScaffolding Then
+            ' hasAny nur, wenn sein einziger Abnehmer (BuildTeacherRangeVars)
+            ' ueberhaupt gebaut wird.
+            BuildScaffolding(model, teacherNames, built.Days, built.Periods,
+                             IndexLessonByEntityDayPeriod(built.Lesson, Function(k) k.Teacher), "T",
+                             occupiedTeacher, hasAnyTeacher, dailyCountTeacher, buildHasAny:=w.IncludeTeacherLoadVariance)
+        End If
 
         Dim classGapFlags As New List(Of BoolVar)
         If w.IncludeClassGaps Then
@@ -345,9 +382,7 @@ Friend Module SolveTopObjective
         ' Fenster bereits als Fehler abgewiesen, bevor ein Solve startet.
         Dim occupiedDensityParts As New List(Of LinearExpr)
         If w.IncludeOccupiedDensity Then
-            For Each c In JsonHelpers.Constraints(data)
-                If JsonHelpers.GetString(c, "type") <> "occupied_window" Then Continue For
-                If JsonHelpers.GetPriority(c) <> JsonHelpers.PriorityShould Then Continue For
+            For Each c In shouldWindows
                 Dim scope = JsonHelpers.GetString(c, "scope")
                 Dim entity = JsonHelpers.GetString(c, "entity")
                 Dim fromPeriod = JsonHelpers.GetInt(c, "from_period")
@@ -385,22 +420,55 @@ Friend Module SolveTopObjective
         Return result
     End Function
 
-    ''' <summary>Die klassische gewichtete Gesamtzielfunktion ueber ALLE
-    ''' vorhandenen Terme - identische Gewichtung/Termreihenfolge wie
-    ''' ApplyQualityObjective vor der Review-Umsetzung. Nothing, wenn kein
-    ''' einziger Term existiert.</summary>
-    Friend Function WeightedTotal(terms As QualityTerms, w As QualityWeights) As LinearExpr
-        Dim parts As New List(Of LinearExpr)
-        If terms.KannSum IsNot Nothing Then parts.Add(CLng(w.Kann) * terms.KannSum)
-        If terms.ClassGapsSum IsNot Nothing Then parts.Add(CLng(w.ClassGaps) * terms.ClassGapsSum)
-        If terms.TeacherGapsSum IsNot Nothing Then parts.Add(CLng(w.TeacherGaps) * terms.TeacherGapsSum)
-        If terms.EdgeSum IsNot Nothing Then parts.Add(CLng(w.EdgePeriod) * terms.EdgeSum)
-        If terms.AfternoonSum IsNot Nothing Then parts.Add(CLng(w.AfternoonDayCount) * terms.AfternoonSum)
-        If terms.ClassRangeSum IsNot Nothing Then parts.Add(CLng(w.ClassLoadVariance) * terms.ClassRangeSum)
-        If terms.TeacherRangeSum IsNot Nothing Then parts.Add(CLng(w.TeacherLoadVariance) * terms.TeacherRangeSum)
-        If terms.OccupiedDensitySum IsNot Nothing Then parts.Add(CLng(w.OccupiedDensity) * terms.OccupiedDensitySum)
+    ''' <summary>Code-Review-Umsetzung (P6): kombiniert gewichtete Terme zu
+    ''' EINER Zielfunktion, deren Integer-Koeffizienten vorher durch ihren
+    ''' groessten gemeinsamen Teiler geteilt wurden. Eine positive
+    ''' Gesamtskalierung aendert weder Optimum noch Ranking - sie
+    ''' verkleinert aber die Koeffizienten (z.B. 100/500 -> 1/5), was
+    ''' CP-SATs Bound-Beweis nachweislich leichter faellt (2.25c-Befund:
+    ''' grosse Integer-Koeffizienten schwaechen die LP-Relaxierung;
+    ''' GMS-P1-Befund: die Rest-Zielfunktion ist dort der verbliebene
+    ''' Bound-Engpass). Zu beachten: ObjectiveValue/BestObjectiveBound
+    ''' eines Laufs sind dadurch um den GCD-Faktor kleiner als die
+    ''' nachgelagerte Quality.Total-Skala - die Optimalitaets-LUECKE in
+    ''' Prozent ist skalierungsinvariant und bleibt vergleichbar.
+    ''' Gewichte, deren CLng-Rundung 0 ergibt, bleiben wirkungslos (wie
+    ''' bisher) und beeinflussen den GCD nicht.</summary>
+    Private Function CombineGcdNormalized(parts As List(Of (Weight As Long, Expr As LinearExpr))) As LinearExpr
         If parts.Count = 0 Then Return Nothing
-        Return parts.Aggregate(Function(a, b) a + b)
+        Dim g As Long = 0
+        For Each p In parts
+            If p.Weight > 0 Then g = Gcd(g, p.Weight)
+        Next
+        If g = 0 Then g = 1
+        Return parts.Select(Function(p) (p.Weight \ g) * p.Expr).Aggregate(Function(a, b) a + b)
+    End Function
+
+    Private Function Gcd(a As Long, b As Long) As Long
+        While b <> 0
+            Dim t = a Mod b
+            a = b
+            b = t
+        End While
+        Return a
+    End Function
+
+    ''' <summary>Die klassische gewichtete Gesamtzielfunktion ueber ALLE
+    ''' vorhandenen Terme - identische Gewichtungsverhaeltnisse/
+    ''' Termreihenfolge wie ApplyQualityObjective vor der Review-Umsetzung,
+    ''' seit P6 GCD-normalisiert (siehe CombineGcdNormalized). Nothing,
+    ''' wenn kein einziger Term existiert.</summary>
+    Friend Function WeightedTotal(terms As QualityTerms, w As QualityWeights) As LinearExpr
+        Dim parts As New List(Of (Weight As Long, Expr As LinearExpr))
+        If terms.KannSum IsNot Nothing Then parts.Add((CLng(w.Kann), terms.KannSum))
+        If terms.ClassGapsSum IsNot Nothing Then parts.Add((CLng(w.ClassGaps), terms.ClassGapsSum))
+        If terms.TeacherGapsSum IsNot Nothing Then parts.Add((CLng(w.TeacherGaps), terms.TeacherGapsSum))
+        If terms.EdgeSum IsNot Nothing Then parts.Add((CLng(w.EdgePeriod), terms.EdgeSum))
+        If terms.AfternoonSum IsNot Nothing Then parts.Add((CLng(w.AfternoonDayCount), terms.AfternoonSum))
+        If terms.ClassRangeSum IsNot Nothing Then parts.Add((CLng(w.ClassLoadVariance), terms.ClassRangeSum))
+        If terms.TeacherRangeSum IsNot Nothing Then parts.Add((CLng(w.TeacherLoadVariance), terms.TeacherRangeSum))
+        If terms.OccupiedDensitySum IsNot Nothing Then parts.Add((CLng(w.OccupiedDensity), terms.OccupiedDensitySum))
+        Return CombineGcdNormalized(parts)
     End Function
 
     ''' <summary>P2: die gewichtete Summe der nicht lexikografisch
@@ -415,17 +483,16 @@ Friend Module SolveTopObjective
     ''' wenn kein einziges Rest-Kriterium aktiv ist.</summary>
     Friend Function WeightedResidual(terms As QualityTerms, w As QualityWeights,
                                       Optional teacherGapsInResidual As Boolean = False) As LinearExpr
-        Dim parts As New List(Of LinearExpr)
+        Dim parts As New List(Of (Weight As Long, Expr As LinearExpr))
         If teacherGapsInResidual AndAlso terms.TeacherGapsSum IsNot Nothing Then
-            parts.Add(CLng(w.TeacherGaps) * terms.TeacherGapsSum)
+            parts.Add((CLng(w.TeacherGaps), terms.TeacherGapsSum))
         End If
-        If terms.OccupiedDensitySum IsNot Nothing Then parts.Add(CLng(w.OccupiedDensity) * terms.OccupiedDensitySum)
-        If terms.EdgeSum IsNot Nothing Then parts.Add(CLng(w.EdgePeriod) * terms.EdgeSum)
-        If terms.AfternoonSum IsNot Nothing Then parts.Add(CLng(w.AfternoonDayCount) * terms.AfternoonSum)
-        If terms.ClassRangeSum IsNot Nothing Then parts.Add(CLng(w.ClassLoadVariance) * terms.ClassRangeSum)
-        If terms.TeacherRangeSum IsNot Nothing Then parts.Add(CLng(w.TeacherLoadVariance) * terms.TeacherRangeSum)
-        If parts.Count = 0 Then Return Nothing
-        Return parts.Aggregate(Function(a, b) a + b)
+        If terms.OccupiedDensitySum IsNot Nothing Then parts.Add((CLng(w.OccupiedDensity), terms.OccupiedDensitySum))
+        If terms.EdgeSum IsNot Nothing Then parts.Add((CLng(w.EdgePeriod), terms.EdgeSum))
+        If terms.AfternoonSum IsNot Nothing Then parts.Add((CLng(w.AfternoonDayCount), terms.AfternoonSum))
+        If terms.ClassRangeSum IsNot Nothing Then parts.Add((CLng(w.ClassLoadVariance), terms.ClassRangeSum))
+        If terms.TeacherRangeSum IsNot Nothing Then parts.Add((CLng(w.TeacherLoadVariance), terms.TeacherRangeSum))
+        Return CombineGcdNormalized(parts)
     End Function
 
 End Module

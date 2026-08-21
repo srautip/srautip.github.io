@@ -94,6 +94,13 @@ Public NotInheritable Class RunConfig
     ''' fuer Laeufe, deren Ziel moeglichst VERSCHIEDENE Alternativen sind,
     ''' abschalten). Nothing/true = heutiges Verhalten.</summary>
     Public Property RehintFoundSolutions As Boolean? = Nothing
+    ''' <summary>Code-Review-Umsetzung (P6): relatives Gap-Limit NUR fuer
+    ''' Iterationen ab der zweiten - die erste darf sorgfaeltig beweisen,
+    ''' Folge-Iterationen (Zweck: Alternativen) akzeptieren frueher.
+    ''' Sinnvolle Werte ~0.05-0.2; Nothing = kein Limit (unveraendertes
+    ''' Verhalten). Ueberstimmt ab Iteration 2 ein gesetztes
+    ''' relative_gap_limit.</summary>
+    Public Property LaterIterationsGapLimit As Double? = Nothing
 End Class
 
 ''' <summary>Phase 2.24: die sieben Gewichte aus ScheduleQuality.
@@ -301,7 +308,8 @@ Public Module Run
             stagnationTimeoutS:=stagnationTimeoutS, diversifySeed:=diversifySeed, randomizeSearch:=randomizeSearch,
             relativeGapLimit:=cfg.RelativeGapLimit,
             lexicographic:=lexicographic, lexTolerance:=lexTolerance, lexTeacherGapsStage:=lexTeacherGapsStage,
-            minDiversity:=minDiversity, rehintFoundSolutions:=rehintFoundSolutions)
+            minDiversity:=minDiversity, rehintFoundSolutions:=rehintFoundSolutions,
+            laterIterationsGapLimit:=cfg.LaterIterationsGapLimit)
         Dim solveOk = topResult.Solutions.Count > 0
         If Not solveOk Then
             IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.md"),
