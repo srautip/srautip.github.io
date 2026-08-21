@@ -5,13 +5,11 @@
 # FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
 # "CP-SAT-Status"-Feld in output/stundenplan.md.
 #
-# Kurzauftrag (Code-Review-Umsetzung P1, GMS-Umstellung): 5-Min-Budget
-# fuer den Performancevergleich "occupied_slot-Batterie (720 Kann-Regeln)
-# vs. occupied_window (24 Regeln)" - Messwerte beider Varianten im
-# Kommentar bei quality_weights unten. Der fruehere 60-Min-Lauf bleibt
-# als Referenz in der Git-Historie; ein langer Lauf mit der neuen
-# Kodierung steht noch aus.
-solve_time_limit_s: 300.0
+# Kurzauftrag (P1-Langvergleich): 20-Min-Budget fuer den erneuten
+# Performancevergleich "occupied_slot-Batterie (720 Kann-Regeln) vs.
+# occupied_window (24 Regeln)" - Messwerte beider Budgets (300s und
+# 1200s) im Kommentar bei quality_weights unten.
+solve_time_limit_s: 1200.0
 
 # Deutlich groesser/komplexer als das vorherige generische Beispiel (24
 # statt 12 Klassen, 114 Gruppen fuer Niveau-/WPF-/Profil-/Religions-
