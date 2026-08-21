@@ -5,12 +5,11 @@
 # FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
 # "CP-SAT-Status"-Feld in output/stundenplan.md.
 #
-# Kurzauftrag (Code-Review-Umsetzung P2/P3): Live-Beleg fuer den neuen
-# lexikografischen Modus + echte Diversitaets-Cuts (siehe
-# lexicographic/min_diversity/rehint_found_solutions unten und
-# docs/code-review-cpsat-performance.md) - gleiches 2-Min-Gesamtbudget
-# wie der vorherige Lauf, damit die Ergebnisse vergleichbar bleiben.
-solve_time_limit_s: 120.0
+# Kurzauftrag (Code-Review-Umsetzung P1): 3-Min-Gesamtbudget fuer den
+# Performancevergleich "occupied_slot-Batterie (140 Kann-Regeln) vs.
+# kompaktes occupied_window-Dichte-Kriterium (8 Regeln)" - Messwerte
+# beider Varianten im Kommentar bei quality_weights unten.
+solve_time_limit_s: 180.0
 
 # Anzahl paralleler CP-SAT-Suchpfade (Portfolio-Threading). Hoeher kann
 # helfen, ueberhaupt schneller eine erste Loesung zu finden, geht aber zu
@@ -113,3 +112,30 @@ rehint_found_solutions: false
 quality_weights:
   class_gaps: 1000.0
   teacher_gaps: 50.0
+  # P1: Gewicht pro unbelegtem occupied_window-Slot - 100 entspricht dem
+  # frueheren Kann-Gewicht der abgeloesten occupied_slot-Batterie (dort
+  # zaehlte jede verletzte Regel = jeder unbelegte Slot ebenfalls 100).
+  #
+  # Performancevergleich (je exakt 180s Gesamtbudget, identischer Seed
+  # und identische uebrige Config, dieselbe Maschine direkt
+  # nacheinander):
+  # - Variante A (140 occupied_slot-Kann-Regeln, alter Stand):
+  #   21 Loesungen, beste Quality.Total 186.0, alle Fenster in ALLEN
+  #   Loesungen belegt (die Kann-Stufe fixiert die Batterie hart auf 0),
+  #   Totals eng geclustert (186.0-197.4), Residual-Luecke 68.7%.
+  # - Variante B (8 occupied_window-Regeln, dieser Stand):
+  #   21 Loesungen, beste Quality.Total 187.2 (praktisch gleich), 140
+  #   Kann-BoolVars + 140 reifizierte Constraints + die komplette
+  #   Kann-Stufe entfallen (constraints.yaml: 1581 -> 663 Zeilen);
+  #   Dichte ist jetzt ABWAEGBAR statt hart fixiert - 20/21 Loesungen
+  #   voll belegt, 1 spaete (vom 4s-Stagnation-Cutoff frueh gekappte)
+  #   Iteration mit 6 unbelegten Fenster-Slots + 19 Lehrer-Springstunden
+  #   landet als ehrlicher Ausreisser am Listenende (Rang 21/21;
+  #   die ClassGaps-Stufe hielt auch dort: 0 Klassen-Springstunden).
+  # Fazit fuer diese Schulgroesse: gleichwertige Ergebnisqualitaet bei
+  # deutlich kleinerem Modell/Datenbestand; der eigentliche
+  # Bound-Beweis-Gewinn von P1 wird bei der ~5x groesseren
+  # occupied_slot-Batterie des bw-gms-beispiels erwartet. Wer die alte
+  # harte Fenster-Garantie zurueckwill: priority auf must setzen (haerter
+  # als vorher) oder occupied_density weiter anheben.
+  occupied_density: 100.0

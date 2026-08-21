@@ -308,8 +308,32 @@ Doc-Kommentaren der betroffenen Module):
 - **R4** - `ApplyConstraints` ist ein reiner Dispatcher; jeder
   Constraint-Typ lebt in einer eigenen `ApplyXxx`-Methode.
 
-Offen aus der Empfehlungsliste bleiben P1 (occupied_slot-Batterien),
-P4/P5 (Scaffolding/Extraktion) und der Viewer-Ausbau (Empfehlung 6).
+- **P1** - neuer Constraint-Typ `occupied_window`: EIN Objekt pro
+  Belegungsfenster (Tage x from_period..to_period) statt einer
+  occupied_slot-Regel pro Slot. `must` erzwingt jeden Fenster-Slot hart;
+  `should` erzeugt KEINE Kann-BoolVars, sondern zaehlt unbelegte
+  Fenster-Slots als neues Qualitaetskriterium **OccupiedDensity** - eine
+  reine Linearsumme ueber das vorhandene occupied-Scaffolding (null neue
+  Variablen), Teil der Rest-Zielfunktion, Gewicht
+  `quality_weights.occupied_density`, nachgelagert exakt gezaehlt als
+  `QualityScore.OccupiedDensityCount`. `occupied_slot` bleibt als Typ
+  fuer gezielte Einzel-Slots vollstaendig erhalten (Nutzerentscheidung).
+  Das bw-grundschule-beispiel nutzt jetzt 8 Fenster statt 140
+  Slot-Regeln. **Performancevergleich** (je exakt 180s, identische
+  uebrige Config): Batterie 21 Loesungen/beste Total 186.0 (Fenster
+  ueberall hart erfuellt, da die Kann-Stufe die Batterie auf 0
+  fixierte); occupied_window 21 Loesungen/beste Total 187.2 -
+  gleichwertige Ergebnisqualitaet bei 140 eingesparten Kann-BoolVars,
+  140 eingesparten reifizierten Constraints und einer kompletten
+  eingesparten Stufe; die Dichte ist jetzt abwaegbar statt hart (1/21
+  spaete Cutoff-Iteration mit Defizit 6 landete als Rang 21/21 am
+  Listenende, die ClassGaps-Stufe hielt auch dort). Der eigentliche
+  Bound-Gewinn wird bei der ~5x groesseren GMS-Batterie erwartet -
+  deren Umstellung steht noch aus.
+
+Offen aus der Empfehlungsliste bleiben die Umstellung der
+GMS-occupied_slot-Batterie auf `occupied_window`, P4/P5
+(Scaffolding/Extraktion) und der Viewer-Ausbau (Empfehlung 6).
 
 **Live-Beleg** (`bw-grundschule-beispiel`, identisches 2-Min-Budget,
 `lexicographic: true`, `min_diversity: 8`, `rehint_found_solutions:

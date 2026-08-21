@@ -48,7 +48,7 @@ Public Module Validation
     ' physically/structurally necessary and must always stay "must".
     Private ReadOnly KannCapableTypes As New HashSet(Of String) From {
         "teacher_availability", "forbidden_slot", "room_requirement", "consecutive_required", "weekly_hours",
-        "required_slot", "occupied_slot"
+        "required_slot", "occupied_slot", "occupied_window"
     }
 
     ' occupied_slot only supports "class"/"teacher" scope (unlike
@@ -211,6 +211,48 @@ Public Module Validation
                     End If
                 End If
                 errors.AddRange(SlotRangeErrors(c, i, "occupied_slot", knownDays, periodsPerDay))
+            End If
+
+            ' P1: occupied_window - gleiche Scope-/Entity-/Session-Checks
+            ' wie occupied_slot, plus Fensterkonsistenz (from <= to, beide
+            ' im Periodenraster, days-Teilmenge der bekannten Tage). Ein
+            ' inkonsistentes Fenster waere im Solver/Objective sonst ein
+            ' stiller Teil-No-Op - dieselbe Falle wie bei R2.
+            If constraintType = "occupied_window" Then
+                Dim owScope = JsonHelpers.GetString(c, "scope")
+                If Not OccupiedSlotScopeEntityKey.ContainsKey(owScope) Then
+                    errors.Add(WithReason($"constraints[{i}]: occupied_window.scope={JsonHelpers.PyRepr(owScope)} ungueltig (erlaubt: teacher/class)", c))
+                Else
+                    Dim entityKey = OccupiedSlotScopeEntityKey(owScope)
+                    Dim entityVal = JsonHelpers.GetString(c, "entity")
+                    If Not known(entityKey).Contains(entityVal) Then
+                        errors.Add(WithReason($"constraints[{i}]: occupied_window.entity='{entityVal}' nicht in {entityKey}", c))
+                    Else
+                        Dim hasSessions = If(owScope = "class", classesWithSessions.Contains(entityVal), teachersWithSessions.Contains(entityVal))
+                        If Not hasSessions Then
+                            errors.Add(WithReason($"constraints[{i}]: occupied_window.entity='{entityVal}' hat keine einzige teacher_subject_assignment-Session - die Regel wuerde wirkungslos fallengelassen", c))
+                        End If
+                    End If
+                End If
+                Dim owFrom = JsonHelpers.GetInt(c, "from_period")
+                Dim owTo = JsonHelpers.GetInt(c, "to_period")
+                If Not owFrom.HasValue OrElse Not owTo.HasValue Then
+                    errors.Add(WithReason($"constraints[{i}] (type=occupied_window): from_period/to_period muessen beide gesetzt sein", c))
+                Else
+                    If owFrom.Value > owTo.Value Then
+                        errors.Add(WithReason($"constraints[{i}] (type=occupied_window): from_period={owFrom.Value} > to_period={owTo.Value}", c))
+                    End If
+                    If periodsPerDay.HasValue AndAlso (owFrom.Value < 1 OrElse owTo.Value > periodsPerDay.Value) Then
+                        errors.Add(WithReason($"constraints[{i}] (type=occupied_window): Fenster {owFrom.Value}..{owTo.Value} liegt nicht vollstaendig in 1..{periodsPerDay.Value}", c))
+                    End If
+                End If
+                If knownDays IsNot Nothing Then
+                    For Each d In JsonHelpers.AsStringList(c, "days")
+                        If Not knownDays.Contains(d) Then
+                            errors.Add(WithReason($"constraints[{i}] (type=occupied_window): day='{d}' ist kein Tag aus entities.timeslots.days", c))
+                        End If
+                    Next
+                End If
             End If
 
             ' R2: required_slot referenziert eine konkrete (Klasse,Fach)-

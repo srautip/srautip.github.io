@@ -110,6 +110,9 @@ Public NotInheritable Class QualityWeightsConfig
     Public Property AfternoonDayCount As Double? = Nothing
     Public Property ClassLoadVariance As Double? = Nothing
     Public Property TeacherLoadVariance As Double? = Nothing
+    ''' <summary>P1: Gewicht pro unbelegtem occupied_window-Slot (Default
+    ''' 5.0 - siehe ScheduleQuality.WeightOccupiedDensity).</summary>
+    Public Property OccupiedDensity As Double? = Nothing
     ''' <summary>Phase 2.25-Nachtrag-2: Nothing -&gt; Default True (unveraendertes
     ''' Verhalten). `false` schaltet TeacherGaps strukturell aus SolveTops
     ''' Zielfunktion aus (keine Hilfsvariablen/-Constraints, nicht nur
@@ -126,6 +129,7 @@ Public NotInheritable Class QualityWeightsConfig
     Public Property IncludeAfternoonDayCount As Boolean? = Nothing
     Public Property IncludeClassLoadVariance As Boolean? = Nothing
     Public Property IncludeTeacherLoadVariance As Boolean? = Nothing
+    Public Property IncludeOccupiedDensity As Boolean? = Nothing
 End Class
 
 Public Module Run
@@ -157,12 +161,14 @@ Public Module Run
         If cfg.AfternoonDayCount.HasValue Then w.AfternoonDayCount = cfg.AfternoonDayCount.Value
         If cfg.ClassLoadVariance.HasValue Then w.ClassLoadVariance = cfg.ClassLoadVariance.Value
         If cfg.TeacherLoadVariance.HasValue Then w.TeacherLoadVariance = cfg.TeacherLoadVariance.Value
+        If cfg.OccupiedDensity.HasValue Then w.OccupiedDensity = cfg.OccupiedDensity.Value
         If cfg.IncludeTeacherGaps.HasValue Then w.IncludeTeacherGaps = cfg.IncludeTeacherGaps.Value
         If cfg.IncludeClassGaps.HasValue Then w.IncludeClassGaps = cfg.IncludeClassGaps.Value
         If cfg.IncludeEdgePeriod.HasValue Then w.IncludeEdgePeriod = cfg.IncludeEdgePeriod.Value
         If cfg.IncludeAfternoonDayCount.HasValue Then w.IncludeAfternoonDayCount = cfg.IncludeAfternoonDayCount.Value
         If cfg.IncludeClassLoadVariance.HasValue Then w.IncludeClassLoadVariance = cfg.IncludeClassLoadVariance.Value
         If cfg.IncludeTeacherLoadVariance.HasValue Then w.IncludeTeacherLoadVariance = cfg.IncludeTeacherLoadVariance.Value
+        If cfg.IncludeOccupiedDensity.HasValue Then w.IncludeOccupiedDensity = cfg.IncludeOccupiedDensity.Value
         Return w
     End Function
 

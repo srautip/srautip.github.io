@@ -722,6 +722,43 @@ Public Class SolveTopTests
             "Der nachgelagerte Score sieht die echte Luecke weiterhin - nur die Suche war blind.")
     End Sub
 
+    ''' <summary>Code-Review-Umsetzung (P1): occupied_window/should steuert
+    ''' die SUCHE als Dichte-Kriterium (OccupiedDensity in der Rest-
+    ''' Zielfunktion), ohne eine einzige Kann-BoolVar zu erzeugen.
+    ''' Gegenlaeufiger Zug zu EdgePeriod: Fenster 1..2 verlangt die
+    ''' Randstunde Periode 1, EdgePeriod (5) bestraft sie. Mit
+    ''' occupied_density=100 gewinnt das Fenster ({1,2}, Defizit 0);
+    ''' mit IncludeOccupiedDensity:=False ist die Suche fenster-blind,
+    ''' meidet Periode 1 und der nachgelagerte OccupiedDensityCount
+    ''' zeigt das echte Defizit trotzdem an.</summary>
+    <TestMethod>
+    Public Sub OccupiedWindowShouldSteersDensityViaResidualObjective()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "occupied_window"}, {"scope", "class"}, {"entity", "5a"}, {"from_period", 1}, {"to_period", 2}, {"priority", "should"}}
+        })
+
+        Dim denseWeights As New QualityWeights With {.OccupiedDensity = 100.0}
+        Dim steered = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1, qualityWeights:=denseWeights)
+        Assert.AreEqual(CpSolverStatus.Optimal, steered.Solutions(0).Status)
+        Dim steeredPeriods = steered.Solutions(0).Schedule.Select(Function(l) l.Period).OrderBy(Function(p) p).ToList()
+        CollectionAssert.AreEqual(New List(Of Integer) From {1, 2}, steeredPeriods,
+            "Mit occupied_density=100 muss das Fenster gefuellt werden, obwohl Periode 1 eine Randstunde kostet.")
+        Assert.AreEqual(0, steered.Solutions(0).Quality.OccupiedDensityCount)
+
+        Dim blindWeights As New QualityWeights With {.OccupiedDensity = 100.0, .IncludeOccupiedDensity = False}
+        Dim blind = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1, qualityWeights:=blindWeights)
+        Assert.AreEqual(CpSolverStatus.Optimal, blind.Solutions(0).Status)
+        Assert.IsFalse(blind.Solutions(0).Schedule.Any(Function(l) l.Period = 1),
+            "Fenster-blind meidet die Suche die Randstunde Periode 1.")
+        Assert.IsTrue(blind.Solutions(0).Quality.OccupiedDensityCount >= 1,
+            "Der nachgelagerte Score zaehlt das echte Fenster-Defizit weiterhin - nur die Suche war blind.")
+
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, steered.Solutions(0).Schedule).Count)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, blind.Solutions(0).Schedule).Count)
+    End Sub
+
     ''' <summary>Nutzerentscheidung "TeacherGaps-Stufe opt-in": ohne
     ''' lexTeacherGapsStage bleibt TeacherGaps gewichtet in der
     ''' Rest-Zielfunktion und ist gegen andere Restkriterien abwaegbar;

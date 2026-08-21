@@ -386,6 +386,64 @@ Wirkung im Modell führen (die generische "unbekannte Entity"-Falle, die
 ist `room` hier ein harter Validierungsfehler statt eines akzeptierten,
 aber leeren Werts.
 
+**Hinweis (Code-Review-Umsetzung P1):** für FLÄCHIGE Belegungsfenster
+("täglich Stunde 2-4 belegt") ist `occupied_window` (unten) der
+vorgesehene Typ - eine `occupied_slot`-Batterie mit einer Kann-Regel pro
+Slot erzeugt pro Regel eine eigene Verletzungs-BoolVar mit Gewicht 100
+in der Zielfunktion, was CP-SATs Optimalitätsbeweis ab einigen hundert
+Regeln messbar strukturell schwächt (siehe
+`docs/code-review-cpsat-performance.md`, Befund P1). `occupied_slot`
+bleibt der richtige Typ für gezielte EINZELNE Slots.
+
+---
+
+### `occupied_window` (Code-Review-Umsetzung P1)
+
+Das kompakte Gegenstück zur `occupied_slot`-Batterie: EIN
+Constraint-Objekt beschreibt ein ganzes Belegungsfenster - alle
+angegebenen Tage (Default: alle Tage) mal den Periodenbereich
+`from_period..to_period` - einer Klasse oder Lehrkraft.
+
+Die beiden Prioritäten verhalten sich bewusst unterschiedlich:
+
+- **`must`**: jeder Fenster-Slot wird hart erzwungen (`Sum >= 1` pro
+  Slot) - äquivalent zu einer must-`occupied_slot`-Batterie, nur als
+  ein Objekt. Der Verifier prüft jeden Fenster-Slot unabhängig nach.
+- **`should`**: erzeugt KEINE Kann-Verletzungs-BoolVars (der Kern von
+  P1). Stattdessen zählt jeder unbelegte Fenster-Slot als
+  Dichte-Defizit im Qualitätskriterium **OccupiedDensity** - eine reine
+  Linearsumme über die ohnehin gebauten `occupied`-Hilfsvariablen von
+  `SolveTopObjective` (keine einzige zusätzliche Variable, kein
+  reifiziertes Constraint). Gewicht: `quality_weights.occupied_density`
+  (Default 5.0), strukturell abschaltbar per
+  `include_occupied_density: false`. Der exakte Zähler erscheint
+  nachgelagert als `QualityScore.OccupiedDensityCount` (bzw.
+  `occupied_density_count` im `stundenplan.json`-Export), NICHT als
+  Kann-Verstoß. Konsequenz: im reinen `Solver.Solve`-Pfad (Kann-only-
+  Zielfunktion) hat ein should-Fenster keine Wirkung - es ist ein
+  `SolveTop`-Qualitätskriterium und gehört dort zur Rest-Zielfunktion
+  (nie zu den lexikografischen Stufen).
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `scope` | `"class"`\|`"teacher"` | ja |
+| `entity` | string | ja |
+| `from_period` | int | ja |
+| `to_period` | int | ja (>= `from_period`) |
+| `days` | string[] | nein (Default: alle Tage) |
+| `priority` | `"must"`\|`"should"` | nein |
+| `reason` | string | nein |
+
+```json
+{ "type": "occupied_window", "scope": "class", "entity": "1a",
+  "from_period": 2, "to_period": 4, "priority": "should",
+  "reason": "1./2. Klasse soll taeglich Stunde 2-4 belegt sein" }
+```
+
+Validierung (Fail-Fast): unbekannte Entity, Entity ohne einzige Session,
+`from_period > to_period`, Fenster außerhalb `1..periods_per_day` und
+unbekannte `days`-Einträge sind harte Fehler.
+
 ---
 
 ### `consecutive_required`

@@ -520,6 +520,8 @@ Public Module Solver
                     ApplyRequiredSlot(model, c, ci, priority, sessions, lesson, kannVars)
                 Case "occupied_slot"
                     ApplyOccupiedSlot(model, c, ci, priority, sessions, lesson, kannVars)
+                Case "occupied_window"
+                    ApplyOccupiedWindow(model, c, priority, sessions, lesson, days)
                 Case "consecutive_required"
                     ApplyConsecutiveRequired(model, c, ci, priority, sessions, lesson, days, periods, kannVars)
                 Case "teacher_subject_assignment", "room_requirement", "parallel_group"
@@ -786,6 +788,59 @@ Public Module Solver
             Dim con = model.Add(LinearExpr.Sum(occVars) >= 1L)
             If occViolated IsNot Nothing Then con.OnlyEnforceIf(occViolated.Not())
         End If
+    End Sub
+
+    ''' <summary>Code-Review-Umsetzung (P1): kompaktes Gegenstueck zur
+    ''' occupied_slot-BATTERIE - EIN Constraint-Objekt beschreibt ein
+    ''' ganzes (Tage x from_period..to_period)-Belegungsfenster einer
+    ''' Klasse/Lehrkraft statt einer Regel pro Slot. `must` erzwingt hier
+    ''' jeden Fenster-Slot hart (Sum >= 1, wie eine must-occupied_slot-
+    ''' Batterie, nur als ein Objekt). `should` erzeugt BEWUSST KEINE
+    ''' Kann-BoolVars: das Dichte-Defizit fliesst stattdessen als reine
+    ''' Linearsumme ueber das occupied-Scaffolding in SolveTops
+    ''' Zielfunktion ein (SolveTopObjective.BuildQualityTerms,
+    ''' QualityWeights.OccupiedDensity) - der P1-Befund war ja gerade,
+    ''' dass hunderte reifizierte Kann-Terme mit Gewicht 100 CP-SATs
+    ''' Bound-Beweis strukturell verhindern. Konsequenz: ein
+    ''' should-occupied_window hat im reinen Solve()/BuildModel-Pfad
+    ''' (Kann-only-Objective) keine Wirkung - es ist ein
+    ''' SolveTop-Qualitaetskriterium. occupied_slot bleibt als Typ
+    ''' vollstaendig erhalten (per-Slot-Kann-Semantik, wo genau EIN
+    ''' einzelner Slot gemeint ist).</summary>
+    Private Sub ApplyOccupiedWindow(model As CpModel, c As JsonObject, priority As String,
+                                     sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                     days As List(Of String))
+        If priority = JsonHelpers.PriorityShould Then Return
+
+        Dim scope = JsonHelpers.GetString(c, "scope")
+        Dim entity = JsonHelpers.GetString(c, "entity")
+        Dim fromPeriod = JsonHelpers.GetInt(c, "from_period").Value
+        Dim toPeriod = JsonHelpers.GetInt(c, "to_period").Value
+        Dim windowDaysList = JsonHelpers.AsStringList(c, "days")
+        Dim windowDays = If(windowDaysList.Any(), windowDaysList, days)
+
+        Dim relevantSessions As List(Of Session)
+        Select Case scope
+            Case "class"
+                relevantSessions = sessions.Where(Function(s) s.ClassName = entity).ToList()
+            Case "teacher"
+                relevantSessions = sessions.Where(Function(s) s.Teacher = entity).ToList()
+            Case Else
+                relevantSessions = New List(Of Session)
+        End Select
+
+        For Each d In windowDays
+            For p = fromPeriod To toPeriod
+                Dim slotVars As New List(Of BoolVar)
+                For Each s In relevantSessions
+                    Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)
+                    If lesson.ContainsKey(key) Then slotVars.Add(lesson(key))
+                Next
+                If slotVars.Count > 0 Then
+                    model.Add(LinearExpr.Sum(slotVars) >= 1L)
+                End If
+            Next
+        Next
     End Sub
 
     Private Sub ApplyConsecutiveRequired(model As CpModel, c As JsonObject, ci As Integer, priority As String,

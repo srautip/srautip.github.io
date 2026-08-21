@@ -36,6 +36,14 @@ Friend NotInheritable Class QualityTerms
     Public Property AfternoonSum As LinearExpr
     Public Property ClassRangeSum As LinearExpr
     Public Property TeacherRangeSum As LinearExpr
+    ''' <summary>P1: Summe der UNBELEGTEN Slots ueber alle should-
+    ''' `occupied_window`-Constraints - eine reine Linearsumme ueber das
+    ''' ohnehin gebaute occupied-Scaffolding (keine einzige neue Variable,
+    ''' kein reifiziertes Constraint - der entscheidende Unterschied zur
+    ''' abgeloesten occupied_slot-Batterie, die pro Slot eine eigene
+    ''' Kann-BoolVar samt halbreifizierter Summe erzeugte). Gehoert zur
+    ''' Rest-Zielfunktion, nie zu den lexikografischen Stufen.</summary>
+    Public Property OccupiedDensitySum As LinearExpr
 End Class
 
 Friend Module SolveTopObjective
@@ -329,6 +337,36 @@ Friend Module SolveTopObjective
             BuildTeacherRangeVars(model, teacherNames, built.Days, built.Periods, built.Lesson, dailyCountTeacher, hasAnyTeacher, teacherRangeVars)
         End If
 
+        ' P1: should-occupied_window -> Dichte-Term ueber die bereits
+        ' reifizierten occupied-Variablen. must-Fenster sind harte
+        ' Constraints (Solver.ApplyOccupiedWindow) und tauchen hier nicht
+        ' auf. Ein unbekannter (Entity, Tag, Periode)-Schluessel wird
+        ' still uebersprungen - Validation.ValidateEntities hat solche
+        ' Fenster bereits als Fehler abgewiesen, bevor ein Solve startet.
+        Dim occupiedDensityParts As New List(Of LinearExpr)
+        If w.IncludeOccupiedDensity Then
+            For Each c In JsonHelpers.Constraints(data)
+                If JsonHelpers.GetString(c, "type") <> "occupied_window" Then Continue For
+                If JsonHelpers.GetPriority(c) <> JsonHelpers.PriorityShould Then Continue For
+                Dim scope = JsonHelpers.GetString(c, "scope")
+                Dim entity = JsonHelpers.GetString(c, "entity")
+                Dim fromPeriod = JsonHelpers.GetInt(c, "from_period")
+                Dim toPeriod = JsonHelpers.GetInt(c, "to_period")
+                If Not fromPeriod.HasValue OrElse Not toPeriod.HasValue Then Continue For
+                Dim windowDaysList = JsonHelpers.AsStringList(c, "days")
+                Dim windowDays = If(windowDaysList.Any(), windowDaysList, built.Days)
+                Dim occLookup = If(scope = "teacher", occupiedTeacher, occupiedClass)
+                For Each d In windowDays
+                    For p = fromPeriod.Value To toPeriod.Value
+                        Dim occ As BoolVar = Nothing
+                        If occLookup.TryGetValue((entity, d, p), occ) Then
+                            occupiedDensityParts.Add(1L - occ)
+                        End If
+                    Next
+                Next
+            Next
+        End If
+
         Dim result As New QualityTerms()
         If built.KannVars.Count > 0 Then
             result.KannSum = LinearExpr.Sum(built.KannVars.Values.Select(Function(kv) kv.Var))
@@ -343,6 +381,7 @@ Friend Module SolveTopObjective
         If classAfternoonDayVars.Count > 0 Then result.AfternoonSum = LinearExpr.Sum(classAfternoonDayVars)
         If classRangeVars.Count > 0 Then result.ClassRangeSum = LinearExpr.Sum(classRangeVars)
         If teacherRangeVars.Count > 0 Then result.TeacherRangeSum = LinearExpr.Sum(teacherRangeVars)
+        If occupiedDensityParts.Count > 0 Then result.OccupiedDensitySum = occupiedDensityParts.Aggregate(Function(a, b) a + b)
         Return result
     End Function
 
@@ -359,6 +398,7 @@ Friend Module SolveTopObjective
         If terms.AfternoonSum IsNot Nothing Then parts.Add(CLng(w.AfternoonDayCount) * terms.AfternoonSum)
         If terms.ClassRangeSum IsNot Nothing Then parts.Add(CLng(w.ClassLoadVariance) * terms.ClassRangeSum)
         If terms.TeacherRangeSum IsNot Nothing Then parts.Add(CLng(w.TeacherLoadVariance) * terms.TeacherRangeSum)
+        If terms.OccupiedDensitySum IsNot Nothing Then parts.Add(CLng(w.OccupiedDensity) * terms.OccupiedDensitySum)
         If parts.Count = 0 Then Return Nothing
         Return parts.Aggregate(Function(a, b) a + b)
     End Function
@@ -379,6 +419,7 @@ Friend Module SolveTopObjective
         If teacherGapsInResidual AndAlso terms.TeacherGapsSum IsNot Nothing Then
             parts.Add(CLng(w.TeacherGaps) * terms.TeacherGapsSum)
         End If
+        If terms.OccupiedDensitySum IsNot Nothing Then parts.Add(CLng(w.OccupiedDensity) * terms.OccupiedDensitySum)
         If terms.EdgeSum IsNot Nothing Then parts.Add(CLng(w.EdgePeriod) * terms.EdgeSum)
         If terms.AfternoonSum IsNot Nothing Then parts.Add(CLng(w.AfternoonDayCount) * terms.AfternoonSum)
         If terms.ClassRangeSum IsNot Nothing Then parts.Add(CLng(w.ClassLoadVariance) * terms.ClassRangeSum)

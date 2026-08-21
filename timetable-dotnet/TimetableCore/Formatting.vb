@@ -204,6 +204,7 @@ Public Module Formatting
                 {"kann_violation_count", sol.Quality.KannViolationCount},
                 {"muss_violation_count", Verifier.VerifySchedule(data, sol.Schedule).Count},
                 {"quality_total", sol.Quality.Total},
+                {"occupied_density_count", sol.Quality.OccupiedDensityCount},
                 {"objective_value", sol.ObjectiveValue},
                 {"best_objective_bound", sol.BestObjectiveBound},
                 {"gap_percent", gapPercent},

@@ -17,6 +17,12 @@ Public NotInheritable Class QualityScore
     Public Property AfternoonDayCount As Integer
     Public Property ClassLoadVariance As Double
     Public Property TeacherLoadVariance As Double
+    ''' <summary>Code-Review-Umsetzung (P1): Anzahl UNBELEGTER Slots ueber
+    ''' alle `occupied_window`-Constraints (jeder Prioritaet - bei must
+    ''' garantiert der Solver ohnehin 0, bei should ist dies das echte,
+    ''' nachgelagert gezaehlte Dichte-Defizit). 0, wenn das Szenario keine
+    ''' occupied_window-Constraints enthaelt.</summary>
+    Public Property OccupiedDensityCount As Integer
     Public Property Total As Double
 End Class
 
@@ -42,6 +48,14 @@ Public NotInheritable Class QualityWeights
     Public Property AfternoonDayCount As Double = ScheduleQuality.WeightAfternoonDayCount
     Public Property ClassLoadVariance As Double = ScheduleQuality.WeightClassLoadVariance
     Public Property TeacherLoadVariance As Double = ScheduleQuality.WeightTeacherLoadVariance
+    ''' <summary>P1: Gewicht pro unbelegtem `occupied_window`-Slot (siehe
+    ''' QualityScore.OccupiedDensityCount) - Default bewusst im selben
+    ''' "mildly disruptive"-Tier wie EdgePeriod/AfternoonDayCount; eine
+    ''' Schule, die Vormittagsdichte hart priorisieren will, hebt es per
+    ''' config.yaml an (das bw-grundschule-beispiel nutzt 100, den
+    ''' frueheren Kann-Gewichtswert seiner abgeloesten
+    ''' occupied_slot-Batterie).</summary>
+    Public Property OccupiedDensity As Double = ScheduleQuality.WeightOccupiedDensity
     ''' <summary>Phase 2.25-Nachtrag-2: whether SolveTopObjective.
     ''' ApplyQualityObjective builds TeacherGaps' auxiliary variables/
     ''' constraints into the CP-SAT model at all - a structural on/off
@@ -77,6 +91,14 @@ Public NotInheritable Class QualityWeights
     Public Property IncludeAfternoonDayCount As Boolean = True
     Public Property IncludeClassLoadVariance As Boolean = True
     Public Property IncludeTeacherLoadVariance As Boolean = True
+    ''' <summary>P1: strukturelles An/Aus fuer den OccupiedDensity-Term in
+    ''' SolveTops Zielfunktion (der Term selbst erzeugt KEINE neuen
+    ''' Variablen - er ist eine reine Linearsumme ueber das ohnehin
+    ''' gebaute occupied-Scaffolding - das Flag existiert fuer Symmetrie
+    ''' zu den uebrigen Kriterien und um die Suche gezielt blind zu
+    ''' schalten). Beeinflusst nie den immer berechneten
+    ''' OccupiedDensityCount der Anzeige.</summary>
+    Public Property IncludeOccupiedDensity As Boolean = True
 End Class
 
 Public Module ScheduleQuality
@@ -128,6 +150,12 @@ Public Module ScheduleQuality
     Public Const WeightClassLoadVariance As Double = 3.0
     Public Const WeightTeacherLoadVariance As Double = 3.0
 
+    ' P1: Vormittags-/Fensterdichte - Kosten pro unbelegtem Slot innerhalb
+    ' eines occupied_window-Constraints. Gleicher Tier wie EdgePeriod/
+    ' AfternoonDayCount (eine Komfort-Praeferenz); Schulen mit harter
+    ' Dichte-Anforderung heben das Gewicht per config.yaml an.
+    Public Const WeightOccupiedDensity As Double = 5.0
+
     ''' <summary>Periods &gt;= this count as "Nachmittag" for the
     ''' Randstunden metric - matches the convention already used in this
     ''' project's own fixture prompts (Gymnasium/MussKann explicitly call
@@ -159,17 +187,62 @@ Public Module ScheduleQuality
         Dim classVariance = LoadVarianceOverAllDays(schedule.GroupBy(Function(l) l.ClassName), allDays)
         Dim teacherVariance = LoadVarianceOverWorkingDaysOnly(schedule.GroupBy(Function(l) l.Teacher))
 
+        Dim occupiedDensity = OccupiedWindowDeficit(data, schedule, allDays)
+
         Dim total = w.Kann * kannViolationCount +
                     w.ClassGaps * classGaps + w.TeacherGaps * teacherGaps +
                     w.EdgePeriod * edgeCount + w.AfternoonDayCount * afternoonDayCount +
-                    w.ClassLoadVariance * classVariance + w.TeacherLoadVariance * teacherVariance
+                    w.ClassLoadVariance * classVariance + w.TeacherLoadVariance * teacherVariance +
+                    w.OccupiedDensity * occupiedDensity
 
         Return New QualityScore With {
             .KannViolationCount = kannViolationCount, .ClassGapCount = classGaps, .TeacherGapCount = teacherGaps,
             .EdgePeriodCount = edgeCount, .AfternoonDayCount = afternoonDayCount,
             .ClassLoadVariance = classVariance, .TeacherLoadVariance = teacherVariance,
+            .OccupiedDensityCount = occupiedDensity,
             .Total = total
         }
+    End Function
+
+    ''' <summary>P1: zaehlt ueber alle `occupied_window`-Constraints in
+    ''' `data` die (Tag, Periode)-Slots innerhalb des jeweiligen Fensters,
+    ''' an denen die Entity KEINEN Unterricht hat - unabhaengig von der
+    ''' Prioritaet (bei must garantiert der Solver 0, bei should ist dies
+    ''' das nachgelagert exakt gezaehlte Dichte-Defizit). Unabhaengig
+    ''' re-deriviert aus Schedule + JSON, teilt keinen Code mit
+    ''' SolveTopObjectives In-Modell-Term (gleiche Philosophie wie
+    ''' Verifier.vb).</summary>
+    Private Function OccupiedWindowDeficit(data As JsonObject, schedule As List(Of ScheduleEntry), allDays As List(Of String)) As Integer
+        Dim deficit = 0
+        For Each c In JsonHelpers.Constraints(data)
+            If JsonHelpers.GetString(c, "type") <> "occupied_window" Then Continue For
+            Dim scope = JsonHelpers.GetString(c, "scope")
+            Dim entity = JsonHelpers.GetString(c, "entity")
+            Dim fromPeriod = JsonHelpers.GetInt(c, "from_period")
+            Dim toPeriod = JsonHelpers.GetInt(c, "to_period")
+            If Not fromPeriod.HasValue OrElse Not toPeriod.HasValue Then Continue For
+            Dim windowDaysList = JsonHelpers.AsStringList(c, "days")
+            Dim windowDays = If(windowDaysList.Any(), windowDaysList, allDays)
+
+            Dim occupiedSlots As HashSet(Of (Day As String, Period As Integer))
+            Select Case scope
+                Case "class"
+                    occupiedSlots = New HashSet(Of (Day As String, Period As Integer))(
+                        schedule.Where(Function(l) l.ClassName = entity).Select(Function(l) (l.Day, l.Period)))
+                Case "teacher"
+                    occupiedSlots = New HashSet(Of (Day As String, Period As Integer))(
+                        schedule.Where(Function(l) l.Teacher = entity).Select(Function(l) (l.Day, l.Period)))
+                Case Else
+                    Continue For
+            End Select
+
+            For Each d In windowDays
+                For p = fromPeriod.Value To toPeriod.Value
+                    If Not occupiedSlots.Contains((d, p)) Then deficit += 1
+                Next
+            Next
+        Next
+        Return deficit
     End Function
 
     ''' <summary>Sum, over every entity (class), of the number of DISTINCT

@@ -349,7 +349,9 @@ quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe un
   afternoon_day_count: 5.0
   class_load_variance: 3.0
   teacher_load_variance: 3.0
+  occupied_density: 5.0   # Optional, Default 5.0 - Code-Review-Umsetzung P1: Gewicht pro unbelegtem occupied_window-Slot
   include_class_gaps: true   # Optional, Default true - Code-Review-Umsetzung R3
+  include_occupied_density: true   # Optional, Default true - P1, strukturelles An/Aus des Dichte-Terms
   include_teacher_gaps: true   # Optional, Default true - Phase 2.25-Nachtrag-2, siehe unten
   include_edge_period: true   # Optional, Default true - siehe unten
   include_afternoon_day_count: true   # Optional, Default true - siehe unten
