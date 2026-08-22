@@ -1,0 +1,1533 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Klassenbildung</title>
+<style>
+  :root {
+    color-scheme: light;
+  }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    margin: 1.5rem;
+    background: #fff;
+    color: #000;
+  }
+  h1 {
+    font-size: 1.3rem;
+    margin-bottom: 0.2rem;
+    color: #000;
+  }
+  h2 {
+    font-size: 1rem;
+    margin: 1rem 0 0.4rem;
+  }
+  #meta {
+    color: #333;
+    margin-bottom: 0.8rem;
+    font-size: 0.88rem;
+  }
+  button {
+    font: inherit;
+    font-size: 0.8rem;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    background: #fff;
+    color: #000;
+    cursor: pointer;
+  }
+  button:hover { background: #f2f2f2; }
+  button.primaer { border-color: #1d4ed8; color: #1d4ed8; }
+
+  /* ---- Fortschrittsleiste (U3): der Trichter als sichtbarer Prozess */
+  #prozess {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 0.5rem 0.7rem;
+    margin-bottom: 0.9rem;
+    font-size: 0.82rem;
+    background: #fafafa;
+  }
+  #prozess .schritt {
+    color: #555;
+    white-space: nowrap;
+  }
+  #prozess .schritt b { color: #000; }
+  #prozess .zaehler {
+    margin-left: auto;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* ---- Varianten-Kacheln (U2) ---- */
+  #varianten {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.7rem;
+  }
+  .variante-kachel {
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    font-size: 0.82rem;
+    min-width: 11rem;
+    background: #fff;
+  }
+  .variante-kachel:hover { background: #f2f2f2; }
+  .variante-kachel.active {
+    border-color: #1d4ed8;
+    background: #dcebff;
+  }
+  .variante-kachel.compare { background: #fdf0e5; }
+  .variante-kachel .kopf { font-weight: 600; }
+  .variante-kachel .zeile { color: #444; font-variant-numeric: tabular-nums; }
+
+  #controls {
+    margin-bottom: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+  }
+  #controls label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    cursor: pointer;
+  }
+  #compare-info { color: #555; font-size: 0.82rem; }
+
+  /* ---- Hauptbereich: Panel-Seitenleiste + Board (U1) ---- */
+  #haupt {
+    display: flex;
+    gap: 0.9rem;
+    align-items: flex-start;
+  }
+  #panel {
+    flex: 0 0 21rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    max-height: 75vh;
+    overflow-y: auto;
+    background: #fff;
+  }
+  #panel .sektion {
+    padding: 0.35rem 0.55rem 0.1rem;
+    font-weight: 700;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    color: #555;
+    border-top: 1px solid #eee;
+  }
+  #panel .sektion:first-child { border-top: none; }
+  .gruppe-zeile {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.55rem;
+    cursor: pointer;
+  }
+  .gruppe-zeile:hover { background: #f2f2f2; }
+  .gruppe-zeile.aktiv { background: #eef4ff; }
+  .gruppe-zeile .kuerzel {
+    flex: 0 0 auto;
+    min-width: 2.4rem;
+    text-align: center;
+    border-radius: 3px;
+    font-weight: 700;
+    font-size: 0.7rem;
+    padding: 1px 3px;
+    color: #fff;
+  }
+  .gruppe-zeile .typ { color: #555; flex: 0 0 auto; }
+  .gruppe-zeile .status { flex: 0 0 auto; font-size: 0.75rem; }
+  .status.s-verletzt { color: #b91c1c; font-weight: 600; }
+  .status.s-knapp { color: #a16207; font-weight: 600; }
+  .status.s-ok { color: #15803d; }
+  .gruppe-zeile .name {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #333;
+  }
+  /* Mini-Balken: Ist-Verteilung ueber die Klassen. */
+  .mini-balken {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 14px;
+  }
+  .mini-balken i {
+    display: block;
+    width: 5px;
+    background: #94a3b8;
+    border-radius: 1px 1px 0 0;
+  }
+  .mini-balken i.ueber { background: #b91c1c; }
+  .mini-balken i.voll { background: #ca8a04; }
+  .gruppe-zeile .fixieren { flex: 0 0 auto; padding: 0 0.35rem; }
+  #panel .block {
+    padding: 0.25rem 0.55rem 0.45rem;
+    color: #333;
+  }
+  #panel .block .zeile { padding: 0.1rem 0; display: flex; gap: 0.4rem; align-items: center; }
+
+  /* ---- Board (U1/U2) ---- */
+  #board {
+    flex: 1 1 auto;
+    display: flex;
+    gap: 0.8rem;
+    align-items: flex-start;
+    overflow-x: auto;
+  }
+  .klasse-spalte {
+    flex: 1 1 0;
+    min-width: 14rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fafafa;
+  }
+  .klasse-kopf {
+    padding: 0.45rem 0.6rem;
+    border-bottom: 1px solid #ccc;
+    background: #fff;
+    border-radius: 6px 6px 0 0;
+  }
+  .klasse-kopf .name-zeile {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .klasse-kopf .name { font-weight: 600; flex: 1 1 auto; }
+  /* Kapazitaetsbalken: Fuellstand relativ zu max_groesse. */
+  .kapazitaet {
+    height: 6px;
+    background: #e5e7eb;
+    border-radius: 3px;
+    margin: 0.3rem 0 0.2rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .kapazitaet i {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: #60a5fa;
+  }
+  .kapazitaet.ausserhalb i { background: #b91c1c; }
+  .klasse-kopf .kennzahl {
+    font-size: 0.72rem;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .klasse-kopf .kennzahl.verletzt { color: #b91c1c; font-weight: 600; }
+  .karten {
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  /* Buendelungs-Stapel (U2): Karten derselben Gruppe im Gruppenrahmen. */
+  .stapel {
+    border: 2px solid;
+    border-radius: 6px;
+    padding: 0.25rem;
+  }
+  .stapel .stapel-kopf {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0 0.2rem 0.2rem;
+  }
+  .stapel .stapel-kopf .zerrissen { color: #b91c1c; }
+  .stapel .karten-innen {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .karte {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-left: 4px solid #9ca3af;
+    border-radius: 4px;
+    padding: 0.22rem 0.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    position: relative;
+  }
+  .karte.agg-gruen { border-left-color: #15803d; }
+  .karte.agg-gelb  { border-left-color: #ca8a04; }
+  .karte.agg-rot   { border-left-color: #b91c1c; }
+  .karte.diff { outline: 3px solid #c2410c; outline-offset: -3px; }
+  .karte.hl { box-shadow: 0 0 0 2px var(--hl, #1d4ed8); }
+  .karte.gepinnt { background: #f4f6fa; }
+  .karte .kind-id {
+    font-variant-numeric: tabular-nums;
+    min-width: 3rem;
+    cursor: pointer;
+  }
+  .karte .konsens { color: #1d4ed8; font-size: 0.7rem; }
+  .karte .pin {
+    margin-left: auto;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: #bbb;
+  }
+  .karte .pin.an { color: #1d4ed8; }
+  .badges { display: flex; gap: 0.2rem; flex-wrap: wrap; }
+  /* Gruppen-Badge (U1): Grundfarbe = GRUPPE, Statuszeichen = Ampel. */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    border-radius: 3px;
+    font-size: 0.66rem;
+    font-weight: 700;
+    padding: 0 3px;
+    color: #fff;
+    cursor: pointer;
+  }
+  .badge .st { font-weight: 400; }
+  .badge .st.gruen { color: #bbf7d0; }
+  .badge .st.gelb  { color: #fde047; }
+  .badge .st.rot   { color: #fecaca; }
+  .badge.wunsch { background: #64748b; }
+
+  /* ---- Karten-Popover (U3: F1/F2) ---- */
+  #popover {
+    position: absolute;
+    z-index: 20;
+    background: #fff;
+    border: 1px solid #999;
+    border-radius: 6px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+    padding: 0.5rem 0.6rem;
+    font-size: 0.78rem;
+    max-width: 20rem;
+  }
+  #popover .kopf { font-weight: 700; margin-bottom: 0.25rem; }
+  #popover ul { margin: 0.2rem 0 0.4rem 1rem; padding: 0; }
+  #popover .aktionen { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+  /* ---- Fixierungen-Panel (U3) ---- */
+  #fixierungen {
+    margin-top: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.82rem;
+  }
+  #fixierungen textarea {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 0.75rem;
+    min-height: 8rem;
+    margin-top: 0.4rem;
+  }
+  #fixierungen .cli {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 0.75rem;
+    background: #f4f4f4;
+    padding: 0.25rem 0.4rem;
+    border-radius: 4px;
+    display: inline-block;
+    margin-top: 0.3rem;
+  }
+  .hinweis { color: #555; font-size: 0.75rem; }
+
+  /* ---- U4: Drag & Drop + Warnbanner ---- */
+  .karte[draggable="true"] { cursor: grab; }
+  .karte.verschoben {
+    border-style: dashed;
+    border-color: #1d4ed8;
+    background: #eef4ff;
+  }
+  .klasse-spalte.dropziel {
+    border-color: #1d4ed8;
+    box-shadow: 0 0 0 2px #93c5fd inset;
+  }
+  #warnung { margin-bottom: 0.9rem; }
+  #warnung .banner {
+    border: 1px solid #fca5a5;
+    background: #fef2f2;
+    color: #7f1d1d;
+    border-radius: 6px;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.82rem;
+  }
+  #warnung .banner.ok {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #14532d;
+  }
+  #warnung .banner .titel { font-weight: 700; }
+  #warnung .banner ul { margin: 0.2rem 0 0 1.1rem; padding: 0; }
+  #warnung .banner .zu {
+    float: right;
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-size: 0.9rem;
+    color: inherit;
+    padding: 0 0.2rem;
+  }
+</style>
+</head>
+<body>
+  <h1 id="titel">Klassenbildung</h1>
+  <div id="meta"></div>
+
+  <div id="prozess"></div>
+  <div id="warnung"></div>
+  <div id="varianten"></div>
+
+  <div id="controls">
+    <label for="compare-select">Vergleichen mit: <select id="compare-select"></select></label>
+    <label><input type="checkbox" id="filter-kritisch">nur Diskussionsbedarf (gelb/rot)</label>
+    <label><input type="checkbox" id="filter-offene">nur offene (nicht fixierte) Kinder</label>
+    <label><input type="checkbox" id="konsens-toggle" checked>Konsens-Kern markieren (&#9679;)</label>
+    <span id="compare-info"></span>
+  </div>
+
+  <div id="haupt">
+    <div id="panel"></div>
+    <div id="board"></div>
+  </div>
+
+  <div id="fixierungen"></div>
+
+  <script type="application/json" id="klassenbildung-data">{"schule":"bw-grundschule-beispiel","schueler_anzahl":100,"klassen_anzahl":4,"min_groesse":22,"max_groesse":26,"klassen_labels":["1a","1b","1c","1d"],"gruppen":[{"id":"G_zwillinge","kuerzel":"ZWI","typ":"buendelung","modus":"hard","prio":3,"max_pro_klasse":null,"mitglieder":["S031","S062"]},{"id":"G_kita_sonnenblume_1","kuerzel":"K1","typ":"buendelung","modus":"soft","prio":2,"max_pro_klasse":null,"mitglieder":["S007","S084","S012","S053"]},{"id":"G_kita_regenbogen_2","kuerzel":"K2","typ":"buendelung","modus":"soft","prio":2,"max_pro_klasse":null,"mitglieder":["S057","S003"]},{"id":"G_kita_pusteblume_3","kuerzel":"K3","typ":"buendelung","modus":"soft","prio":2,"max_pro_klasse":null,"mitglieder":["S023","S065"]},{"id":"G_kita_wirbelwind_4","kuerzel":"K4","typ":"buendelung","modus":"soft","prio":2,"max_pro_klasse":null,"mitglieder":["S013","S040","S074"]},{"id":"G_kita_loewenzahn_5","kuerzel":"K5","typ":"buendelung","modus":"soft","prio":2,"max_pro_klasse":null,"mitglieder":["S002","S066","S020"]},{"id":"G_kita_villakunterbunt_6","kuerzel":"K6","typ":"buendelung","modus":"soft","prio":2,"max_pro_klasse":null,"mitglieder":["S097","S092","S067"]},{"id":"G_kita_sonnenblume_7","kuerzel":"K7","typ":"buendelung","modus":"soft","prio":2,"max_pro_klasse":null,"mitglieder":["S047","S014"]},{"id":"G_kita_regenbogen_8","kuerzel":"K8","typ":"buendelung","modus":"soft","prio":2,"max_pro_klasse":null,"mitglieder":["S044","S098","S079"]},{"id":"G_kita_pusteblume_9","kuerzel":"K9","typ":"buendelung","modus":"soft","prio":2,"max_pro_klasse":null,"mitglieder":["S085","S043"]},{"id":"G_kita_wirbelwind_10","kuerzel":"K10","typ":"buendelung","modus":"soft","prio":2,"max_pro_klasse":null,"mitglieder":["S050","S037"]},{"id":"G_kita_loewenzahn_11","kuerzel":"K11","typ":"buendelung","modus":"soft","prio":2,"max_pro_klasse":null,"mitglieder":["S018","S080","S093","S045"]},{"id":"G_kita_villakunterbunt_12","kuerzel":"K12","typ":"buendelung","modus":"soft","prio":2,"max_pro_klasse":null,"mitglieder":["S001","S058"]},{"id":"G_nordstadt","kuerzel":"NOR","typ":"buendelung","modus":"soft","prio":1,"max_pro_klasse":null,"mitglieder":["S068","S077","S054","S025","S076","S039","S055"]},{"id":"G_sozialverhalten","kuerzel":"SOZ","typ":"verteilung","modus":"soft","prio":3,"max_pro_klasse":1,"mitglieder":["S011","S070","S091","S094","S004"]},{"id":"G_schulbegleitung","kuerzel":"SCH","typ":"buendelung","modus":"soft","prio":2,"max_pro_klasse":null,"mitglieder":["S006","S096"]}],"balance":[{"regel_id":"geschlecht=w","ziel":12,"toleranz":2,"modus":"soft","prio":2,"treffer":["S001","S003","S004","S005","S006","S007","S012","S014","S015","S017","S018","S020","S021","S023","S025","S026","S028","S029","S030","S032","S036","S039","S044","S052","S054","S055","S058","S059","S063","S065","S068","S069","S070","S072","S076","S078","S080","S082","S083","S085","S087","S089","S090","S091","S094","S095","S096","S098"]},{"regel_id":"sprachfoerderung=ja","ziel":4,"toleranz":1,"modus":"soft","prio":2,"treffer":["S006","S009","S011","S016","S025","S038","S047","S049","S059","S069","S071","S074","S080","S081","S091","S094"]},{"regel_id":"kann_kind=ja","ziel":2,"toleranz":1,"modus":"soft","prio":1,"treffer":["S014","S017","S035","S042","S044","S055","S057","S068","S100"]}],"wuensche":[{"index":0,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[0]:S098\u002BS069","kinder":["S098","S069"]},{"index":1,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[1]:S099\u002BS017","kinder":["S099","S017"]},{"index":2,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[2]:S017\u002BS085","kinder":["S017","S085"]},{"index":3,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[3]:S061\u002BS071","kinder":["S061","S071"]},{"index":4,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[4]:S022\u002BS034","kinder":["S022","S034"]},{"index":5,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[5]:S068\u002BS078","kinder":["S068","S078"]},{"index":6,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[6]:S055\u002BS028","kinder":["S055","S028"]},{"index":7,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[7]:S070\u002BS097","kinder":["S070","S097"]},{"index":8,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[8]:S094\u002BS089","kinder":["S094","S089"]},{"index":9,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[9]:S026\u002BS092","kinder":["S026","S092"]},{"index":10,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[10]:S040\u002BS052","kinder":["S040","S052"]},{"index":11,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[11]:S086\u002BS084","kinder":["S086","S084"]},{"index":12,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[12]:S048\u002BS057","kinder":["S048","S057"]},{"index":13,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[13]:S067\u002BS058","kinder":["S067","S058"]},{"index":14,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[14]:S016\u002BS032","kinder":["S016","S032"]},{"index":15,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[15]:S029\u002BS009","kinder":["S029","S009"]},{"index":16,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[16]:S044\u002BS003","kinder":["S044","S003"]},{"index":17,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[17]:S076\u002BS071","kinder":["S076","S071"]},{"index":18,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[18]:S030\u002BS076","kinder":["S030","S076"]},{"index":19,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[19]:S029\u002BS001","kinder":["S029","S001"]},{"index":20,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[20]:S010\u002BS091","kinder":["S010","S091"]},{"index":21,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[21]:S081\u002BS008","kinder":["S081","S008"]},{"index":22,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[22]:S030\u002BS009","kinder":["S030","S009"]},{"index":23,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[23]:S005\u002BS043","kinder":["S005","S043"]},{"index":24,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[24]:S010\u002BS066","kinder":["S010","S066"]},{"index":25,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[25]:S031\u002BS036","kinder":["S031","S036"]},{"index":26,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[26]:S086\u002BS063","kinder":["S086","S063"]},{"index":27,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[27]:S028\u002BS070","kinder":["S028","S070"]},{"index":28,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[28]:S017\u002BS093","kinder":["S017","S093"]},{"index":29,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[29]:S074\u002BS061","kinder":["S074","S061"]},{"index":30,"typ":"zusammen","modus":"soft","prio":1,"regel_id":"wunsch[30]:S032\u002BS061","kinder":["S032","S061"]},{"index":31,"typ":"getrennt","modus":"soft","prio":2,"regel_id":"wunsch[31]:S053\u002BS025","kinder":["S053","S025"]},{"index":32,"typ":"getrennt","modus":"soft","prio":2,"regel_id":"wunsch[32]:S013\u002BS085","kinder":["S013","S085"]},{"index":33,"typ":"getrennt","modus":"soft","prio":2,"regel_id":"wunsch[33]:S056\u002BS046","kinder":["S056","S046"]}],"fixierungen":[{"kind":"S030","klasse":1,"nicht_klasse":null}],"parameter":{"zeitlimit_s":20,"epsilon":0.05,"min_distanz":8},"konsens_kern":["S001","S002","S004","S005","S007","S009","S010","S011","S012","S013","S016","S017","S018","S020","S021","S024","S025","S026","S027","S028","S029","S030","S032","S039","S040","S041","S043","S045","S052","S053","S054","S055","S058","S061","S063","S064","S066","S067","S068","S070","S074","S076","S077","S078","S080","S084","S085","S086","S091","S092","S093","S095","S097","S099"],"varianten":[{"index":1,"status":"Optimal","objective":1001,"diff_zu_v1":0,"zuordnung":{"S001":1,"S002":2,"S003":3,"S004":3,"S005":3,"S006":2,"S007":4,"S008":3,"S009":1,"S010":2,"S011":4,"S012":4,"S013":2,"S014":4,"S015":3,"S016":2,"S017":3,"S018":3,"S019":2,"S020":2,"S021":3,"S022":3,"S023":4,"S024":3,"S025":1,"S026":1,"S027":3,"S028":1,"S029":1,"S030":1,"S031":2,"S032":2,"S033":2,"S034":3,"S035":2,"S036":2,"S037":1,"S038":4,"S039":1,"S040":2,"S041":4,"S042":4,"S043":3,"S044":3,"S045":3,"S046":3,"S047":4,"S048":3,"S049":4,"S050":1,"S051":4,"S052":2,"S053":4,"S054":1,"S055":1,"S056":4,"S057":3,"S058":1,"S059":4,"S060":2,"S061":2,"S062":2,"S063":4,"S064":4,"S065":4,"S066":2,"S067":1,"S068":1,"S069":3,"S070":1,"S071":1,"S072":2,"S073":1,"S074":2,"S075":1,"S076":1,"S077":1,"S078":1,"S079":3,"S080":3,"S081":3,"S082":4,"S083":4,"S084":4,"S085":3,"S086":4,"S087":2,"S088":1,"S089":2,"S090":2,"S091":2,"S092":1,"S093":3,"S094":2,"S095":4,"S096":2,"S097":1,"S098":3,"S099":3,"S100":1},"balance_kennzahlen":[{"regel_id":"geschlecht=w","ziel":12,"toleranz":2,"counts":[14,12,12,10]},{"regel_id":"sprachfoerderung=ja","ziel":4,"toleranz":1,"counts":[3,5,3,5]},{"regel_id":"kann_kind=ja","ziel":2,"toleranz":1,"counts":[3,1,3,2]}],"verletzungen":[{"regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_regenbogen_2","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_pusteblume_3","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_wirbelwind_4","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_loewenzahn_5","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_villakunterbunt_6","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_sonnenblume_7","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_regenbogen_8","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_pusteblume_9","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_wirbelwind_10","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_villakunterbunt_12","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_nordstadt","regel_typ":"buendelung","prio":1,"mass":0},{"regel_id":"G_sozialverhalten","regel_typ":"verteilung","prio":3,"mass":1},{"regel_id":"G_schulbegleitung","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"geschlecht=w","regel_typ":"balance","prio":2,"mass":0},{"regel_id":"sprachfoerderung=ja","regel_typ":"balance","prio":2,"mass":0},{"regel_id":"kann_kind=ja","regel_typ":"balance","prio":1,"mass":0},{"regel_id":"wunsch[0]:S098\u002BS069","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[1]:S099\u002BS017","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[2]:S017\u002BS085","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[3]:S061\u002BS071","regel_typ":"wunsch_zusammen","prio":1,"mass":1},{"regel_id":"wunsch[4]:S022\u002BS034","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[5]:S068\u002BS078","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[6]:S055\u002BS028","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[7]:S070\u002BS097","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[8]:S094\u002BS089","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[9]:S026\u002BS092","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[10]:S040\u002BS052","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[11]:S086\u002BS084","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[12]:S048\u002BS057","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[13]:S067\u002BS058","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[14]:S016\u002BS032","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[15]:S029\u002BS009","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[16]:S044\u002BS003","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[17]:S076\u002BS071","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[18]:S030\u002BS076","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[19]:S029\u002BS001","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[20]:S010\u002BS091","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[21]:S081\u002BS008","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[22]:S030\u002BS009","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[23]:S005\u002BS043","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[24]:S010\u002BS066","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[25]:S031\u002BS036","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[26]:S086\u002BS063","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[27]:S028\u002BS070","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[28]:S017\u002BS093","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[29]:S074\u002BS061","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[30]:S032\u002BS061","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[31]:S053\u002BS025","regel_typ":"wunsch_getrennt","prio":2,"mass":0},{"regel_id":"wunsch[32]:S013\u002BS085","regel_typ":"wunsch_getrennt","prio":2,"mass":0},{"regel_id":"wunsch[33]:S056\u002BS046","regel_typ":"wunsch_getrennt","prio":2,"mass":0}],"chips":[{"kind":"S031","regel_id":"G_zwillinge","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_zwillinge: alle in Klasse 2"},{"kind":"S062","regel_id":"G_zwillinge","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_zwillinge: alle in Klasse 2"},{"kind":"S007","regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_1: alle in Klasse 4"},{"kind":"S084","regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_1: alle in Klasse 4"},{"kind":"S012","regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_1: alle in Klasse 4"},{"kind":"S053","regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_1: alle in Klasse 4"},{"kind":"S057","regel_id":"G_kita_regenbogen_2","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_2: alle in Klasse 3"},{"kind":"S003","regel_id":"G_kita_regenbogen_2","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_2: alle in Klasse 3"},{"kind":"S023","regel_id":"G_kita_pusteblume_3","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_pusteblume_3: alle in Klasse 4"},{"kind":"S065","regel_id":"G_kita_pusteblume_3","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_pusteblume_3: alle in Klasse 4"},{"kind":"S013","regel_id":"G_kita_wirbelwind_4","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_4: alle in Klasse 2"},{"kind":"S040","regel_id":"G_kita_wirbelwind_4","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_4: alle in Klasse 2"},{"kind":"S074","regel_id":"G_kita_wirbelwind_4","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_4: alle in Klasse 2"},{"kind":"S002","regel_id":"G_kita_loewenzahn_5","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_5: alle in Klasse 2"},{"kind":"S066","regel_id":"G_kita_loewenzahn_5","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_5: alle in Klasse 2"},{"kind":"S020","regel_id":"G_kita_loewenzahn_5","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_5: alle in Klasse 2"},{"kind":"S097","regel_id":"G_kita_villakunterbunt_6","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_6: alle in Klasse 1"},{"kind":"S092","regel_id":"G_kita_villakunterbunt_6","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_6: alle in Klasse 1"},{"kind":"S067","regel_id":"G_kita_villakunterbunt_6","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_6: alle in Klasse 1"},{"kind":"S047","regel_id":"G_kita_sonnenblume_7","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_7: alle in Klasse 4"},{"kind":"S014","regel_id":"G_kita_sonnenblume_7","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_7: alle in Klasse 4"},{"kind":"S044","regel_id":"G_kita_regenbogen_8","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_8: alle in Klasse 3"},{"kind":"S098","regel_id":"G_kita_regenbogen_8","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_8: alle in Klasse 3"},{"kind":"S079","regel_id":"G_kita_regenbogen_8","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_8: alle in Klasse 3"},{"kind":"S085","regel_id":"G_kita_pusteblume_9","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_pusteblume_9: alle in Klasse 3"},{"kind":"S043","regel_id":"G_kita_pusteblume_9","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_pusteblume_9: alle in Klasse 3"},{"kind":"S050","regel_id":"G_kita_wirbelwind_10","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_10: alle in Klasse 1"},{"kind":"S037","regel_id":"G_kita_wirbelwind_10","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_10: alle in Klasse 1"},{"kind":"S018","regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_11: alle in Klasse 3"},{"kind":"S080","regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_11: alle in Klasse 3"},{"kind":"S093","regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_11: alle in Klasse 3"},{"kind":"S045","regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_11: alle in Klasse 3"},{"kind":"S001","regel_id":"G_kita_villakunterbunt_12","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_12: alle in Klasse 1"},{"kind":"S058","regel_id":"G_kita_villakunterbunt_12","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_12: alle in Klasse 1"},{"kind":"S068","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S077","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S054","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S025","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S076","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S039","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S055","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S011","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"gelb","text":"Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"},{"kind":"S070","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"gelb","text":"Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"},{"kind":"S091","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"rot","text":"Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"},{"kind":"S094","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"rot","text":"Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"},{"kind":"S004","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"gelb","text":"Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"},{"kind":"S006","regel_id":"G_schulbegleitung","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_schulbegleitung: alle in Klasse 2"},{"kind":"S096","regel_id":"G_schulbegleitung","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_schulbegleitung: alle in Klasse 2"},{"kind":"S001","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S003","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S004","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S005","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S006","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S007","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S012","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S014","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S015","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S017","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S018","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S020","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S021","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S023","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S025","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S026","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S028","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S029","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S030","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S032","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S036","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S039","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S044","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S052","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S054","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S055","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S058","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S059","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S063","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S065","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S068","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S069","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S070","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S072","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S076","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S078","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S080","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S082","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S083","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S085","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S087","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S089","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S090","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S091","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S094","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S095","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S096","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S098","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S006","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S009","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S011","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S016","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S025","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S038","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S047","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S049","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S059","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S069","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S071","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S074","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S080","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S081","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S091","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S094","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S014","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gruen","text":"Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S017","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S035","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 1 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S042","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gruen","text":"Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S044","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S055","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S057","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S068","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S100","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S098","regel_id":"wunsch[0]:S098\u002BS069","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S069: erfuellt"},{"kind":"S069","regel_id":"wunsch[0]:S098\u002BS069","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S098: erfuellt"},{"kind":"S099","regel_id":"wunsch[1]:S099\u002BS017","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S017: erfuellt"},{"kind":"S017","regel_id":"wunsch[1]:S099\u002BS017","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S099: erfuellt"},{"kind":"S017","regel_id":"wunsch[2]:S017\u002BS085","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S085: erfuellt"},{"kind":"S085","regel_id":"wunsch[2]:S017\u002BS085","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S017: erfuellt"},{"kind":"S061","regel_id":"wunsch[3]:S061\u002BS071","regel_typ":"wunsch_zusammen","status":"rot","text":"Wunsch zusammen mit S071: nicht erfuellt"},{"kind":"S071","regel_id":"wunsch[3]:S061\u002BS071","regel_typ":"wunsch_zusammen","status":"rot","text":"Wunsch zusammen mit S061: nicht erfuellt"},{"kind":"S022","regel_id":"wunsch[4]:S022\u002BS034","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S034: erfuellt"},{"kind":"S034","regel_id":"wunsch[4]:S022\u002BS034","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S022: erfuellt"},{"kind":"S068","regel_id":"wunsch[5]:S068\u002BS078","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S078: erfuellt"},{"kind":"S078","regel_id":"wunsch[5]:S068\u002BS078","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S068: erfuellt"},{"kind":"S055","regel_id":"wunsch[6]:S055\u002BS028","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S028: erfuellt"},{"kind":"S028","regel_id":"wunsch[6]:S055\u002BS028","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S055: erfuellt"},{"kind":"S070","regel_id":"wunsch[7]:S070\u002BS097","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S097: erfuellt"},{"kind":"S097","regel_id":"wunsch[7]:S070\u002BS097","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S070: erfuellt"},{"kind":"S094","regel_id":"wunsch[8]:S094\u002BS089","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S089: erfuellt"},{"kind":"S089","regel_id":"wunsch[8]:S094\u002BS089","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S094: erfuellt"},{"kind":"S026","regel_id":"wunsch[9]:S026\u002BS092","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S092: erfuellt"},{"kind":"S092","regel_id":"wunsch[9]:S026\u002BS092","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S026: erfuellt"},{"kind":"S040","regel_id":"wunsch[10]:S040\u002BS052","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S052: erfuellt"},{"kind":"S052","regel_id":"wunsch[10]:S040\u002BS052","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S040: erfuellt"},{"kind":"S086","regel_id":"wunsch[11]:S086\u002BS084","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S084: erfuellt"},{"kind":"S084","regel_id":"wunsch[11]:S086\u002BS084","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S086: erfuellt"},{"kind":"S048","regel_id":"wunsch[12]:S048\u002BS057","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S057: erfuellt"},{"kind":"S057","regel_id":"wunsch[12]:S048\u002BS057","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S048: erfuellt"},{"kind":"S067","regel_id":"wunsch[13]:S067\u002BS058","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S058: erfuellt"},{"kind":"S058","regel_id":"wunsch[13]:S067\u002BS058","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S067: erfuellt"},{"kind":"S016","regel_id":"wunsch[14]:S016\u002BS032","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S032: erfuellt"},{"kind":"S032","regel_id":"wunsch[14]:S016\u002BS032","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S016: erfuellt"},{"kind":"S029","regel_id":"wunsch[15]:S029\u002BS009","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S009: erfuellt"},{"kind":"S009","regel_id":"wunsch[15]:S029\u002BS009","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S029: erfuellt"},{"kind":"S044","regel_id":"wunsch[16]:S044\u002BS003","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S003: erfuellt"},{"kind":"S003","regel_id":"wunsch[16]:S044\u002BS003","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S044: erfuellt"},{"kind":"S076","regel_id":"wunsch[17]:S076\u002BS071","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S071: erfuellt"},{"kind":"S071","regel_id":"wunsch[17]:S076\u002BS071","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S076: erfuellt"},{"kind":"S030","regel_id":"wunsch[18]:S030\u002BS076","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S076: erfuellt"},{"kind":"S076","regel_id":"wunsch[18]:S030\u002BS076","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S030: erfuellt"},{"kind":"S029","regel_id":"wunsch[19]:S029\u002BS001","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S001: erfuellt"},{"kind":"S001","regel_id":"wunsch[19]:S029\u002BS001","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S029: erfuellt"},{"kind":"S010","regel_id":"wunsch[20]:S010\u002BS091","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S091: erfuellt"},{"kind":"S091","regel_id":"wunsch[20]:S010\u002BS091","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S010: erfuellt"},{"kind":"S081","regel_id":"wunsch[21]:S081\u002BS008","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S008: erfuellt"},{"kind":"S008","regel_id":"wunsch[21]:S081\u002BS008","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S081: erfuellt"},{"kind":"S030","regel_id":"wunsch[22]:S030\u002BS009","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S009: erfuellt"},{"kind":"S009","regel_id":"wunsch[22]:S030\u002BS009","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S030: erfuellt"},{"kind":"S005","regel_id":"wunsch[23]:S005\u002BS043","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S043: erfuellt"},{"kind":"S043","regel_id":"wunsch[23]:S005\u002BS043","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S005: erfuellt"},{"kind":"S010","regel_id":"wunsch[24]:S010\u002BS066","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S066: erfuellt"},{"kind":"S066","regel_id":"wunsch[24]:S010\u002BS066","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S010: erfuellt"},{"kind":"S031","regel_id":"wunsch[25]:S031\u002BS036","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S036: erfuellt"},{"kind":"S036","regel_id":"wunsch[25]:S031\u002BS036","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S031: erfuellt"},{"kind":"S086","regel_id":"wunsch[26]:S086\u002BS063","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S063: erfuellt"},{"kind":"S063","regel_id":"wunsch[26]:S086\u002BS063","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S086: erfuellt"},{"kind":"S028","regel_id":"wunsch[27]:S028\u002BS070","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S070: erfuellt"},{"kind":"S070","regel_id":"wunsch[27]:S028\u002BS070","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S028: erfuellt"},{"kind":"S017","regel_id":"wunsch[28]:S017\u002BS093","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S093: erfuellt"},{"kind":"S093","regel_id":"wunsch[28]:S017\u002BS093","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S017: erfuellt"},{"kind":"S074","regel_id":"wunsch[29]:S074\u002BS061","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S061: erfuellt"},{"kind":"S061","regel_id":"wunsch[29]:S074\u002BS061","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S074: erfuellt"},{"kind":"S032","regel_id":"wunsch[30]:S032\u002BS061","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S061: erfuellt"},{"kind":"S061","regel_id":"wunsch[30]:S032\u002BS061","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S032: erfuellt"},{"kind":"S053","regel_id":"wunsch[31]:S053\u002BS025","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S025: erfuellt"},{"kind":"S025","regel_id":"wunsch[31]:S053\u002BS025","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S053: erfuellt"},{"kind":"S013","regel_id":"wunsch[32]:S013\u002BS085","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S085: erfuellt"},{"kind":"S085","regel_id":"wunsch[32]:S013\u002BS085","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S013: erfuellt"},{"kind":"S056","regel_id":"wunsch[33]:S056\u002BS046","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S046: erfuellt"},{"kind":"S046","regel_id":"wunsch[33]:S056\u002BS046","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S056: erfuellt"}]},{"index":2,"status":"Optimal","objective":1001,"diff_zu_v1":37,"zuordnung":{"S001":1,"S002":2,"S003":2,"S004":3,"S005":3,"S006":4,"S007":4,"S008":1,"S009":1,"S010":2,"S011":4,"S012":4,"S013":2,"S014":4,"S015":4,"S016":2,"S017":3,"S018":3,"S019":3,"S020":2,"S021":3,"S022":2,"S023":2,"S024":3,"S025":1,"S026":1,"S027":3,"S028":1,"S029":1,"S030":1,"S031":4,"S032":2,"S033":1,"S034":2,"S035":3,"S036":4,"S037":3,"S038":1,"S039":1,"S040":2,"S041":4,"S042":4,"S043":3,"S044":2,"S045":3,"S046":4,"S047":4,"S048":2,"S049":3,"S050":3,"S051":4,"S052":2,"S053":4,"S054":1,"S055":1,"S056":3,"S057":2,"S058":1,"S059":3,"S060":4,"S061":2,"S062":4,"S063":4,"S064":4,"S065":2,"S066":2,"S067":1,"S068":1,"S069":2,"S070":1,"S071":1,"S072":4,"S073":4,"S074":2,"S075":1,"S076":1,"S077":1,"S078":1,"S079":2,"S080":3,"S081":1,"S082":3,"S083":3,"S084":4,"S085":3,"S086":4,"S087":4,"S088":1,"S089":2,"S090":3,"S091":2,"S092":1,"S093":3,"S094":2,"S095":4,"S096":4,"S097":1,"S098":2,"S099":3,"S100":2},"balance_kennzahlen":[{"regel_id":"geschlecht=w","ziel":12,"toleranz":2,"counts":[14,12,11,11]},{"regel_id":"sprachfoerderung=ja","ziel":4,"toleranz":1,"counts":[5,5,3,3]},{"regel_id":"kann_kind=ja","ziel":2,"toleranz":1,"counts":[2,3,2,2]}],"verletzungen":[{"regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_regenbogen_2","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_pusteblume_3","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_wirbelwind_4","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_loewenzahn_5","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_villakunterbunt_6","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_sonnenblume_7","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_regenbogen_8","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_pusteblume_9","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_wirbelwind_10","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_villakunterbunt_12","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_nordstadt","regel_typ":"buendelung","prio":1,"mass":0},{"regel_id":"G_sozialverhalten","regel_typ":"verteilung","prio":3,"mass":1},{"regel_id":"G_schulbegleitung","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"geschlecht=w","regel_typ":"balance","prio":2,"mass":0},{"regel_id":"sprachfoerderung=ja","regel_typ":"balance","prio":2,"mass":0},{"regel_id":"kann_kind=ja","regel_typ":"balance","prio":1,"mass":0},{"regel_id":"wunsch[0]:S098\u002BS069","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[1]:S099\u002BS017","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[2]:S017\u002BS085","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[3]:S061\u002BS071","regel_typ":"wunsch_zusammen","prio":1,"mass":1},{"regel_id":"wunsch[4]:S022\u002BS034","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[5]:S068\u002BS078","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[6]:S055\u002BS028","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[7]:S070\u002BS097","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[8]:S094\u002BS089","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[9]:S026\u002BS092","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[10]:S040\u002BS052","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[11]:S086\u002BS084","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[12]:S048\u002BS057","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[13]:S067\u002BS058","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[14]:S016\u002BS032","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[15]:S029\u002BS009","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[16]:S044\u002BS003","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[17]:S076\u002BS071","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[18]:S030\u002BS076","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[19]:S029\u002BS001","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[20]:S010\u002BS091","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[21]:S081\u002BS008","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[22]:S030\u002BS009","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[23]:S005\u002BS043","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[24]:S010\u002BS066","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[25]:S031\u002BS036","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[26]:S086\u002BS063","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[27]:S028\u002BS070","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[28]:S017\u002BS093","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[29]:S074\u002BS061","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[30]:S032\u002BS061","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[31]:S053\u002BS025","regel_typ":"wunsch_getrennt","prio":2,"mass":0},{"regel_id":"wunsch[32]:S013\u002BS085","regel_typ":"wunsch_getrennt","prio":2,"mass":0},{"regel_id":"wunsch[33]:S056\u002BS046","regel_typ":"wunsch_getrennt","prio":2,"mass":0}],"chips":[{"kind":"S031","regel_id":"G_zwillinge","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_zwillinge: alle in Klasse 4"},{"kind":"S062","regel_id":"G_zwillinge","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_zwillinge: alle in Klasse 4"},{"kind":"S007","regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_1: alle in Klasse 4"},{"kind":"S084","regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_1: alle in Klasse 4"},{"kind":"S012","regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_1: alle in Klasse 4"},{"kind":"S053","regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_1: alle in Klasse 4"},{"kind":"S057","regel_id":"G_kita_regenbogen_2","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_2: alle in Klasse 2"},{"kind":"S003","regel_id":"G_kita_regenbogen_2","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_2: alle in Klasse 2"},{"kind":"S023","regel_id":"G_kita_pusteblume_3","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_pusteblume_3: alle in Klasse 2"},{"kind":"S065","regel_id":"G_kita_pusteblume_3","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_pusteblume_3: alle in Klasse 2"},{"kind":"S013","regel_id":"G_kita_wirbelwind_4","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_4: alle in Klasse 2"},{"kind":"S040","regel_id":"G_kita_wirbelwind_4","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_4: alle in Klasse 2"},{"kind":"S074","regel_id":"G_kita_wirbelwind_4","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_4: alle in Klasse 2"},{"kind":"S002","regel_id":"G_kita_loewenzahn_5","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_5: alle in Klasse 2"},{"kind":"S066","regel_id":"G_kita_loewenzahn_5","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_5: alle in Klasse 2"},{"kind":"S020","regel_id":"G_kita_loewenzahn_5","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_5: alle in Klasse 2"},{"kind":"S097","regel_id":"G_kita_villakunterbunt_6","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_6: alle in Klasse 1"},{"kind":"S092","regel_id":"G_kita_villakunterbunt_6","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_6: alle in Klasse 1"},{"kind":"S067","regel_id":"G_kita_villakunterbunt_6","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_6: alle in Klasse 1"},{"kind":"S047","regel_id":"G_kita_sonnenblume_7","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_7: alle in Klasse 4"},{"kind":"S014","regel_id":"G_kita_sonnenblume_7","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_7: alle in Klasse 4"},{"kind":"S044","regel_id":"G_kita_regenbogen_8","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_8: alle in Klasse 2"},{"kind":"S098","regel_id":"G_kita_regenbogen_8","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_8: alle in Klasse 2"},{"kind":"S079","regel_id":"G_kita_regenbogen_8","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_8: alle in Klasse 2"},{"kind":"S085","regel_id":"G_kita_pusteblume_9","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_pusteblume_9: alle in Klasse 3"},{"kind":"S043","regel_id":"G_kita_pusteblume_9","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_pusteblume_9: alle in Klasse 3"},{"kind":"S050","regel_id":"G_kita_wirbelwind_10","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_10: alle in Klasse 3"},{"kind":"S037","regel_id":"G_kita_wirbelwind_10","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_10: alle in Klasse 3"},{"kind":"S018","regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_11: alle in Klasse 3"},{"kind":"S080","regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_11: alle in Klasse 3"},{"kind":"S093","regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_11: alle in Klasse 3"},{"kind":"S045","regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_11: alle in Klasse 3"},{"kind":"S001","regel_id":"G_kita_villakunterbunt_12","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_12: alle in Klasse 1"},{"kind":"S058","regel_id":"G_kita_villakunterbunt_12","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_12: alle in Klasse 1"},{"kind":"S068","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S077","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S054","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S025","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S076","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S039","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S055","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S011","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"gelb","text":"Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"},{"kind":"S070","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"gelb","text":"Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"},{"kind":"S091","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"rot","text":"Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"},{"kind":"S094","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"rot","text":"Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"},{"kind":"S004","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"gelb","text":"Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"},{"kind":"S006","regel_id":"G_schulbegleitung","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_schulbegleitung: alle in Klasse 4"},{"kind":"S096","regel_id":"G_schulbegleitung","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_schulbegleitung: alle in Klasse 4"},{"kind":"S001","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S003","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S004","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S005","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S006","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S007","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S012","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S014","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S015","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S017","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S018","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S020","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S021","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S023","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S025","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S026","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S028","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S029","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S030","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S032","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S036","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S039","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S044","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S052","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S054","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S055","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S058","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S059","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S063","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S065","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S068","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S069","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S070","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S072","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S076","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S078","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S080","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S082","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S083","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S085","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S087","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S089","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S090","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S091","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S094","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S095","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S096","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S098","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S006","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S009","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S011","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S016","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S025","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S038","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S047","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S049","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S059","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S069","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S071","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S074","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S080","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S081","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S091","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S094","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S014","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gruen","text":"Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S017","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gruen","text":"Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S035","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gruen","text":"Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S042","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gruen","text":"Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S044","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S055","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gruen","text":"Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S057","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S068","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gruen","text":"Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S100","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S098","regel_id":"wunsch[0]:S098\u002BS069","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S069: erfuellt"},{"kind":"S069","regel_id":"wunsch[0]:S098\u002BS069","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S098: erfuellt"},{"kind":"S099","regel_id":"wunsch[1]:S099\u002BS017","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S017: erfuellt"},{"kind":"S017","regel_id":"wunsch[1]:S099\u002BS017","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S099: erfuellt"},{"kind":"S017","regel_id":"wunsch[2]:S017\u002BS085","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S085: erfuellt"},{"kind":"S085","regel_id":"wunsch[2]:S017\u002BS085","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S017: erfuellt"},{"kind":"S061","regel_id":"wunsch[3]:S061\u002BS071","regel_typ":"wunsch_zusammen","status":"rot","text":"Wunsch zusammen mit S071: nicht erfuellt"},{"kind":"S071","regel_id":"wunsch[3]:S061\u002BS071","regel_typ":"wunsch_zusammen","status":"rot","text":"Wunsch zusammen mit S061: nicht erfuellt"},{"kind":"S022","regel_id":"wunsch[4]:S022\u002BS034","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S034: erfuellt"},{"kind":"S034","regel_id":"wunsch[4]:S022\u002BS034","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S022: erfuellt"},{"kind":"S068","regel_id":"wunsch[5]:S068\u002BS078","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S078: erfuellt"},{"kind":"S078","regel_id":"wunsch[5]:S068\u002BS078","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S068: erfuellt"},{"kind":"S055","regel_id":"wunsch[6]:S055\u002BS028","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S028: erfuellt"},{"kind":"S028","regel_id":"wunsch[6]:S055\u002BS028","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S055: erfuellt"},{"kind":"S070","regel_id":"wunsch[7]:S070\u002BS097","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S097: erfuellt"},{"kind":"S097","regel_id":"wunsch[7]:S070\u002BS097","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S070: erfuellt"},{"kind":"S094","regel_id":"wunsch[8]:S094\u002BS089","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S089: erfuellt"},{"kind":"S089","regel_id":"wunsch[8]:S094\u002BS089","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S094: erfuellt"},{"kind":"S026","regel_id":"wunsch[9]:S026\u002BS092","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S092: erfuellt"},{"kind":"S092","regel_id":"wunsch[9]:S026\u002BS092","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S026: erfuellt"},{"kind":"S040","regel_id":"wunsch[10]:S040\u002BS052","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S052: erfuellt"},{"kind":"S052","regel_id":"wunsch[10]:S040\u002BS052","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S040: erfuellt"},{"kind":"S086","regel_id":"wunsch[11]:S086\u002BS084","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S084: erfuellt"},{"kind":"S084","regel_id":"wunsch[11]:S086\u002BS084","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S086: erfuellt"},{"kind":"S048","regel_id":"wunsch[12]:S048\u002BS057","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S057: erfuellt"},{"kind":"S057","regel_id":"wunsch[12]:S048\u002BS057","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S048: erfuellt"},{"kind":"S067","regel_id":"wunsch[13]:S067\u002BS058","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S058: erfuellt"},{"kind":"S058","regel_id":"wunsch[13]:S067\u002BS058","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S067: erfuellt"},{"kind":"S016","regel_id":"wunsch[14]:S016\u002BS032","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S032: erfuellt"},{"kind":"S032","regel_id":"wunsch[14]:S016\u002BS032","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S016: erfuellt"},{"kind":"S029","regel_id":"wunsch[15]:S029\u002BS009","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S009: erfuellt"},{"kind":"S009","regel_id":"wunsch[15]:S029\u002BS009","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S029: erfuellt"},{"kind":"S044","regel_id":"wunsch[16]:S044\u002BS003","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S003: erfuellt"},{"kind":"S003","regel_id":"wunsch[16]:S044\u002BS003","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S044: erfuellt"},{"kind":"S076","regel_id":"wunsch[17]:S076\u002BS071","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S071: erfuellt"},{"kind":"S071","regel_id":"wunsch[17]:S076\u002BS071","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S076: erfuellt"},{"kind":"S030","regel_id":"wunsch[18]:S030\u002BS076","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S076: erfuellt"},{"kind":"S076","regel_id":"wunsch[18]:S030\u002BS076","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S030: erfuellt"},{"kind":"S029","regel_id":"wunsch[19]:S029\u002BS001","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S001: erfuellt"},{"kind":"S001","regel_id":"wunsch[19]:S029\u002BS001","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S029: erfuellt"},{"kind":"S010","regel_id":"wunsch[20]:S010\u002BS091","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S091: erfuellt"},{"kind":"S091","regel_id":"wunsch[20]:S010\u002BS091","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S010: erfuellt"},{"kind":"S081","regel_id":"wunsch[21]:S081\u002BS008","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S008: erfuellt"},{"kind":"S008","regel_id":"wunsch[21]:S081\u002BS008","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S081: erfuellt"},{"kind":"S030","regel_id":"wunsch[22]:S030\u002BS009","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S009: erfuellt"},{"kind":"S009","regel_id":"wunsch[22]:S030\u002BS009","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S030: erfuellt"},{"kind":"S005","regel_id":"wunsch[23]:S005\u002BS043","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S043: erfuellt"},{"kind":"S043","regel_id":"wunsch[23]:S005\u002BS043","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S005: erfuellt"},{"kind":"S010","regel_id":"wunsch[24]:S010\u002BS066","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S066: erfuellt"},{"kind":"S066","regel_id":"wunsch[24]:S010\u002BS066","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S010: erfuellt"},{"kind":"S031","regel_id":"wunsch[25]:S031\u002BS036","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S036: erfuellt"},{"kind":"S036","regel_id":"wunsch[25]:S031\u002BS036","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S031: erfuellt"},{"kind":"S086","regel_id":"wunsch[26]:S086\u002BS063","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S063: erfuellt"},{"kind":"S063","regel_id":"wunsch[26]:S086\u002BS063","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S086: erfuellt"},{"kind":"S028","regel_id":"wunsch[27]:S028\u002BS070","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S070: erfuellt"},{"kind":"S070","regel_id":"wunsch[27]:S028\u002BS070","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S028: erfuellt"},{"kind":"S017","regel_id":"wunsch[28]:S017\u002BS093","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S093: erfuellt"},{"kind":"S093","regel_id":"wunsch[28]:S017\u002BS093","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S017: erfuellt"},{"kind":"S074","regel_id":"wunsch[29]:S074\u002BS061","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S061: erfuellt"},{"kind":"S061","regel_id":"wunsch[29]:S074\u002BS061","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S074: erfuellt"},{"kind":"S032","regel_id":"wunsch[30]:S032\u002BS061","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S061: erfuellt"},{"kind":"S061","regel_id":"wunsch[30]:S032\u002BS061","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S032: erfuellt"},{"kind":"S053","regel_id":"wunsch[31]:S053\u002BS025","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S025: erfuellt"},{"kind":"S025","regel_id":"wunsch[31]:S053\u002BS025","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S053: erfuellt"},{"kind":"S013","regel_id":"wunsch[32]:S013\u002BS085","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S085: erfuellt"},{"kind":"S085","regel_id":"wunsch[32]:S013\u002BS085","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S013: erfuellt"},{"kind":"S056","regel_id":"wunsch[33]:S056\u002BS046","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S046: erfuellt"},{"kind":"S046","regel_id":"wunsch[33]:S056\u002BS046","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S056: erfuellt"}]},{"index":3,"status":"Optimal","objective":1001,"diff_zu_v1":41,"zuordnung":{"S001":1,"S002":2,"S003":2,"S004":3,"S005":3,"S006":4,"S007":4,"S008":4,"S009":1,"S010":2,"S011":4,"S012":4,"S013":2,"S014":3,"S015":4,"S016":2,"S017":3,"S018":3,"S019":3,"S020":2,"S021":3,"S022":2,"S023":3,"S024":3,"S025":1,"S026":1,"S027":3,"S028":1,"S029":1,"S030":1,"S031":2,"S032":2,"S033":1,"S034":2,"S035":4,"S036":2,"S037":3,"S038":1,"S039":1,"S040":2,"S041":4,"S042":1,"S043":3,"S044":2,"S045":3,"S046":4,"S047":3,"S048":2,"S049":3,"S050":3,"S051":3,"S052":2,"S053":4,"S054":1,"S055":1,"S056":1,"S057":2,"S058":1,"S059":3,"S060":4,"S061":2,"S062":2,"S063":4,"S064":4,"S065":3,"S066":2,"S067":1,"S068":1,"S069":2,"S070":1,"S071":2,"S072":2,"S073":4,"S074":2,"S075":3,"S076":1,"S077":1,"S078":1,"S079":2,"S080":3,"S081":4,"S082":3,"S083":4,"S084":4,"S085":3,"S086":4,"S087":4,"S088":4,"S089":4,"S090":4,"S091":2,"S092":1,"S093":3,"S094":4,"S095":4,"S096":4,"S097":1,"S098":2,"S099":3,"S100":3},"balance_kennzahlen":[{"regel_id":"geschlecht=w","ziel":12,"toleranz":2,"counts":[14,10,12,12]},{"regel_id":"sprachfoerderung=ja","ziel":4,"toleranz":1,"counts":[3,5,4,4]},{"regel_id":"kann_kind=ja","ziel":2,"toleranz":1,"counts":[3,2,3,1]}],"verletzungen":[{"regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_regenbogen_2","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_pusteblume_3","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_wirbelwind_4","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_loewenzahn_5","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_villakunterbunt_6","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_sonnenblume_7","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_regenbogen_8","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_pusteblume_9","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_wirbelwind_10","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_kita_villakunterbunt_12","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"G_nordstadt","regel_typ":"buendelung","prio":1,"mass":0},{"regel_id":"G_sozialverhalten","regel_typ":"verteilung","prio":3,"mass":1},{"regel_id":"G_schulbegleitung","regel_typ":"buendelung","prio":2,"mass":0},{"regel_id":"geschlecht=w","regel_typ":"balance","prio":2,"mass":0},{"regel_id":"sprachfoerderung=ja","regel_typ":"balance","prio":2,"mass":0},{"regel_id":"kann_kind=ja","regel_typ":"balance","prio":1,"mass":0},{"regel_id":"wunsch[0]:S098\u002BS069","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[1]:S099\u002BS017","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[2]:S017\u002BS085","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[3]:S061\u002BS071","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[4]:S022\u002BS034","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[5]:S068\u002BS078","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[6]:S055\u002BS028","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[7]:S070\u002BS097","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[8]:S094\u002BS089","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[9]:S026\u002BS092","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[10]:S040\u002BS052","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[11]:S086\u002BS084","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[12]:S048\u002BS057","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[13]:S067\u002BS058","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[14]:S016\u002BS032","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[15]:S029\u002BS009","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[16]:S044\u002BS003","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[17]:S076\u002BS071","regel_typ":"wunsch_zusammen","prio":1,"mass":1},{"regel_id":"wunsch[18]:S030\u002BS076","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[19]:S029\u002BS001","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[20]:S010\u002BS091","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[21]:S081\u002BS008","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[22]:S030\u002BS009","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[23]:S005\u002BS043","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[24]:S010\u002BS066","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[25]:S031\u002BS036","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[26]:S086\u002BS063","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[27]:S028\u002BS070","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[28]:S017\u002BS093","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[29]:S074\u002BS061","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[30]:S032\u002BS061","regel_typ":"wunsch_zusammen","prio":1,"mass":0},{"regel_id":"wunsch[31]:S053\u002BS025","regel_typ":"wunsch_getrennt","prio":2,"mass":0},{"regel_id":"wunsch[32]:S013\u002BS085","regel_typ":"wunsch_getrennt","prio":2,"mass":0},{"regel_id":"wunsch[33]:S056\u002BS046","regel_typ":"wunsch_getrennt","prio":2,"mass":0}],"chips":[{"kind":"S031","regel_id":"G_zwillinge","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_zwillinge: alle in Klasse 2"},{"kind":"S062","regel_id":"G_zwillinge","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_zwillinge: alle in Klasse 2"},{"kind":"S007","regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_1: alle in Klasse 4"},{"kind":"S084","regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_1: alle in Klasse 4"},{"kind":"S012","regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_1: alle in Klasse 4"},{"kind":"S053","regel_id":"G_kita_sonnenblume_1","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_1: alle in Klasse 4"},{"kind":"S057","regel_id":"G_kita_regenbogen_2","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_2: alle in Klasse 2"},{"kind":"S003","regel_id":"G_kita_regenbogen_2","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_2: alle in Klasse 2"},{"kind":"S023","regel_id":"G_kita_pusteblume_3","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_pusteblume_3: alle in Klasse 3"},{"kind":"S065","regel_id":"G_kita_pusteblume_3","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_pusteblume_3: alle in Klasse 3"},{"kind":"S013","regel_id":"G_kita_wirbelwind_4","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_4: alle in Klasse 2"},{"kind":"S040","regel_id":"G_kita_wirbelwind_4","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_4: alle in Klasse 2"},{"kind":"S074","regel_id":"G_kita_wirbelwind_4","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_4: alle in Klasse 2"},{"kind":"S002","regel_id":"G_kita_loewenzahn_5","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_5: alle in Klasse 2"},{"kind":"S066","regel_id":"G_kita_loewenzahn_5","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_5: alle in Klasse 2"},{"kind":"S020","regel_id":"G_kita_loewenzahn_5","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_5: alle in Klasse 2"},{"kind":"S097","regel_id":"G_kita_villakunterbunt_6","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_6: alle in Klasse 1"},{"kind":"S092","regel_id":"G_kita_villakunterbunt_6","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_6: alle in Klasse 1"},{"kind":"S067","regel_id":"G_kita_villakunterbunt_6","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_6: alle in Klasse 1"},{"kind":"S047","regel_id":"G_kita_sonnenblume_7","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_7: alle in Klasse 3"},{"kind":"S014","regel_id":"G_kita_sonnenblume_7","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_sonnenblume_7: alle in Klasse 3"},{"kind":"S044","regel_id":"G_kita_regenbogen_8","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_8: alle in Klasse 2"},{"kind":"S098","regel_id":"G_kita_regenbogen_8","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_8: alle in Klasse 2"},{"kind":"S079","regel_id":"G_kita_regenbogen_8","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_regenbogen_8: alle in Klasse 2"},{"kind":"S085","regel_id":"G_kita_pusteblume_9","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_pusteblume_9: alle in Klasse 3"},{"kind":"S043","regel_id":"G_kita_pusteblume_9","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_pusteblume_9: alle in Klasse 3"},{"kind":"S050","regel_id":"G_kita_wirbelwind_10","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_10: alle in Klasse 3"},{"kind":"S037","regel_id":"G_kita_wirbelwind_10","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_wirbelwind_10: alle in Klasse 3"},{"kind":"S018","regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_11: alle in Klasse 3"},{"kind":"S080","regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_11: alle in Klasse 3"},{"kind":"S093","regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_11: alle in Klasse 3"},{"kind":"S045","regel_id":"G_kita_loewenzahn_11","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_loewenzahn_11: alle in Klasse 3"},{"kind":"S001","regel_id":"G_kita_villakunterbunt_12","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_12: alle in Klasse 1"},{"kind":"S058","regel_id":"G_kita_villakunterbunt_12","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_kita_villakunterbunt_12: alle in Klasse 1"},{"kind":"S068","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S077","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S054","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S025","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S076","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S039","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S055","regel_id":"G_nordstadt","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_nordstadt: alle in Klasse 1"},{"kind":"S011","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"rot","text":"Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"},{"kind":"S070","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"gelb","text":"Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"},{"kind":"S091","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"gelb","text":"Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"},{"kind":"S094","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"rot","text":"Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"},{"kind":"S004","regel_id":"G_sozialverhalten","regel_typ":"verteilung","status":"gelb","text":"Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"},{"kind":"S006","regel_id":"G_schulbegleitung","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_schulbegleitung: alle in Klasse 4"},{"kind":"S096","regel_id":"G_schulbegleitung","regel_typ":"buendelung","status":"gruen","text":"Buendelung G_schulbegleitung: alle in Klasse 4"},{"kind":"S001","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S003","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S004","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S005","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S006","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S007","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S012","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S014","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S015","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S017","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S018","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S020","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S021","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S023","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S025","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S026","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S028","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S029","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S030","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S032","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S036","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S039","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S044","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S052","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S054","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S055","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S058","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S059","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S063","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S065","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S068","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S069","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S070","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S072","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S076","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S078","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S080","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S082","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S083","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S085","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S087","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S089","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S090","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S091","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S094","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S095","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S096","regel_id":"geschlecht=w","regel_typ":"balance","status":"gruen","text":"Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S098","regel_id":"geschlecht=w","regel_typ":"balance","status":"gelb","text":"Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"},{"kind":"S006","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gruen","text":"Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S009","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S011","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gruen","text":"Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S016","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S025","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S038","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S047","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gruen","text":"Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S049","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gruen","text":"Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S059","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gruen","text":"Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S069","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S071","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S074","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S080","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gruen","text":"Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S081","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gruen","text":"Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S091","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gelb","text":"Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S094","regel_id":"sprachfoerderung=ja","regel_typ":"balance","status":"gruen","text":"Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"},{"kind":"S014","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S017","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S035","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 1 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S042","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S044","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gruen","text":"Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S055","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S057","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gruen","text":"Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S068","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S100","regel_id":"kann_kind=ja","regel_typ":"balance","status":"gelb","text":"Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"},{"kind":"S098","regel_id":"wunsch[0]:S098\u002BS069","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S069: erfuellt"},{"kind":"S069","regel_id":"wunsch[0]:S098\u002BS069","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S098: erfuellt"},{"kind":"S099","regel_id":"wunsch[1]:S099\u002BS017","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S017: erfuellt"},{"kind":"S017","regel_id":"wunsch[1]:S099\u002BS017","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S099: erfuellt"},{"kind":"S017","regel_id":"wunsch[2]:S017\u002BS085","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S085: erfuellt"},{"kind":"S085","regel_id":"wunsch[2]:S017\u002BS085","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S017: erfuellt"},{"kind":"S061","regel_id":"wunsch[3]:S061\u002BS071","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S071: erfuellt"},{"kind":"S071","regel_id":"wunsch[3]:S061\u002BS071","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S061: erfuellt"},{"kind":"S022","regel_id":"wunsch[4]:S022\u002BS034","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S034: erfuellt"},{"kind":"S034","regel_id":"wunsch[4]:S022\u002BS034","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S022: erfuellt"},{"kind":"S068","regel_id":"wunsch[5]:S068\u002BS078","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S078: erfuellt"},{"kind":"S078","regel_id":"wunsch[5]:S068\u002BS078","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S068: erfuellt"},{"kind":"S055","regel_id":"wunsch[6]:S055\u002BS028","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S028: erfuellt"},{"kind":"S028","regel_id":"wunsch[6]:S055\u002BS028","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S055: erfuellt"},{"kind":"S070","regel_id":"wunsch[7]:S070\u002BS097","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S097: erfuellt"},{"kind":"S097","regel_id":"wunsch[7]:S070\u002BS097","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S070: erfuellt"},{"kind":"S094","regel_id":"wunsch[8]:S094\u002BS089","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S089: erfuellt"},{"kind":"S089","regel_id":"wunsch[8]:S094\u002BS089","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S094: erfuellt"},{"kind":"S026","regel_id":"wunsch[9]:S026\u002BS092","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S092: erfuellt"},{"kind":"S092","regel_id":"wunsch[9]:S026\u002BS092","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S026: erfuellt"},{"kind":"S040","regel_id":"wunsch[10]:S040\u002BS052","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S052: erfuellt"},{"kind":"S052","regel_id":"wunsch[10]:S040\u002BS052","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S040: erfuellt"},{"kind":"S086","regel_id":"wunsch[11]:S086\u002BS084","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S084: erfuellt"},{"kind":"S084","regel_id":"wunsch[11]:S086\u002BS084","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S086: erfuellt"},{"kind":"S048","regel_id":"wunsch[12]:S048\u002BS057","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S057: erfuellt"},{"kind":"S057","regel_id":"wunsch[12]:S048\u002BS057","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S048: erfuellt"},{"kind":"S067","regel_id":"wunsch[13]:S067\u002BS058","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S058: erfuellt"},{"kind":"S058","regel_id":"wunsch[13]:S067\u002BS058","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S067: erfuellt"},{"kind":"S016","regel_id":"wunsch[14]:S016\u002BS032","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S032: erfuellt"},{"kind":"S032","regel_id":"wunsch[14]:S016\u002BS032","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S016: erfuellt"},{"kind":"S029","regel_id":"wunsch[15]:S029\u002BS009","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S009: erfuellt"},{"kind":"S009","regel_id":"wunsch[15]:S029\u002BS009","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S029: erfuellt"},{"kind":"S044","regel_id":"wunsch[16]:S044\u002BS003","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S003: erfuellt"},{"kind":"S003","regel_id":"wunsch[16]:S044\u002BS003","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S044: erfuellt"},{"kind":"S076","regel_id":"wunsch[17]:S076\u002BS071","regel_typ":"wunsch_zusammen","status":"rot","text":"Wunsch zusammen mit S071: nicht erfuellt"},{"kind":"S071","regel_id":"wunsch[17]:S076\u002BS071","regel_typ":"wunsch_zusammen","status":"rot","text":"Wunsch zusammen mit S076: nicht erfuellt"},{"kind":"S030","regel_id":"wunsch[18]:S030\u002BS076","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S076: erfuellt"},{"kind":"S076","regel_id":"wunsch[18]:S030\u002BS076","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S030: erfuellt"},{"kind":"S029","regel_id":"wunsch[19]:S029\u002BS001","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S001: erfuellt"},{"kind":"S001","regel_id":"wunsch[19]:S029\u002BS001","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S029: erfuellt"},{"kind":"S010","regel_id":"wunsch[20]:S010\u002BS091","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S091: erfuellt"},{"kind":"S091","regel_id":"wunsch[20]:S010\u002BS091","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S010: erfuellt"},{"kind":"S081","regel_id":"wunsch[21]:S081\u002BS008","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S008: erfuellt"},{"kind":"S008","regel_id":"wunsch[21]:S081\u002BS008","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S081: erfuellt"},{"kind":"S030","regel_id":"wunsch[22]:S030\u002BS009","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S009: erfuellt"},{"kind":"S009","regel_id":"wunsch[22]:S030\u002BS009","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S030: erfuellt"},{"kind":"S005","regel_id":"wunsch[23]:S005\u002BS043","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S043: erfuellt"},{"kind":"S043","regel_id":"wunsch[23]:S005\u002BS043","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S005: erfuellt"},{"kind":"S010","regel_id":"wunsch[24]:S010\u002BS066","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S066: erfuellt"},{"kind":"S066","regel_id":"wunsch[24]:S010\u002BS066","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S010: erfuellt"},{"kind":"S031","regel_id":"wunsch[25]:S031\u002BS036","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S036: erfuellt"},{"kind":"S036","regel_id":"wunsch[25]:S031\u002BS036","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S031: erfuellt"},{"kind":"S086","regel_id":"wunsch[26]:S086\u002BS063","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S063: erfuellt"},{"kind":"S063","regel_id":"wunsch[26]:S086\u002BS063","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S086: erfuellt"},{"kind":"S028","regel_id":"wunsch[27]:S028\u002BS070","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S070: erfuellt"},{"kind":"S070","regel_id":"wunsch[27]:S028\u002BS070","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S028: erfuellt"},{"kind":"S017","regel_id":"wunsch[28]:S017\u002BS093","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S093: erfuellt"},{"kind":"S093","regel_id":"wunsch[28]:S017\u002BS093","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S017: erfuellt"},{"kind":"S074","regel_id":"wunsch[29]:S074\u002BS061","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S061: erfuellt"},{"kind":"S061","regel_id":"wunsch[29]:S074\u002BS061","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S074: erfuellt"},{"kind":"S032","regel_id":"wunsch[30]:S032\u002BS061","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S061: erfuellt"},{"kind":"S061","regel_id":"wunsch[30]:S032\u002BS061","regel_typ":"wunsch_zusammen","status":"gruen","text":"Wunsch zusammen mit S032: erfuellt"},{"kind":"S053","regel_id":"wunsch[31]:S053\u002BS025","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S025: erfuellt"},{"kind":"S025","regel_id":"wunsch[31]:S053\u002BS025","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S053: erfuellt"},{"kind":"S013","regel_id":"wunsch[32]:S013\u002BS085","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S085: erfuellt"},{"kind":"S085","regel_id":"wunsch[32]:S013\u002BS085","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S013: erfuellt"},{"kind":"S056","regel_id":"wunsch[33]:S056\u002BS046","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S046: erfuellt"},{"kind":"S046","regel_id":"wunsch[33]:S056\u002BS046","regel_typ":"wunsch_getrennt","status":"gruen","text":"Wunsch getrennt von S056: erfuellt"}]}]}</script>
+  <script>
+    (function () {
+      var data = JSON.parse(document.getElementById('klassenbildung-data').textContent);
+      var varianten = data.varianten;
+      var gruppen = data.gruppen || [];
+      var wuensche = data.wuensche || [];
+      var bestandsFixierungen = data.fixierungen || [];
+      var konsens = {};
+      (data.konsens_kern || []).forEach(function (id) { konsens[id] = true; });
+      var alleKinder = Object.keys(varianten[0].zuordnung);
+
+      var labels = data.klassen_labels || [];
+      function labelVon(klasse) { return labels[klasse - 1] || ('Klasse ' + klasse); }
+
+      document.getElementById('titel').textContent = 'Klassenbildung: ' + data.schule;
+      document.getElementById('meta').textContent =
+        data.schueler_anzahl + ' Kinder auf ' + data.klassen_anzahl + ' Klassen (' +
+        data.min_groesse + '-' + data.max_groesse + ' je Klasse) | Qualitaetsband epsilon ' + data.parameter.epsilon +
+        ' | Mindestdistanz ' + data.parameter.min_distanz + ' Kinder. ' +
+        'Der Solver liefert Vorschlaege - die Zuordnung entscheidet die Schulleitung.';
+
+      // ---- Zustand -------------------------------------------------
+      var aktuelleVariante = 0;       // Arbeitsstand (U2)
+      var compareIndex = null;
+      var highlights = {};            // gruppen-id -> true (Mehrfach-Highlight, U1)
+      var pins = {};                  // kind -> klasse (F1, U3; ein Pin auf eine ANDERE
+                                      // Klasse als in der Basis-Variante IST die Verschiebung, U4)
+      var notPins = {};               // kind -> {klasse: true} (F2)
+      var pinHerkunft = {};           // kind -> 'manuell' | 'konsens' | 'verschoben' | ...
+      var haertungen = { gruppen: {}, wuensche: {} }; // F5 / F3 (U4): nur Export-Direktive
+      var warnungen = null;           // {titel, zeilen, ok} nach der letzten Verschiebung (U4)
+      var bestandVon = {};            // kind -> klasse aus YAML-Fixierungen (nicht loesbar)
+      bestandsFixierungen.forEach(function (f) {
+        if (f.klasse !== null && f.klasse !== undefined) bestandVon[f.kind] = f.klasse;
+      });
+
+      // localStorage-Komfort (file:// ist unzuverlaessig - massgeblich
+      // ist immer der YAML-Export).
+      var storeKey = 'klassenbildung-pins:' + data.schule;
+      function ladePins() {
+        try {
+          var raw = localStorage.getItem(storeKey);
+          if (!raw) return;
+          var st = JSON.parse(raw);
+          pins = st.pins || {};
+          notPins = st.notPins || {};
+          pinHerkunft = st.herkunft || {};
+          haertungen = st.haertungen || { gruppen: {}, wuensche: {} };
+        } catch (e) { /* ohne Persistenz weiterarbeiten */ }
+      }
+      function speicherePins() {
+        try {
+          localStorage.setItem(storeKey, JSON.stringify({
+            pins: pins, notPins: notPins, herkunft: pinHerkunft, haertungen: haertungen }));
+        } catch (e) { /* ignorieren */ }
+      }
+      ladePins();
+
+      // ---- Gruppen-Identitaet (U1): Farbe + Kuerzel ----------------
+      var palette = ['#2563eb', '#0d9488', '#7c3aed', '#db2777', '#ea580c', '#65a30d',
+                     '#0891b2', '#9333ea', '#b45309', '#4f46e5', '#15803d', '#be123c',
+                     '#0369a1', '#a21caf', '#4d7c0f', '#c2410c'];
+      var farbeVon = {};
+      var kuerzelVon = {};
+      var gruppeVon = {};             // id -> gruppe
+      var mitgliedVon = {};           // id -> {kind: true}
+      gruppen.forEach(function (g, i) {
+        farbeVon[g.id] = palette[i % palette.length];
+        kuerzelVon[g.id] = g.kuerzel || g.id;
+        gruppeVon[g.id] = g;
+        var m = {};
+        g.mitglieder.forEach(function (id) { m[id] = true; });
+        mitgliedVon[g.id] = m;
+      });
+      var gruppenVonKind = {};        // kind -> [gruppe]
+      gruppen.forEach(function (g) {
+        g.mitglieder.forEach(function (id) {
+          (gruppenVonKind[id] = gruppenVonKind[id] || []).push(g);
+        });
+      });
+      var wuenscheVonKind = {};
+      wuensche.forEach(function (w) {
+        w.kinder.forEach(function (id) {
+          (wuenscheVonKind[id] = wuenscheVonKind[id] || []).push(w);
+        });
+      });
+
+      var statusRang = { gruen: 0, gelb: 1, rot: 2 };
+      var chipSymbol = { gruen: '✓', gelb: '!', rot: '✗' };
+      var prioName = { 3: 'KRITISCH (Prio 3)', 2: 'WICHTIG (Prio 2)', 1: 'WENN MOEGLICH (Prio 1)' };
+
+      function chipsJeKind(v) {
+        var map = {};
+        v.chips.forEach(function (c) {
+          (map[c.kind] = map[c.kind] || []).push(c);
+        });
+        return map;
+      }
+      function chipStatusVon(v, kind, regelId) {
+        for (var i = 0; i < v.chips.length; i++) {
+          if (v.chips[i].kind === kind && v.chips[i].regel_id === regelId) return v.chips[i];
+        }
+        return null;
+      }
+      function aggregat(chips) {
+        if (!chips || chips.length === 0) return 'frei';
+        var worst = 'gruen';
+        chips.forEach(function (c) {
+          if (statusRang[c.status] > statusRang[worst]) worst = c.status;
+        });
+        return worst;
+      }
+      function ampelZaehler(v) {
+        var map = chipsJeKind(v);
+        var z = { rot: 0, gelb: 0, gruen: 0, frei: 0 };
+        alleKinder.forEach(function (id) { z[aggregat(map[id])] += 1; });
+        return z;
+      }
+      function istFixiert(id) {
+        return pins.hasOwnProperty(id) || bestandVon.hasOwnProperty(id);
+      }
+      function fixierteAnzahl() {
+        var n = 0;
+        alleKinder.forEach(function (id) { if (istFixiert(id)) n += 1; });
+        return n;
+      }
+      // Gruppenstatus in der aktiven Variante: verletzt > knapp > ok.
+      function gruppenStatus(v, g) {
+        if (g.modus === 'hard') return { klasse: 's-ok', text: 'hart' };
+        var mass = 0;
+        v.verletzungen.forEach(function (x) { if (x.regel_id === g.id) mass = x.mass; });
+        if (mass > 0) return { klasse: 's-verletzt', text: '✗ ' + mass };
+        var knapp = false;
+        g.mitglieder.forEach(function (id) {
+          var c = chipStatusVon(v, id, g.id);
+          if (c && c.status === 'gelb') knapp = true;
+        });
+        return knapp ? { klasse: 's-knapp', text: '! knapp' } : { klasse: 's-ok', text: '✓' };
+      }
+
+      // ---- U4: Live-Bewertung --------------------------------------
+      // Bewusstes, kommentiertes JS-Duplikat von
+      // KlassenbildungQuality.Bewerte (VB) - dieselbe Formel-Duplikation
+      // wie beim Gewichts-Regler des Stundentafel-Viewers. Status UND
+      // Chip-Texte muessen zeichengleich zum VB-Original bleiben (der
+      // Interaktionstest vergleicht beide Ausgaben exakt); die
+      // unabhaengige Ground Truth bleibt der naechste CLI-Lauf.
+      // Balance braucht data.balance (Treffer-IDs je Regel) - aeltere
+      // JSONs ohne diesen Block laufen im reinen Anzeige-Modus weiter.
+      var liveFaehig = !!(data.balance);
+      function bewerte(zuordnung) {
+        var verletzungen = [];
+        var chips = [];
+        gruppen.forEach(function (g) {
+          var proKlasse = {};
+          g.mitglieder.forEach(function (m) {
+            proKlasse[zuordnung[m]] = (proKlasse[zuordnung[m]] || 0) + 1;
+          });
+          if (g.typ === 'buendelung') {
+            var spread = Object.keys(proKlasse).length;
+            var massB = spread - 1;
+            if (g.modus === 'soft') {
+              verletzungen.push({ regel_id: g.id, regel_typ: 'buendelung', prio: g.prio, mass: massB });
+            }
+            g.mitglieder.forEach(function (m) {
+              chips.push({ kind: m, regel_id: g.id, regel_typ: 'buendelung',
+                status: massB > 0 ? 'rot' : 'gruen',
+                text: massB > 0
+                  ? 'Buendelung ' + g.id + ': auf ' + spread + ' Klassen verteilt'
+                  : 'Buendelung ' + g.id + ': alle in Klasse ' + zuordnung[g.mitglieder[0]] });
+            });
+          } else { // verteilung
+            var kappe = g.max_pro_klasse;
+            var massV = 0;
+            Object.keys(proKlasse).forEach(function (k) { massV += Math.max(proKlasse[k] - kappe, 0); });
+            if (g.modus === 'soft') {
+              verletzungen.push({ regel_id: g.id, regel_typ: 'verteilung', prio: g.prio, mass: massV });
+            }
+            g.mitglieder.forEach(function (m) {
+              var cnt = proKlasse[zuordnung[m]];
+              chips.push({ kind: m, regel_id: g.id, regel_typ: 'verteilung',
+                status: cnt > kappe ? 'rot' : (cnt === kappe ? 'gelb' : 'gruen'),
+                text: 'Verteilung ' + g.id + ': ' + cnt + '/' + kappe + ' in dieser Klasse' +
+                      (cnt === kappe ? ' - Kappe voll' : (cnt > kappe ? ' - Kappe ueberschritten' : '')) });
+            });
+          }
+        });
+        (data.balance || []).forEach(function (b) {
+          var cntJeKlasse = {};
+          var c;
+          for (c = 1; c <= data.klassen_anzahl; c++) cntJeKlasse[c] = 0;
+          b.treffer.forEach(function (id) { cntJeKlasse[zuordnung[id]] += 1; });
+          var massBal = 0;
+          for (c = 1; c <= data.klassen_anzahl; c++) {
+            massBal += Math.max(Math.abs(cntJeKlasse[c] - b.ziel) - b.toleranz, 0);
+          }
+          if (b.modus === 'soft') {
+            verletzungen.push({ regel_id: b.regel_id, regel_typ: 'balance', prio: b.prio, mass: massBal });
+          }
+          b.treffer.forEach(function (id) {
+            var dev = Math.abs(cntJeKlasse[zuordnung[id]] - b.ziel);
+            chips.push({ kind: id, regel_id: b.regel_id, regel_typ: 'balance',
+              status: dev > b.toleranz ? 'rot' : (dev === b.toleranz && b.toleranz > 0 ? 'gelb' : 'gruen'),
+              text: 'Balance ' + b.regel_id + ': ' + cntJeKlasse[zuordnung[id]] +
+                    ' in dieser Klasse (Ziel ' + b.ziel + ' +/- ' + b.toleranz + ')' });
+          });
+        });
+        wuensche.forEach(function (w) {
+          var s1 = w.kinder[0];
+          var s2 = w.kinder[1];
+          var zusammen = zuordnung[s1] === zuordnung[s2];
+          var erfuellt = w.typ === 'zusammen' ? zusammen : !zusammen;
+          var regelTyp = w.typ === 'zusammen' ? 'wunsch_zusammen' : 'wunsch_getrennt';
+          if (w.modus === 'soft') {
+            verletzungen.push({ regel_id: w.regel_id, regel_typ: regelTyp, prio: w.prio, mass: erfuellt ? 0 : 1 });
+          }
+          w.kinder.forEach(function (kind) {
+            chips.push({ kind: kind, regel_id: w.regel_id, regel_typ: regelTyp,
+              status: erfuellt ? 'gruen' : 'rot',
+              text: 'Wunsch ' + (w.typ === 'zusammen' ? 'zusammen mit' : 'getrennt von') + ' ' +
+                    (kind === s1 ? s2 : s1) + ': ' + (erfuellt ? 'erfuellt' : 'nicht erfuellt') });
+          });
+        });
+        return { verletzungen: verletzungen, chips: chips };
+      }
+
+      // Arbeits-Zuordnung (U4): die Basis-Variante, ueberlagert mit den
+      // Pins - ein Pin auf eine andere Klasse IST die Verschiebung.
+      // Pin loesen legt die Karte zurueck an ihren Varianten-Platz.
+      function arbeitsZuordnung() {
+        var v = varianten[aktuelleVariante];
+        var z = {};
+        alleKinder.forEach(function (id) {
+          z[id] = pins.hasOwnProperty(id) ? pins[id] : v.zuordnung[id];
+        });
+        return z;
+      }
+      function verschobene() {
+        var v = varianten[aktuelleVariante];
+        return alleKinder.filter(function (id) {
+          return pins.hasOwnProperty(id) && pins[id] !== v.zuordnung[id];
+        });
+      }
+      // Die "Sicht" hat dieselbe Form wie eine Variante (zuordnung,
+      // chips, verletzungen, balance_kennzahlen) - alle Render-Pfade
+      // arbeiten unveraendert darauf, nur eben live nachgerechnet.
+      function aktuelleSicht() {
+        var v = varianten[aktuelleVariante];
+        if (!liveFaehig) return v;
+        var z = arbeitsZuordnung();
+        var bew = bewerte(z);
+        var bk = (data.balance || []).map(function (b) {
+          var counts = [];
+          for (var c = 1; c <= data.klassen_anzahl; c++) counts.push(0);
+          b.treffer.forEach(function (id) { counts[z[id] - 1] += 1; });
+          return { regel_id: b.regel_id, ziel: b.ziel, toleranz: b.toleranz, counts: counts };
+        });
+        return { index: v.index, status: v.status, objective: v.objective,
+                 diff_zu_v1: v.diff_zu_v1, zuordnung: z,
+                 chips: bew.chips, verletzungen: bew.verletzungen, balance_kennzahlen: bk };
+      }
+
+      // ---- U4: Verschieben (Drag & Drop -> F1-Pin) -----------------
+      function verschiebe(id, zielKlasse) {
+        if (!liveFaehig || bestandVon.hasOwnProperty(id)) return;
+        var vorher = aktuelleSicht();
+        if (vorher.zuordnung[id] === zielKlasse) return;
+        setzePin(id, zielKlasse, 'verschoben');
+        warnungen = baueWarnungen(id, zielKlasse, vorher, aktuelleSicht());
+        render();
+      }
+      function baueWarnungen(id, zielKlasse, vorher, nachher) {
+        var zeilen = [];
+        var nZiel = 0;
+        var nQuelle = 0;
+        var quelle = vorher.zuordnung[id];
+        alleKinder.forEach(function (k) {
+          if (nachher.zuordnung[k] === zielKlasse) nZiel += 1;
+          if (nachher.zuordnung[k] === quelle) nQuelle += 1;
+        });
+        // Kapazitaet blockiert den Drop nicht (Konzept 3.4) - der
+        // Spaltenkopf wird rot, hier zusaetzlich der Klartext.
+        if (nZiel > data.max_groesse) {
+          zeilen.push(labelVon(zielKlasse) + ' hat jetzt ' + nZiel + ' Kinder (Korridor ' +
+            data.min_groesse + '-' + data.max_groesse + ') - harte Grenze, entscheidet der Solver');
+        }
+        if (nQuelle < data.min_groesse) {
+          zeilen.push(labelVon(quelle) + ' hat jetzt nur ' + nQuelle + ' Kinder (Korridor ' +
+            data.min_groesse + '-' + data.max_groesse + ') - harte Grenze, entscheidet der Solver');
+        }
+        var altMass = {};
+        vorher.verletzungen.forEach(function (x) { altMass[x.regel_id] = x.mass; });
+        nachher.verletzungen.forEach(function (x) {
+          var alt = altMass.hasOwnProperty(x.regel_id) ? altMass[x.regel_id] : 0;
+          if (x.mass <= alt) return;
+          // Klartext bevorzugt aus dem Chip des verschobenen Kindes
+          // ("damit sind 2 SOZ-Kinder in 1c"), sonst generisch.
+          var chip = null;
+          nachher.chips.forEach(function (ch) {
+            if (ch.kind === id && ch.regel_id === x.regel_id && ch.status === 'rot') chip = ch;
+          });
+          zeilen.push(chip ? 'damit: ' + chip.text
+                           : x.regel_id + ' (' + x.regel_typ + '): Mass ' + alt + ' -> ' + x.mass);
+        });
+        return { titel: 'Verschiebung ' + id + ' → ' + labelVon(zielKlasse),
+                 zeilen: zeilen, ok: zeilen.length === 0 };
+      }
+      function renderWarnung() {
+        var c = document.getElementById('warnung');
+        c.innerHTML = '';
+        if (!warnungen) return;
+        var banner = document.createElement('div');
+        banner.className = 'banner' + (warnungen.ok ? ' ok' : '');
+        var zu = document.createElement('button');
+        zu.className = 'zu';
+        zu.textContent = '✕';
+        zu.title = 'Hinweis schliessen';
+        zu.addEventListener('click', function () { warnungen = null; renderWarnung(); });
+        banner.appendChild(zu);
+        var titel = document.createElement('span');
+        titel.className = 'titel';
+        titel.textContent = warnungen.titel + (warnungen.ok ? ': keine zusaetzliche Verletzung' : '');
+        banner.appendChild(titel);
+        if (!warnungen.ok) {
+          var ul = document.createElement('ul');
+          warnungen.zeilen.forEach(function (t) {
+            var li = document.createElement('li');
+            li.textContent = t;
+            ul.appendChild(li);
+          });
+          banner.appendChild(ul);
+        }
+        c.appendChild(banner);
+      }
+
+      // ---- Pin-Aktionen (U3) ---------------------------------------
+      function setzePin(id, klasse, herkunft) {
+        if (bestandVon.hasOwnProperty(id)) return; // YAML-Fixierung gewinnt
+        pins[id] = klasse;
+        pinHerkunft[id] = herkunft;
+        speicherePins();
+      }
+      function loesePin(id) {
+        delete pins[id];
+        delete pinHerkunft[id];
+        speicherePins();
+      }
+      function konsensFixieren() {
+        var v = aktuelleSicht();
+        (data.konsens_kern || []).forEach(function (id) {
+          if (!istFixiert(id)) setzePin(id, v.zuordnung[id], 'konsens');
+        });
+        render();
+      }
+      function unkritischeFixieren() {
+        var v = aktuelleSicht();
+        var map = chipsJeKind(v);
+        alleKinder.forEach(function (id) {
+          var agg = aggregat(map[id]);
+          if ((agg === 'gruen' || agg === 'frei') && !istFixiert(id)) {
+            setzePin(id, v.zuordnung[id], 'unkritisch');
+          }
+        });
+        render();
+      }
+      function gruppeFixieren(g) {
+        var v = aktuelleSicht();
+        g.mitglieder.forEach(function (id) {
+          if (!istFixiert(id)) setzePin(id, v.zuordnung[id], 'gruppe ' + kuerzelVon[g.id]);
+        });
+        render();
+      }
+      function klasseEinfrieren(klasse) {
+        var v = aktuelleSicht();
+        alleKinder.forEach(function (id) {
+          if (v.zuordnung[id] === klasse && !istFixiert(id)) setzePin(id, klasse, 'klasse ' + labelVon(klasse));
+        });
+        render();
+      }
+      function allePinsLoesen() {
+        pins = {}; notPins = {}; pinHerkunft = {};
+        haertungen = { gruppen: {}, wuensche: {} };
+        warnungen = null;
+        speicherePins();
+        render();
+      }
+
+      // ---- Fortschrittsleiste (U3) ---------------------------------
+      function renderProzess() {
+        var v = aktuelleSicht();
+        var map = chipsJeKind(v);
+        var offenKritisch = 0;
+        alleKinder.forEach(function (id) {
+          var agg = aggregat(map[id]);
+          if (!istFixiert(id) && (agg === 'rot' || agg === 'gelb')) offenKritisch += 1;
+        });
+        var p = document.getElementById('prozess');
+        p.innerHTML = '';
+        function schritt(html) {
+          var s = document.createElement('span');
+          s.className = 'schritt';
+          s.innerHTML = html;
+          p.appendChild(s);
+        }
+        var nVerschoben = liveFaehig ? verschobene().length : 0;
+        schritt('[1] Basis: <b>Variante ' + v.index + '</b>' +
+          (nVerschoben > 0 ? ' <b>+ ' + nVerschoben + ' verschoben</b>' : ''));
+        schritt('→ [2]');
+        var offeneKonsens = (data.konsens_kern || []).filter(function (id) { return !istFixiert(id); }).length;
+        var bKonsens = document.createElement('button');
+        bKonsens.className = 'primaer';
+        bKonsens.id = 'btn-konsens';
+        bKonsens.textContent = 'Konsens-Kern fixieren (' + offeneKonsens + ')';
+        bKonsens.disabled = offeneKonsens === 0;
+        bKonsens.addEventListener('click', konsensFixieren);
+        p.appendChild(bKonsens);
+        var bUnkrit = document.createElement('button');
+        bUnkrit.id = 'btn-unkritisch';
+        bUnkrit.textContent = 'Alle unkritischen fixieren';
+        bUnkrit.addEventListener('click', unkritischeFixieren);
+        p.appendChild(bUnkrit);
+        schritt('→ [3] Gruppen fixieren (Panel links)');
+        schritt('→ [4] Einzelfaelle: <b>' + offenKritisch + '</b> gelb/rot offen');
+        schritt('→ [5] Export unten & Re-Solve');
+        var zaehler = document.createElement('span');
+        zaehler.className = 'zaehler';
+        zaehler.id = 'fix-zaehler';
+        zaehler.textContent = fixierteAnzahl() + ' von ' + alleKinder.length + ' Kindern fixiert';
+        p.appendChild(zaehler);
+      }
+
+      // ---- Varianten-Kacheln (U2) ----------------------------------
+      function renderVarianten() {
+        var c = document.getElementById('varianten');
+        c.innerHTML = '';
+        varianten.forEach(function (v, i) {
+          var k = document.createElement('div');
+          k.className = 'variante-kachel' + (i === aktuelleVariante ? ' active' :
+            (compareIndex === i ? ' compare' : ''));
+          var z = ampelZaehler(v);
+          k.innerHTML = '<div class="kopf">Variante ' + v.index + ' (' + v.status + ')</div>' +
+            '<div class="zeile">Zielwert ' + v.objective + ' | Diff zu V1: ' + v.diff_zu_v1 + '</div>' +
+            '<div class="zeile">' + z.rot + ' rot / ' + z.gelb + ' gelb / ' + z.gruen + ' gruen / ' + z.frei + ' frei</div>';
+          k.title = 'Als Arbeitsstand uebernehmen';
+          k.addEventListener('click', function () {
+            aktuelleVariante = i;
+            render();
+          });
+          c.appendChild(k);
+        });
+      }
+
+      // ---- Vergleich -----------------------------------------------
+      var compareSelect = document.getElementById('compare-select');
+      (function () {
+        var none = document.createElement('option');
+        none.value = '';
+        none.textContent = '- kein Vergleich -';
+        compareSelect.appendChild(none);
+        varianten.forEach(function (v, i) {
+          var opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = 'Variante ' + v.index;
+          compareSelect.appendChild(opt);
+        });
+        compareSelect.addEventListener('change', function () {
+          compareIndex = compareSelect.value === '' ? null : parseInt(compareSelect.value, 10);
+          render();
+        });
+      })();
+      function updateCompareInfo() {
+        var info = document.getElementById('compare-info');
+        if (compareIndex === null || compareIndex === aktuelleVariante) {
+          info.textContent = '';
+          return;
+        }
+        var a = aktuelleSicht().zuordnung;
+        var b = varianten[compareIndex].zuordnung;
+        var n = 0;
+        alleKinder.forEach(function (id) { if (a[id] !== b[id]) n += 1; });
+        info.textContent = n + ' Kinder anders zugeordnet als in Variante ' + varianten[compareIndex].index + ' (markiert).';
+      }
+
+      document.getElementById('filter-kritisch').addEventListener('change', render);
+      document.getElementById('filter-offene').addEventListener('change', render);
+      document.getElementById('konsens-toggle').addEventListener('change', render);
+
+      // ---- Panel-Seitenleiste (U1): Prio-Sektionen -----------------
+      function renderPanel() {
+        var v = aktuelleSicht();
+        var panel = document.getElementById('panel');
+        panel.innerHTML = '';
+
+        [3, 2, 1].forEach(function (prio) {
+          var inStufe = gruppen.filter(function (g) { return g.prio === prio; });
+          if (inStufe.length === 0) return;
+          var kopf = document.createElement('div');
+          kopf.className = 'sektion';
+          kopf.textContent = prioName[prio];
+          panel.appendChild(kopf);
+          // Tagesordnung: verletzte zuerst, dann knappe, dann erfuellte.
+          var rangVon = { 's-verletzt': 0, 's-knapp': 1, 's-ok': 2 };
+          inStufe.map(function (g) { return { g: g, st: gruppenStatus(v, g) }; }).
+            sort(function (a, b) { return rangVon[a.st.klasse] - rangVon[b.st.klasse] || a.g.id.localeCompare(b.g.id); }).
+            forEach(function (e) {
+              panel.appendChild(baueGruppenZeile(v, e.g, e.st));
+            });
+        });
+
+        // Balance-Block mit Mini-Balken (Ziel +/- Toleranz).
+        if ((v.balance_kennzahlen || []).length > 0) {
+          var kopfB = document.createElement('div');
+          kopfB.className = 'sektion';
+          kopfB.textContent = 'BALANCE';
+          panel.appendChild(kopfB);
+          var blockB = document.createElement('div');
+          blockB.className = 'block';
+          v.balance_kennzahlen.forEach(function (b) {
+            var zeile = document.createElement('div');
+            zeile.className = 'zeile';
+            var balken = baueMiniBalken(b.counts, function (count) {
+              var dev = Math.abs(count - b.ziel);
+              return dev > b.toleranz ? 'ueber' : (dev === b.toleranz && b.toleranz > 0 ? 'voll' : '');
+            }, function (count, idx) {
+              return labelVon(idx + 1) + ': ' + count + ' (Ziel ' + b.ziel + ' ± ' + b.toleranz + ')';
+            });
+            var text = document.createElement('span');
+            text.textContent = b.regel_id + ' (Ziel ' + b.ziel + ' ± ' + b.toleranz + ')';
+            zeile.appendChild(balken);
+            zeile.appendChild(text);
+            blockB.appendChild(zeile);
+          });
+          panel.appendChild(blockB);
+        }
+
+        // Wunsch-Block: Zaehler + verletzte Liste.
+        if (wuensche.length > 0) {
+          var kopfW = document.createElement('div');
+          kopfW.className = 'sektion';
+          kopfW.textContent = 'WUENSCHE';
+          panel.appendChild(kopfW);
+          var blockW = document.createElement('div');
+          blockW.className = 'block';
+          var stat = { zusammen: { n: 0, ok: 0 }, getrennt: { n: 0, ok: 0 } };
+          var verletzte = [];
+          wuensche.forEach(function (w) {
+            var c = chipStatusVon(v, w.kinder[0], w.regel_id);
+            var erfuellt = c === null || c.status !== 'rot';
+            stat[w.typ].n += 1;
+            if (erfuellt) stat[w.typ].ok += 1;
+            else verletzte.push(w);
+          });
+          var zusatz = document.createElement('div');
+          zusatz.className = 'zeile';
+          zusatz.textContent = stat.zusammen.n + ' zusammen (' + stat.zusammen.ok + ' ✓) | ' +
+            stat.getrennt.n + ' getrennt (' + stat.getrennt.ok + ' ✓)';
+          blockW.appendChild(zusatz);
+          verletzte.forEach(function (w) {
+            var zeile = document.createElement('div');
+            zeile.className = 'zeile status s-verletzt';
+            zeile.textContent = '✗ ' + w.kinder[0] + ' + ' + w.kinder[1] + ' ' +
+              (w.typ === 'zusammen' ? 'zusammen' : 'getrennt') + ' nicht erfuellt';
+            if (w.modus === 'soft') {
+              var haertW = document.createElement('button');
+              haertW.className = 'fixieren';
+              haertW.textContent = haertungen.wuensche[w.index] ? '🔒' : '🔓';
+              haertW.title = haertungen.wuensche[w.index]
+                ? 'Haertung zuruecknehmen (F3)'
+                : 'F3: Wunsch hart stellen (modus: hard) - erscheint als Diff-Hinweis im Export';
+              haertW.addEventListener('click', function () {
+                if (haertungen.wuensche[w.index]) delete haertungen.wuensche[w.index];
+                else haertungen.wuensche[w.index] = true;
+                speicherePins();
+                render();
+              });
+              zeile.appendChild(haertW);
+            }
+            blockW.appendChild(zeile);
+          });
+          panel.appendChild(blockW);
+        }
+      }
+
+      function baueGruppenZeile(v, g, st) {
+        var zeile = document.createElement('div');
+        zeile.className = 'gruppe-zeile' + (highlights[g.id] ? ' aktiv' : '');
+        var kuerzel = document.createElement('span');
+        kuerzel.className = 'kuerzel';
+        kuerzel.style.background = farbeVon[g.id];
+        kuerzel.textContent = kuerzelVon[g.id];
+        zeile.appendChild(kuerzel);
+        var typ = document.createElement('span');
+        typ.className = 'typ';
+        typ.textContent = (g.typ === 'buendelung' ? '⧉' : '⇌') + (g.modus === 'hard' ? '🔒' : '');
+        typ.title = g.typ + (g.modus === 'hard' ? ' (hart)' : '') +
+          (g.max_pro_klasse ? ', max ' + g.max_pro_klasse + '/Klasse' : '');
+        zeile.appendChild(typ);
+        var status = document.createElement('span');
+        status.className = 'status ' + st.klasse;
+        status.textContent = st.text;
+        zeile.appendChild(status);
+        var name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = g.id + ' (' + g.mitglieder.length + ')';
+        name.title = g.id;
+        zeile.appendChild(name);
+        // Ist-Verteilung als Mini-Balken.
+        var counts = [];
+        for (var c = 1; c <= data.klassen_anzahl; c++) counts.push(0);
+        g.mitglieder.forEach(function (id) { counts[v.zuordnung[id] - 1] += 1; });
+        zeile.appendChild(baueMiniBalken(counts, function (count) {
+          if (g.max_pro_klasse && count > g.max_pro_klasse) return 'ueber';
+          if (g.max_pro_klasse && count === g.max_pro_klasse) return 'voll';
+          return '';
+        }, function (count, idx) { return labelVon(idx + 1) + ': ' + count; }));
+        var fixBtn = document.createElement('button');
+        fixBtn.className = 'fixieren';
+        fixBtn.textContent = '📌';
+        fixBtn.title = 'Alle Mitglieder auf ihre aktuelle Klasse fixieren (F4)';
+        fixBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          gruppeFixieren(g);
+        });
+        zeile.appendChild(fixBtn);
+        // F5 (U4): Gruppe hart stellen - reine Export-Direktive fuer
+        // den naechsten Lauf (modus: hard), aendert die Live-Bewertung
+        // bewusst NICHT (der Solver entscheidet harte Regeln).
+        if (g.modus === 'soft') {
+          var haert = document.createElement('button');
+          haert.className = 'fixieren';
+          haert.textContent = haertungen.gruppen[g.id] ? '🔒' : '🔓';
+          haert.title = haertungen.gruppen[g.id]
+            ? 'Haertung zuruecknehmen (F5)'
+            : 'F5: Gruppe hart stellen (modus: hard) - erscheint als Diff-Hinweis im Export';
+          haert.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (haertungen.gruppen[g.id]) delete haertungen.gruppen[g.id];
+            else haertungen.gruppen[g.id] = true;
+            speicherePins();
+            render();
+          });
+          zeile.appendChild(haert);
+        }
+        zeile.addEventListener('click', function () {
+          if (highlights[g.id]) delete highlights[g.id];
+          else highlights[g.id] = true;
+          render();
+        });
+        zeile.addEventListener('mouseenter', function () { hoverGruppe(g.id, true); });
+        zeile.addEventListener('mouseleave', function () { hoverGruppe(g.id, false); });
+        return zeile;
+      }
+
+      function baueMiniBalken(counts, klasseFuer, titleFuer) {
+        var max = 1;
+        counts.forEach(function (c) { if (c > max) max = c; });
+        var b = document.createElement('span');
+        b.className = 'mini-balken';
+        counts.forEach(function (count, idx) {
+          var i = document.createElement('i');
+          i.style.height = Math.max(2, Math.round(count / max * 14)) + 'px';
+          i.className = klasseFuer(count);
+          i.title = titleFuer(count, idx);
+          b.appendChild(i);
+        });
+        return b;
+      }
+
+      // Fluechtiges Hover-Highlight (U1): Mitglieder-Karten in der
+      // Gruppenfarbe umranden, ohne den Klick-Zustand zu aendern.
+      function hoverGruppe(gruppenId, an) {
+        var karten = document.querySelectorAll('.karte');
+        for (var i = 0; i < karten.length; i++) {
+          var k = karten[i];
+          var id = k.getAttribute('data-kind');
+          if (!mitgliedVon[gruppenId][id]) continue;
+          if (an) {
+            k.classList.add('hl');
+            k.style.setProperty('--hl', farbeVon[gruppenId]);
+          } else if (dauerhaftesHighlight(id)) {
+            anwendenDauerHighlight(k, id);
+          } else {
+            k.classList.remove('hl');
+            k.style.removeProperty('--hl');
+          }
+        }
+      }
+      function dauerhaftesHighlight(kindId) {
+        for (var gid in highlights) {
+          if (mitgliedVon[gid][kindId]) return gid;
+        }
+        return null;
+      }
+      function anwendenDauerHighlight(karte, kindId) {
+        var gid = dauerhaftesHighlight(kindId);
+        if (gid) {
+          karte.classList.add('hl');
+          karte.style.setProperty('--hl', farbeVon[gid]);
+        }
+      }
+
+      // ---- Karten-Popover (U3: F1/F2 + Kriterien-Klartext) ---------
+      var popover = null;
+      function schliessePopover() {
+        if (popover) { popover.parentNode.removeChild(popover); popover = null; }
+      }
+      document.addEventListener('click', function (e) {
+        if (popover && !popover.contains(e.target)) schliessePopover();
+      });
+      function oeffnePopover(karte, id) {
+        schliessePopover();
+        var v = aktuelleSicht();
+        var klasse = v.zuordnung[id];
+        popover = document.createElement('div');
+        popover.id = 'popover';
+        var kopf = document.createElement('div');
+        kopf.className = 'kopf';
+        kopf.textContent = id + ' - aktuell ' + labelVon(klasse) +
+          (bestandVon[id] ? ' (per YAML fixiert)' : '');
+        popover.appendChild(kopf);
+        var liste = document.createElement('ul');
+        (chipsJeKind(v)[id] || []).forEach(function (c) {
+          var li = document.createElement('li');
+          li.textContent = chipSymbol[c.status] + ' ' + c.text;
+          liste.appendChild(li);
+        });
+        if (!liste.hasChildNodes()) {
+          var li = document.createElement('li');
+          li.textContent = 'Von keinem Kriterium betroffen (freies Kind).';
+          liste.appendChild(li);
+        }
+        popover.appendChild(liste);
+        var aktionen = document.createElement('div');
+        aktionen.className = 'aktionen';
+        if (!bestandVon[id]) {
+          if (pins.hasOwnProperty(id)) {
+            var loese = document.createElement('button');
+            loese.textContent = 'Pin loesen';
+            loese.addEventListener('click', function () { loesePin(id); schliessePopover(); render(); });
+            aktionen.appendChild(loese);
+          } else {
+            var fixiere = document.createElement('button');
+            fixiere.className = 'primaer';
+            fixiere.textContent = 'In ' + labelVon(klasse) + ' fixieren';
+            fixiere.addEventListener('click', function () { setzePin(id, klasse, 'manuell'); schliessePopover(); render(); });
+            aktionen.appendChild(fixiere);
+          }
+          var nicht = document.createElement('button');
+          nicht.textContent = 'Nicht in ' + labelVon(klasse);
+          nicht.title = 'F2: beim naechsten Re-Solve aus dieser Klasse ausschliessen';
+          nicht.addEventListener('click', function () {
+            (notPins[id] = notPins[id] || {})[klasse] = true;
+            speicherePins();
+            schliessePopover();
+            render();
+          });
+          aktionen.appendChild(nicht);
+        }
+        // F3 (U4): Wuensche dieses Kindes hart stellen - wie F5 eine
+        // reine Export-Direktive (modus: hard im naechsten Lauf).
+        (wuenscheVonKind[id] || []).forEach(function (w) {
+          if (w.modus !== 'soft') return;
+          var partner = w.kinder[0] === id ? w.kinder[1] : w.kinder[0];
+          var b = document.createElement('button');
+          b.textContent = (haertungen.wuensche[w.index] ? '🔒 ' : '🔓 ') +
+            (w.typ === 'zusammen' ? 'zusammen mit ' : 'getrennt von ') + partner + ' hart';
+          b.title = haertungen.wuensche[w.index]
+            ? 'Haertung zuruecknehmen (F3)'
+            : 'F3: Wunsch hart stellen (modus: hard) - erscheint als Diff-Hinweis im Export';
+          b.addEventListener('click', function () {
+            if (haertungen.wuensche[w.index]) delete haertungen.wuensche[w.index];
+            else haertungen.wuensche[w.index] = true;
+            speicherePins();
+            schliessePopover();
+            render();
+          });
+          aktionen.appendChild(b);
+        });
+        popover.appendChild(aktionen);
+        document.body.appendChild(popover);
+        var r = karte.getBoundingClientRect();
+        popover.style.left = (window.pageXOffset + r.left) + 'px';
+        popover.style.top = (window.pageYOffset + r.bottom + 4) + 'px';
+      }
+
+      // ---- Board (U1/U2) -------------------------------------------
+      function render() {
+        renderProzess();
+        renderVarianten();
+        renderPanel();
+        updateCompareInfo();
+        renderFixierungen();
+        schliessePopover();
+        renderWarnung();
+
+        var v = aktuelleSicht();
+        var chipMap = chipsJeKind(v);
+        var cmp = (compareIndex !== null && compareIndex !== aktuelleVariante) ? varianten[compareIndex] : null;
+        var nurKritisch = document.getElementById('filter-kritisch').checked;
+        var nurOffene = document.getElementById('filter-offene').checked;
+        var zeigeKonsens = document.getElementById('konsens-toggle').checked;
+
+        // Stapel-Zuordnung (U2): jedes Kind gehoert zum Stapel seiner
+        // hoechstprioren Buendelungsgruppe (falls vorhanden).
+        var stapelVon = {};
+        alleKinder.forEach(function (id) {
+          var beste = null;
+          (gruppenVonKind[id] || []).forEach(function (g) {
+            if (g.typ !== 'buendelung') return;
+            if (beste === null || g.prio > beste.prio) beste = g;
+          });
+          if (beste) stapelVon[id] = beste.id;
+        });
+
+        var board = document.getElementById('board');
+        board.innerHTML = '';
+        for (var klasse = 1; klasse <= data.klassen_anzahl; klasse++) {
+          board.appendChild(baueSpalte(v, chipMap, cmp, klasse, stapelVon, nurKritisch, nurOffene, zeigeKonsens));
+        }
+      }
+
+      function baueSpalte(v, chipMap, cmp, klasse, stapelVon, nurKritisch, nurOffene, zeigeKonsens) {
+        var spalte = document.createElement('div');
+        spalte.className = 'klasse-spalte';
+        var mitglieder = alleKinder.filter(function (id) { return v.zuordnung[id] === klasse; });
+
+        // U4: die ganze Spalte ist Dropziel - der Drop erzeugt einen
+        // F1-Pin auf die Zielklasse (verschiebe rechnet live nach).
+        if (liveFaehig) {
+          spalte.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            spalte.classList.add('dropziel');
+          });
+          spalte.addEventListener('dragleave', function (e) {
+            if (!spalte.contains(e.relatedTarget)) spalte.classList.remove('dropziel');
+          });
+          spalte.addEventListener('drop', function (e) {
+            e.preventDefault();
+            spalte.classList.remove('dropziel');
+            var id = e.dataTransfer.getData('text/plain');
+            if (id) verschiebe(id, klasse);
+          });
+        }
+
+        // ---- Kopf: Name, Kapazitaetsbalken, Balance, Einfrieren ----
+        var kopf = document.createElement('div');
+        kopf.className = 'klasse-kopf';
+        var nameZeile = document.createElement('div');
+        nameZeile.className = 'name-zeile';
+        var name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = labelVon(klasse) + ' - ' + mitglieder.length + ' Kinder';
+        nameZeile.appendChild(name);
+        var freeze = document.createElement('button');
+        freeze.textContent = '🔒';
+        freeze.title = labelVon(klasse) + ' einfrieren: alle aktuellen Kinder fixieren (F6)';
+        freeze.addEventListener('click', function () { klasseEinfrieren(klasse); });
+        nameZeile.appendChild(freeze);
+        kopf.appendChild(nameZeile);
+
+        var kap = document.createElement('div');
+        var ausserhalb = mitglieder.length < data.min_groesse || mitglieder.length > data.max_groesse;
+        kap.className = 'kapazitaet' + (ausserhalb ? ' ausserhalb' : '');
+        var fuellung = document.createElement('i');
+        fuellung.style.width = Math.min(100, Math.round(mitglieder.length / data.max_groesse * 100)) + '%';
+        kap.title = mitglieder.length + ' von ' + data.min_groesse + '-' + data.max_groesse;
+        kap.appendChild(fuellung);
+        kopf.appendChild(kap);
+
+        (v.balance_kennzahlen || []).forEach(function (b) {
+          var count = b.counts[klasse - 1];
+          var dev = Math.abs(count - b.ziel);
+          var k = document.createElement('div');
+          k.className = 'kennzahl' + (dev > b.toleranz ? ' verletzt' : '');
+          k.textContent = b.regel_id + ': ' + count + ' (Ziel ' + b.ziel + ' ± ' + b.toleranz + ')';
+          kopf.appendChild(k);
+        });
+        spalte.appendChild(kopf);
+
+        // ---- Karten: erst Stapel (nach Gruppe), dann Einzelkarten --
+        var karten = document.createElement('div');
+        karten.className = 'karten';
+        var sichtbar = mitglieder.filter(function (id) {
+          var agg = aggregat(chipMap[id]);
+          if (nurKritisch && agg !== 'rot' && agg !== 'gelb') return false;
+          if (nurOffene && istFixiert(id)) return false;
+          return true;
+        });
+        function sortiere(ids) {
+          return ids.slice().sort(function (a, b) {
+            var ra = aggregat(chipMap[a]) === 'frei' ? -1 : statusRang[aggregat(chipMap[a])];
+            var rb = aggregat(chipMap[b]) === 'frei' ? -1 : statusRang[aggregat(chipMap[b])];
+            return (rb - ra) || a.localeCompare(b);
+          });
+        }
+        var stapelReihen = {};   // gruppen-id -> [kind]
+        var einzeln = [];
+        sichtbar.forEach(function (id) {
+          if (stapelVon[id]) (stapelReihen[stapelVon[id]] = stapelReihen[stapelVon[id]] || []).push(id);
+          else einzeln.push(id);
+        });
+        Object.keys(stapelReihen).sort().forEach(function (gid) {
+          var g = gruppeVon[gid];
+          var hier = stapelReihen[gid];
+          var stapel = document.createElement('div');
+          stapel.className = 'stapel';
+          stapel.style.borderColor = farbeVon[gid];
+          var kopfS = document.createElement('div');
+          kopfS.className = 'stapel-kopf';
+          kopfS.style.color = farbeVon[gid];
+          var gesamt = g.mitglieder.length;
+          var hierGesamt = g.mitglieder.filter(function (id) { return v.zuordnung[id] === klasse; }).length;
+          kopfS.innerHTML = '[' + kuerzelVon[gid] + '] ' + g.id + ' - ' +
+            (hierGesamt === gesamt ? gesamt + '/' + gesamt + ' hier'
+                                   : '<span class="zerrissen">' + hierGesamt + '/' + gesamt + ' hier</span>');
+          kopfS.title = 'Buendelung ' + g.id + (g.modus === 'hard' ? ' (hart)' : '') + ', Prio ' + g.prio;
+          kopfS.addEventListener('mouseenter', function () { hoverGruppe(gid, true); });
+          kopfS.addEventListener('mouseleave', function () { hoverGruppe(gid, false); });
+          stapel.appendChild(kopfS);
+          var innen = document.createElement('div');
+          innen.className = 'karten-innen';
+          sortiere(hier).forEach(function (id) {
+            innen.appendChild(baueKarte(v, chipMap, cmp, id, klasse, zeigeKonsens));
+          });
+          stapel.appendChild(innen);
+          karten.appendChild(stapel);
+        });
+        sortiere(einzeln).forEach(function (id) {
+          karten.appendChild(baueKarte(v, chipMap, cmp, id, klasse, zeigeKonsens));
+        });
+        spalte.appendChild(karten);
+        return spalte;
+      }
+
+      function baueKarte(v, chipMap, cmp, id, klasse, zeigeKonsens) {
+        var chips = chipMap[id] || [];
+        var agg = aggregat(chips);
+        var karte = document.createElement('div');
+        karte.className = 'karte' + (agg === 'frei' ? '' : ' agg-' + agg) + (istFixiert(id) ? ' gepinnt' : '');
+        karte.setAttribute('data-kind', id);
+        anwendenDauerHighlight(karte, id);
+        // U4: Karten sind verschiebbar (ausser YAML-fixierte - die kann
+        // der Viewer nicht aendern); verschobene Karten sind markiert.
+        var basisKlasse = varianten[aktuelleVariante].zuordnung[id];
+        if (liveFaehig && !bestandVon[id]) {
+          karte.draggable = true;
+          karte.addEventListener('dragstart', function (e) {
+            e.dataTransfer.setData('text/plain', id);
+            e.dataTransfer.effectAllowed = 'move';
+          });
+        }
+        if (liveFaehig && pins.hasOwnProperty(id) && pins[id] !== basisKlasse) {
+          karte.classList.add('verschoben');
+          karte.title = 'Verschoben aus ' + labelVon(basisKlasse) + ' (F1-Pin - 📌 loest und legt zurueck)';
+        }
+        if (cmp && cmp.zuordnung[id] !== klasse) {
+          karte.classList.add('diff');
+          karte.title = 'In Variante ' + cmp.index + ': ' + labelVon(cmp.zuordnung[id]);
+        }
+        var kindId = document.createElement('span');
+        kindId.className = 'kind-id';
+        kindId.textContent = id;
+        kindId.title = 'Details und Fixier-Aktionen';
+        kindId.addEventListener('click', function (e) {
+          e.stopPropagation();
+          oeffnePopover(karte, id);
+        });
+        karte.appendChild(kindId);
+        if (zeigeKonsens && konsens[id]) {
+          var punkt = document.createElement('span');
+          punkt.className = 'konsens';
+          punkt.textContent = '●';
+          punkt.title = 'Konsens-Kern: in allen Varianten in derselben Klasse';
+          karte.appendChild(punkt);
+        }
+        // Gruppen-Badges (U1): Grundfarbe = Gruppe, Statuszeichen = Ampel.
+        var badges = document.createElement('span');
+        badges.className = 'badges';
+        (gruppenVonKind[id] || []).forEach(function (g) {
+          var c = chipStatusVon(v, id, g.id);
+          var badge = document.createElement('span');
+          badge.className = 'badge';
+          badge.style.background = farbeVon[g.id];
+          var status = c ? c.status : 'gruen';
+          badge.innerHTML = kuerzelVon[g.id] + '<span class="st ' + status + '">' + chipSymbol[status] + '</span>';
+          badge.title = (c ? c.text : g.id);
+          badge.addEventListener('mouseenter', function () { hoverGruppe(g.id, true); });
+          badge.addEventListener('mouseleave', function () { hoverGruppe(g.id, false); });
+          badge.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (highlights[g.id]) delete highlights[g.id];
+            else highlights[g.id] = true;
+            render();
+          });
+          badges.appendChild(badge);
+        });
+        (wuenscheVonKind[id] || []).forEach(function (w) {
+          var c = chipStatusVon(v, id, w.regel_id);
+          var badge = document.createElement('span');
+          badge.className = 'badge wunsch';
+          var status = c ? c.status : 'gruen';
+          badge.innerHTML = (w.typ === 'zusammen' ? 'W+' : 'W−') +
+            '<span class="st ' + status + '">' + chipSymbol[status] + '</span>';
+          var partner = w.kinder[0] === id ? w.kinder[1] : w.kinder[0];
+          badge.title = (w.typ === 'zusammen' ? 'zusammen mit ' : 'getrennt von ') + partner +
+            (c && c.status === 'rot' ? ' - nicht erfuellt' : ' - erfuellt');
+          badges.appendChild(badge);
+        });
+        karte.appendChild(badges);
+        // Pin (F1): Toggle auf die aktuelle Klasse.
+        var pin = document.createElement('span');
+        pin.className = 'pin' + (istFixiert(id) ? ' an' : '');
+        pin.textContent = '📌';
+        if (bestandVon[id]) {
+          pin.title = 'Per YAML fixiert (' + labelVon(bestandVon[id]) + ') - im Viewer nicht loesbar';
+        } else if (pins.hasOwnProperty(id)) {
+          pin.title = 'Fixiert auf ' + labelVon(pins[id]) + ' (' + (pinHerkunft[id] || 'manuell') + ') - Klick loest';
+        } else {
+          pin.title = 'In ' + labelVon(klasse) + ' fixieren (F1)';
+        }
+        pin.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (bestandVon[id]) return;
+          if (pins.hasOwnProperty(id)) loesePin(id);
+          else setzePin(id, klasse, 'manuell');
+          render();
+        });
+        karte.appendChild(pin);
+        return karte;
+      }
+
+      // ---- Fixierungen-Panel mit YAML-Export (U3) ------------------
+      function renderFixierungen() {
+        var c = document.getElementById('fixierungen');
+        c.innerHTML = '';
+        var kopf = document.createElement('h2');
+        var pinListe = Object.keys(pins).sort();
+        var notListe = [];
+        Object.keys(notPins).sort().forEach(function (id) {
+          Object.keys(notPins[id]).forEach(function (klasse) { notListe.push({ kind: id, klasse: parseInt(klasse, 10) }); });
+        });
+        var nHart = Object.keys(haertungen.gruppen).length + Object.keys(haertungen.wuensche).length;
+        kopf.textContent = 'Fixierungen fuer den naechsten Lauf (' +
+          (bestandsFixierungen.length + pinListe.length + notListe.length) + ')' +
+          (nHart > 0 ? ' + ' + nHart + ' Haertung' + (nHart > 1 ? 'en' : '') + ' (F3/F5)' : '');
+        c.appendChild(kopf);
+        var hinweis = document.createElement('div');
+        hinweis.className = 'hinweis';
+        hinweis.textContent = 'Den Block unten als fixierungen: in input/klassenbildung.yaml uebernehmen und neu rechnen - ' +
+          'der Viewer bewertet Verschiebungen live, optimiert aber nicht (Re-Solve: Ausbaustufe U5). ' +
+          'Pins ueberleben Reloads nur als Browser-Komfort.';
+        c.appendChild(hinweis);
+
+        var zeilen = ['fixierungen:'];
+        bestandsFixierungen.forEach(function (f) {
+          if (f.klasse !== null && f.klasse !== undefined) {
+            zeilen.push('  - {kind: ' + f.kind + ', klasse: ' + f.klasse + '}   # bestehend (YAML)');
+          } else {
+            zeilen.push('  - {kind: ' + f.kind + ', nicht_klasse: ' + f.nicht_klasse + '}   # bestehend (YAML)');
+          }
+        });
+        pinListe.forEach(function (id) {
+          zeilen.push('  - {kind: ' + id + ', klasse: ' + pins[id] + '}   # ' + (pinHerkunft[id] || 'manuell'));
+        });
+        notListe.forEach(function (e) {
+          zeilen.push('  - {kind: ' + e.kind + ', nicht_klasse: ' + e.klasse + '}   # manuell (F2)');
+        });
+        // U4: Haertungen (F3/F5) als modus-hard-Diff-Hinweis - kein
+        // fixierungen-Eintrag, sondern eine Aenderung an der Regel
+        // selbst in input/klassenbildung.yaml.
+        var gruppenHart = Object.keys(haertungen.gruppen).sort();
+        var wuenscheHart = Object.keys(haertungen.wuensche).map(Number).sort(function (a, b) { return a - b; });
+        if (gruppenHart.length + wuenscheHart.length > 0) {
+          zeilen.push('# Haertungen: bei diesen Regeln in input/klassenbildung.yaml modus: hard setzen');
+          gruppenHart.forEach(function (gid) {
+            zeilen.push('#   gruppe ' + gid + ' -> modus: hard   # F5');
+          });
+          wuenscheHart.forEach(function (wi) {
+            var w = wuensche[wi];
+            zeilen.push('#   wunsch[' + wi + '] (' + w.kinder[0] + ' + ' + w.kinder[1] + ' ' + w.typ +
+              ') -> modus: hard   # F3');
+          });
+        }
+        var ta = document.createElement('textarea');
+        ta.readOnly = true;
+        ta.id = 'yaml-export';
+        ta.value = zeilen.join('\n');
+        c.appendChild(ta);
+        var cli = document.createElement('div');
+        cli.className = 'cli';
+        cli.textContent = 'dotnet run --project SchoolTestRunner -- klassen ' + data.schule;
+        c.appendChild(cli);
+        var reset = document.createElement('button');
+        reset.style.marginLeft = '0.6rem';
+        reset.textContent = 'Alle Pins loesen';
+        reset.addEventListener('click', allePinsLoesen);
+        c.appendChild(reset);
+      }
+
+      render();
+
+      // Test-Hook (U4): der Chromium-Interaktionstest prueft darueber
+      // "Live-Bewertung == Bewerte" gegen die eingebetteten VB-Chips
+      // und simuliert Verschiebungen deterministisch. Kein UI-Vertrag.
+      window.__kbTest = {
+        bewerte: bewerte,
+        sicht: aktuelleSicht,
+        verschiebe: verschiebe,
+        pins: function () { return pins; },
+        herkunft: function () { return pinHerkunft; },
+        warnungen: function () { return warnungen; },
+        haertungen: function () { return haertungen; },
+        loesePin: function (id) { loesePin(id); render(); },
+        liveFaehig: liveFaehig
+      };
+    })();
+  </script>
+</body>
+</html>

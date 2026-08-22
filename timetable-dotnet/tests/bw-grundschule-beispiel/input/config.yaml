@@ -193,3 +193,19 @@ quality_weights:
   include_afternoon_day_count: false
   include_class_load_variance: false
   include_teacher_load_variance: false
+
+# Stufe 0 (docs/klassenbildung-plan.md, K4): Parameter des
+# `klassen`-Subkommandos - Klassenbildung aus input/klassenbildung.yaml
+# (Beispiel A des Konzepts: 100 Kinder -> 4 Klassen).
+# BELEG-LAUF (Beispiel A, 100 Kinder -> 4 Klassen): 3 Varianten, alle
+# Optimal mit Zielwert 1001 - exakt die Konzept-Vorhersage: der
+# unvermeidbare Sozialverhalten-Ueberlauf (5 Kinder, Kappe 1, 4
+# Klassen -> Mass 1 x Gewicht 1000) plus ein Nordstadt-Buendelungs-
+# Split (Mass 1 x Gewicht 1); alle 34 Wuensche und alle drei Balance-
+# Kriterien erfuellt, Rollstuhl-Fixierung haelt, Groessen 26/26/26/22.
+# Varianten-Diffs zu V1: 11 bzw. 59 Kinder; Konsens-Kern 33/100.
+klassenbildung:
+  zeitlimit_s: 20.0
+  n_varianten: 3
+  epsilon: 0.05
+  min_distanz: 8

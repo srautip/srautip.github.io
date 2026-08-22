@@ -634,6 +634,85 @@ Plan. Standardmäßig wird nur EIN finaler Plan erzeugt (`max_solutions: 1`);
 ein höherer Wert in `config.yaml` exportiert zusätzliche, vergleichbare
 Alternativen (siehe Abschnitt "Stundentafel-Visualisierung" unten).
 
+## Klassenbildung (Stufe 0, `klassen <schule>`)
+
+`dotnet run --project SchoolTestRunner -- klassen <schule>` löst die
+**Klassenbildung** (docs/klassenbildung-konzept.md + -plan.md) aus
+`input/klassenbildung.yaml`: Schüler mit Pseudonym-IDs und
+Attribut-Tags, Klassenrahmen, Bündelungs-/Verteilungsgruppen
+(`modus: hard|soft`, `prio: 1..3`), Balance-Kriterien,
+Zusammen-/Getrennt-Wünsche und Fixierungen (`klasse` = F1,
+`nicht_klasse` = F2). Parameter über den `klassenbildung:`-Block der
+config.yaml (`zeitlimit_s`, `n_varianten`, `epsilon`, `min_distanz`,
+`symmetriebrechung`, `prio_gewichte`). Ergebnis:
+`output/klassenbildung.md` (je Variante Scorecard, Klassenlisten,
+Balance-Kennzahlen, Ampel-Zusammenfassung und Verletzungsreport, dazu
+der Konsens-Kern über alle Varianten) und `output/klassenbildung.json`
+(maschinenlesbar inkl. Ampel-Chips je Kind/Kriterium; seit U4
+zusätzlich ein Top-Level-Block `balance` mit `regel_id`/`ziel`/
+`toleranz`/`modus`/`prio` und den Treffer-IDs je Regel - die Grundlage
+der Live-Bewertung im Viewer) sowie
+`output/klassenbildung.html` - ein self-contained **Viewer** nach dem
+Stundentafel-Muster: Varianten-Übersicht (Zeilenklick wählt; Zielwert,
+Diff zu V1, Ampel-Zähler), Board-Ansicht mit Klassen-Spalten und
+Kinder-Karten (Ampel-Chips ✓/!/✗ je betroffenem Kriterium mit
+Klartext-Tooltip, Worst-of-Kartenrand, Konsens-Markierung ●),
+Balance-Kennzahlen im Spaltenkopf, "Vergleichen mit"-Diff zwischen
+Varianten und Filter "nur Diskussionsbedarf". Die Klassen tragen
+Anzeige-Namen (`klassen.stufe: 1` generiert 1a/1b/…, `klassen.labels`
+setzt sie explizit; ohne beides "Klasse N"), und eine **Gruppen-Tabelle**
+zeigt das Regelwerk samt Ist-Verteilung über die Klassen und
+Erfüllungsstatus in der aktiven Variante - Zeilenklick hebt die
+Mitglieder-Karten im Board hervor.
+
+**UI-Ausbau U1-U3** (docs/klassenbildung-ui-konzept.md): Gruppen sind
+erstklassige sichtbare Objekte - jede trägt eine stabile Gruppenfarbe
+und ein Kürzel (`gruppen[].kuerzel` optional, sonst aus der Id
+abgeleitet), Karten tragen **Gruppen-Badges** (Gruppenfarbe +
+Statuszeichen ✓/!/✗) und W+/W−-Wunsch-Badges, Bündelungsgruppen
+erscheinen als **farbige Stapel** in den Klassen-Spalten („[K3] … 2/4
+hier" macht zerrissene Bündel sofort sichtbar), Hover/Klick auf Badge
+oder Panel-Zeile hebt alle Mitglieder hervor (mehrere Gruppen
+gleichzeitig). Das **Gruppen-Panel** ist eine Seitenleiste nach
+Prio-Stufen (kritisch/wichtig/wenn möglich, verletzte zuerst) mit
+Verteilungs-Mini-Balken, Balance- und Wunsch-Block. Der
+**Fixierungs-Workflow**: Fortschrittsleiste („n von m fixiert",
+Konsens-/Unkritisch-Bulk-Buttons), Pin je Karte (F1),
+Karten-Popover mit „Nicht in …" (F2), „Gruppe fixieren" (F4) im
+Panel, „Klasse einfrieren" (F6) am Spaltenkopf; alle Pins sammeln
+sich in einem Export-Panel als fertiger `fixierungen:`-YAML-Block
+(bestehende YAML-Fixierungen inklusive, Herkunft je Pin als
+Kommentar) für den nächsten `klassen`-Lauf. Pins überleben Reloads
+per localStorage (nur Browser-Komfort). `render <schule>` baut
+den Viewer aus vorhandener klassenbildung.json neu (ohne Solve). Der
+Bewertungslauf zählt alle Regeln unabhängig vom Solver nach
+(Verifier-Prinzip) - eine Abweichung wäre ein FAIL. Die Klassenbildung
+ist eigenständig: Schulen ohne `klassenbildung.yaml` sind unberührt,
+`run` bleibt die Stundenplan-Pipeline.
+
+**UI-Ausbau U4 - Live-Bewertung + Drag & Drop**: Karten sind per
+Drag & Drop zwischen den Klassen-Spalten verschiebbar (außer per YAML
+fixierte Kinder). Jede Verschiebung erzeugt einen sichtbaren, lösbaren
+F1-Pin (Herkunft „verschoben", Karte gestrichelt markiert; 📌 löst und
+legt die Karte an ihren Varianten-Platz zurück) - der Arbeitsstand ist
+schlicht „Basis-Variante überlagert mit den Pins". Nach jeder
+Verschiebung läuft die **reine Bewertung im Browser** (bewusstes,
+kommentiertes JS-Duplikat des VB-Bewertungslaufs; die Ground Truth
+bleibt der nächste `klassen`-Lauf): Chips, Panel-Status, Mini-Balken,
+Ampel-Zähler und Kapazitätsbalken aktualisieren sofort, ein Warnbanner
+nennt verschlechterte Regeln im Klartext („damit: Verteilung
+G_sozialverhalten: 2/1 in dieser Klasse - Kappe überschritten") plus
+Korridor-Hinweis. Eine Kapazitätsverletzung blockiert den Drop nicht,
+färbt aber den Spaltenkopf rot - harte Grenzen entscheidet endgültig
+der Solver. Neu sind außerdem die **Härtungen F3/F5** (Wunsch bzw.
+weiche Gruppe „hart stellen", 🔓/🔒 im Karten-Popover, Panel und in
+der Wunschliste): reine Export-Direktiven, die im Fixierungen-Panel
+als `modus: hard`-Diff-Hinweis erscheinen und die Live-Bewertung
+bewusst nicht verändern. Ein Re-Solve direkt aus dem Viewer (U5) ist
+weiterhin offen - der Viewer bewertet, er optimiert nicht. Ältere
+klassenbildung.json ohne den `balance`-Block laufen im reinen
+Anzeige-Modus weiter (ohne Drag & Drop).
+
 ## Stundentafel-Visualisierung (Phase 2.21)
 
 `output/stundenplan.json` enthält ALLE von `Solver.SolveTop` gefundenen
@@ -820,7 +899,13 @@ endnutzerorientierter Überblick über beide Beispiele steht außerdem in
   weitere `occupied_slot`-Kann-Regeln sorgen für eine durchgängige
   zeitliche Belegung (Klasse 1/2 soll täglich Stunde 2-4 belegt sein,
   Klasse 3/4 Stunde 2-5) - fach-unabhängig, im Gegensatz zum obigen
-  `required_slot`.
+  `required_slot`. Zusätzlich trägt dieses Beispiel die einzige
+  committete **Klassenbildungs-Fixture** (`input/klassenbildung.yaml`,
+  "Beispiel A" des Konzepts: 100 Kinder, 4 Klassen, 16 Gruppen, 3
+  Balance-Kriterien, 34 Wünsche, 1 Fixierung; Lauf per
+  `klassen bw-grundschule-beispiel`, siehe Abschnitt oben) - der
+  erwartete Zielwert 1001 ist als Beleg-Kommentar in der `config.yaml`
+  dokumentiert (1 unvermeidbarer Prio-3-Überlauf + 1 Prio-1-Split).
 
 - **`tests/bw-gms-beispiel/`** (6 Klassenstufen [5-10], 24 Klassen [4-zügig],
   ~696 Schüler, 48 Lehrkräfte, BW-Gemeinschaftsschule) - realitätsnah von

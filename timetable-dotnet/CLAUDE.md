@@ -10,6 +10,16 @@ pauschal die volle Suite zu fahren:
   Lehrereinsatzplanung, ...): volle Suite ist Pflicht -
   `dotnet test TimetableCore.Tests` muss vollstaendig gruen bleiben
   (Definition-of-Done-Konvention aller Phasen-Berichte in `docs/`).
+- **Aenderungen NUR an der Klassenbildung** (`TimetableCore/
+  Klassenbildung.vb`, `TimetableCore/KlassenbildungQuality.vb`,
+  `SchoolTestRunner/KlassenRun.vb`, `SchoolTestRunner/
+  YamlKlassenbildung.vb`, `tests/*/input/klassenbildung.yaml`): die
+  EIGENE Suite genuegt - `dotnet test Klassenbildung.Tests` (laeuft in
+  unter einer Sekunde; die Klassenbildung ist ein eigenstaendiges
+  Modul ohne jede Kopplung an Solver/SolveTop, die teuren
+  Stundenplan-Tests exerzieren sie nicht und umgekehrt). Bei
+  querschneidenden Aenderungen (z.B. gemeinsame Helfer) beide Suiten
+  fahren; "volle Suite" heisst seither BEIDE Testprojekte.
 - **Aenderungen nur an `SchoolTestRunner/`-CLI oder
   `SchoolTestRunner/Templates/stundentafel.html`** (Viewer): die Suite
   deckt beides NICHT ab - stattdessen gezielt pruefen:
@@ -56,6 +66,9 @@ stabil verlinkte Seiten fuer Zwischenstaende direkt nach einem Lauf:
 
 - Grundschule: https://claude.ai/code/artifact/d644d791-48e1-4bbd-89fa-02d2cf13fe09
 - GMS: https://claude.ai/code/artifact/ae942861-a1ae-4664-a1f5-51ac9ce702d1
+- Klassenbildung Grundschule: https://claude.ai/code/artifact/d00f8a57-75ca-4809-9690-19613dd071a1
+  (Quelle: tests/bw-grundschule-beispiel/output/klassenbildung.html,
+  Titel "Klassenbildung Grundschule", Favicon 🧩)
 
 Aktualisierung nach jedem `run`-Lauf: den aeusseren Dokumentrahmen der
 generierten `output/stundentafel.html` strippen (doctype/html/head/
