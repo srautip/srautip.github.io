@@ -29,6 +29,7 @@
        ueber Assembly.GetManifestResourceStream lesbar ist. -->
   <ItemGroup>
     <EmbeddedResource Include="Templates\stundentafel.html" />
+    <EmbeddedResource Include="Templates\klassenbildung.html" />
   </ItemGroup>
 
 </Project>

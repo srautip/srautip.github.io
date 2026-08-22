@@ -288,3 +288,14 @@ dritter. K6 einzeln auf Zuruf.
   eigenen Testprojekt `Klassenbildung.Tests` (13 Tests, < 1 s) - bei
   reinen Klassenbildungs-Aenderungen muss die teure Stundenplan-Suite
   (`TimetableCore.Tests`, ~6 Min) nicht mitlaufen; Regel in CLAUDE.md.
+- **K5 umgesetzt:** self-contained Viewer `klassenbildung.html`
+  (Template + KlassenbildungHtml als Embedded Resource, vom
+  `klassen`-Lauf geschrieben und per `render` aus vorhandener JSON
+  regenerierbar): Varianten-Uebersicht mit Ampel-Zaehlern,
+  Board-Ansicht (Klassen-Spalten, Karten mit Chips ✓/!/✗ +
+  Klartext-Tooltips, Worst-of-Rand, Konsens-Punkt),
+  Balance-Kennzahlen je Spaltenkopf, Varianten-Diff und
+  Kritisch-Filter. JSON dafuer um balance_kennzahlen und den
+  Klassenrahmen erweitert. Chromium-Interaktionstest gegen
+  unabhaengige Python-Nachrechnung: Ampel 4/41/44/11, Konsens 23,
+  Diff V2-V1 54, Kritisch-Filter 32 - alles exakt getroffen.

@@ -66,6 +66,9 @@ stabil verlinkte Seiten fuer Zwischenstaende direkt nach einem Lauf:
 
 - Grundschule: https://claude.ai/code/artifact/d644d791-48e1-4bbd-89fa-02d2cf13fe09
 - GMS: https://claude.ai/code/artifact/ae942861-a1ae-4664-a1f5-51ac9ce702d1
+- Klassenbildung Grundschule: https://claude.ai/code/artifact/d00f8a57-75ca-4809-9690-19613dd071a1
+  (Quelle: tests/bw-grundschule-beispiel/output/klassenbildung.html,
+  Titel "Klassenbildung Grundschule", Favicon 🧩)
 
 Aktualisierung nach jedem `run`-Lauf: den aeusseren Dokumentrahmen der
 generierten `output/stundentafel.html` strippen (doctype/html/head/

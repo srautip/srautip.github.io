@@ -648,7 +648,15 @@ config.yaml (`zeitlimit_s`, `n_varianten`, `epsilon`, `min_distanz`,
 `output/klassenbildung.md` (je Variante Scorecard, Klassenlisten,
 Balance-Kennzahlen, Ampel-Zusammenfassung und Verletzungsreport, dazu
 der Konsens-Kern über alle Varianten) und `output/klassenbildung.json`
-(maschinenlesbar inkl. Ampel-Chips je Kind/Kriterium). Der
+(maschinenlesbar inkl. Ampel-Chips je Kind/Kriterium) sowie
+`output/klassenbildung.html` - ein self-contained **Viewer** nach dem
+Stundentafel-Muster: Varianten-Übersicht (Zeilenklick wählt; Zielwert,
+Diff zu V1, Ampel-Zähler), Board-Ansicht mit Klassen-Spalten und
+Kinder-Karten (Ampel-Chips ✓/!/✗ je betroffenem Kriterium mit
+Klartext-Tooltip, Worst-of-Kartenrand, Konsens-Markierung ●),
+Balance-Kennzahlen im Spaltenkopf, "Vergleichen mit"-Diff zwischen
+Varianten und Filter "nur Diskussionsbedarf". `render <schule>` baut
+den Viewer aus vorhandener klassenbildung.json neu (ohne Solve). Der
 Bewertungslauf zählt alle Regeln unabhängig vom Solver nach
 (Verifier-Prinzip) - eine Abweichung wäre ein FAIL. Die Klassenbildung
 ist eigenständig: Schulen ohne `klassenbildung.yaml` sind unberührt,

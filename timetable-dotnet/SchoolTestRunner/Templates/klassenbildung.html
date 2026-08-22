@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Klassenbildung</title>
+<style>
+  :root {
+    color-scheme: light;
+  }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    margin: 1.5rem;
+    background: #fff;
+    color: #000;
+  }
+  h1 {
+    font-size: 1.3rem;
+    margin-bottom: 0.2rem;
+    color: #000;
+  }
+  #meta {
+    color: #333;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  #controls {
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    flex-wrap: wrap;
+    font-size: 0.9rem;
+  }
+  #controls label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    cursor: pointer;
+  }
+  #compare-info {
+    color: #555;
+    font-size: 0.85rem;
+  }
+  /* Varianten-Uebersicht: gleiche Interaktions-Optik wie die
+     Loesungsuebersicht der Stundentafel (Zeilenklick waehlt,
+     Vergleichszeile markiert). */
+  #varianten-overview {
+    margin-bottom: 1rem;
+    overflow-x: auto;
+    border: 1px solid #ccc;
+  }
+  #varianten-overview table {
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+    width: 100%;
+  }
+  #varianten-overview th, #varianten-overview td {
+    border: 1px solid #ccc;
+    padding: 4px 10px;
+    text-align: right;
+    white-space: nowrap;
+  }
+  #varianten-overview th.txt, #varianten-overview td.txt {
+    text-align: left;
+  }
+  #varianten-overview tbody tr {
+    cursor: pointer;
+  }
+  #varianten-overview tbody tr:hover {
+    background: #f2f2f2;
+  }
+  #varianten-overview tbody tr.active {
+    background: #dcebff;
+  }
+  #varianten-overview tbody tr.compare {
+    background: #fdf0e5;
+  }
+  .overview-note {
+    font-size: 0.75rem;
+    color: #555;
+    padding: 3px 8px;
+  }
+  /* Board: Klassen als Spalten, Kinder als Karten (Konzept 9.2
+     Phase 3 / 11.1). */
+  #board {
+    display: flex;
+    gap: 0.8rem;
+    align-items: flex-start;
+    overflow-x: auto;
+  }
+  .klasse-spalte {
+    flex: 1 1 0;
+    min-width: 13rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fafafa;
+  }
+  .klasse-kopf {
+    padding: 0.5rem 0.6rem;
+    border-bottom: 1px solid #ccc;
+    background: #fff;
+    border-radius: 6px 6px 0 0;
+  }
+  .klasse-kopf .name {
+    font-weight: 600;
+  }
+  .klasse-kopf .kennzahl {
+    font-size: 0.75rem;
+    color: #555;
+  }
+  .klasse-kopf .kennzahl.verletzt {
+    color: #b91c1c;
+    font-weight: 600;
+  }
+  .karten {
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .karte {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-left: 4px solid #9ca3af; /* Worst-of-Rand, Default frei/grau */
+    border-radius: 4px;
+    padding: 0.25rem 0.45rem;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.82rem;
+  }
+  .karte.agg-gruen { border-left-color: #15803d; }
+  .karte.agg-gelb  { border-left-color: #ca8a04; }
+  .karte.agg-rot   { border-left-color: #b91c1c; }
+  .karte.diff {
+    outline: 3px solid #c2410c;
+    outline-offset: -3px;
+  }
+  .karte .kind-id {
+    font-variant-numeric: tabular-nums;
+    min-width: 3.2rem;
+  }
+  .karte .konsens {
+    color: #1d4ed8;
+    font-size: 0.7rem;
+  }
+  .chips {
+    display: flex;
+    gap: 0.2rem;
+    flex-wrap: wrap;
+  }
+  /* Ampel-Chips: Farbe UND Symbol (Konzept 11.1, Farbfehlsichtigkeit). */
+  .chip {
+    display: inline-block;
+    min-width: 1.05rem;
+    text-align: center;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    padding: 0 2px;
+    cursor: default;
+  }
+  .chip.gruen { background: #dcfce7; color: #15803d; }
+  .chip.gelb  { background: #fef9c3; color: #a16207; }
+  .chip.rot   { background: #fee2e2; color: #b91c1c; }
+</style>
+</head>
+<body>
+  <h1 id="titel">Klassenbildung</h1>
+  <div id="meta"></div>
+  <div id="controls">
+    <label for="compare-select">Vergleichen mit: <select id="compare-select"></select></label>
+    <label><input type="checkbox" id="filter-kritisch">nur Diskussionsbedarf (gelb/rot)</label>
+    <label><input type="checkbox" id="konsens-toggle" checked>Konsens-Kern markieren (&#9679;)</label>
+    <span id="compare-info"></span>
+  </div>
+  <div id="varianten-overview"></div>
+  <div id="board"></div>
+
+  <script type="application/json" id="klassenbildung-data">__KLASSENBILDUNG_JSON__</script>
+  <script>
+    (function () {
+      var data = JSON.parse(document.getElementById('klassenbildung-data').textContent);
+      var varianten = data.varianten;
+      var konsens = {};
+      (data.konsens_kern || []).forEach(function (id) { konsens[id] = true; });
+
+      document.getElementById('titel').textContent = 'Klassenbildung: ' + data.schule;
+      document.getElementById('meta').textContent =
+        data.schueler_anzahl + ' Kinder auf ' + data.klassen_anzahl + ' Klassen (' +
+        data.min_groesse + '-' + data.max_groesse + ') | Qualitaetsband epsilon ' + data.parameter.epsilon +
+        ' | Mindestdistanz ' + data.parameter.min_distanz + ' Kinder | ' +
+        'Konsens-Kern: ' + (data.konsens_kern || []).length + ' von ' + data.schueler_anzahl +
+        ' Kindern in allen Varianten identisch. Der Solver liefert Vorschlaege - die Zuordnung entscheidet die Schulleitung.';
+
+      var aktuelleVariante = 0;
+      var compareIndex = null;
+
+      // Feste Chip-Reihenfolge je Karte (Konzept 11.1):
+      // Buendelung -> Verteilung -> Balance -> Wunsch.
+      var typRang = { buendelung: 0, verteilung: 1, balance: 2, wunsch_zusammen: 3, wunsch_getrennt: 3 };
+      var statusRang = { gruen: 0, gelb: 1, rot: 2 };
+      var chipSymbol = { gruen: '✓', gelb: '!', rot: '✗' };
+
+      // Chips je Kind (vorsortiert) und Worst-of-Aggregat je Variante.
+      function chipsJeKind(v) {
+        var map = {};
+        v.chips.forEach(function (c) {
+          if (!map[c.kind]) map[c.kind] = [];
+          map[c.kind].push(c);
+        });
+        Object.keys(map).forEach(function (kind) {
+          map[kind].sort(function (a, b) {
+            return (typRang[a.regel_typ] - typRang[b.regel_typ]) || a.regel_id.localeCompare(b.regel_id);
+          });
+        });
+        return map;
+      }
+      function aggregat(chips) {
+        if (!chips || chips.length === 0) return 'frei';
+        var worst = 'gruen';
+        chips.forEach(function (c) {
+          if (statusRang[c.status] > statusRang[worst]) worst = c.status;
+        });
+        return worst;
+      }
+      function ampelZaehler(v) {
+        var map = chipsJeKind(v);
+        var z = { rot: 0, gelb: 0, gruen: 0, frei: 0 };
+        Object.keys(varianten[0].zuordnung).forEach(function (id) {
+          z[aggregat(map[id])] += 1;
+        });
+        return z;
+      }
+
+      // ---- Varianten-Uebersicht -------------------------------------
+      function renderOverview() {
+        var container = document.getElementById('varianten-overview');
+        container.innerHTML = '';
+        var table = document.createElement('table');
+        var thead = document.createElement('thead');
+        var hr = document.createElement('tr');
+        ['Variante', 'Status', 'Zielwert', 'Diff zu V1', 'verletzte Regeln', 'rot', 'gelb', 'gruen', 'frei'].forEach(function (h, idx) {
+          var th = document.createElement('th');
+          th.textContent = h;
+          if (idx <= 1) th.className = 'txt';
+          hr.appendChild(th);
+        });
+        thead.appendChild(hr);
+        table.appendChild(thead);
+        var tbody = document.createElement('tbody');
+        varianten.forEach(function (v, i) {
+          var tr = document.createElement('tr');
+          var z = ampelZaehler(v);
+          var verletzt = v.verletzungen.filter(function (x) { return x.mass > 0; }).length;
+          [ 'V' + v.index, v.status, v.objective, v.diff_zu_v1, verletzt, z.rot, z.gelb, z.gruen, z.frei ].forEach(function (val, idx) {
+            var td = document.createElement('td');
+            td.textContent = val;
+            if (idx <= 1) td.className = 'txt';
+            tr.appendChild(td);
+          });
+          if (i === aktuelleVariante) tr.className = 'active';
+          else if (compareIndex !== null && i === compareIndex) tr.className = 'compare';
+          tr.addEventListener('click', function () {
+            aktuelleVariante = i;
+            render();
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+        var note = document.createElement('div');
+        note.className = 'overview-note';
+        note.textContent = 'Zeile anklicken = Variante waehlen. Ampel = Worst-of ueber die Kriterien-Chips je Kind; "frei" = von keinem Kriterium betroffen.';
+        container.appendChild(note);
+      }
+
+      // ---- Vergleich ------------------------------------------------
+      var compareSelect = document.getElementById('compare-select');
+      (function () {
+        var none = document.createElement('option');
+        none.value = '';
+        none.textContent = '- kein Vergleich -';
+        compareSelect.appendChild(none);
+        varianten.forEach(function (v, i) {
+          var opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = 'Variante ' + v.index;
+          compareSelect.appendChild(opt);
+        });
+        compareSelect.addEventListener('change', function () {
+          compareIndex = compareSelect.value === '' ? null : parseInt(compareSelect.value, 10);
+          render();
+        });
+      })();
+      function updateCompareInfo() {
+        var info = document.getElementById('compare-info');
+        if (compareIndex === null || compareIndex === aktuelleVariante) {
+          info.textContent = '';
+          return;
+        }
+        var a = varianten[aktuelleVariante].zuordnung;
+        var b = varianten[compareIndex].zuordnung;
+        var n = 0;
+        Object.keys(a).forEach(function (id) { if (a[id] !== b[id]) n += 1; });
+        info.textContent = n + ' Kinder anders zugeordnet als in Variante ' + varianten[compareIndex].index + ' (markiert).';
+      }
+
+      document.getElementById('filter-kritisch').addEventListener('change', render);
+      document.getElementById('konsens-toggle').addEventListener('change', render);
+
+      // ---- Board ----------------------------------------------------
+      function render() {
+        renderOverview();
+        updateCompareInfo();
+        var v = varianten[aktuelleVariante];
+        var chipMap = chipsJeKind(v);
+        var cmp = (compareIndex !== null && compareIndex !== aktuelleVariante) ? varianten[compareIndex] : null;
+        var nurKritisch = document.getElementById('filter-kritisch').checked;
+        var zeigeKonsens = document.getElementById('konsens-toggle').checked;
+
+        var board = document.getElementById('board');
+        board.innerHTML = '';
+        for (var klasse = 1; klasse <= data.klassen_anzahl; klasse++) {
+          var spalte = document.createElement('div');
+          spalte.className = 'klasse-spalte';
+
+          var mitglieder = Object.keys(v.zuordnung).filter(function (id) { return v.zuordnung[id] === klasse; });
+          mitglieder.sort(function (a, b) {
+            var ra = aggregat(chipMap[a]) === 'frei' ? -1 : statusRang[aggregat(chipMap[a])];
+            var rb = aggregat(chipMap[b]) === 'frei' ? -1 : statusRang[aggregat(chipMap[b])];
+            return (rb - ra) || a.localeCompare(b); // Rot zuerst, dann Id
+          });
+
+          var kopf = document.createElement('div');
+          kopf.className = 'klasse-kopf';
+          var name = document.createElement('div');
+          name.className = 'name';
+          name.textContent = 'Klasse ' + klasse + ' - ' + mitglieder.length + ' Kinder';
+          kopf.appendChild(name);
+          (v.balance_kennzahlen || []).forEach(function (b) {
+            var count = b.counts[klasse - 1];
+            var dev = Math.abs(count - b.ziel);
+            var k = document.createElement('div');
+            k.className = 'kennzahl' + (dev > b.toleranz ? ' verletzt' : '');
+            k.textContent = b.regel_id + ': ' + count + ' (Ziel ' + b.ziel + ' ± ' + b.toleranz + ')';
+            kopf.appendChild(k);
+          });
+          spalte.appendChild(kopf);
+
+          var karten = document.createElement('div');
+          karten.className = 'karten';
+          mitglieder.forEach(function (id) {
+            var chips = chipMap[id] || [];
+            var agg = aggregat(chips);
+            if (nurKritisch && agg !== 'rot' && agg !== 'gelb') return;
+            var karte = document.createElement('div');
+            karte.className = 'karte' + (agg === 'frei' ? '' : ' agg-' + agg);
+            if (cmp && cmp.zuordnung[id] !== klasse) {
+              karte.className += ' diff';
+              karte.title = 'In Variante ' + cmp.index + ': Klasse ' + cmp.zuordnung[id];
+            }
+            var kindId = document.createElement('span');
+            kindId.className = 'kind-id';
+            kindId.textContent = id;
+            karte.appendChild(kindId);
+            if (zeigeKonsens && konsens[id]) {
+              var punkt = document.createElement('span');
+              punkt.className = 'konsens';
+              punkt.textContent = '●';
+              punkt.title = 'Konsens-Kern: in allen Varianten in derselben Klasse';
+              karte.appendChild(punkt);
+            }
+            var chipsDiv = document.createElement('span');
+            chipsDiv.className = 'chips';
+            chips.forEach(function (c) {
+              var chip = document.createElement('span');
+              chip.className = 'chip ' + c.status;
+              chip.textContent = chipSymbol[c.status];
+              chip.title = c.text;
+              chipsDiv.appendChild(chip);
+            });
+            karte.appendChild(chipsDiv);
+            karten.appendChild(karte);
+          });
+          spalte.appendChild(karten);
+          board.appendChild(spalte);
+        }
+      }
+
+      render();
+    })();
+  </script>
+</body>
+</html>

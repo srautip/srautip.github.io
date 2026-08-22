@@ -49,6 +49,17 @@ Module Program
         Dim htmlPath = IO.Path.Combine(TestsRoot, schule, "output", "stundentafel.html")
         IO.File.WriteAllText(htmlPath, StundentafelHtml.BuildStundentafelHtml(node.ToJsonString()))
         Console.WriteLine($"[{schule}] RENDER OK - {htmlPath} aus vorhandener stundenplan.json neu gebaut")
+
+        ' K5: existiert auch eine Klassenbildungs-JSON, wird deren Viewer
+        ' gleich mit regeneriert - reine Template-Aenderungen brauchen so
+        ' keinen neuen Solver-Lauf (dieselbe Leitplanke wie oben).
+        Dim kbJsonPath = IO.Path.Combine(TestsRoot, schule, "output", "klassenbildung.json")
+        If IO.File.Exists(kbJsonPath) Then
+            Dim kbNode = System.Text.Json.Nodes.JsonNode.Parse(IO.File.ReadAllText(kbJsonPath))
+            Dim kbHtmlPath = IO.Path.Combine(TestsRoot, schule, "output", "klassenbildung.html")
+            IO.File.WriteAllText(kbHtmlPath, KlassenbildungHtml.BuildKlassenbildungHtml(kbNode.ToJsonString()))
+            Console.WriteLine($"[{schule}] RENDER OK - {kbHtmlPath} aus vorhandener klassenbildung.json neu gebaut")
+        End If
         Return 0
     End Function
 

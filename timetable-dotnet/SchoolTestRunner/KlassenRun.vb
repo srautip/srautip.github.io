@@ -76,6 +76,10 @@ Public Module KlassenRun
         Dim json = BaueJson(schule, input, top, geloeste, bewertungen, zeitlimit, epsilon, minDistanz)
         IO.File.WriteAllText(IO.Path.Combine(outputDir, "klassenbildung.json"),
             json.ToJsonString(New JsonSerializerOptions With {.WriteIndented = True}))
+        ' K5: self-contained Viewer (Varianten-Uebersicht, Board mit
+        ' Ampel-Chips, Konsens-Markierung, Varianten-Diff).
+        IO.File.WriteAllText(IO.Path.Combine(outputDir, "klassenbildung.html"),
+            KlassenbildungHtml.BuildKlassenbildungHtml(json.ToJsonString()))
 
         Console.WriteLine($"[{schule}] PASS - Klassenbildung: {geloeste.Count} Variante(n) " &
             $"(beste Objective={geloeste(0).Objective}, Status={geloeste(0).Status}), " &
@@ -177,6 +181,23 @@ Public Module KlassenRun
             Dim bewertung = bewertungen(i)
             Dim zuordnungJson As New JsonObject()
             For Each kvp In v.Zuordnung : zuordnungJson(kvp.Key) = kvp.Value : Next
+            ' K5: verdichtete Balance-Kennzahlen je Variante (Zaehler je
+            ' Klasse + Ziel/Toleranz) - der Viewer zeigt sie im
+            ' Spaltenkopf, ohne dass Roh-Attribute exportiert werden
+            ' muessten (Datenminimierung).
+            Dim balanceJson As New JsonArray()
+            For Each b In input.Balance
+                Dim treffer = input.Schueler.Where(Function(s) s.Attribute.ContainsKey(b.Attribut) AndAlso
+                                                       s.Attribute(b.Attribut) = b.Wert).Select(Function(s) s.Id).ToList()
+                Dim counts As New JsonArray(Enumerable.Range(1, input.Klassen.Anzahl).
+                    Select(Function(c) CType(treffer.Where(Function(id) v.Zuordnung(id) = c).Count(), JsonNode)).ToArray())
+                balanceJson.Add(New JsonObject From {
+                    {"regel_id", $"{b.Attribut}={b.Wert}"},
+                    {"ziel", Math.Round(treffer.Count / CDbl(input.Klassen.Anzahl))},
+                    {"toleranz", b.Toleranz},
+                    {"counts", counts}
+                })
+            Next
             Dim verletzungenJson As New JsonArray(bewertung.Verletzungen.Select(Function(x) CType(New JsonObject From {
                 {"regel_id", x.RegelId}, {"regel_typ", x.RegelTyp}, {"prio", x.Prio}, {"mass", x.Mass}
             }, JsonNode)).ToArray())
@@ -190,6 +211,7 @@ Public Module KlassenRun
                 {"objective", v.Objective},
                 {"diff_zu_v1", DiffZuErster(geloeste(0), v)},
                 {"zuordnung", zuordnungJson},
+                {"balance_kennzahlen", balanceJson},
                 {"verletzungen", verletzungenJson},
                 {"chips", chipsJson}
             })
@@ -198,6 +220,8 @@ Public Module KlassenRun
             {"schule", schule},
             {"schueler_anzahl", input.Schueler.Count},
             {"klassen_anzahl", input.Klassen.Anzahl},
+            {"min_groesse", input.Klassen.MinGroesse},
+            {"max_groesse", input.Klassen.MaxGroesse},
             {"parameter", New JsonObject From {
                 {"zeitlimit_s", zeitlimit}, {"epsilon", epsilon}, {"min_distanz", minDistanz}}},
             {"konsens_kern", New JsonArray(top.KonsensKern.Select(Function(id) CType(id, JsonNode)).ToArray())},
