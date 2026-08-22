@@ -243,5 +243,28 @@ Highlight-Mengen, Pin-Export-Inhalt, Live-Bewertung == Bewerte).
   Badges, 15 Stapel, Sektionen kritisch/wichtig/wenn moeglich/
   Balance/Wuensche, Konsens-Bulk 27 -> Einzelpin 28 -> Gruppen-Pin 31,
   YAML-Export 31 Eintraege inkl. Bestand, Filter "nur offene"
-  100 -> 69 Karten (exakt 100 - 31). Offen: U4 (Live-Bewertung +
-  Drag & Drop) und U5 (Re-Solve-Loop).
+  100 -> 69 Karten (exakt 100 - 31).
+- **U4 umgesetzt** (Live-Bewertung + Drag & Drop): `bewerte()` als
+  bewusstes, kommentiertes JS-Duplikat von `KlassenbildungQuality.
+  Bewerte` (Status UND Chip-Texte zeichengleich; Ground Truth bleibt
+  der CLI-Lauf). Die "Arbeits-Sicht" ueberlagert die Basis-Variante
+  mit den Pins - ein Pin auf eine andere Klasse IST die Verschiebung,
+  Pin loesen legt die Karte zurueck. Karten sind per Drag & Drop
+  zwischen Spalten verschiebbar (Drop erzeugt F1-Pin mit Herkunft
+  "verschoben", Karte gestrichelt markiert); Chips, Panel, Mini-Balken,
+  Ampel-Zaehler und Kapazitaetsbalken rechnen sofort nach, ein
+  Warnbanner nennt verschlechterte Regeln im Klartext ("damit:
+  Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe
+  ueberschritten") plus Korridor-Hinweis; Kapazitaetsverletzung
+  blockiert den Drop nicht, faerbt aber den Spaltenkopf rot (Konzept
+  3.4). F3/F5-Haertungen (Wunsch/Gruppe auf hart, Popover bzw.
+  Panel/Wunschliste) sind reine Export-Direktiven und erscheinen als
+  `modus: hard`-Diff-Hinweis im Fixierungen-Block. JSON dafuer um den
+  Top-Level-Block `balance` (regel_id, ziel, toleranz, modus, prio,
+  treffer-IDs) erweitert - aeltere JSONs ohne den Block laufen im
+  reinen Anzeige-Modus weiter (kein Drag & Drop). Verifikation:
+  Chromium-Interaktionstest mit echten DragEvents gegen unabhaengige
+  Python-Nachrechnung - Live-Bewertung == Bewerte fuer alle 3
+  Varianten (Chips + Verletzungen zeichengleich), Ampel nach
+  Verschiebung exakt wie vorhergesagt, Warnbanner/Kapazitaets-Rot/
+  Haertungs-Export/Pin-Ruecknahme geprueft. Offen: U5 (Re-Solve-Loop).

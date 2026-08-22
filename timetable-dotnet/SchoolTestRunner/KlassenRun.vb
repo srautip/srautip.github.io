@@ -228,6 +228,26 @@ Public Module KlassenRun
                 {"chips", chipsJson}
             })
         Next
+        ' U4: Balance-Regelwerk-Echo INKLUSIVE Treffer-IDs - die
+        ' Live-Bewertung im Viewer (JS-Duplikat von Bewerte) muss die
+        ' Zaehler nach jeder Verschiebung neu rechnen koennen, ohne
+        ' Roh-Attribute zu exportieren (nur Mitgliedschaft je Regel).
+        ' `ziel` wird hier in VB gerundet (Math.Round = Banker's
+        ' Rounding) und im JS NICHT neu berechnet - die Treffermenge
+        ' ist statisch, das Ziel damit auch.
+        Dim balanceRegelnJson As New JsonArray()
+        For Each b In input.Balance
+            Dim treffer = input.Schueler.Where(Function(s) s.Attribute.ContainsKey(b.Attribut) AndAlso
+                                                   s.Attribute(b.Attribut) = b.Wert).Select(Function(s) s.Id).ToList()
+            balanceRegelnJson.Add(New JsonObject From {
+                {"regel_id", $"{b.Attribut}={b.Wert}"},
+                {"ziel", Math.Round(treffer.Count / CDbl(input.Klassen.Anzahl))},
+                {"toleranz", b.Toleranz},
+                {"modus", b.Modus},
+                {"prio", b.Prio},
+                {"treffer", New JsonArray(treffer.Select(Function(id) CType(id, JsonNode)).ToArray())}
+            })
+        Next
         Return New JsonObject From {
             {"schule", schule},
             {"schueler_anzahl", input.Schueler.Count},
@@ -237,6 +257,7 @@ Public Module KlassenRun
             {"klassen_labels", New JsonArray(Klassenbildung.KlassenLabels(input).
                 Select(Function(l) CType(l, JsonNode)).ToArray())},
             {"gruppen", BaueGruppenJson(input)},
+            {"balance", balanceRegelnJson},
             {"wuensche", New JsonArray(input.Wuensche.Select(Function(w, wi) CType(New JsonObject From {
                 {"index", wi}, {"typ", w.Typ}, {"modus", w.Modus}, {"prio", w.Prio},
                 {"regel_id", $"wunsch[{wi}]:{w.Kinder(0)}+{w.Kinder(1)}"},

@@ -348,6 +348,43 @@
     margin-top: 0.3rem;
   }
   .hinweis { color: #555; font-size: 0.75rem; }
+
+  /* ---- U4: Drag & Drop + Warnbanner ---- */
+  .karte[draggable="true"] { cursor: grab; }
+  .karte.verschoben {
+    border-style: dashed;
+    border-color: #1d4ed8;
+    background: #eef4ff;
+  }
+  .klasse-spalte.dropziel {
+    border-color: #1d4ed8;
+    box-shadow: 0 0 0 2px #93c5fd inset;
+  }
+  #warnung { margin-bottom: 0.9rem; }
+  #warnung .banner {
+    border: 1px solid #fca5a5;
+    background: #fef2f2;
+    color: #7f1d1d;
+    border-radius: 6px;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.82rem;
+  }
+  #warnung .banner.ok {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #14532d;
+  }
+  #warnung .banner .titel { font-weight: 700; }
+  #warnung .banner ul { margin: 0.2rem 0 0 1.1rem; padding: 0; }
+  #warnung .banner .zu {
+    float: right;
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-size: 0.9rem;
+    color: inherit;
+    padding: 0 0.2rem;
+  }
 </style>
 </head>
 <body>
@@ -355,6 +392,7 @@
   <div id="meta"></div>
 
   <div id="prozess"></div>
+  <div id="warnung"></div>
   <div id="varianten"></div>
 
   <div id="controls">
@@ -398,9 +436,12 @@
       var aktuelleVariante = 0;       // Arbeitsstand (U2)
       var compareIndex = null;
       var highlights = {};            // gruppen-id -> true (Mehrfach-Highlight, U1)
-      var pins = {};                  // kind -> klasse (F1, U3)
+      var pins = {};                  // kind -> klasse (F1, U3; ein Pin auf eine ANDERE
+                                      // Klasse als in der Basis-Variante IST die Verschiebung, U4)
       var notPins = {};               // kind -> {klasse: true} (F2)
-      var pinHerkunft = {};           // kind -> 'manuell' | 'konsens' | 'gruppe X' | ...
+      var pinHerkunft = {};           // kind -> 'manuell' | 'konsens' | 'verschoben' | ...
+      var haertungen = { gruppen: {}, wuensche: {} }; // F5 / F3 (U4): nur Export-Direktive
+      var warnungen = null;           // {titel, zeilen, ok} nach der letzten Verschiebung (U4)
       var bestandVon = {};            // kind -> klasse aus YAML-Fixierungen (nicht loesbar)
       bestandsFixierungen.forEach(function (f) {
         if (f.klasse !== null && f.klasse !== undefined) bestandVon[f.kind] = f.klasse;
@@ -417,11 +458,13 @@
           pins = st.pins || {};
           notPins = st.notPins || {};
           pinHerkunft = st.herkunft || {};
+          haertungen = st.haertungen || { gruppen: {}, wuensche: {} };
         } catch (e) { /* ohne Persistenz weiterarbeiten */ }
       }
       function speicherePins() {
         try {
-          localStorage.setItem(storeKey, JSON.stringify({ pins: pins, notPins: notPins, herkunft: pinHerkunft }));
+          localStorage.setItem(storeKey, JSON.stringify({
+            pins: pins, notPins: notPins, herkunft: pinHerkunft, haertungen: haertungen }));
         } catch (e) { /* ignorieren */ }
       }
       ladePins();
@@ -508,6 +551,201 @@
         return knapp ? { klasse: 's-knapp', text: '! knapp' } : { klasse: 's-ok', text: '✓' };
       }
 
+      // ---- U4: Live-Bewertung --------------------------------------
+      // Bewusstes, kommentiertes JS-Duplikat von
+      // KlassenbildungQuality.Bewerte (VB) - dieselbe Formel-Duplikation
+      // wie beim Gewichts-Regler des Stundentafel-Viewers. Status UND
+      // Chip-Texte muessen zeichengleich zum VB-Original bleiben (der
+      // Interaktionstest vergleicht beide Ausgaben exakt); die
+      // unabhaengige Ground Truth bleibt der naechste CLI-Lauf.
+      // Balance braucht data.balance (Treffer-IDs je Regel) - aeltere
+      // JSONs ohne diesen Block laufen im reinen Anzeige-Modus weiter.
+      var liveFaehig = !!(data.balance);
+      function bewerte(zuordnung) {
+        var verletzungen = [];
+        var chips = [];
+        gruppen.forEach(function (g) {
+          var proKlasse = {};
+          g.mitglieder.forEach(function (m) {
+            proKlasse[zuordnung[m]] = (proKlasse[zuordnung[m]] || 0) + 1;
+          });
+          if (g.typ === 'buendelung') {
+            var spread = Object.keys(proKlasse).length;
+            var massB = spread - 1;
+            if (g.modus === 'soft') {
+              verletzungen.push({ regel_id: g.id, regel_typ: 'buendelung', prio: g.prio, mass: massB });
+            }
+            g.mitglieder.forEach(function (m) {
+              chips.push({ kind: m, regel_id: g.id, regel_typ: 'buendelung',
+                status: massB > 0 ? 'rot' : 'gruen',
+                text: massB > 0
+                  ? 'Buendelung ' + g.id + ': auf ' + spread + ' Klassen verteilt'
+                  : 'Buendelung ' + g.id + ': alle in Klasse ' + zuordnung[g.mitglieder[0]] });
+            });
+          } else { // verteilung
+            var kappe = g.max_pro_klasse;
+            var massV = 0;
+            Object.keys(proKlasse).forEach(function (k) { massV += Math.max(proKlasse[k] - kappe, 0); });
+            if (g.modus === 'soft') {
+              verletzungen.push({ regel_id: g.id, regel_typ: 'verteilung', prio: g.prio, mass: massV });
+            }
+            g.mitglieder.forEach(function (m) {
+              var cnt = proKlasse[zuordnung[m]];
+              chips.push({ kind: m, regel_id: g.id, regel_typ: 'verteilung',
+                status: cnt > kappe ? 'rot' : (cnt === kappe ? 'gelb' : 'gruen'),
+                text: 'Verteilung ' + g.id + ': ' + cnt + '/' + kappe + ' in dieser Klasse' +
+                      (cnt === kappe ? ' - Kappe voll' : (cnt > kappe ? ' - Kappe ueberschritten' : '')) });
+            });
+          }
+        });
+        (data.balance || []).forEach(function (b) {
+          var cntJeKlasse = {};
+          var c;
+          for (c = 1; c <= data.klassen_anzahl; c++) cntJeKlasse[c] = 0;
+          b.treffer.forEach(function (id) { cntJeKlasse[zuordnung[id]] += 1; });
+          var massBal = 0;
+          for (c = 1; c <= data.klassen_anzahl; c++) {
+            massBal += Math.max(Math.abs(cntJeKlasse[c] - b.ziel) - b.toleranz, 0);
+          }
+          if (b.modus === 'soft') {
+            verletzungen.push({ regel_id: b.regel_id, regel_typ: 'balance', prio: b.prio, mass: massBal });
+          }
+          b.treffer.forEach(function (id) {
+            var dev = Math.abs(cntJeKlasse[zuordnung[id]] - b.ziel);
+            chips.push({ kind: id, regel_id: b.regel_id, regel_typ: 'balance',
+              status: dev > b.toleranz ? 'rot' : (dev === b.toleranz && b.toleranz > 0 ? 'gelb' : 'gruen'),
+              text: 'Balance ' + b.regel_id + ': ' + cntJeKlasse[zuordnung[id]] +
+                    ' in dieser Klasse (Ziel ' + b.ziel + ' +/- ' + b.toleranz + ')' });
+          });
+        });
+        wuensche.forEach(function (w) {
+          var s1 = w.kinder[0];
+          var s2 = w.kinder[1];
+          var zusammen = zuordnung[s1] === zuordnung[s2];
+          var erfuellt = w.typ === 'zusammen' ? zusammen : !zusammen;
+          var regelTyp = w.typ === 'zusammen' ? 'wunsch_zusammen' : 'wunsch_getrennt';
+          if (w.modus === 'soft') {
+            verletzungen.push({ regel_id: w.regel_id, regel_typ: regelTyp, prio: w.prio, mass: erfuellt ? 0 : 1 });
+          }
+          w.kinder.forEach(function (kind) {
+            chips.push({ kind: kind, regel_id: w.regel_id, regel_typ: regelTyp,
+              status: erfuellt ? 'gruen' : 'rot',
+              text: 'Wunsch ' + (w.typ === 'zusammen' ? 'zusammen mit' : 'getrennt von') + ' ' +
+                    (kind === s1 ? s2 : s1) + ': ' + (erfuellt ? 'erfuellt' : 'nicht erfuellt') });
+          });
+        });
+        return { verletzungen: verletzungen, chips: chips };
+      }
+
+      // Arbeits-Zuordnung (U4): die Basis-Variante, ueberlagert mit den
+      // Pins - ein Pin auf eine andere Klasse IST die Verschiebung.
+      // Pin loesen legt die Karte zurueck an ihren Varianten-Platz.
+      function arbeitsZuordnung() {
+        var v = varianten[aktuelleVariante];
+        var z = {};
+        alleKinder.forEach(function (id) {
+          z[id] = pins.hasOwnProperty(id) ? pins[id] : v.zuordnung[id];
+        });
+        return z;
+      }
+      function verschobene() {
+        var v = varianten[aktuelleVariante];
+        return alleKinder.filter(function (id) {
+          return pins.hasOwnProperty(id) && pins[id] !== v.zuordnung[id];
+        });
+      }
+      // Die "Sicht" hat dieselbe Form wie eine Variante (zuordnung,
+      // chips, verletzungen, balance_kennzahlen) - alle Render-Pfade
+      // arbeiten unveraendert darauf, nur eben live nachgerechnet.
+      function aktuelleSicht() {
+        var v = varianten[aktuelleVariante];
+        if (!liveFaehig) return v;
+        var z = arbeitsZuordnung();
+        var bew = bewerte(z);
+        var bk = (data.balance || []).map(function (b) {
+          var counts = [];
+          for (var c = 1; c <= data.klassen_anzahl; c++) counts.push(0);
+          b.treffer.forEach(function (id) { counts[z[id] - 1] += 1; });
+          return { regel_id: b.regel_id, ziel: b.ziel, toleranz: b.toleranz, counts: counts };
+        });
+        return { index: v.index, status: v.status, objective: v.objective,
+                 diff_zu_v1: v.diff_zu_v1, zuordnung: z,
+                 chips: bew.chips, verletzungen: bew.verletzungen, balance_kennzahlen: bk };
+      }
+
+      // ---- U4: Verschieben (Drag & Drop -> F1-Pin) -----------------
+      function verschiebe(id, zielKlasse) {
+        if (!liveFaehig || bestandVon.hasOwnProperty(id)) return;
+        var vorher = aktuelleSicht();
+        if (vorher.zuordnung[id] === zielKlasse) return;
+        setzePin(id, zielKlasse, 'verschoben');
+        warnungen = baueWarnungen(id, zielKlasse, vorher, aktuelleSicht());
+        render();
+      }
+      function baueWarnungen(id, zielKlasse, vorher, nachher) {
+        var zeilen = [];
+        var nZiel = 0;
+        var nQuelle = 0;
+        var quelle = vorher.zuordnung[id];
+        alleKinder.forEach(function (k) {
+          if (nachher.zuordnung[k] === zielKlasse) nZiel += 1;
+          if (nachher.zuordnung[k] === quelle) nQuelle += 1;
+        });
+        // Kapazitaet blockiert den Drop nicht (Konzept 3.4) - der
+        // Spaltenkopf wird rot, hier zusaetzlich der Klartext.
+        if (nZiel > data.max_groesse) {
+          zeilen.push(labelVon(zielKlasse) + ' hat jetzt ' + nZiel + ' Kinder (Korridor ' +
+            data.min_groesse + '-' + data.max_groesse + ') - harte Grenze, entscheidet der Solver');
+        }
+        if (nQuelle < data.min_groesse) {
+          zeilen.push(labelVon(quelle) + ' hat jetzt nur ' + nQuelle + ' Kinder (Korridor ' +
+            data.min_groesse + '-' + data.max_groesse + ') - harte Grenze, entscheidet der Solver');
+        }
+        var altMass = {};
+        vorher.verletzungen.forEach(function (x) { altMass[x.regel_id] = x.mass; });
+        nachher.verletzungen.forEach(function (x) {
+          var alt = altMass.hasOwnProperty(x.regel_id) ? altMass[x.regel_id] : 0;
+          if (x.mass <= alt) return;
+          // Klartext bevorzugt aus dem Chip des verschobenen Kindes
+          // ("damit sind 2 SOZ-Kinder in 1c"), sonst generisch.
+          var chip = null;
+          nachher.chips.forEach(function (ch) {
+            if (ch.kind === id && ch.regel_id === x.regel_id && ch.status === 'rot') chip = ch;
+          });
+          zeilen.push(chip ? 'damit: ' + chip.text
+                           : x.regel_id + ' (' + x.regel_typ + '): Mass ' + alt + ' -> ' + x.mass);
+        });
+        return { titel: 'Verschiebung ' + id + ' → ' + labelVon(zielKlasse),
+                 zeilen: zeilen, ok: zeilen.length === 0 };
+      }
+      function renderWarnung() {
+        var c = document.getElementById('warnung');
+        c.innerHTML = '';
+        if (!warnungen) return;
+        var banner = document.createElement('div');
+        banner.className = 'banner' + (warnungen.ok ? ' ok' : '');
+        var zu = document.createElement('button');
+        zu.className = 'zu';
+        zu.textContent = '✕';
+        zu.title = 'Hinweis schliessen';
+        zu.addEventListener('click', function () { warnungen = null; renderWarnung(); });
+        banner.appendChild(zu);
+        var titel = document.createElement('span');
+        titel.className = 'titel';
+        titel.textContent = warnungen.titel + (warnungen.ok ? ': keine zusaetzliche Verletzung' : '');
+        banner.appendChild(titel);
+        if (!warnungen.ok) {
+          var ul = document.createElement('ul');
+          warnungen.zeilen.forEach(function (t) {
+            var li = document.createElement('li');
+            li.textContent = t;
+            ul.appendChild(li);
+          });
+          banner.appendChild(ul);
+        }
+        c.appendChild(banner);
+      }
+
       // ---- Pin-Aktionen (U3) ---------------------------------------
       function setzePin(id, klasse, herkunft) {
         if (bestandVon.hasOwnProperty(id)) return; // YAML-Fixierung gewinnt
@@ -521,14 +759,14 @@
         speicherePins();
       }
       function konsensFixieren() {
-        var v = varianten[aktuelleVariante];
+        var v = aktuelleSicht();
         (data.konsens_kern || []).forEach(function (id) {
           if (!istFixiert(id)) setzePin(id, v.zuordnung[id], 'konsens');
         });
         render();
       }
       function unkritischeFixieren() {
-        var v = varianten[aktuelleVariante];
+        var v = aktuelleSicht();
         var map = chipsJeKind(v);
         alleKinder.forEach(function (id) {
           var agg = aggregat(map[id]);
@@ -539,14 +777,14 @@
         render();
       }
       function gruppeFixieren(g) {
-        var v = varianten[aktuelleVariante];
+        var v = aktuelleSicht();
         g.mitglieder.forEach(function (id) {
           if (!istFixiert(id)) setzePin(id, v.zuordnung[id], 'gruppe ' + kuerzelVon[g.id]);
         });
         render();
       }
       function klasseEinfrieren(klasse) {
-        var v = varianten[aktuelleVariante];
+        var v = aktuelleSicht();
         alleKinder.forEach(function (id) {
           if (v.zuordnung[id] === klasse && !istFixiert(id)) setzePin(id, klasse, 'klasse ' + labelVon(klasse));
         });
@@ -554,13 +792,15 @@
       }
       function allePinsLoesen() {
         pins = {}; notPins = {}; pinHerkunft = {};
+        haertungen = { gruppen: {}, wuensche: {} };
+        warnungen = null;
         speicherePins();
         render();
       }
 
       // ---- Fortschrittsleiste (U3) ---------------------------------
       function renderProzess() {
-        var v = varianten[aktuelleVariante];
+        var v = aktuelleSicht();
         var map = chipsJeKind(v);
         var offenKritisch = 0;
         alleKinder.forEach(function (id) {
@@ -575,7 +815,9 @@
           s.innerHTML = html;
           p.appendChild(s);
         }
-        schritt('[1] Basis: <b>Variante ' + v.index + '</b>');
+        var nVerschoben = liveFaehig ? verschobene().length : 0;
+        schritt('[1] Basis: <b>Variante ' + v.index + '</b>' +
+          (nVerschoben > 0 ? ' <b>+ ' + nVerschoben + ' verschoben</b>' : ''));
         schritt('→ [2]');
         var offeneKonsens = (data.konsens_kern || []).filter(function (id) { return !istFixiert(id); }).length;
         var bKonsens = document.createElement('button');
@@ -645,7 +887,7 @@
           info.textContent = '';
           return;
         }
-        var a = varianten[aktuelleVariante].zuordnung;
+        var a = aktuelleSicht().zuordnung;
         var b = varianten[compareIndex].zuordnung;
         var n = 0;
         alleKinder.forEach(function (id) { if (a[id] !== b[id]) n += 1; });
@@ -658,7 +900,7 @@
 
       // ---- Panel-Seitenleiste (U1): Prio-Sektionen -----------------
       function renderPanel() {
-        var v = varianten[aktuelleVariante];
+        var v = aktuelleSicht();
         var panel = document.getElementById('panel');
         panel.innerHTML = '';
 
@@ -731,6 +973,21 @@
             zeile.className = 'zeile status s-verletzt';
             zeile.textContent = '✗ ' + w.kinder[0] + ' + ' + w.kinder[1] + ' ' +
               (w.typ === 'zusammen' ? 'zusammen' : 'getrennt') + ' nicht erfuellt';
+            if (w.modus === 'soft') {
+              var haertW = document.createElement('button');
+              haertW.className = 'fixieren';
+              haertW.textContent = haertungen.wuensche[w.index] ? '🔒' : '🔓';
+              haertW.title = haertungen.wuensche[w.index]
+                ? 'Haertung zuruecknehmen (F3)'
+                : 'F3: Wunsch hart stellen (modus: hard) - erscheint als Diff-Hinweis im Export';
+              haertW.addEventListener('click', function () {
+                if (haertungen.wuensche[w.index]) delete haertungen.wuensche[w.index];
+                else haertungen.wuensche[w.index] = true;
+                speicherePins();
+                render();
+              });
+              zeile.appendChild(haertW);
+            }
             blockW.appendChild(zeile);
           });
           panel.appendChild(blockW);
@@ -778,6 +1035,25 @@
           gruppeFixieren(g);
         });
         zeile.appendChild(fixBtn);
+        // F5 (U4): Gruppe hart stellen - reine Export-Direktive fuer
+        // den naechsten Lauf (modus: hard), aendert die Live-Bewertung
+        // bewusst NICHT (der Solver entscheidet harte Regeln).
+        if (g.modus === 'soft') {
+          var haert = document.createElement('button');
+          haert.className = 'fixieren';
+          haert.textContent = haertungen.gruppen[g.id] ? '🔒' : '🔓';
+          haert.title = haertungen.gruppen[g.id]
+            ? 'Haertung zuruecknehmen (F5)'
+            : 'F5: Gruppe hart stellen (modus: hard) - erscheint als Diff-Hinweis im Export';
+          haert.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (haertungen.gruppen[g.id]) delete haertungen.gruppen[g.id];
+            else haertungen.gruppen[g.id] = true;
+            speicherePins();
+            render();
+          });
+          zeile.appendChild(haert);
+        }
         zeile.addEventListener('click', function () {
           if (highlights[g.id]) delete highlights[g.id];
           else highlights[g.id] = true;
@@ -846,7 +1122,7 @@
       });
       function oeffnePopover(karte, id) {
         schliessePopover();
-        var v = varianten[aktuelleVariante];
+        var v = aktuelleSicht();
         var klasse = v.zuordnung[id];
         popover = document.createElement('div');
         popover.id = 'popover';
@@ -893,6 +1169,26 @@
           });
           aktionen.appendChild(nicht);
         }
+        // F3 (U4): Wuensche dieses Kindes hart stellen - wie F5 eine
+        // reine Export-Direktive (modus: hard im naechsten Lauf).
+        (wuenscheVonKind[id] || []).forEach(function (w) {
+          if (w.modus !== 'soft') return;
+          var partner = w.kinder[0] === id ? w.kinder[1] : w.kinder[0];
+          var b = document.createElement('button');
+          b.textContent = (haertungen.wuensche[w.index] ? '🔒 ' : '🔓 ') +
+            (w.typ === 'zusammen' ? 'zusammen mit ' : 'getrennt von ') + partner + ' hart';
+          b.title = haertungen.wuensche[w.index]
+            ? 'Haertung zuruecknehmen (F3)'
+            : 'F3: Wunsch hart stellen (modus: hard) - erscheint als Diff-Hinweis im Export';
+          b.addEventListener('click', function () {
+            if (haertungen.wuensche[w.index]) delete haertungen.wuensche[w.index];
+            else haertungen.wuensche[w.index] = true;
+            speicherePins();
+            schliessePopover();
+            render();
+          });
+          aktionen.appendChild(b);
+        });
         popover.appendChild(aktionen);
         document.body.appendChild(popover);
         var r = karte.getBoundingClientRect();
@@ -908,8 +1204,9 @@
         updateCompareInfo();
         renderFixierungen();
         schliessePopover();
+        renderWarnung();
 
-        var v = varianten[aktuelleVariante];
+        var v = aktuelleSicht();
         var chipMap = chipsJeKind(v);
         var cmp = (compareIndex !== null && compareIndex !== aktuelleVariante) ? varianten[compareIndex] : null;
         var nurKritisch = document.getElementById('filter-kritisch').checked;
@@ -939,6 +1236,25 @@
         var spalte = document.createElement('div');
         spalte.className = 'klasse-spalte';
         var mitglieder = alleKinder.filter(function (id) { return v.zuordnung[id] === klasse; });
+
+        // U4: die ganze Spalte ist Dropziel - der Drop erzeugt einen
+        // F1-Pin auf die Zielklasse (verschiebe rechnet live nach).
+        if (liveFaehig) {
+          spalte.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            spalte.classList.add('dropziel');
+          });
+          spalte.addEventListener('dragleave', function (e) {
+            if (!spalte.contains(e.relatedTarget)) spalte.classList.remove('dropziel');
+          });
+          spalte.addEventListener('drop', function (e) {
+            e.preventDefault();
+            spalte.classList.remove('dropziel');
+            var id = e.dataTransfer.getData('text/plain');
+            if (id) verschiebe(id, klasse);
+          });
+        }
 
         // ---- Kopf: Name, Kapazitaetsbalken, Balance, Einfrieren ----
         var kopf = document.createElement('div');
@@ -1037,6 +1353,20 @@
         karte.className = 'karte' + (agg === 'frei' ? '' : ' agg-' + agg) + (istFixiert(id) ? ' gepinnt' : '');
         karte.setAttribute('data-kind', id);
         anwendenDauerHighlight(karte, id);
+        // U4: Karten sind verschiebbar (ausser YAML-fixierte - die kann
+        // der Viewer nicht aendern); verschobene Karten sind markiert.
+        var basisKlasse = varianten[aktuelleVariante].zuordnung[id];
+        if (liveFaehig && !bestandVon[id]) {
+          karte.draggable = true;
+          karte.addEventListener('dragstart', function (e) {
+            e.dataTransfer.setData('text/plain', id);
+            e.dataTransfer.effectAllowed = 'move';
+          });
+        }
+        if (liveFaehig && pins.hasOwnProperty(id) && pins[id] !== basisKlasse) {
+          karte.classList.add('verschoben');
+          karte.title = 'Verschoben aus ' + labelVon(basisKlasse) + ' (F1-Pin - 📌 loest und legt zurueck)';
+        }
         if (cmp && cmp.zuordnung[id] !== klasse) {
           karte.classList.add('diff');
           karte.title = 'In Variante ' + cmp.index + ': ' + labelVon(cmp.zuordnung[id]);
@@ -1123,13 +1453,16 @@
         Object.keys(notPins).sort().forEach(function (id) {
           Object.keys(notPins[id]).forEach(function (klasse) { notListe.push({ kind: id, klasse: parseInt(klasse, 10) }); });
         });
+        var nHart = Object.keys(haertungen.gruppen).length + Object.keys(haertungen.wuensche).length;
         kopf.textContent = 'Fixierungen fuer den naechsten Lauf (' +
-          (bestandsFixierungen.length + pinListe.length + notListe.length) + ')';
+          (bestandsFixierungen.length + pinListe.length + notListe.length) + ')' +
+          (nHart > 0 ? ' + ' + nHart + ' Haertung' + (nHart > 1 ? 'en' : '') + ' (F3/F5)' : '');
         c.appendChild(kopf);
         var hinweis = document.createElement('div');
         hinweis.className = 'hinweis';
         hinweis.textContent = 'Den Block unten als fixierungen: in input/klassenbildung.yaml uebernehmen und neu rechnen - ' +
-          'der Viewer selbst rechnet nicht (self-contained; Ausbaustufe U5). Pins ueberleben Reloads nur als Browser-Komfort.';
+          'der Viewer bewertet Verschiebungen live, optimiert aber nicht (Re-Solve: Ausbaustufe U5). ' +
+          'Pins ueberleben Reloads nur als Browser-Komfort.';
         c.appendChild(hinweis);
 
         var zeilen = ['fixierungen:'];
@@ -1146,6 +1479,22 @@
         notListe.forEach(function (e) {
           zeilen.push('  - {kind: ' + e.kind + ', nicht_klasse: ' + e.klasse + '}   # manuell (F2)');
         });
+        // U4: Haertungen (F3/F5) als modus-hard-Diff-Hinweis - kein
+        // fixierungen-Eintrag, sondern eine Aenderung an der Regel
+        // selbst in input/klassenbildung.yaml.
+        var gruppenHart = Object.keys(haertungen.gruppen).sort();
+        var wuenscheHart = Object.keys(haertungen.wuensche).map(Number).sort(function (a, b) { return a - b; });
+        if (gruppenHart.length + wuenscheHart.length > 0) {
+          zeilen.push('# Haertungen: bei diesen Regeln in input/klassenbildung.yaml modus: hard setzen');
+          gruppenHart.forEach(function (gid) {
+            zeilen.push('#   gruppe ' + gid + ' -> modus: hard   # F5');
+          });
+          wuenscheHart.forEach(function (wi) {
+            var w = wuensche[wi];
+            zeilen.push('#   wunsch[' + wi + '] (' + w.kinder[0] + ' + ' + w.kinder[1] + ' ' + w.typ +
+              ') -> modus: hard   # F3');
+          });
+        }
         var ta = document.createElement('textarea');
         ta.readOnly = true;
         ta.id = 'yaml-export';
@@ -1163,6 +1512,21 @@
       }
 
       render();
+
+      // Test-Hook (U4): der Chromium-Interaktionstest prueft darueber
+      // "Live-Bewertung == Bewerte" gegen die eingebetteten VB-Chips
+      // und simuliert Verschiebungen deterministisch. Kein UI-Vertrag.
+      window.__kbTest = {
+        bewerte: bewerte,
+        sicht: aktuelleSicht,
+        verschiebe: verschiebe,
+        pins: function () { return pins; },
+        herkunft: function () { return pinHerkunft; },
+        warnungen: function () { return warnungen; },
+        haertungen: function () { return haertungen; },
+        loesePin: function (id) { loesePin(id); render(); },
+        liveFaehig: liveFaehig
+      };
     })();
   </script>
 </body>
