@@ -27,8 +27,9 @@ Vorab geklärte Nutzerentscheidungen (Dialograunde zu diesem Konzept):
 
 ### 1.1 GUI-Technologie: WPF + WebView2
 
-Die arc42-Doku vermerkt bisher "GUI-Technologie WinForms geplant"
-(arc42 §2). Neue Vorgabe: **WPF** als Anwendungsrahmen (Formulare,
+Die arc42-Doku vermerkte bis zu diesem Konzept "GUI-Technologie
+WinForms geplant" (arc42 §2 - inzwischen nachgezogen). Neue Vorgabe:
+**WPF** als Anwendungsrahmen (Formulare,
 Stammdaten-/Constraint-Editoren, Databinding auf das typisierte
 `Stammdaten.vb`-Modell - genau der in arc42 §8.7 vorgesehene Weg) plus
 **WebView2** für die interaktiven Anteile **Klassenzuordnung** und
