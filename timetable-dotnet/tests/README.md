@@ -634,6 +634,26 @@ Plan. Standardmäßig wird nur EIN finaler Plan erzeugt (`max_solutions: 1`);
 ein höherer Wert in `config.yaml` exportiert zusätzliche, vergleichbare
 Alternativen (siehe Abschnitt "Stundentafel-Visualisierung" unten).
 
+## Klassenbildung (Stufe 0, `klassen <schule>`)
+
+`dotnet run --project SchoolTestRunner -- klassen <schule>` löst die
+**Klassenbildung** (docs/klassenbildung-konzept.md + -plan.md) aus
+`input/klassenbildung.yaml`: Schüler mit Pseudonym-IDs und
+Attribut-Tags, Klassenrahmen, Bündelungs-/Verteilungsgruppen
+(`modus: hard|soft`, `prio: 1..3`), Balance-Kriterien,
+Zusammen-/Getrennt-Wünsche und Fixierungen (`klasse` = F1,
+`nicht_klasse` = F2). Parameter über den `klassenbildung:`-Block der
+config.yaml (`zeitlimit_s`, `n_varianten`, `epsilon`, `min_distanz`,
+`symmetriebrechung`, `prio_gewichte`). Ergebnis:
+`output/klassenbildung.md` (je Variante Scorecard, Klassenlisten,
+Balance-Kennzahlen, Ampel-Zusammenfassung und Verletzungsreport, dazu
+der Konsens-Kern über alle Varianten) und `output/klassenbildung.json`
+(maschinenlesbar inkl. Ampel-Chips je Kind/Kriterium). Der
+Bewertungslauf zählt alle Regeln unabhängig vom Solver nach
+(Verifier-Prinzip) - eine Abweichung wäre ein FAIL. Die Klassenbildung
+ist eigenständig: Schulen ohne `klassenbildung.yaml` sind unberührt,
+`run` bleibt die Stundenplan-Pipeline.
+
 ## Stundentafel-Visualisierung (Phase 2.21)
 
 `output/stundenplan.json` enthält ALLE von `Solver.SolveTop` gefundenen

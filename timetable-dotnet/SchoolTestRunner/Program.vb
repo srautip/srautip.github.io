@@ -30,6 +30,7 @@ Module Program
         Console.WriteLine("  dotnet run --project SchoolTestRunner -- run <schule>")
         Console.WriteLine("  dotnet run --project SchoolTestRunner -- run --all")
         Console.WriteLine("  dotnet run --project SchoolTestRunner -- render <schule>")
+        Console.WriteLine("  dotnet run --project SchoolTestRunner -- klassen <schule>")
     End Sub
 
     ''' <summary>Viewer-Ausbau (docs/viewer-ausbau-plan.md, Leitplanke
@@ -83,6 +84,12 @@ Module Program
                 Case "render"
                     If args.Length < 2 Then Throw New InvalidOperationException("Fehlender Schulname.")
                     Return RenderOne(args(1))
+
+                Case "klassen"
+                    ' Stufe 0 (docs/klassenbildung-plan.md, K4):
+                    ' Klassenbildung aus input/klassenbildung.yaml.
+                    If args.Length < 2 Then Throw New InvalidOperationException("Fehlender Schulname.")
+                    Return If(KlassenRun.KlassenOne(TestsRoot, args(1)), 0, 1)
 
                 Case Else
                     PrintUsage()

@@ -191,6 +191,98 @@ Public Class KlassenbildungTests
         Assert.AreEqual(1L, result.Verletzungen.Single(Function(x) x.RegelTyp = "wunsch_zusammen").Mass)
     End Sub
 
+    ''' <summary>K3, Verifier-Prinzip: der Bewertungslauf
+    ''' (KlassenbildungQuality.Bewerte, reine Auszaehlung ohne Solver)
+    ''' reproduziert die Verletzungsmasse des Solvers unabhaengig - fuer
+    ''' ein Szenario mit bekannter Buendelungs- und Wunsch-Verletzung.</summary>
+    <TestMethod>
+    Public Sub BewerteMatchesSolverViolationsIndependently()
+        Dim input = Basis(4, 2, 2, 2)
+        input.Gruppen.Add(New KlassenbildungGruppe With {.Id = "G", .Typ = "buendelung", .Modus = "soft", .Prio = 2, .Mitglieder = New List(Of String) From {"S1", "S2", "S3"}})
+        input.Wuensche.Add(New KlassenbildungWunsch With {.Typ = "zusammen", .Kinder = New List(Of String) From {"S1", "S4"}, .Prio = 1})
+        Dim result = Klassenbildung.SolveKlassenbildung(input, zeitlimitS:=10)
+        Assert.AreEqual(CpSolverStatus.Optimal, result.Status)
+
+        Dim bewertung = KlassenbildungQuality.Bewerte(input, result.Zuordnung)
+        Assert.AreEqual(result.Verletzungen.Count, bewertung.Verletzungen.Count)
+        For Each sv In result.Verletzungen
+            Assert.AreEqual(sv.Mass, bewertung.Verletzungen.Single(Function(b) b.RegelId = sv.RegelId).Mass,
+                $"Unabhaengige Nachzaehlung weicht ab fuer {sv.RegelId}")
+        Next
+    End Sub
+
+    ''' <summary>K3, Ampel-Chips (Konzept 11.1): exakte Kappen-Auslastung
+    ''' ist GELB, Ueberschreitung ROT, Balance am Toleranzrand GELB,
+    ''' verletzter Wunsch ROT - gegen eine handgebaute Zuordnung
+    ''' klassifiziert (kein Solve noetig).</summary>
+    <TestMethod>
+    Public Sub ChipsClassifyKnappUndVerletzt()
+        Dim input = Basis(6, 2, 3, 3)
+        ' Verteilung Kappe 1: S1/S2 in Klasse 1 -> Ueberlauf (rot), S3 allein in 2 -> Kappe voll (gelb).
+        input.Gruppen.Add(New KlassenbildungGruppe With {.Id = "D", .Typ = "verteilung", .MaxProKlasse = 1, .Mitglieder = New List(Of String) From {"S1", "S2", "S3"}})
+        ' Balance mit Toleranz 1: 2 w-Kinder beide in Klasse 1 -> dev |2-1|=1 = Toleranzrand (gelb).
+        input.Schueler(0).Attribute("geschlecht") = "w" ' S1
+        input.Schueler(3).Attribute("geschlecht") = "w" ' S4
+        input.Balance.Add(New KlassenbildungBalance With {.Attribut = "geschlecht", .Wert = "w", .Toleranz = 1})
+        ' Wunsch zusammen S5+S6, aber getrennt zugeordnet -> rot.
+        input.Wuensche.Add(New KlassenbildungWunsch With {.Typ = "zusammen", .Kinder = New List(Of String) From {"S5", "S6"}})
+
+        Dim zuordnung As New Dictionary(Of String, Integer) From {
+            {"S1", 1}, {"S2", 1}, {"S4", 1}, {"S3", 2}, {"S5", 1}, {"S6", 2}}
+        Dim bewertung = KlassenbildungQuality.Bewerte(input, zuordnung)
+
+        Assert.AreEqual("rot", bewertung.Chips.Single(Function(c) c.KindId = "S1" AndAlso c.RegelId = "D").Status)
+        Assert.AreEqual("gelb", bewertung.Chips.Single(Function(c) c.KindId = "S3" AndAlso c.RegelId = "D").Status)
+        Assert.AreEqual("gelb", bewertung.Chips.Single(Function(c) c.KindId = "S1" AndAlso c.RegelTyp = "balance").Status)
+        Assert.AreEqual("rot", bewertung.Chips.Single(Function(c) c.KindId = "S5").Status)
+        Assert.AreEqual(1L, bewertung.Verletzungen.Single(Function(v) v.RegelId = "D").Mass)
+        ' S2 sitzt mit S1 in der ueberlaufenen Klasse -> ebenfalls rot;
+        ' freie Kinder (ohne jede Regel) haben keine Chips.
+        Assert.AreEqual("rot", bewertung.Chips.Single(Function(c) c.KindId = "S2" AndAlso c.RegelId = "D").Status)
+        Assert.IsFalse(bewertung.Chips.Any(Function(c) c.KindId = "S4" AndAlso c.RegelTyp <> "balance"))
+    End Sub
+
+    ''' <summary>K3, Varianten-Schleife (Konzept 8): liefert n paarweise
+    ''' um mindestens min_distanz verschiedene Varianten; mit aktiver
+    ''' Symmetriebrechung ist keine davon eine blosse
+    ''' Klassennummern-Vertauschung (Fallstrick 8.2). Der Konsens-Kern
+    ''' enthaelt genau die in allen Varianten identisch zugeordneten
+    ''' Kinder - das per Fixierung gepinnte Kind immer.</summary>
+    <TestMethod>
+    Public Sub SolveKlassenbildungTopProducesDiverseVariantsAndKonsens()
+        Dim input = Basis(8, 2, 4, 4)
+        input.Fixierungen.Add(New KlassenbildungFixierung With {.Kind = "S8", .Klasse = 2})
+        Dim top = Klassenbildung.SolveKlassenbildungTop(input, zeitlimitS:=10, nVarianten:=3, minDistanz:=2)
+        Assert.AreEqual(3, top.Varianten.Count)
+        For i = 0 To 2
+            For j = i + 1 To 2
+                Dim dist = top.Varianten(i).Zuordnung.Keys.
+                    Where(Function(id) top.Varianten(i).Zuordnung(id) <> top.Varianten(j).Zuordnung(id)).Count()
+                Assert.IsTrue(dist >= 2, $"Variante {i + 1} vs {j + 1}: Distanz {dist} < 2")
+            Next
+        Next
+        CollectionAssert.Contains(top.KonsensKern, "S8", "Das fixierte Kind ist zwangslaeufig in allen Varianten identisch.")
+        For Each id In top.KonsensKern
+            Dim erste = top.Varianten(0).Zuordnung(id)
+            Assert.IsTrue(top.Varianten.All(Function(v) v.Zuordnung(id) = erste))
+        Next
+    End Sub
+
+    ''' <summary>K3, Qualitaetsschranke: bei epsilon 0 muss jede weitere
+    ''' Variante exakt den Optimalwert halten - im Szenario mit
+    ''' unvermeidbarem Buendelungs-Split (Optimum 50) sind alle
+    ''' gefundenen Varianten gleich gut.</summary>
+    <TestMethod>
+    Public Sub SolveKlassenbildungTopHoldsQualityBound()
+        Dim input = Basis(4, 2, 2, 2)
+        input.Gruppen.Add(New KlassenbildungGruppe With {.Id = "G", .Typ = "buendelung", .Modus = "soft", .Prio = 2, .Mitglieder = New List(Of String) From {"S1", "S2", "S3"}})
+        Dim top = Klassenbildung.SolveKlassenbildungTop(input, zeitlimitS:=10, nVarianten:=3, epsilon:=0.0, minDistanz:=1)
+        Assert.IsTrue(top.Varianten.Count >= 2, "Mindestens eine gleich gute Alternative erwartet.")
+        For Each v In top.Varianten
+            Assert.AreEqual(50.0, v.Objective, 0.001, "epsilon 0: jede Variante muss das Optimum halten.")
+        Next
+    End Sub
+
     ''' <summary>Symmetriebrechung: ohne Fixierungen sind die Klassen
     ''' austauschbar - die Praezedenz-Kette erzwingt den kanonischen
     ''' Repraesentanten (S1 sitzt in Klasse 1, und Klasse 2 wird

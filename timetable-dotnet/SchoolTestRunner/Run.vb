@@ -149,6 +149,27 @@ Public NotInheritable Class RunConfig
     ''' starten (live beobachteter GMS-Fehlermodus: TimeLimitReached
     ''' ohne eine einzige Loesung).</summary>
     Public Property Stage1TimeLimitS As Double? = Nothing
+    ''' <summary>Stufe 0 (docs/klassenbildung-plan.md, K4): Parameter des
+    ''' `klassen`-Subkommandos. Nothing/fehlender Block = Defaults.</summary>
+    Public Property Klassenbildung As KlassenbildungConfig = Nothing
+End Class
+
+''' <summary>Parameter der Klassenbildung (Konzept Abschnitte 4/8) als
+''' optionaler `klassenbildung:`-Block in config.yaml - Nothing je Feld
+''' = Default von Klassenbildung.SolveKlassenbildungTop.</summary>
+Public NotInheritable Class KlassenbildungConfig
+    Public Property ZeitlimitS As Double? = Nothing
+    Public Property NVarianten As Integer? = Nothing
+    ''' <summary>Qualitaetsschranke der Varianten: Zielfunktion &lt;=
+    ''' Optimum * (1 + epsilon). Default 0.05.</summary>
+    Public Property Epsilon As Double? = Nothing
+    ''' <summary>Mindestanzahl Kinder, die jede weitere Variante anders
+    ''' zuordnen muss. Default 8.</summary>
+    Public Property MinDistanz As Integer? = Nothing
+    Public Property Symmetriebrechung As Boolean? = Nothing
+    ''' <summary>Prio-Stufe (1..3) -> Zielfunktions-Gewicht. Fehlend =
+    ''' Klassenbildung.DefaultPrioGewichte (1000/50/1).</summary>
+    Public Property PrioGewichte As Dictionary(Of Integer, Long) = Nothing
 End Class
 
 ''' <summary>Phase 2.24: die sieben Gewichte aus ScheduleQuality.
@@ -198,7 +219,7 @@ Public Module Run
         WithNamingConvention(UnderscoredNamingConvention.Instance).
         Build()
 
-    Private Function LoadConfig(path As String) As RunConfig
+    Friend Function LoadConfig(path As String) As RunConfig
         If Not IO.File.Exists(path) Then Return New RunConfig()
         Dim yaml = IO.File.ReadAllText(path)
         If String.IsNullOrWhiteSpace(yaml) Then Return New RunConfig()

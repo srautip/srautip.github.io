@@ -1,0 +1,331 @@
+# Klassenbildung Beispiel A (docs/klassenbildung-konzept.md, 12.1):
+# ~100 Kinder -> 4 Klassen a 22-26. Synthetische Pseudonym-Daten,
+# deterministisch generiert (Seed 42) - Regelwerk 1:1 nach der
+# Konzept-Tabelle (Zwillinge hart, Kita-Freundes-Cluster, Wohngebiet,
+# Sozialverhalten-Verteilung, Schulbegleitung, drei Balance-Kriterien,
+# Zusammen-/Getrennt-Wuensche, Rollstuhl-Fixierung).
+schueler:
+  - id: S001
+    attribute: {geschlecht: w}
+  - id: S002
+    attribute: {geschlecht: m}
+  - id: S003
+    attribute: {geschlecht: w}
+  - id: S004
+    attribute: {geschlecht: w}
+  - id: S005
+    attribute: {geschlecht: w}
+  - id: S006
+    attribute: {geschlecht: w, sprachfoerderung: ja}
+  - id: S007
+    attribute: {geschlecht: w}
+  - id: S008
+    attribute: {geschlecht: m}
+  - id: S009
+    attribute: {geschlecht: m, sprachfoerderung: ja}
+  - id: S010
+    attribute: {geschlecht: m}
+  - id: S011
+    attribute: {geschlecht: m, sprachfoerderung: ja}
+  - id: S012
+    attribute: {geschlecht: w}
+  - id: S013
+    attribute: {geschlecht: m}
+  - id: S014
+    attribute: {geschlecht: w, kann_kind: ja}
+  - id: S015
+    attribute: {geschlecht: w}
+  - id: S016
+    attribute: {geschlecht: m, sprachfoerderung: ja}
+  - id: S017
+    attribute: {geschlecht: w, kann_kind: ja}
+  - id: S018
+    attribute: {geschlecht: w}
+  - id: S019
+    attribute: {geschlecht: m}
+  - id: S020
+    attribute: {geschlecht: w}
+  - id: S021
+    attribute: {geschlecht: w}
+  - id: S022
+    attribute: {geschlecht: m}
+  - id: S023
+    attribute: {geschlecht: w}
+  - id: S024
+    attribute: {geschlecht: m}
+  - id: S025
+    attribute: {geschlecht: w, sprachfoerderung: ja}
+  - id: S026
+    attribute: {geschlecht: w}
+  - id: S027
+    attribute: {geschlecht: m}
+  - id: S028
+    attribute: {geschlecht: w}
+  - id: S029
+    attribute: {geschlecht: w}
+  - id: S030
+    attribute: {geschlecht: w}
+  - id: S031
+    attribute: {geschlecht: m}
+  - id: S032
+    attribute: {geschlecht: w}
+  - id: S033
+    attribute: {geschlecht: m}
+  - id: S034
+    attribute: {geschlecht: m}
+  - id: S035
+    attribute: {geschlecht: m, kann_kind: ja}
+  - id: S036
+    attribute: {geschlecht: w}
+  - id: S037
+    attribute: {geschlecht: m}
+  - id: S038
+    attribute: {geschlecht: m, sprachfoerderung: ja}
+  - id: S039
+    attribute: {geschlecht: w}
+  - id: S040
+    attribute: {geschlecht: m}
+  - id: S041
+    attribute: {geschlecht: m}
+  - id: S042
+    attribute: {geschlecht: m, kann_kind: ja}
+  - id: S043
+    attribute: {geschlecht: m}
+  - id: S044
+    attribute: {geschlecht: w, kann_kind: ja}
+  - id: S045
+    attribute: {geschlecht: m}
+  - id: S046
+    attribute: {geschlecht: m}
+  - id: S047
+    attribute: {geschlecht: m, sprachfoerderung: ja}
+  - id: S048
+    attribute: {geschlecht: m}
+  - id: S049
+    attribute: {geschlecht: m, sprachfoerderung: ja}
+  - id: S050
+    attribute: {geschlecht: m}
+  - id: S051
+    attribute: {geschlecht: m}
+  - id: S052
+    attribute: {geschlecht: w}
+  - id: S053
+    attribute: {geschlecht: m}
+  - id: S054
+    attribute: {geschlecht: w}
+  - id: S055
+    attribute: {geschlecht: w, kann_kind: ja}
+  - id: S056
+    attribute: {geschlecht: m}
+  - id: S057
+    attribute: {geschlecht: m, kann_kind: ja}
+  - id: S058
+    attribute: {geschlecht: w}
+  - id: S059
+    attribute: {geschlecht: w, sprachfoerderung: ja}
+  - id: S060
+    attribute: {geschlecht: m}
+  - id: S061
+    attribute: {geschlecht: m}
+  - id: S062
+    attribute: {geschlecht: m}
+  - id: S063
+    attribute: {geschlecht: w}
+  - id: S064
+    attribute: {geschlecht: m}
+  - id: S065
+    attribute: {geschlecht: w}
+  - id: S066
+    attribute: {geschlecht: m}
+  - id: S067
+    attribute: {geschlecht: m}
+  - id: S068
+    attribute: {geschlecht: w, kann_kind: ja}
+  - id: S069
+    attribute: {geschlecht: w, sprachfoerderung: ja}
+  - id: S070
+    attribute: {geschlecht: w}
+  - id: S071
+    attribute: {geschlecht: m, sprachfoerderung: ja}
+  - id: S072
+    attribute: {geschlecht: w}
+  - id: S073
+    attribute: {geschlecht: m}
+  - id: S074
+    attribute: {geschlecht: m, sprachfoerderung: ja}
+  - id: S075
+    attribute: {geschlecht: m}
+  - id: S076
+    attribute: {geschlecht: w}
+  - id: S077
+    attribute: {geschlecht: m}
+  - id: S078
+    attribute: {geschlecht: w}
+  - id: S079
+    attribute: {geschlecht: m}
+  - id: S080
+    attribute: {geschlecht: w, sprachfoerderung: ja}
+  - id: S081
+    attribute: {geschlecht: m, sprachfoerderung: ja}
+  - id: S082
+    attribute: {geschlecht: w}
+  - id: S083
+    attribute: {geschlecht: w}
+  - id: S084
+    attribute: {geschlecht: m}
+  - id: S085
+    attribute: {geschlecht: w}
+  - id: S086
+    attribute: {geschlecht: m}
+  - id: S087
+    attribute: {geschlecht: w}
+  - id: S088
+    attribute: {geschlecht: m}
+  - id: S089
+    attribute: {geschlecht: w}
+  - id: S090
+    attribute: {geschlecht: w}
+  - id: S091
+    attribute: {geschlecht: w, sprachfoerderung: ja}
+  - id: S092
+    attribute: {geschlecht: m}
+  - id: S093
+    attribute: {geschlecht: m}
+  - id: S094
+    attribute: {geschlecht: w, sprachfoerderung: ja}
+  - id: S095
+    attribute: {geschlecht: w}
+  - id: S096
+    attribute: {geschlecht: w}
+  - id: S097
+    attribute: {geschlecht: m}
+  - id: S098
+    attribute: {geschlecht: w}
+  - id: S099
+    attribute: {geschlecht: m}
+  - id: S100
+    attribute: {geschlecht: m, kann_kind: ja}
+
+klassen: {anzahl: 4, min_groesse: 22, max_groesse: 26}
+
+gruppen:
+  # Zwillinge - Elternwunsch: zusammen (hart, Konzept 12.1)
+  - id: G_zwillinge
+    typ: buendelung
+    mitglieder: [S031, S062]
+    modus: hard
+    prio: 3
+  # Kita-Freundes-Cluster: kein Kind startet allein (soft / wichtig)
+  - id: G_kita_sonnenblume_1
+    typ: buendelung
+    mitglieder: [S007, S084, S012, S053]
+    prio: 2
+  - id: G_kita_regenbogen_2
+    typ: buendelung
+    mitglieder: [S057, S003]
+    prio: 2
+  - id: G_kita_pusteblume_3
+    typ: buendelung
+    mitglieder: [S023, S065]
+    prio: 2
+  - id: G_kita_wirbelwind_4
+    typ: buendelung
+    mitglieder: [S013, S040, S074]
+    prio: 2
+  - id: G_kita_loewenzahn_5
+    typ: buendelung
+    mitglieder: [S002, S066, S020]
+    prio: 2
+  - id: G_kita_villakunterbunt_6
+    typ: buendelung
+    mitglieder: [S097, S092, S067]
+    prio: 2
+  - id: G_kita_sonnenblume_7
+    typ: buendelung
+    mitglieder: [S047, S014]
+    prio: 2
+  - id: G_kita_regenbogen_8
+    typ: buendelung
+    mitglieder: [S044, S098, S079]
+    prio: 2
+  - id: G_kita_pusteblume_9
+    typ: buendelung
+    mitglieder: [S085, S043]
+    prio: 2
+  - id: G_kita_wirbelwind_10
+    typ: buendelung
+    mitglieder: [S050, S037]
+    prio: 2
+  - id: G_kita_loewenzahn_11
+    typ: buendelung
+    mitglieder: [S018, S080, S093, S045]
+    prio: 2
+  - id: G_kita_villakunterbunt_12
+    typ: buendelung
+    mitglieder: [S001, S058]
+    prio: 2
+  # Laufgruppe Wohngebiet (soft / wenn moeglich - nie ueber Durchmischung)
+  - id: G_nordstadt
+    typ: buendelung
+    mitglieder: [S068, S077, S054, S025, S076, S039, S055]
+    prio: 1
+  # Auffaelliges Sozialverhalten lt. Kita: verteilen (soft / kritisch;
+  # 5 Kinder auf 4 Klassen - max 1 geht rechnerisch nicht auf, der
+  # Solver findet die beste Annaeherung, Konzept 12.1)
+  - id: G_sozialverhalten
+    typ: verteilung
+    mitglieder: [S011, S070, S091, S094, S004]
+    max_pro_klasse: 1
+    prio: 3
+  # Zwei Kinder mit Schulbegleitung buendeln (Traeger-Effizienz)
+  - id: G_schulbegleitung
+    typ: buendelung
+    mitglieder: [S006, S096]
+    prio: 2
+
+balance:
+  - {attribut: geschlecht, wert: w, toleranz: 2, prio: 2}
+  - {attribut: sprachfoerderung, wert: ja, toleranz: 1, prio: 2}
+  - {attribut: kann_kind, wert: ja, toleranz: 1, prio: 1}
+
+wuensche:
+  # 31 Zusammen-Wuensche aus der Anmeldung (soft / wenn moeglich)
+  - {typ: zusammen, kinder: [S098, S069], prio: 1}
+  - {typ: zusammen, kinder: [S099, S017], prio: 1}
+  - {typ: zusammen, kinder: [S017, S085], prio: 1}
+  - {typ: zusammen, kinder: [S061, S071], prio: 1}
+  - {typ: zusammen, kinder: [S022, S034], prio: 1}
+  - {typ: zusammen, kinder: [S068, S078], prio: 1}
+  - {typ: zusammen, kinder: [S055, S028], prio: 1}
+  - {typ: zusammen, kinder: [S070, S097], prio: 1}
+  - {typ: zusammen, kinder: [S094, S089], prio: 1}
+  - {typ: zusammen, kinder: [S026, S092], prio: 1}
+  - {typ: zusammen, kinder: [S040, S052], prio: 1}
+  - {typ: zusammen, kinder: [S086, S084], prio: 1}
+  - {typ: zusammen, kinder: [S048, S057], prio: 1}
+  - {typ: zusammen, kinder: [S067, S058], prio: 1}
+  - {typ: zusammen, kinder: [S016, S032], prio: 1}
+  - {typ: zusammen, kinder: [S029, S009], prio: 1}
+  - {typ: zusammen, kinder: [S044, S003], prio: 1}
+  - {typ: zusammen, kinder: [S076, S071], prio: 1}
+  - {typ: zusammen, kinder: [S030, S076], prio: 1}
+  - {typ: zusammen, kinder: [S029, S001], prio: 1}
+  - {typ: zusammen, kinder: [S010, S091], prio: 1}
+  - {typ: zusammen, kinder: [S081, S008], prio: 1}
+  - {typ: zusammen, kinder: [S030, S009], prio: 1}
+  - {typ: zusammen, kinder: [S005, S043], prio: 1}
+  - {typ: zusammen, kinder: [S010, S066], prio: 1}
+  - {typ: zusammen, kinder: [S031, S036], prio: 1}
+  - {typ: zusammen, kinder: [S086, S063], prio: 1}
+  - {typ: zusammen, kinder: [S028, S070], prio: 1}
+  - {typ: zusammen, kinder: [S017, S093], prio: 1}
+  - {typ: zusammen, kinder: [S074, S061], prio: 1}
+  - {typ: zusammen, kinder: [S032, S061], prio: 1}
+  # 3 bekannte Konfliktpaare aus den Kitas (soft / wichtig)
+  - {typ: getrennt, kinder: [S053, S025], prio: 2}
+  - {typ: getrennt, kinder: [S013, S085], prio: 2}
+  - {typ: getrennt, kinder: [S056, S046], prio: 2}
+
+fixierungen:
+  # Kind mit Rollstuhl -> Klasse 1 (einziger barrierefreier Raum)
+  - {kind: S030, klasse: 1}

@@ -110,6 +110,30 @@ Public NotInheritable Class KlassenbildungResult
     Public Property Verletzungen As List(Of KlassenbildungVerletzung)
 End Class
 
+''' <summary>K3 (Konzept Abschnitt 8): Ergebnis der Varianten-Schleife -
+''' bis zu `nVarianten` qualitativ gleichwertige (Zielfunktion &lt;=
+''' Optimum * (1+epsilon)), aber um mindestens `minDistanz` Kinder
+''' verschiedene Zuordnungen, plus der Konsens-Kern (Kinder, die in
+''' ALLEN Varianten in derselben Klasse gelandet sind - der stabile
+''' Kern fuer die Bulk-Fixierung, Konzept 11.3).</summary>
+Public NotInheritable Class KlassenbildungTopResult
+    Public Property Varianten As List(Of KlassenbildungResult)
+    Public Property KonsensKern As List(Of String)
+End Class
+
+''' <summary>Das fertig gebaute (ungeloeste) Modell samt allem, was die
+''' Varianten-Schleife braucht - dasselbe Muster wie
+''' LehrereinsatzModell.</summary>
+Friend NotInheritable Class KlassenbildungModell
+    Public Property Model As CpModel
+    Public Property X As Dictionary(Of (Id As String, Klasse As Integer), BoolVar)
+    Public Property Strafen As List(Of (RegelId As String, RegelTyp As String, Prio As Integer, Mass As LinearExpr, Gewicht As Long))
+    ''' <summary>Gewichtete Gesamtzielfunktion (Nothing, wenn keine
+    ''' einzige weiche Regel existiert - dann gibt es nichts zu
+    ''' beschraenken).</summary>
+    Public Property Objective As LinearExpr
+End Class
+
 Public Module Klassenbildung
 
     ''' <summary>Default-Gewichte der drei Prioritaetsstufen
@@ -277,6 +301,86 @@ Public Module Klassenbildung
                                          Optional numWorkers As Integer = 1,
                                          Optional prioGewichte As Dictionary(Of Integer, Long) = Nothing,
                                          Optional symmetriebrechung As Boolean = True) As KlassenbildungResult
+        Dim modell = BuildKlassenbildungModell(input, prioGewichte, symmetriebrechung)
+        Dim solver As New CpSolver()
+        solver.StringParameters = $"max_time_in_seconds:{zeitlimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
+        Dim status = solver.Solve(modell.Model)
+        Return ExtractKlassenbildungResult(input, modell, solver, status)
+    End Function
+
+    ''' <summary>K3 (Konzept 8.1): Optimum + Diversifikations-Schleife auf
+    ''' DEMSELBEN Modell (SolveTop-Muster). Nach der ersten (optimalen)
+    ''' Variante wird die Zielfunktion auf `optimum * (1 + epsilon)`
+    ''' beschraenkt; jede weitere Variante muss sich von JEDER bereits
+    ''' gefundenen in mindestens `minDistanz` Kindern unterscheiden
+    ''' (BlockSolution-Formel ueber die wahren x-Variablen; mit aktiver
+    ''' Symmetriebrechung ist "V1 mit vertauschten Klassennummern" gar
+    ''' nicht erst zulaessig - der Konzept-8.2-Fallstrick). Jeder
+    ''' Folgelauf startet mit der Vorloesung als Hint. Das erste Element
+    ''' traegt auch einen Fehlschlag-Status (Semantik wie
+    ''' SolveLehrereinsatzTop); der Konsens-Kern sind die Kinder mit
+    ''' identischer Klasse in allen gefundenen Varianten.</summary>
+    Public Function SolveKlassenbildungTop(input As KlassenbildungInput,
+                                            Optional zeitlimitS As Double = 30.0,
+                                            Optional seed As Integer = 42,
+                                            Optional numWorkers As Integer = 1,
+                                            Optional prioGewichte As Dictionary(Of Integer, Long) = Nothing,
+                                            Optional symmetriebrechung As Boolean = True,
+                                            Optional nVarianten As Integer = 3,
+                                            Optional epsilon As Double = 0.05,
+                                            Optional minDistanz As Integer = 8) As KlassenbildungTopResult
+        Dim modell = BuildKlassenbildungModell(input, prioGewichte, symmetriebrechung)
+        Dim varianten As New List(Of KlassenbildungResult)
+
+        For iteration = 0 To Math.Max(nVarianten, 1) - 1
+            Dim solver As New CpSolver()
+            solver.StringParameters = $"max_time_in_seconds:{zeitlimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
+            Dim status = solver.Solve(modell.Model)
+            Dim ok = status = CpSolverStatus.Optimal OrElse status = CpSolverStatus.Feasible
+            If Not ok Then
+                If iteration = 0 Then varianten.Add(New KlassenbildungResult With {.Status = status})
+                Exit For
+            End If
+            Dim variante = ExtractKlassenbildungResult(input, modell, solver, status)
+            varianten.Add(variante)
+
+            ' Qualitaetsschranke nach der ersten Variante (nur wenn es
+            ' ueberhaupt eine Zielfunktion gibt).
+            If iteration = 0 AndAlso modell.Objective IsNot Nothing Then
+                modell.Model.Add(modell.Objective <= CLng(Math.Floor(solver.ObjectiveValue * (1.0 + Math.Max(epsilon, 0.0)))))
+            End If
+
+            ' Diversitaets-Cut gegen DIESE Variante (BlockSolution-Formel;
+            ' d >= 1 blockt zugleich die exakte Wiederholung).
+            Dim d = Math.Max(minDistanz, 1)
+            Dim trueVars = modell.X.Values.Where(Function(v) solver.BooleanValue(v)).ToList()
+            modell.Model.Add(LinearExpr.Sum(trueVars) <= CLng(trueVars.Count) - CLng(d))
+
+            ' Vorloesung als Hint fuer den Folgelauf.
+            modell.Model.ClearHints()
+            For Each kvp In modell.X
+                modell.Model.AddHint(kvp.Value, solver.BooleanValue(kvp.Value))
+            Next
+        Next
+
+        ' Konsens-Kern: identische Klasse in ALLEN gefundenen Varianten.
+        Dim konsens As New List(Of String)
+        Dim geloeste = varianten.Where(Function(v) v.Zuordnung IsNot Nothing).ToList()
+        If geloeste.Count > 0 Then
+            For Each s In input.Schueler
+                Dim erste = geloeste(0).Zuordnung(s.Id)
+                If geloeste.All(Function(v) v.Zuordnung(s.Id) = erste) Then konsens.Add(s.Id)
+            Next
+        End If
+        Return New KlassenbildungTopResult With {.Varianten = varianten, .KonsensKern = konsens}
+    End Function
+
+    ''' <summary>Modellbau (mechanisch aus SolveKlassenbildung
+    ''' herausgeloest, identisches Verhalten) - gemeinsame Basis der
+    ''' Ein-Loesungs-Fassade und der Varianten-Schleife.</summary>
+    Private Function BuildKlassenbildungModell(input As KlassenbildungInput,
+                                                prioGewichte As Dictionary(Of Integer, Long),
+                                                symmetriebrechung As Boolean) As KlassenbildungModell
         Dim gewichte = If(prioGewichte, DefaultPrioGewichte)
         Dim model As New CpModel()
         Dim schueler = input.Schueler
@@ -433,19 +537,28 @@ Public Module Klassenbildung
         End If
 
         ' --- Zielfunktion (Konzept 3.6, Variante A) ---
+        Dim objective As LinearExpr = Nothing
         If strafen.Count > 0 Then
-            model.Minimize(strafen.Select(Function(t) t.Mass * t.Gewicht).Aggregate(Function(a, b) a + b))
+            objective = strafen.Select(Function(t) t.Mass * t.Gewicht).Aggregate(Function(a, b) a + b)
+            model.Minimize(objective)
         End If
 
-        Dim solver As New CpSolver()
-        solver.StringParameters = $"max_time_in_seconds:{zeitlimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
-        Dim status = solver.Solve(model)
+        Return New KlassenbildungModell With {
+            .Model = model, .X = x, .Strafen = strafen, .Objective = objective}
+    End Function
 
+    ''' <summary>Ergebnis-Extraktion (Zuordnung + Verletzungsreport) -
+    ''' von Fassade und Varianten-Schleife je Iteration genutzt.</summary>
+    Private Function ExtractKlassenbildungResult(input As KlassenbildungInput, modell As KlassenbildungModell,
+                                                  solver As CpSolver, status As CpSolverStatus) As KlassenbildungResult
+        Dim x = modell.X
+        Dim strafen = modell.Strafen
+        Dim anzahl = input.Klassen.Anzahl
         Dim result As New KlassenbildungResult With {.Status = status}
         If status = CpSolverStatus.Optimal OrElse status = CpSolverStatus.Feasible Then
             result.Objective = solver.ObjectiveValue
             Dim zuordnung As New Dictionary(Of String, Integer)
-            For Each s In schueler
+            For Each s In input.Schueler
                 For c = 0 To anzahl - 1
                     If solver.BooleanValue(x((s.Id, c))) Then
                         zuordnung(s.Id) = c + 1

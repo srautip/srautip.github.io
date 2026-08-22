@@ -269,3 +269,18 @@ dritter. K6 einzeln auf Zuruf.
   9 handnachgerechnete Tests (Regeltyp-Encodings, Prio-Dominanz,
   kanonischer Repraesentant, Fixierungs-Vertraeglichkeit der
   Symmetriekette); volle Suite 271/271 gruen.
+- **K3 umgesetzt:** `KlassenbildungQuality.Bewerte` (unabhaengiger
+  Auszaehl-Bewerter nach Verifier-Prinzip: Verletzungsmass je Regel +
+  Ampel-Chips gruen/gelb/rot je (Kind, Kriterium) inkl. der
+  rechnerischen Gelb-Faelle Kappe-voll/Toleranzrand) und
+  `SolveKlassenbildungTop` (Varianten-Schleife mit Qualitaetsschranke
+  optimum*(1+epsilon), Diversitaets-Cut, Hints, Konsens-Kern). 4 neue
+  Tests, u.a. Bewerter==Solver-Cross-Check und Qualitaetsband bei
+  epsilon 0.
+- **K4 umgesetzt:** `klassen <schule>`-Subkommando (KlassenRun.vb) mit
+  `klassenbildung:`-Config-Block, klassenbildung.md/.json-Outputs und
+  Bewerter-Cross-Check als FAIL-Kriterium. Beispiel-A-Fixture (100
+  synthetische Kinder, Regelwerk 1:1 nach Konzept 12.1) im
+  bw-grundschule-beispiel; Beleg-Lauf: 3 Varianten, alle Optimal
+  (Zielwert 1001 = vorhergesagter Sozialverhalten-Ueberlauf 1000 +
+  Nordstadt-Split 1), Konsens-Kern 33/100, Diffs 11/59 Kinder.
