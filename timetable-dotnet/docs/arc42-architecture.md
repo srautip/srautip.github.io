@@ -2,9 +2,15 @@
 
 Diese Dokumentation folgt der [arc42](https://arc42.de)-Gliederung und beschreibt
 die .NET/VB.NET-Lösung unter `timetable-dotnet/` - den Nachfolger des
-eingefrorenen Python-Prototyps unter `timetable/`. Stand: Phase 2.14
-abgeschlossen (siehe `docs/phase2-*.md` für die Entstehungsgeschichte der
-einzelnen Fähigkeiten).
+eingefrorenen Python-Prototyps unter `timetable/`. Stand: Phase 2.25 plus
+Code-Review-Umsetzung (lexikografische Stufen als `SolveTop`-Default,
+`occupied_window`/Dichte-Stufe), Rhythmisierung (`subject_period_window`),
+Mehr-Zuteilungs-Pipeline mit Lehrer-Äquivalenzklassen, ausgebaute
+Self-contained-HTML-Viewer und die vorgelagerte Klassenbildungs-Stufe
+(Stufe 0, K1-K5 + Viewer U1-U4). Entstehungsgeschichte der einzelnen
+Fähigkeiten: `docs/phase2-*.md`, `docs/code-review-cpsat-performance.md`,
+`docs/viewer-ausbau-plan.md`, `docs/klassenbildung-plan.md` und
+`docs/klassenbildung-ui-konzept.md`.
 
 Ergänzend zu diesem Dokument beschreibt
 [`docs/json-constraints-reference.md`](json-constraints-reference.md) das
@@ -34,6 +40,17 @@ Zwei grundsätzlich verschiedene Schulformen werden abgedeckt:
   Schüler wählen individuell Kurse (Leistungs-/Grundkurse); Überschneidungsfreiheit
   gilt pro Schüler(-Wahlprofil), nicht pro Klasse. Modelliert über das in
   echten Schulen verbreitete **Schienenmodell**.
+
+Der eigentlichen Stundenplanung vorgelagert existieren zwei
+eigenständige Planungsstufen: die **Lehrereinsatzplanung** (Stufe 1:
+Lehrkraft → Klasse/Fach, siehe 6.6) und - noch davor - die
+**Klassenbildung** (Stufe 0: Einteilung eines Einschulungs-/Neubildungs-
+Jahrgangs in Parallelklassen nach pädagogischen Regeln, siehe 6.9 und
+`docs/klassenbildung-konzept.md`). Beide sind CP-SAT-Teilmodelle ohne
+Tag/Periode-Bezug; die Klassenbildung ist bewusst ein vollständig
+entkoppeltes Modul mit eigener Testsuite (siehe 5.1), da ihr Ergebnis
+Menschen-moderiert ist (der Solver liefert Vorschläge, die Schulleitung
+entscheidet) und sie keinerlei Code mit der Stundenplan-Pipeline teilt.
 
 ### 1.2 Qualitätsziele
 
@@ -150,14 +167,22 @@ Zwei grundsätzlich verschiedene Schulformen werden abgedeckt:
 timetable-dotnet/
 ├── TimetableCore/            Klassenbibliothek (.NET 8) - der eigentliche Kern
 ├── TimetableCore.Tests/      MSTest-Suite + Fixtures (Testszenarien)
+├── Klassenbildung.Tests/     eigene, schnelle MSTest-Suite NUR für die
+│                             Klassenbildung (<1s statt ~6min - siehe 8.9)
 ├── RobustnessRunner/         Konsolenprogramm: LLM-Wiederholungsstudien
 ├── SchoolTestRunner/         Konsolenprogramm: code-freie YAML-Testfälle
-│                             (siehe 6.7 und docs/schooltestrunner-benutzerhandbuch.md)
+│                             + Self-contained-HTML-Viewer als Embedded
+│                             Resources (Templates/stundentafel.html,
+│                             Templates/klassenbildung.html - siehe 8.10;
+│                             6.7 und docs/schooltestrunner-benutzerhandbuch.md)
 └── (nachgelagert) TimetableGui/   WinForms-GUI, referenziert TimetableCore direkt
 ```
 
 `TimetableCore` hat keine Abhängigkeit auf `TimetableCore.Tests`,
-`RobustnessRunner` oder `SchoolTestRunner`. `RobustnessRunner` bindet
+`Klassenbildung.Tests`, `RobustnessRunner` oder `SchoolTestRunner`.
+`Klassenbildung.Tests` referenziert nur `TimetableCore` (RootNamespace
+bewusst `KlassenbildungTests`, damit der Namespace das Modul
+`Klassenbildung` nicht verschattet). `RobustnessRunner` bindet
 einzelne Testfixtures per `<Compile Include>` ein, um MSTest als
 Abhängigkeit zu vermeiden. `SchoolTestRunner` (Phase 2.18) referenziert
 `TimetableCore` per normaler `ProjectReference` (kein Testprojekt) und
@@ -171,19 +196,21 @@ dessen Abhängigkeitsoberfläche minimal bleibt (siehe 8.7).
 |---|---|---|
 | **Models.vb** | `JsonHelpers` (Zugriff auf das rohe `System.Text.Json.Nodes`-JSON, Python-`dict.get`-artig statt starrem Typmodell - minimiert Übersetzungsrisiko beim Portieren), Muss/Kann-Konstanten, Kursstufe-Zugriffshelfer (`GetKurse`/`GetSchienen`). | - |
 | **Validation.vb** | Deterministische Vorab-Prüfung: harte Cross-Reference-Fehler (unbekannte Entity-Referenz) vs. weiche Coverage-Warnungen (fehlende `no_overlap`-Regel). `ValidateKursstufeEntities` erweitert das um Kurs-/Schienen-/Wahlprofil-Konsistenz. | Models.vb |
-| **Solver.vb** | CP-SAT-Modellbau (`BuildCoreModel`/`BuildModel`/`ApplyConstraints`/`AddBlockConstraint`) und -Lösung (`Solve`, `SolveTop`, `SolveKursstufe`). Größtes Modul - bewusst der einzige Ort, der `model.Add(...)` für die 9 klassenbasierten Constraint-Typen aufruft (Phase 2.20 fügt einen 10.: `parallel_group`, siehe unten). Phase 2.22: `SolveTop`s Iterationsschleife übergibt einen `CpSolverSolutionCallback` an `Solve()`, der jede gefundene Verbesserung (Zeit + Objective) aufzeichnet; `ScoredSolution` trägt zusätzlich `ObjectiveValue`/`BestObjectiveBound` (die Optimalitäts-Lücke) mit. Phase 2.25: `SolveWithStagnationCutoff` löst jede Iteration auf einem separaten `Task`, pollt periodisch gegen die `ConvergenceCallback`-Historie und ruft `solver.StopSearch()` (dokumentiert cross-thread-sicher), sobald `stagnationTimeoutS` (Default 45s, standardmäßig aktiv) ohne neue Verbesserung verstrichen ist - die gesparte Zeit steht der nächsten `SolveTop`-Iteration zur Verfügung, statt eine stehende Suche bis zum Zeitlimit weiterlaufen zu lassen (`StagnationTriggeredCount` macht sichtbar, ob/wie oft das griff). `diversifySeed`/`randomizeSearch` streuen aufeinanderfolgende Iterationen zusätzlich, bleiben aber für denselben Basis-`seed` deterministisch. | Models.vb, Validation.vb, Verifier.vb (für `SolveTop`s Kann-Neuberechnung), ScheduleQuality.vb, SolveTopObjective.vb, Kursblockung.vb, Schienenraster.vb, Raumzuordnung.vb |
+| **Solver.vb** | CP-SAT-Modellbau (`BuildCoreModel`/`BuildModel`/`ApplyConstraints`/`AddBlockConstraint`) und -Lösung (`Solve`, `SolveTop`, `SolveKursstufe`). Größtes Modul - bewusst der einzige Ort, der `model.Add(...)` für die inzwischen 13 klassenbasierten Constraint-Typen aufruft (u.a. `parallel_group` seit Phase 2.20, `required_slot` seit 2.23, `occupied_window` seit Code-Review P1, `subject_period_window` für die Rhythmisierung - vollständige Liste in `json-constraints-reference.md`). Seit der Code-Review-Umsetzung P2 ist `lexicographic:=True` der `SolveTop`-Default: statt einer gewichteten Gesamtsumme werden Stufen nacheinander optimiert und jeweils als hartes Band (`<= opt + lexTolerance`) fixiert - Kann → (Dichte, opt-in `lexOccupiedDensityStage`) → (Fach-Fenster, opt-in `lexSubjectWindowStage`) → ClassGaps → (TeacherGaps, opt-in) - der gewichtete Rest bildet die letzte Stufe; `lexicographic:=False` liefert weiterhin den früheren Ein-Summen-Modus. P3 ergänzt `minDiversity` (Distanz-Cuts: jede weitere Lösung muss sich in mindestens n Belegungen unterscheiden, statt nur per No-Good "nicht identisch" zu sein), `laterIterationsGapLimit` erlaubt späteren Iterationen ein früheres Abbrechen bei akzeptierter Optimalitätslücke. Phase 2.22: `SolveTop`s Iterationsschleife übergibt einen `CpSolverSolutionCallback` an `Solve()`, der jede gefundene Verbesserung (Zeit + Objective) aufzeichnet; `ScoredSolution` trägt zusätzlich `ObjectiveValue`/`BestObjectiveBound` (die Optimalitäts-Lücke) mit. Phase 2.25: `SolveWithStagnationCutoff` löst jede Iteration auf einem separaten `Task`, pollt periodisch gegen die `ConvergenceCallback`-Historie und ruft `solver.StopSearch()` (dokumentiert cross-thread-sicher), sobald `stagnationTimeoutS` (Default 45s, standardmäßig aktiv) ohne neue Verbesserung verstrichen ist - die gesparte Zeit steht der nächsten `SolveTop`-Iteration zur Verfügung, statt eine stehende Suche bis zum Zeitlimit weiterlaufen zu lassen (`StagnationTriggeredCount` macht sichtbar, ob/wie oft das griff). `diversifySeed`/`randomizeSearch` streuen aufeinanderfolgende Iterationen zusätzlich, bleiben aber für denselben Basis-`seed` deterministisch. | Models.vb, Validation.vb, Verifier.vb (für `SolveTop`s Kann-Neuberechnung), ScheduleQuality.vb, SolveTopObjective.vb, Kursblockung.vb, Schienenraster.vb, Raumzuordnung.vb |
 | **Verifier.vb** | Unabhängiger Solution-Checker - teilt bewusst KEINEN Code mit Solver.vb (siehe 8.2). `VerifySchedule`/`VerifyScheduleDetailed` (Muss/Kann getrennt), `VerifyKursblockung` (Stufe-A-Ergebnis unabhängig re-prüfen), `VerifyLehrereinsatz`. Phase 2.20 ergänzt einen unabhängig re-derivierten `parallel_group`-Check plus eine Gruppen-bewusste `VerifyLehrereinsatz`-Erweiterung (alle real umspannten Klassen einer Gruppe müssen vom selben Lehrer unterrichtet werden). | Models.vb |
-| **Formatting.vb** | Rohes `ScheduleEntry`-Ergebnis → Klassen-/Lehrer-/Wahlprofil-Raster (`GridCell`), ASCII-Tabellen, JSON-Export. Reine Präsentationsschicht, keine GUI-Abhängigkeit. Seit Phase 2.20 kollisionsbewusst: mehrere gleichzeitige Sessions derselben Klasse (Parallelgruppe) werden in `ToClassGrids` zu einer kombinierten Zelle zusammengeführt statt einander zu überschreiben. Phase 2.21 ergänzt `ToStundentafelJson` (Klassenstufen-/Parallelklassen-gruppierter Multi-Lösungs-Export für den SchoolTestRunner) - erste Stelle, an der `Formatting.vb` `Verifier.vb` aufruft (pro Lösung ein unabhängiger Muss-Verstoß-Recheck). Phase 2.22: `ToStundentafelJson` exportiert pro Lösung zusätzlich `objective_value`/`best_objective_bound`/`gap_percent` (Optimalitäts-Lücke) und `convergence` (Zeit-vs-Objective-Verlauf). | Models.vb, Verifier.vb |
+| **Formatting.vb** | Rohes `ScheduleEntry`-Ergebnis → Klassen-/Lehrer-/Wahlprofil-Raster (`GridCell`), ASCII-Tabellen, JSON-Export. Reine Präsentationsschicht, keine GUI-Abhängigkeit. Seit Phase 2.20 kollisionsbewusst: mehrere gleichzeitige Sessions derselben Klasse (Parallelgruppe) werden in `ToClassGrids` zu einer kombinierten Zelle zusammengeführt statt einander zu überschreiben. Phase 2.21 ergänzt `ToStundentafelJson` (Klassenstufen-/Parallelklassen-gruppierter Multi-Lösungs-Export für den SchoolTestRunner) - erste Stelle, an der `Formatting.vb` `Verifier.vb` aufruft (pro Lösung ein unabhängiger Muss-Verstoß-Recheck). Phase 2.22: `ToStundentafelJson` exportiert pro Lösung zusätzlich `objective_value`/`best_objective_bound`/`gap_percent` (Optimalitäts-Lücke) und `convergence` (Zeit-vs-Objective-Verlauf). Viewer-Ausbau: der Export trägt den vollen Qualitätsvektor + `quality_weights` je Lösung (Grundlage für Sortierung, Gewichte-Regler und Pareto-Filter im Viewer, siehe 8.10); `ToStundentafelJsonMulti` (Mehr-Zuteilungs-Modus, siehe 6.8) fasst mehrere `AssignmentRun`s (je: Stammdaten-abgeleitetes Szenario + `MultiSolveResult` + Zuteilungs-Index) zu EINEM Export mit global nach Qualität sortierten Lösungen zusammen und exportiert `teacher_equivalence_classes` (nur Klassen mit ≥2 Mitgliedern) für die Tausch-Anzeige. | Models.vb, Verifier.vb |
 | **LlmExtraction.vb** | Freitext → strukturierte Constraints via Ollama/Qwen. Ein Call pro Constraint-Typ mit eigenem JSON-Schema; `period_exception` wird deterministisch zu `forbidden_slot`-Einträgen expandiert (`ExpandPeriodException`); `DropContradictoryConsecutiveRequired` als deterministisches Sicherheitsnetz gegen unmögliche Block-Kombinationen. | Models.vb |
-| **ScheduleQuality.vb** | Post-hoc-Bewertungsschema für Kandidaten-Stundenpläne, 7 Kriterien (Kann-Verstöße, Klassen-/Lehrer-Lücken, Randstunden, Nachmittags-Tage, Klassen-/Lehrer-Tagesausgewogenheit) - unabhängig von der CP-SAT-Modellierung, dient als "Wahrheit" für `SolveTop`s Endsortierung. `QualityWeights` (Phase 2.24 über `SchoolTestRunner/Run.vb`s `config.yaml` konfigurierbar, siehe `tests/README.md`) gewichtet jedes Kriterium; seit Phase 2.25-Nachtrag-2 sind `ClassGaps`/`TeacherGaps`-Gewicht mit `Kann` vereinheitlicht (früher war `ClassGaps` bewusst 10x höher gewichtet - Live-Experimente zeigten, dass nicht das Gewicht, sondern `TeacherGaps`' CP-SAT-Kodierung die eigentliche Ursache schlecht beweisbarer Lösungsschranken war, siehe `docs/phase2-25-stagnation-heuristik.md` Nachtrag 2). Neues `IncludeTeacherGaps`-Flag (Default `true`) - ein Sicherheitsventil, das den Aufbau der `TeacherGaps`-Hilfskonstrukte im CP-SAT-Modell komplett unterdrücken kann. | Models.vb |
-| **SolveTopObjective.vb** | Baut dieselben Bewertungskriterien zusätzlich direkt ins CP-SAT-Modell (`Friend`, nur von `Solver.SolveTop` genutzt), damit die Suche selbst dorthin gelenkt wird, statt nur die gefundenen Kandidaten hinterher zu sortieren: Randstunden/Nachmittags-Tage/Tagesausgewogenheit über eine CP-SAT-freundliche Näherung (Spannweite statt echter Varianz, teils weiterhin über den Sentinel-Min/Max-Trick, siehe 9). `ClassGaps`/`TeacherGaps` nutzen seit Phase 2.25-Nachtrag-2 `BuildGapFlags` - eine Big-M-freie Kodierung (Präfix/Suffix-OR-Ketten `anyBefore`/`anyAfter` + lineare Reifikation jeder einzelnen Lücken-PERIODE als eigene `BoolVar`), die die vorherige `AddMinEquality`/`AddMaxEquality`-Sentinel-Konstruktion ersetzt, siehe 9. `BuildGapFlags` wird für Lehrkräfte nur aufgerufen, wenn `QualityWeights.IncludeTeacherGaps = True` ist (strukturelles Abschalten, nicht nur Gewicht 0). | Models.vb |
+| **ScheduleQuality.vb** | Post-hoc-Bewertungsschema für Kandidaten-Stundenpläne, 9 Kriterien (Kann-Verstöße, Klassen-/Lehrer-Lücken, Randstunden, Nachmittags-Tage, Klassen-/Lehrer-Tagesausgewogenheit, Dichte-Defizit `OccupiedDensity` für should-`occupied_window`, Fenster-Verstöße `SubjectWindow` für should-`subject_period_window`) - unabhängig von der CP-SAT-Modellierung, dient als "Wahrheit" für `SolveTop`s Endsortierung. `QualityWeights` (Phase 2.24 über `SchoolTestRunner/Run.vb`s `config.yaml` konfigurierbar, siehe `tests/README.md`) gewichtet jedes Kriterium; seit Phase 2.25-Nachtrag-2 sind `ClassGaps`/`TeacherGaps`-Gewicht mit `Kann` vereinheitlicht (früher war `ClassGaps` bewusst 10x höher gewichtet - Live-Experimente zeigten, dass nicht das Gewicht, sondern `TeacherGaps`' CP-SAT-Kodierung die eigentliche Ursache schlecht beweisbarer Lösungsschranken war, siehe `docs/phase2-25-stagnation-heuristik.md` Nachtrag 2). Neues `IncludeTeacherGaps`-Flag (Default `true`) - ein Sicherheitsventil, das den Aufbau der `TeacherGaps`-Hilfskonstrukte im CP-SAT-Modell komplett unterdrücken kann. | Models.vb |
+| **SolveTopObjective.vb** | Baut dieselben Bewertungskriterien zusätzlich direkt ins CP-SAT-Modell (`Friend`, nur von `Solver.SolveTop` genutzt), damit die Suche selbst dorthin gelenkt wird, statt nur die gefundenen Kandidaten hinterher zu sortieren: Randstunden/Nachmittags-Tage/Tagesausgewogenheit über eine CP-SAT-freundliche Näherung (Spannweite statt echter Varianz, teils weiterhin über den Sentinel-Min/Max-Trick, siehe 9). `ClassGaps`/`TeacherGaps` nutzen seit Phase 2.25-Nachtrag-2 `BuildGapFlags` - eine Big-M-freie Kodierung (Präfix/Suffix-OR-Ketten `anyBefore`/`anyAfter` + lineare Reifikation jeder einzelnen Lücken-PERIODE als eigene `BoolVar`), die die vorherige `AddMinEquality`/`AddMaxEquality`-Sentinel-Konstruktion ersetzt, siehe 9. `BuildGapFlags` wird für Lehrkräfte nur aufgerufen, wenn `QualityWeights.IncludeTeacherGaps = True` ist (strukturelles Abschalten, nicht nur Gewicht 0). `BuildQualityTerms` liefert die Stufen-Terme (`KannSum`/`OccupiedDensitySum`/`SubjectWindowSum`/`ClassGapsSum`/`TeacherGapsSum`) einzeln an `SolveTop`s lexikografischen Modus; `OccupiedDensitySum`/`SubjectWindowSum` sind reine Linearsummen über ohnehin existierende Variablen (keine zusätzlichen Verletzungs-BoolVars - der Kern von P1). | Models.vb |
 | **Kursblockung.vb** | Kursstufe Stufe A: Kurs→Schiene-Zuordnung (CP-SAT-Teilmodell, eigenständig, kein Tag/Periode-Bezug). | Models.vb |
 | **Schienenraster.vb** | Kursstufe Stufe B: Schiene→Tag/Periode. Konstruiert ein synthetisches Szenario und ruft `Solver.Solve()` unverändert auf. | Models.vb |
 | **Raumzuordnung.vb** | Kursstufe Stufe C: Kurs→Raum, mit aus Stufe B gepinntem Tag/Periode. Ebenfalls über ein synthetisches Szenario + `Solver.Solve()`. | Models.vb, Schienenraster.vb (für `SlotsForKurs`) |
 | **CombinedSchool.vb** | Orchestriert einen gemeinsamen Solve von Sek-I- und Kursstufen-Hälfte, sodass ein geteilter Lehrer-/Raum-Name nicht doppelt belegt wird - ohne `Solver.vb` selbst zu ändern. | Models.vb, Solver.vb, Kursblockung.vb, Schienenraster.vb, Raumzuordnung.vb |
 | **Stammdaten.vb** | Typisiertes Domänenmodell (Klassenstufe/Fach/Klasse/Raum/Lehrer/FachLehrerZuordnung) für dauerhaft verwaltete Schul-Stammdaten (Phase 2.15) - bewusst NICHT das rohe `JsonObject`-Muster der Constraints (siehe 8.7). Laden/Speichern als JSON, `BuildEntitiesFragment` projiziert in das bestehende `entities`-Format. Phase 2.19 ergänzt ein Mitgliedschaftsdatenmodell (`Schueler`: pseudonyme ID + Heimatklasse; `Gruppe`: benannte, klassenunabhängige Schülergruppe für Fachgruppen/Förderung/Aufsicht). Phase 2.20 macht eine Gruppe für den Fall "klassenübergreifende Fachgruppe" solver-wirksam (`Gruppe.FachName`/`Klassenstufe`/`Parallelverbund`, neuer Helper `KlassenOfGruppe`) - siehe `docs/phase2-20-parallelgruppen.md`. | - |
 | **StammdatenValidation.vb** | Cross-Reference-Prüfung für Stammdaten (unbekannte Klassenstufen-/Lehrer-/Fach-Referenzen, unplausible Deputate, unbekannte Schüler-/Gruppen-Referenzen, doppelte Schüler-IDs), gleiche "Fail-Fast VOR jedem Solve"-Philosophie wie `Validation.vb`. Phase 2.20 ergänzt eine harte Parallelverbund-Konsistenzprüfung (gleiche Klassenstufe/Wochenstunden/Blocklänge über alle Gruppen eines Verbunds - sonst wäre das CP-SAT-Modell strukturell unlösbar). | Stammdaten.vb |
-| **Lehrereinsatzplanung.vb** | Neue, vorgeschaltete Planungsstufe (Phase 2.15): verteilt Lehrkräfte IDEAL auf Klassen/Fächer (Qualifikation hart, Deputat-Korridor/Klassenlehrer/Präferenzen weich) - ein eigenständiges CP-SAT-Teilmodell ohne Tag/Periode-Bezug. `BuildAssignmentConstraints` übersetzt das Ergebnis in `teacher_subject_assignment`/`weekly_hours`/`no_overlap`-Constraints, die unverändert an `Solver.Solve` gehen (`no_overlap` ist zwingend - siehe `docs/phase2-15-lehrereinsatzplanung.md`s Phase-2.16-Nachtrag zu einem live gefundenen Bug ohne diese Regel). Phase 2.17 ergänzt sieben weitere weiche/harte Ziele (Kontinuität über Jahre, Fachfremd-Vermeidung, Max. Klassen/Fächer pro Lehrer, Teilzeit-Tage-Kohärenz als harter Vorfilter, Klassenlehrer-Tandem-Balance, Springerreserve, faire Verteilung unbeliebter Fächer) - siehe `docs/phase2-15-lehrereinsatzplanung.md`s Nachtrag 5. Phase 2.20 ergänzt einen Gruppen-Zweig (`AssignKey.IstGruppe`): ein klassenübergreifendes Fach bekommt EINE Zuweisung pro Gruppe statt einer pro echter Klasse (Deputat wird dadurch korrekt einmal gezählt), bei der Lösungsextraktion sofort auf alle real umspannten Klassen expandiert; `BuildAssignmentConstraints` emittiert zusätzlich eine `parallel_group`-Regel pro Parallelverbund. | Stammdaten.vb |
+| **Lehrereinsatzplanung.vb** | Neue, vorgeschaltete Planungsstufe (Phase 2.15): verteilt Lehrkräfte IDEAL auf Klassen/Fächer (Qualifikation hart, Deputat-Korridor/Klassenlehrer/Präferenzen weich) - ein eigenständiges CP-SAT-Teilmodell ohne Tag/Periode-Bezug. `BuildAssignmentConstraints` übersetzt das Ergebnis in `teacher_subject_assignment`/`weekly_hours`/`no_overlap`-Constraints, die unverändert an `Solver.Solve` gehen (`no_overlap` ist zwingend - siehe `docs/phase2-15-lehrereinsatzplanung.md`s Phase-2.16-Nachtrag zu einem live gefundenen Bug ohne diese Regel). Phase 2.17 ergänzt sieben weitere weiche/harte Ziele (Kontinuität über Jahre, Fachfremd-Vermeidung, Max. Klassen/Fächer pro Lehrer, Teilzeit-Tage-Kohärenz als harter Vorfilter, Klassenlehrer-Tandem-Balance, Springerreserve, faire Verteilung unbeliebter Fächer) - siehe `docs/phase2-15-lehrereinsatzplanung.md`s Nachtrag 5. Phase 2.20 ergänzt einen Gruppen-Zweig (`AssignKey.IstGruppe`): ein klassenübergreifendes Fach bekommt EINE Zuweisung pro Gruppe statt einer pro echter Klasse (Deputat wird dadurch korrekt einmal gezählt), bei der Lösungsextraktion sofort auf alle real umspannten Klassen expandiert; `BuildAssignmentConstraints` emittiert zusätzlich eine `parallel_group`-Regel pro Parallelverbund. Mehr-Zuteilungs-Ausbau (siehe 6.8): `TeacherEquivalenceClasses` berechnet Äquivalenzklassen austauschbarer Lehrkräfte über eine Voll-Pipeline-Signatur (Profil + Qualifikationen + feste Zuordnungen + Hand-Constraints, Eigenreferenzen auf `<SELF>` normalisiert), `AddSymmetryBreaking` bricht Orbits per lexikografischer Kette über benachbarte Klassenmitglieder, `SolveLehrereinsatzTop` liefert mehrere echt NICHT-symmetrische Zuteilungen (Qualitätsband + namensbasierte Distanz-Cuts). | Stammdaten.vb |
+| **Klassenbildung.vb** | Stufe 0 (siehe 6.9, `docs/klassenbildung-plan.md` K1-K3): Datenmodell (`KlassenbildungInput`: Schüler mit Attributen, Klassen-Korridor, Gruppen [Bündelung/Verteilung], Balance-Regeln, Wünsche, Fixierungen), `ValidateKlassenbildung` (Fail-Fast), Kern-Solver `SolveKlassenbildung` (x[s,c]-BoolVars, ExactlyOne via Sum=1, Größenkorridor hart, 4 Regeltypen hart/weich mit Prio-Gewichten 1000/50/1) und Varianten-Schleife `SolveKlassenbildungTop` (Qualitätsband ε, Mindest-Diff-Distanz-Cuts, Konsens-Kern über alle Varianten; Klassen-Symmetriebrechung per Präzedenzkette, Fixierung-referenzierte Klassen ausgenommen). Bewusst NULL Kopplung an Solver/SolveTop - eigenständiges CP-SAT-Teilmodell, nur repo-verifizierte Primitive. | - |
+| **KlassenbildungQuality.vb** | Reiner Bewertungslauf `Bewerte` (Verifier-Prinzip, teilt keine Zeile mit `Klassenbildung.vb`): zählt alle Regeln gegen eine gegebene Zuordnung unabhängig nach (Verletzungsmaß je weicher Regel) und erzeugt je (Kind, betroffene Regel) einen Ampel-Chip grün/gelb/rot (gelb = erfüllt, aber knapp: Kappe exakt voll bzw. Balance am Toleranzrand). `KlassenRun` prüft nach jedem Lauf, dass Bewertung und Solver-Verletzungen exakt übereinstimmen (FAIL bei Abweichung). | - |
 
 **Abhängigkeitsrichtung** (keine Zyklen): `Models.vb` ist die einzige von
 praktisch allem genutzte Basis; `Solver.vb` ist der einzige "große"
@@ -208,6 +235,14 @@ Funktionen von `Solver.vb` und den drei Kursstufe-Modulen auf.
   SolveTop()-Rückgabetypen.
 - `KursstufeSolveResult`/`CombinedSolveResult` - Pro-Stufe-Diagnostik für
   die mehrstufigen Pipelines.
+- `LehrereinsatzResult` + `AssignmentRun` - Ergebnis der Stufe 1 bzw.
+  ein kompletter Stufe-2-Lauf auf Basis EINER Zuteilung (für
+  `ToStundentafelJsonMulti`, siehe 6.8).
+- `KlassenbildungInput`/`KlassenbildungResult`/`KlassenbildungTopResult`
+  (Varianten + Konsens-Kern) und `KlassenbildungBewertung`
+  (Verletzungen + Ampel-Chips) - das eigenständige Datenmodell der
+  Stufe 0 (siehe 6.9), bewusst typisiert statt `JsonObject`-basiert
+  (gleiche Begründung wie `Stammdaten.vb`, siehe 8.7).
 
 ## 6. Laufzeitsicht
 
@@ -221,7 +256,8 @@ Funktionen von `Solver.vb` und den drei Kursstufe-Modulen auf.
    `Session`s aus `teacher_subject_assignment` abgeleitet, `Lesson`-
    BoolVars für jede (Klasse,Fach,Lehrer,Tag,Periode)-Kombination erzeugt,
    `Room`-BoolVars für `room_requirement`-Fälle, und `ApplyConstraints`
-   übersetzt jeden der übrigen 8 Constraint-Typen in `model.Add(...)`-Aufrufe.
+   übersetzt jeden der übrigen Constraint-Typen in `model.Add(...)`-Aufrufe
+   (vollständige Typliste in `json-constraints-reference.md`).
 3. Existieren Kann-Constraints, setzt `BuildModel` `model.Minimize(Sum(KannVars))`.
 4. Ein `CpSolver` mit `max_time_in_seconds`/`random_seed`/`num_search_workers`
    löst das Modell.
@@ -239,12 +275,20 @@ Funktionen von `Solver.vb` und den drei Kursstufe-Modulen auf.
    übergeben. Behebt eine reale Kaltstart-Schwäche der vollen
    6-Kriterien-Zielfunktion bei großen Szenarien (siehe
    `docs/phase2-12-staged-hints.md`).
-3. **Stufe 2**: `SolveTopObjective.ApplyQualityObjective` setzt die volle
-   gewichtete Zielfunktion; eine Schleife löst wiederholt dasselbe
-   `CpModel` (jeweils neuer `CpSolver`, über `SolveWithStagnationCutoff` -
-   siehe Phase 2.25 in 5.2 - falls `stagnationTimeoutS` nicht `Nothing`
-   ist), sperrt jede gefundene Lösung per `BlockSolution` (No-Good-
-   `AddBoolOr`) gegen Wiederholung, reicht die gefundene Belegung optional
+3. **Stufe 2**: Im Default-Modus `lexicographic:=True` (Code-Review P2)
+   werden die Qualitäts-Stufen nacheinander optimiert und jeweils als
+   hartes Band `<= opt + lexTolerance` ins Modell fixiert (Kann →
+   optionale Dichte-/Fach-Fenster-Stufen → ClassGaps → optional
+   TeacherGaps, siehe 5.2); die gewichtete Rest-Zielfunktion bildet die
+   letzte Stufe. Mit `lexicographic:=False` setzt
+   `SolveTopObjective.ApplyQualityObjective` stattdessen die frühere
+   volle gewichtete Ein-Summen-Zielfunktion. Danach löst eine Schleife
+   wiederholt dasselbe `CpModel` (jeweils neuer `CpSolver`, über
+   `SolveWithStagnationCutoff` - siehe Phase 2.25 in 5.2 - falls
+   `stagnationTimeoutS` nicht `Nothing` ist), sperrt jede gefundene
+   Lösung per `BlockSolution` (No-Good-`AddBoolOr`) gegen Wiederholung -
+   mit `minDiversity > 0` als Distanz-Cut (mindestens n abweichende
+   Belegungen, Code-Review P3) -, reicht die gefundene Belegung optional
    als Hint an die nächste Iteration weiter, und bricht ab bei
    `maxSolutions`, `totalTimeLimitS` oder `Infeasible` (Suchraum erschöpft).
 4. Jede Kandidatenlösung wird unabhängig via `Verifier.VerifyScheduleDetailed`
@@ -387,6 +431,81 @@ von Hand nach der Kontingentstundentafel nachgebildet) - siehe
 `docs/schooltestrunner-benutzerhandbuch.md` für eine kurze Beschreibung
 beider.
 
+Der Runner kennt vier Subkommandos: `new` (Scaffold einer neuen
+Schule), `run` (volle Pipeline wie oben), `render` (baut NUR die
+HTML-Viewer aus bereits vorhandenen JSON-Outputs neu - kein
+Solver-Lauf; die tragende Validierung für reine Viewer-Änderungen) und
+`klassen` (die Klassenbildungs-Stufe 0, siehe 6.9).
+
+### 6.8 Szenario: Mehr-Zuteilungs-Modus (Äquivalenzklassen + Symmetriebrechung)
+
+Antwort auf die Frage "könnte man mit mehreren NICHT-symmetrischen
+Lehrerzuteilungen in die zweite Stufe gehen?": ja - aber naiv
+enumerierte Alternativen wären überwiegend Symmetrie-Duplikate
+(zwei qualifikatorisch identische Lehrkräfte tauschen die Klassen).
+
+1. `Lehrereinsatzplanung.TeacherEquivalenceClasses(bestand,
+   handConstraints)` gruppiert Lehrkräfte mit identischer
+   Voll-Pipeline-Signatur (Profil, Qualifikationen, feste Zuordnungen,
+   normalisierte Hand-Constraints - Eigenreferenzen werden zu `<SELF>`,
+   damit inhaltsgleiche Regeln die Äquivalenz erhalten).
+2. `SolveLehrereinsatzTop` löst Stufe 1 mehrfach:
+   `AddSymmetryBreaking` erzwingt pro Äquivalenzklasse eine
+   lexikografische Ordnung der Zuteilungsvektoren benachbarter
+   Mitglieder (genau EIN Repräsentant pro Orbit), ein Qualitätsband
+   (`assignmentTolerance`) und namensbasierte Distanz-Cuts
+   (`assignmentMinDiversity`) liefern echte Alternativen.
+3. `SchoolTestRunner/Run.vb` fährt Stufe 2 (`SolveTop`) pro Zuteilung
+   mit aufgeteiltem Budget (Hand-Constraints je Lauf per `DeepClone`,
+   da `JsonNode` nur einen Parent erlaubt) und übergibt alle Läufe als
+   `AssignmentRun`-Liste an `Formatting.ToStundentafelJsonMulti` -
+   die Lösungen ALLER Zuteilungen werden global nach Qualität sortiert.
+4. Der Viewer zeigt pro Lösung die Zuteilung ("Zuteilung"-Spalte) und
+   markiert über die exportierten `teacher_equivalence_classes`,
+   welche Lehrkräfte per Äquivalenz direkt tauschbar wären (⇄).
+
+Bewusste Entscheidung dabei (live erkannt): der Diversitäts-Cut
+arbeitet auf NAMENS-Ebene, nicht auf der Äquivalenzklassen-Projektion -
+Letztere wäre zu grob und hätte echte Alternativen (z.B. "A übernimmt
+BEIDE Klassen" vs. Aufteilung) fälschlich als Duplikat verboten;
+Orbit-Eindeutigkeit leistet allein die Lex-Symmetriebrechung. Der
+Nutzen ist belegt: im Grundschul-Beispiel lieferte erst eine
+nicht-symmetrische Alternativ-Zuteilung den global besten Plan.
+
+### 6.9 Szenario: Klassenbildung (`klassen <schule>`, Stufe 0)
+
+```
+tests/<schule>/input/klassenbildung.yaml (+ config.yaml klassenbildung:-Block)
+        │
+        ▼
+YamlKlassenbildung.LoadKlassenbildungYaml → Klassenbildung.ValidateKlassenbildung
+        │  (Fail-Fast wie überall: unbekannte Referenzen, unmögliche
+        │   Korridore, Fixierungs-Widersprüche blockieren den Solve)
+        ▼
+Klassenbildung.SolveKlassenbildungTop   (n Varianten im Qualitätsband ε,
+        │                                Mindest-Distanz, Konsens-Kern)
+        ▼
+KlassenbildungQuality.Bewerte je Variante   (unabhängige Nachzählung -
+        │                                    Abweichung vom Solver = FAIL)
+        ▼
+output/klassenbildung.{md,json,html}   (Report, Maschinenformat,
+                                        interaktives Arbeitsbrett)
+```
+
+Die Stufe ist als **menschen-moderierter Entscheidungsprozess**
+entworfen (Konzept-Abschnitt 10: der Solver liefert Vorschläge, die
+Schulleitung entscheidet): der Viewer (`Templates/klassenbildung.html`,
+siehe 8.10) unterstützt den Trichter Basis-Variante wählen →
+Konsens-Kern/Unkritische bulk-fixieren → Gruppen/Einzelfälle pinnen →
+Karten per Drag & Drop verschieben (Live-Bewertung im Browser,
+JS-Duplikat von `Bewerte`) → `fixierungen:`-YAML-Block exportieren →
+`klassen`-Lauf erneut rechnen. Ein Re-Solve direkt aus dem Viewer
+(U5) ist bewusst noch nicht umgesetzt - der Viewer bewertet nur, er
+optimiert nicht. Hinweis zur Reproduzierbarkeit: durch das
+Wandzeit-Limit je Lauf sind Varianten und Konsens-Kern-Größe trotz
+festem Seed nicht run-zu-run-stabil (die Zielwerte der akzeptierten
+Varianten liegen aber stets im ε-Band).
+
 ## 7. Verteilungssicht
 
 | Umgebung | Inhalt | Status |
@@ -399,6 +518,14 @@ bzw. `...win-x64` als transitive NuGet-Abhängigkeit) - derselbe
 `TimetableCore.vbproj`-Build funktioniert unverändert auf beiden. Ollama
 läuft in beiden Umgebungen als separater, lokal zu installierender
 Prozess (`http://127.0.0.1:11434`), keine Cloud-Abhängigkeit.
+
+Die generierten Self-contained-HTML-Viewer (siehe 8.10) brauchen
+keinerlei Laufzeitumgebung außer einem Browser und werden auf zwei
+Wegen bereitgestellt: als committete Kopien für GitHub Pages
+(`stundentafel/*.html`, ausgeliefert wird nur der `main`-Branch) und
+als Claude-Artifacts (stabil verlinkte private Vorschau-Seiten für
+Zwischenstände ohne main-Merge; URLs und Aktualisierungs-Prozedur in
+`timetable-dotnet/CLAUDE.md`).
 
 ## 8. Querschnittliche Konzepte
 
@@ -424,24 +551,37 @@ wiederverwenden, bliebe ein Übersetzungsfehler in dieser gemeinsamen
 Logik unsichtbar - der Checker würde einfach zustimmen, was das
 fehlerhafte Modell produziert hat. Dasselbe Prinzip wiederholt sich bei
 `ScheduleQuality.vb` (unabhängig von `SolveTopObjective.vb`s
-In-Modell-Näherung) und bei `Verifier.VerifyKursblockung` (unabhängig von
-`Kursblockung.vb`s CP-SAT-Constraints).
+In-Modell-Näherung), bei `Verifier.VerifyKursblockung` (unabhängig von
+`Kursblockung.vb`s CP-SAT-Constraints) und bei
+`KlassenbildungQuality.Bewerte` (unabhängig vom CP-SAT-Modell in
+`Klassenbildung.vb`; `KlassenRun` bricht mit FAIL ab, wenn Nachzählung
+und Solver-Verletzungen auseinanderlaufen). Die Viewer führen das
+Prinzip in umgekehrter Rolle fort: ihr Inline-JS enthält BEWUSSTE,
+kommentierte Formel-Duplikate (Gewichte-Regler der Stundentafel,
+U4-Live-Bewertung der Klassenbildung) - dort ist der VB-Kern die
+unabhängige Ground Truth, gegen die die JS-Kopie per
+Chromium-Interaktionstest zeichengleich verifiziert wird (siehe 8.10).
 
 ### 8.3 Muss/Kann-Priorität (`priority: "must"|"should"`)
 
-Fünf von neun klassenbasierten Constraint-Typen (`teacher_availability`,
-`forbidden_slot`, `room_requirement`, `consecutive_required`, sowie der
-`max_per_day`-Teil von `weekly_hours`) können als weich (`"should"`)
-markiert werden. Ein weicher Constraint bekommt eine gemeinsame
-Verletzungs-`BoolVar`; die eigentliche Anforderung wird über
-`.OnlyEnforceIf(violated.Not())` daran gekoppelt, die Zielfunktion
-minimiert die Summe aller Verletzungs-Variablen (binär gewichtet - eine
-verletzte Regel zählt 1, unabhängig davon wie viele Slots sie betrifft).
+Sieben der 13 klassenbasierten Constraint-Typen (`teacher_availability`,
+`forbidden_slot`, `required_slot`, `occupied_slot`, `room_requirement`,
+`consecutive_required`, sowie der `max_per_day`-Teil von `weekly_hours`)
+können als weich (`"should"`) markiert werden. Ein weicher Constraint
+bekommt eine gemeinsame Verletzungs-`BoolVar`; die eigentliche
+Anforderung wird über `.OnlyEnforceIf(violated.Not())` daran gekoppelt,
+die Zielfunktion minimiert die Summe aller Verletzungs-Variablen (binär
+gewichtet - eine verletzte Regel zählt 1, unabhängig davon wie viele
+Slots sie betrifft). Zwei Fenster-Typen weichen bewusst davon ab:
+should-`occupied_window` und should-`subject_period_window` erzeugen
+KEINE Verletzungs-BoolVars, sondern zählen jeden unbelegten bzw. außen
+platzierten Slot in einem eigenen Qualitätskriterium
+(`OccupiedDensity`/`SubjectWindow`) - reine Linearsummen über ohnehin
+existierende Variablen, der Kern der Code-Review-Umsetzung P1.
 Strukturell zwingende Typen (`no_overlap`, `shared_resource_conflict`,
-`teacher_subject_assignment`, `hours_per_week`) bleiben immer hart - sie
-sind physisch/strukturell notwendig (siehe
-`json-constraints-reference.md` für die vollständige Liste). Details und
-Beispiele: `json-constraints-reference.md`.
+`teacher_subject_assignment`, `parallel_group`, `hours_per_week`)
+bleiben immer hart - sie sind physisch/strukturell notwendig. Details
+und Beispiele: `json-constraints-reference.md`.
 
 ### 8.4 Rückverfolgbarkeit (`reason`-Feld)
 
@@ -474,9 +614,14 @@ eigenständiges, in sich konsistentes `entities`/`constraints`-JSON
 synchronisiert die Schienen einer Gruppe gegeneinander);
 `Raumzuordnung.vb` pinnt Tag/Periode aus Stufe B über `forbidden_slot`
 auf allen anderen Slots. Der Vorteil: `BuildCoreModel`/`ApplyConstraints`
-bleiben stabil und weiterhin nur für die 9 klassenbasierten
+bleiben stabil und weiterhin nur für die 13 klassenbasierten
 Constraint-Typen zuständig - jede neue Schulform ist ein neues Modul,
-keine neue `Case`-Verzweigung im Kern.
+keine neue `Case`-Verzweigung im Kern. Die Klassenbildung (Stufe 0)
+treibt das Muster auf die Spitze: sie nutzt die Pipeline gar nicht,
+sondern ist ein komplett eigenständiges CP-SAT-Teilmodell ohne jede
+Kopplung an `Solver.vb` - ihr Ergebnis fließt fachlich (welche Kinder
+bilden Klasse 1a) in die Stammdaten der Folgestufen ein, nicht
+technisch.
 
 ### 8.7 Wire-Format-Parität
 
@@ -488,6 +633,72 @@ Klassenmodells - bewusst dieselbe "dict-artige" Flexibilität wie Pythons
 String als auch eine Liste sein dürfen). Ein typisiertes Modell (für
 GUI-Databinding) kann später darüber gelegt werden, ohne diesen Kern
 anzufassen.
+
+### 8.8 Symmetriebrechung und Lösungsvielfalt
+
+Überall dort, wo mehrere Alternativen enumeriert werden, trennt die
+Architektur zwei Anliegen sauber:
+
+- **Symmetrie-Duplikate verhindern** übernimmt Symmetriebrechung IM
+  Modell: lexikografische Ketten über die Zuteilungsvektoren
+  benachbarter Mitglieder einer Lehrer-Äquivalenzklasse
+  (`Lehrereinsatzplanung.AddSymmetryBreaking`) bzw. eine
+  Präzedenzkette über die Klassen der Klassenbildung (Kind i darf
+  Klasse c nur eröffnen, wenn ein früheres Kind Klasse c-1 eröffnet
+  hat; per Fixierung referenzierte Klassen sind ausgenommen, weil ihre
+  Nummern extern Bedeutung tragen).
+- **Echte Vielfalt erzwingen** übernehmen Cuts ZWISCHEN den Läufen:
+  No-Good-Klauseln ("nicht identisch") bzw. Distanz-Cuts ("mindestens
+  n Entscheidungen anders" - `minDiversity` in `SolveTop`,
+  `assignmentMinDiversity` in `SolveLehrereinsatzTop`, `min_distanz`
+  in `SolveKlassenbildungTop`), jeweils kombiniert mit einem
+  Qualitätsband (ε bzw. absolute Toleranz), damit Vielfalt nicht auf
+  Kosten deutlich schlechterer Lösungen geht.
+
+Die Grenze zwischen beiden ist eine dokumentierte Lehre (siehe 6.8):
+Diversitäts-Cuts auf der Äquivalenzklassen-PROJEKTION wären zu grob
+und würden echte Alternativen verbieten - Cuts bleiben deshalb auf
+Namens-/Variablen-Ebene, Orbit-Eindeutigkeit leistet allein die
+Symmetriebrechung.
+
+### 8.9 Getrennte Testsuiten nach Änderungsbereich
+
+`Klassenbildung.Tests` ist ein eigenes Testprojekt neben
+`TimetableCore.Tests` - nicht aus Ordnungsliebe, sondern als
+Kosten-Entscheidung: die Stundenplan-Suite exerziert die Klassenbildung
+nicht (und umgekehrt), läuft aber Minuten statt Sekunden. Die feste
+Regel dazu (welcher Änderungsbereich welchen Prüfumfang verlangt, inkl.
+des Sonderfalls "reine Viewer-Änderung → Build + `render` +
+Chromium-Smoke statt Suite") steht in `timetable-dotnet/CLAUDE.md`;
+"volle Suite" bedeutet seither BEIDE Testprojekte.
+
+### 8.10 Self-contained-HTML-Viewer und ihre Verifikation
+
+Beide Viewer (`stundentafel.html`, `klassenbildung.html`) folgen
+demselben Muster: ein statisches HTML-Template mit Inline-CSS und
+ES5-Inline-JS liegt als Embedded Resource im `SchoolTestRunner`; beim
+Schreiben wird das komplette Ergebnis-JSON in einen
+`<script type="application/json">`-Block eingebettet (`__..._JSON__`-
+Platzhalter, `</script`-Escape). Die erzeugte Datei ist vollständig
+offline per Doppelklick nutzbar - keine Bibliothek, kein Server, keine
+Build-Kette; ältere JSON-Stände werden defensiv behandelt (fehlende
+Felder → Feature degradiert statt Fehler, z.B. läuft der
+Klassenbildungs-Viewer ohne `balance`-Block im reinen Anzeige-Modus
+ohne Drag & Drop).
+
+Interaktive Was-wäre-wenn-Funktionen (Gewichte-Regler, Pareto-Filter,
+U4-Live-Bewertung mit Drag & Drop) erfordern Zähllogik im Browser -
+diese ist als bewusste, kommentierte Formel-Duplikation des VB-Kerns
+umgesetzt (siehe 8.2) und wird pro Änderung durch
+Headless-Chromium-Interaktionstests abgesichert: ein vor `</body>`
+injiziertes Testskript dispatcht echte DOM-/Drag-Events, schreibt
+Kennzahlen in `document.title`, und eine unabhängige
+Python-Nachrechnung derselben Rohdaten prüft die Browser-Ergebnisse
+(z.B. "Live-Bewertung == Bewerte" zeichengleich für alle Varianten,
+Ampel-Zähler nach einer simulierten Verschiebung exakt wie
+vorhergesagt). Verteilungs-Detail siehe 7: die generierten Seiten
+werden als GitHub-Pages-Kopien (main-Stand) und als Claude-Artifacts
+(Zwischenstände) bereitgestellt.
 
 ## 9. Architekturentscheidungen
 
@@ -505,6 +716,11 @@ Begründungen jeweils in den referenzierten `docs/phase2-*.md`-Berichten):
 | `System.Text.Json.Nodes` statt eines generierten/handgeschriebenen typisierten Modells | Records/Klassen pro Constraint-Typ mit `JsonSerializer`-Attributen | Minimiert das Übersetzungsrisiko beim 1:1-Portieren aus Pythons dict-basiertem Original; ein typisiertes Modell kann bei Bedarf später ergänzt werden (GUI-Databinding), ohne den Kern zu ändern. |
 | Klassenlehrer-Tandem-Balance (Phase 2.17) über den bereits in `SolveTopObjective.vb` verifizierten Sentinel-Min/Max-Trick, mit `>=`-Hinge statt `=`-Gleichheit | Direkte `AddMaxEquality`/`AddMinEquality`-Gleichheit für den Bereich (`tandemRange = tandemMax - tandemMin`) | Live beim Testschreiben entdeckt: bei genau einem (oder keinem) aktiven Tandem-Kandidaten wird der Sentinel-substituierte `tandemMin` (`bigStunden`) größer als der rohe `tandemMax` (0) - eine erzwungene Gleichheit wäre in diesem Randfall unlösbar gewesen. Die Ungleichung `tandemRange >= tandemMax - tandemMin, >= 0` (gleicher Hinge-Trick wie im Deputat-Korridor) lässt der Zielfunktion die Freiheit, `tandemRange` in diesem Fall auf 0 zu setzen, statt Infeasible zu werden. |
 | `ClassGaps`/`TeacherGaps` (Phase 2.25-Nachtrag-2) über eine komplett Big-M-freie Präfix/Suffix-OR-Kodierung (`BuildGapFlags`: `anyBefore`/`anyAfter` je Periode, jede Lücken-PERIODE als eigene reifizierte `BoolVar`) statt des ursprünglichen Sentinel-Min/Max-Tricks | (1) `AddMinEquality`/`AddMaxEquality` mit Big-M-Sentinel-Substitution (Original); (2) eine erste "sentinel-freie" Zwischenstufe, die `AddMinEquality`/`AddMaxEquality` weiterhin nutzte, nur ohne Big-M-Konstante | Systematische Scratch-Experimente (Exp 1-13, `docs/phase2-25-stagnation-heuristik.md` Nachtrag 2) identifizierten `TeacherGaps`' ALTE Kodierung (nicht `ClassGaps`' ursprünglich 10x höheres Gewicht, wie zunächst vermutet) als eigentlichen Treiber einer über 300s hinweg komplett unbewegten `BestObjectiveBound` - selbst bei `TeacherGaps`' eigenem, vergleichsweise niedrigen Original-Gewicht. Zwischenstufe (2) reichte NICHT (97.9% statt 99.7% Lücke im Vollmaßstab-Test, kaum Verbesserung) - erst der komplette Verzicht auf `AddMinEquality`/`AddMaxEquality` behob es. `TeacherLoadVariance` (`BuildTeacherRangeVars`) und die Tandem-Balance oben nutzen den Sentinel-Trick bewusst unverändert weiter - beide waren nicht Teil dieser Diagnose, bleiben als möglicher späterer Kandidat dokumentiert. |
+| Lexikografische Stufen als `SolveTop`-Default (Code-Review P2) statt der gewichteten Gesamtsumme | Nur die gewichtete Ein-Summen-Zielfunktion (vorheriger Stand) | Gewichte vermengen inkommensurable Kriterien (ein eingesparter Kann-Verstoß darf nie gegen viele Springstunden "verrechnet" werden); Stufen mit hartem Band machen die Prioritätsordnung explizit und nachvollziehbar. Der gewichtete Modus bleibt per `lexicographic:=False` erreichbar; `lexTolerance` erlaubt kontrolliertes Aufweichen des Bands. Belegläufe in `docs/code-review-cpsat-performance.md` und den `config.yaml`-Kommentaren der Beispiel-Schulen. |
+| `occupied_window`/`subject_period_window` als Kriteriums-Semantik (Linearsumme) statt Kann-BoolVar-Batterien (Code-Review P1) | Pro Slot ein eigenes should-`occupied_slot`/`forbidden_slot` (Batterie; im GMS-Beispiel 720 Einzelregeln) | Batterien blähen das Modell mit Verletzungs-BoolVars auf und zählen "eine Regel = 1" unabhängig von der Slot-Zahl; die Fenster-Typen beschreiben dasselbe als EIN Objekt und zählen jeden Slot einzeln über ohnehin existierende Variablen. Opt-in-Lex-Stufen (`lexOccupiedDensityStage`/`lexSubjectWindowStage`) geben dem Kriterium bei Bedarf ein dediziertes Budget - die Antwort auf den P1-Langvergleich, in dem die Batterie die Fensterabdeckung zunächst dominierte (ehrlich dokumentiert). |
+| Diversitäts-Cuts der Mehr-Zuteilungs-Enumeration auf Namens-Ebene, Orbit-Eindeutigkeit allein per Lex-Symmetriebrechung | Diversitäts-Cut auf der Äquivalenzklassen-Projektion ("dieselbe Klasse übernimmt dieselben Einheiten") | Beim Umsetzen selbst erkannt: die Projektion ist zu grob und hätte strukturell verschiedene Zuteilungen (z.B. "A übernimmt beide Klassen" vs. Aufteilung innerhalb derselben Äquivalenzklasse) als Duplikat verboten. Symmetrie und Vielfalt sind getrennte Anliegen mit getrennten Mechanismen (siehe 8.8). |
+| Klassenbildung als vollständig entkoppeltes Modul mit eigener Testsuite und eigenen Prio-Gewichten 1000/50/1 (statt der Konzept-Vorgabe 10000/100/1) | (1) Integration in die `Solver.Solve()`-Pipeline via synthetisches Szenario; (2) Konzept-Gewichte unverändert übernehmen | (1) Die Klassenbildung teilt KEINE Fachlichkeit mit der Stundenplanung (keine Tage/Perioden/Sessions) - ein synthetisches Szenario hätte nur Ballast importiert; als eigenes Modell bleibt sie in Sekunden lösbar und in <1s testbar (siehe 8.9). (2) 1000/50/1 hält die Stufen-Trennung (keine realistische Zahl von Prio-2-Verletzungen wiegt eine Prio-3-Verletzung auf), bleibt aber im `Int64`-sicheren Bereich auch für große Jahrgänge; per `config.yaml` überschreibbar. |
+| Viewer-Interaktivität durch bewusste, kommentierte JS-Formel-Duplikate des VB-Kerns | (1) Kein Was-wäre-wenn im Viewer (nur statische Anzeige); (2) ein Backend-/Server-Prozess für Neuberechnung | (1) verfehlt den Zweck des Arbeitsbretts (Konzept 9.2 Phase 3: reine Bewertung in Millisekunden, ohne Solver-Lauf); (2) bräche das Self-contained-Prinzip (Doppelklick, offline). Das Risiko der Duplikation (Divergenz) wird nicht geleugnet, sondern verifiziert: Chromium-Interaktionstests prüfen die JS-Kopie zeichengleich gegen den VB-Export, die Ground Truth bleibt der nächste CLI-Lauf (siehe 8.10). |
 
 ## 10. Qualitätsanforderungen
 
@@ -536,6 +752,8 @@ Qualität
 | Ein 30-Klassen/75-Lehrer-Realmaßstab-Szenario wird mit der vollen 6-Kriterien-`SolveTop`-Zielfunktion bei `numWorkers:=1` gelöst. | Mit `useStagedHints:=True` (Default) wird innerhalb eines begrenzten Zeitbudgets (~20 Min) mindestens eine Lösung gefunden - ohne Staging fand dieselbe Konfiguration in Tests 30 Minuten lang keine. |
 | Die LLM-Extraktion läuft dreimal ohne festen Seed auf demselben Freitext-Szenario. | Ergebnis wird in `RobustnessRunner`-Ergebnisdateien dokumentiert; ein über mehrere Läufe wiederkehrender (nicht nur einmaliger) Fehlermodus wird entweder durch Instruktions-Schärfung oder deterministische Nachbearbeitung behoben. |
 | Ein Lehrer/Raum-Name ist sowohl in der Sek-I- als auch in der Kursstufen-Entity-Liste vorhanden. | `CombinedSchool.SolveCombinedSchool` verhindert in BEIDEN unterstützten Lösungsreihenfolgen nachweislich eine Doppelbelegung dieses Namens (siehe `CombinedSchoolTests.vb`). |
+| Ein `klassen`-Lauf findet Varianten mit weichen Regelverletzungen. | `KlassenbildungQuality.Bewerte` zählt jede Verletzung unabhängig nach; weicht ein Maß vom Solver-Ergebnis ab, meldet der Lauf FAIL statt stillschweigend den Solver-Wert zu übernehmen. Im Beispiel A entspricht der Zielwert 1001 exakt der Hand-Vorhersage (1 unvermeidbarer Prio-3-Überlauf + 1 Prio-1-Split). |
+| Der Klassenbildungs-Viewer bewertet eine per Drag & Drop veränderte Zuordnung. | Die JS-Live-Bewertung reproduziert die exportierten VB-Chips (Status UND Texte) zeichengleich für jede unveränderte Variante; nach einer Verschiebung stimmen Ampel-Zähler und Warnungen mit einer unabhängigen Python-Nachrechnung überein (Chromium-Interaktionstest, siehe 8.10). |
 
 ## 11. Risiken und technische Schulden
 
@@ -546,8 +764,11 @@ Qualität
 | **`SolveTop` bei kleinen/mittleren Szenarien mit Staging reproduzierbar langsamer** als ohne (Overhead der Stufe-1-Vorlösung übersteigt den Nutzen, wenn eine erste Lösung ohnehin leicht zu finden ist). | Bekannt, `useStagedHints:=False` bleibt für solche Fälle die schnellere Wahl trotz `:=True`-Default; keine größenabhängige Auto-Wahl implementiert (`docs/phase2-12-staged-hints.md`). |
 | **Muss/Kann-Priorität ("should") ist eine subjektive Sprecher-Einschätzung**, kein prüfbarer Fakt - es gibt keine deterministische Verifikation von `priority_accuracy` wie z.B. bei `block_length`. | Dokumentierte, akzeptierte Grenze (`docs/phase2-robustness-report.md`, Phase-2.6-Abschnitt). |
 | **`reason` ist eine Paraphrase, kein Verbatim-Zitat mit Zeichen-Offset** - eine exakte GUI-Textstellen-Markierung ist damit nicht möglich. | Als möglicher Umfang einer künftigen Phase vermerkt, nicht umgesetzt. |
-| **Solver.vb ist mit >1000 Zeilen das mit Abstand größte Modul.** | Bewusst in Kauf genommen (alle 9 klassenbasierten Constraint-Typen an einem Ort, direkt neben der Modellkonstruktion, die sie konsumiert) statt künstlich aufgeteilt - abgemildert durch die konsequente Auslagerung neuer, orthogonaler Konzepte (`ScheduleQuality.vb`, `SolveTopObjective.vb`, `Kursblockung.vb` etc.) in eigene Module. |
+| **Solver.vb ist mit ~1400 Zeilen das mit Abstand größte Modul.** | Bewusst in Kauf genommen (alle 13 klassenbasierten Constraint-Typen an einem Ort, direkt neben der Modellkonstruktion, die sie konsumiert) statt künstlich aufgeteilt - abgemildert durch die konsequente Auslagerung neuer, orthogonaler Konzepte (`ScheduleQuality.vb`, `SolveTopObjective.vb`, `Kursblockung.vb` etc.) in eigene Module. |
 | **`BestObjectiveBound` bleibt bei größeren Realmaßstab-Szenarien (`bw-grundschule-beispiel`) auch nach der Big-M-freien `ClassGaps`/`TeacherGaps`-Kodierung (Phase 2.25-Nachtrag-2) deutlich hinter `ObjectiveValue` zurück** (~74.6% Lücke bei 120s/`numWorkers:=4`, gegenüber 99.7% vorher) - CP-SAT erreicht `Feasible`, nicht bewiesen `Optimal`. Die Kodierungs-Schwäche ist behoben, eine zugrundeliegende LP-Relaxations-Schwäche des Gesamtmodells bleibt bestehen. | Teilweise behoben, ehrlich als nicht vollständig geschlossen dokumentiert (`docs/phase2-25-stagnation-heuristik.md` Nachtrag 2). `stagnation_timeout_s`/`per_solve_time_limit_s`/`max_solutions` mildern die praktische Auswirkung (mehrere schnell gefundene, gut bewertete `Feasible`-Alternativen statt einer einzelnen langen Suche). `TeacherLoadVariance` (weiterhin Sentinel-basiert) bleibt als möglicher nächster Untersuchungskandidat offen. |
+| **Viewer-JS-Formel-Duplikate können vom VB-Kern divergieren**, wenn eine Formel nur auf einer Seite geändert wird. | Akzeptiertes, aktiv verifiziertes Risiko: Chromium-Interaktionstests prüfen die Duplikate zeichengleich gegen den VB-Export (siehe 8.10); der nächste CLI-Lauf bleibt in jedem Fall die Ground Truth, ein divergenter Viewer kann also fehlleiten, aber kein falsches Endergebnis erzeugen. |
+| **Klassenbildung: Konfliktkern-Analyse (Plan K6) und Re-Solve aus dem Viewer (UI-Konzept U5) offen.** Bei kollidierenden harten Regeln/Fixierungen meldet der Lauf nur Infeasible ohne Benennung des minimalen Konfliktkerns; der Viewer-Loop läuft über YAML-Export + erneuten CLI-Lauf. | Offen, in `docs/klassenbildung-plan.md` bzw. `docs/klassenbildung-ui-konzept.md` als nächste Ausbaustufen beschrieben; das UI ist so geschnitten, dass U5 nur den Export-Teil ersetzt. |
+| **`klassen`-Läufe sind trotz festem Seed nicht run-zu-run-stabil** (Wandzeit-Limits beeinflussen, welche Varianten im ε-Band gefunden werden - beobachtet: Konsens-Kern 27 vs. 54 von 100 bei identischem Input). | Bekannt und in 6.9 dokumentiert; die Zielwerte akzeptierter Varianten liegen stets im ε-Band, der Konsens-Kern ist als Arbeitshilfe (Bulk-Fixierung), nicht als stabile Kennzahl zu lesen. |
 | **GUI (Phase 3) noch nicht begonnen.** | Geplant, nachgelagert unter Windows; der Kern ist bereits GUI-unabhängig entworfen (siehe 4, 7). |
 
 ## 12. Glossar
@@ -569,3 +790,13 @@ Qualität
 | **Synthetisches Szenario** | Ein intern konstruiertes `entities`/`constraints`-JSON, das eine neue Planungsstufe auf die bestehende `Solver.Solve()`-Pipeline abbildet, ohne diese zu verändern. |
 | **CP-SAT** | Googles Constraint-Programming-/SAT-Solver (Teil von OR-Tools), das eigentliche Optimierungs-Backend. |
 | **Verifier** | Der von der Solver-Logik unabhängige Nachprüfer eines gefundenen Plans. |
+| **Lexikografische Stufe** | Ein Qualitätskriterium, das in `SolveTop` (Default seit Code-Review P2) einzeln optimiert und dann als hartes Band (`<= opt + lexTolerance`) fixiert wird, bevor die nächste Stufe optimiert - macht Prioritätsordnung explizit statt gewichtet verrechnet. |
+| **Dichte-Kriterium (`OccupiedDensity`)** | Zählt unbelegte Slots innerhalb von should-`occupied_window`-Fenstern - Kriteriums-Semantik statt Kann-BoolVar-Batterie (Code-Review P1). |
+| **Rhythmisierung / `subject_period_window`** | Fach-bezogene Zeitfenster-Regel ("Kernfächer vormittags, AGs Mo-Do nachmittags"): must = hartes Verbot außerhalb des Fensters, should = Zählung im `SubjectWindow`-Kriterium. |
+| **Äquivalenzklasse (Lehrkräfte)** | Menge von Lehrkräften mit identischer Voll-Pipeline-Signatur (Profil, Qualifikationen, feste Zuordnungen, normalisierte Hand-Constraints) - untereinander tauschbar, Quelle von Symmetrie-Duplikaten; im Viewer als ⇄ sichtbar. |
+| **Zuteilung (Mehr-Zuteilungs-Modus)** | Ein Stufe-1-Ergebnis (Lehrer→Klasse/Fach), auf dessen Basis Stufe 2 eigene Stundenplan-Lösungen rechnet; `ToStundentafelJsonMulti` sortiert die Lösungen aller Zuteilungen global. |
+| **Klassenbildung (Stufe 0)** | Einteilung eines Jahrgangs in Parallelklassen nach pädagogischen Regeln (Gruppen, Balance, Wünsche, Fixierungen) - eigenständiges CP-SAT-Modul, menschen-moderiert. |
+| **Ampel-Chip** | Status eines Kriteriums für EIN betroffenes Kind der Klassenbildung: grün (erfüllt), gelb (erfüllt, aber knapp), rot (weiche Regel verletzt); Kinder ohne Chips sind "frei". |
+| **Konsens-Kern** | Kinder, die in ALLEN gefundenen Klassenbildungs-Varianten identisch zugeordnet sind - Kandidaten für eine Bulk-Fixierung, keine stabile Kennzahl (siehe 11). |
+| **Fixierung / Pin** | Harte Vorab-Zuordnung eines Kindes zu einer Klasse (bzw. Ausschluss, `nicht_klasse`) - per YAML als Solver-Input, im Viewer als F1/F2-Pin mit YAML-Export für den nächsten Lauf. |
+| **Härtung (F3/F5)** | Viewer-Export-Direktive, einen weichen Wunsch bzw. eine weiche Gruppe im nächsten Lauf `modus: hard` zu stellen - ändert bewusst nicht die Live-Bewertung. |
