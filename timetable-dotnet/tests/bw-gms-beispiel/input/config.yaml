@@ -137,6 +137,19 @@ quality_weights:
   # gleicher Tier wie das TeacherGaps-Default - eine spuerbare
   # Praeferenz in der Rest-Zielfunktion, ohne eigene Lex-Stufe; die
   # Dichte behaelt ihre Stufe (lex_occupied_density_stage).
+  # BELEG-LAUF (1200s-Budget, 27 Loesungen, alle Feasible/Bound 0 wie
+  # in diesem Szenario ueblich): 24 von 27 Loesungen mit
+  # subject_window_count 0 - saemtliche 848 Kernfach-Kurs-Stunden im
+  # Vormittagsblock 1-6 (unabhaengig aus den Grids nachgerechnet);
+  # Rest bis 56. Die besten Loesungen kombinieren 0 Verstoesse mit
+  # TeacherGaps 14-19; Dichte-Defizit weiter KONSTANT 8 (die
+  # Dichte-Stufe haelt ihr Band), ClassGaps ueberall 0. Vorher
+  # (Dichte-Stufen-Lauf OHNE die Regeln, 28 Loesungen): 16-54
+  # Kernfach-Stunden ausserhalb, TeacherGaps 3-63. Ehrlicher
+  # Trade-off: das fruehere TeacherGaps-Minimum 3 ist mit erzwungener
+  # Kernfach-Lage nicht mehr dabei - die Vormittags-Praeferenz kostet
+  # Lehrerplan-Spielraum (best 14 statt 3), bei num_workers=4 zudem
+  # lauf-zu-lauf-Streuung.
   subject_window: 100.0
   include_edge_period: false
   include_afternoon_day_count: false
