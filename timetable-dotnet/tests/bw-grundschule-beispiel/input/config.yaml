@@ -17,11 +17,13 @@ solve_time_limit_s: 180.0
 num_workers: 4
 
 # Begrenzt (getrennt von solve_time_limit_s) jede EINZELNE Solve-
-# Iteration in Solver.SolveTop. Bewusst deutlich UNTER dem 3-Min-
-# Gesamtbudget gesetzt, damit innerhalb der 180s mehrere verschiedene
-# Iterationen (= mehrere verschiedene Loesungen) Platz haben, statt dass
-# die erste Iteration allein das komplette Budget verbraucht.
-per_solve_time_limit_s: 30.0
+# Iteration in Solver.SolveTop. Nutzervorgabe: 3 Min - damit deckt eine
+# einzelne Iteration notfalls das komplette Gesamtbudget ab; dass
+# trotzdem mehrere verschiedene Loesungen entstehen, uebernimmt allein
+# die Stagnationserkennung (unten, 4s): sie kappt Iterationen, die
+# nicht mehr verbessern, und gibt die restliche Zeit an weitere
+# Iterationen weiter.
+per_solve_time_limit_s: 180.0
 
 # Phase 2.25: bricht eine einzelne Solve-Iteration vorzeitig ab, sobald so
 # lange keine neue Verbesserung mehr gefunden wurde - die gesparte Zeit
@@ -83,13 +85,16 @@ rehint_found_solutions: false
 # einzelne Luecken-Variable berechnet wird, nicht wie die beiden Summen
 # gewichtet in die Zielfunktion einfliessen).
 #
-# Code-Review-Umsetzung P2: die vier Sekundaerkriterien (Randstunden,
-# Nachmittags-Tage, Klassen-/Lehrer-Tagesausgewogenheit) sind im
-# lexikografischen Modus wieder AKTIV - sie bilden dort die
-# REST-Zielfunktion, die innerhalb des fixierten Stufen-Optimums
-# (Kann=0/ClassGaps=0/TeacherGaps=0) jede Iteration steuert. Unter dem
-# frueheren Summenmodell waren sie strukturell abgeschaltet, weil sie
-# die Bound-Beweise verwaesserten.
+# Nutzervorgabe: die vier Sekundaerkriterien (Randstunden,
+# Nachmittags-Tage, Klassen-/Lehrer-Tagesausgewogenheit) sind wieder
+# STRUKTURELL abgeschaltet (include_*: false - keine Hilfsvariablen im
+# Modell, nicht nur Gewicht 0). Die Rest-Zielfunktion besteht damit nur
+# noch aus TeacherGaps (50) und der occupied_window-Dichte (100);
+# ScheduleQuality.Score und der Stundentafel-Viewer zeigen die echten
+# Werte der vier Kriterien weiterhin an (gedaempfte Spalten in der
+# Loesungsuebersicht - nur die SUCHE ist blind, nicht die Anzeige).
+# Zwischenzeitlich waren sie als Rest-Zielfunktion aktiv - die
+# Messreihe unten dokumentiert beide Zustaende.
 #
 # Live gemessen (je volles 2-Min-Budget, ehrlicher Vergleich):
 # - Vorher (Summenmodell, committeter Stand): Feasible mit 71-74%
@@ -109,6 +114,17 @@ rehint_found_solutions: false
 #   bleibt pro Iteration Feasible (ihr eigenes Optimum im Band ist im
 #   4s-Stagnation-Fenster nicht beweisbar), was aber nur noch die
 #   Restkriterien betrifft, nie mehr Kann/ClassGaps.
+# - Dieser Stand (Nutzervorgabe: vier Kriterien strukturell aus,
+#   per_solve = Gesamtbudget 180s): Lauf beendet nach nur 41s -
+#   MaxSolutionsReached mit 30 Loesungen, JEDE einzelne bewiesen
+#   Optimal, und alle gesteuerten Metriken auf 0 (Kann, ClassGaps,
+#   TeacherGaps, Fenster-Defizit). Die kleine Rest-Zielfunktion
+#   (nur TeacherGaps 50 + Dichte 100) ist fuer CP-SAT vollstaendig
+#   beweisbar. Quality.Total 247.8-352.4 liegt HOEHER als mit aktiven
+#   Restkriterien (183.6) - der Total-Wert zaehlt die vier jetzt
+#   ungesteuerten Kriterien (Randstunden usw.) weiterhin mit; im
+#   Viewer sind diese Spalten gedaempft und per Gewichts-Betrachtung
+#   nachgelagert bewertbar.
 quality_weights:
   class_gaps: 1000.0
   teacher_gaps: 50.0
@@ -139,3 +155,7 @@ quality_weights:
   # harte Fenster-Garantie zurueckwill: priority auf must setzen (haerter
   # als vorher) oder occupied_density weiter anheben.
   occupied_density: 100.0
+  include_edge_period: false
+  include_afternoon_day_count: false
+  include_class_load_variance: false
+  include_teacher_load_variance: false
