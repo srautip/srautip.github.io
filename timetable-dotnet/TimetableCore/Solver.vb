@@ -8,7 +8,7 @@
 ' motivated this ordering.
 Imports System.Diagnostics
 Imports System.Text.Json.Nodes
-Imports System.Threading.Tasks
+Imports System.Threading
 Imports Google.OrTools.Sat
 
 
@@ -133,6 +133,12 @@ Public NotInheritable Class SolveResult
     Public Property Solver As CpSolver
     Public Property Schedule As List(Of ScheduleEntry)
     Public Property KannConstraintFlags As List(Of KannConstraintFlag)
+    ''' <summary>True, wenn der Aufrufer per CancellationToken abgebrochen
+    ''' hat (arc42 8.11). Das Ergebnis ist dann das, was CP-SAT bis dahin
+    ''' hatte: Feasible mit Teilplan, oder Unknown ohne. War das Token schon
+    ''' beim Eintritt gesetzt, ist zusaetzlich Solver Nothing - dann wurde
+    ''' nicht einmal das Modell gebaut.</summary>
+    Public Property Cancelled As Boolean
 End Class
 
 ''' <summary>Phase 2.8: why Solver.SolveTop's search loop stopped.</summary>
@@ -144,6 +150,14 @@ Public Enum MultiSolveStopReason
     ''' exists. If Solutions is empty, this means the scenario had no
     ''' feasible solution at all.</summary>
     SearchSpaceExhausted
+    ''' <summary>Der Aufrufer hat per CancellationToken abgebrochen (arc42
+    ''' 8.11). Solutions enthaelt alles, was bis dahin gefunden wurde -
+    ''' weiterhin nach Quality.Total sortiert. Der Abbruch kann VOR der
+    ''' ersten Loesung erfolgt sein (z.B. waehrend einer lexikographischen
+    ''' Stufe); dann ist Solutions LEER, ohne dass das Szenario unloesbar
+    ''' waere. Aufrufer duerfen aus einer leeren Liste hier also nicht auf
+    ''' Unloesbarkeit schliessen - anders als bei SearchSpaceExhausted.</summary>
+    Cancelled
 End Enum
 
 ''' <summary>One incumbent improvement CP-SAT found while solving a single
@@ -161,12 +175,64 @@ End Class
 ''' CpSolverSolutionCallback.OnSolutionCallback() fires per improving
 ''' solution, and WallTime()/ObjectiveValue() are both readable from
 ''' inside it (inherited from the SolutionCallback base class).</summary>
+''' <summary>Threadsicher seit dem Abbruch-/Fortschrittskanal (arc42 8.11):
+''' OnSolutionCallback laeuft auf einem CP-SAT-Workerthread, waehrend
+''' SolveRunner.RunSolve vom aufrufenden Thread aus liest. Vorher war Points
+''' eine blanke List(Of T), auf der Count und Last() als zwei getrennte
+''' Zugriffe gelesen wurden - mit dem Fortschrittskanal steigt die
+''' Lesefrequenz deutlich, deshalb jetzt durchgaengig unter _gate.
+'''
+''' BestObjectiveBound() ist laut Reflexion ueber die installierte DLL
+''' ebenfalls ein Member der SolutionCallback-Basis und damit von innen
+''' lesbar - dadurch kann die GUI die Optimalitaetsluecke live zeigen, statt
+''' erst nach dem Lauf ueber ScoredSolution. Der ganze Rumpf liegt in
+''' Try/Catch: eine Exception von hier wuerde ueber die native SWIG-Grenze
+''' propagieren.</summary>
 Friend NotInheritable Class ConvergenceCallback
     Inherits CpSolverSolutionCallback
-    Public ReadOnly Points As New List(Of ConvergencePoint)
+
+    Private ReadOnly _gate As New Object()
+    Private ReadOnly _points As New List(Of ConvergencePoint)
+    Private _lastBound As Double
+
     Public Overrides Sub OnSolutionCallback()
-        Points.Add(New ConvergencePoint With {.ElapsedS = WallTime(), .ObjectiveValue = ObjectiveValue()})
+        Try
+            Dim pt As New ConvergencePoint With {.ElapsedS = WallTime(), .ObjectiveValue = ObjectiveValue()}
+            Dim bound = BestObjectiveBound()
+            SyncLock _gate
+                _points.Add(pt)
+                _lastBound = bound
+            End SyncLock
+        Catch
+            ' Aufzeichnung ist Diagnostik, kein Vertrag - lieber einen Punkt
+            ' verlieren als den Solve ueber die native Grenze reissen.
+        End Try
     End Sub
+
+    ''' <summary>Kopie der bisherigen Aufzeichnung. Kopie, weil der Aufrufer
+    ''' sie (als ScoredSolution.Convergence) behaelt, waehrend CP-SAT
+    ''' moeglicherweise noch weiterschreibt.</summary>
+    Public ReadOnly Property Points As List(Of ConvergencePoint)
+        Get
+            SyncLock _gate
+                Return New List(Of ConvergencePoint)(_points)
+            End SyncLock
+        End Get
+    End Property
+
+    ''' <summary>Anzahl und letzter Stand in EINEM gesperrten Zug.</summary>
+    Public Function Snapshot() As ConvergenceSnapshot
+        SyncLock _gate
+            If _points.Count = 0 Then Return New ConvergenceSnapshot()
+            Dim last = _points(_points.Count - 1)
+            Return New ConvergenceSnapshot With {
+                .Count = _points.Count,
+                .LastElapsedS = last.ElapsedS,
+                .LastObjective = last.ObjectiveValue,
+                .LastBound = _lastBound
+            }
+        End SyncLock
+    End Function
 End Class
 
 ''' <summary>One candidate schedule from Solver.SolveTop, bundled with
@@ -214,7 +280,7 @@ Public NotInheritable Class MultiSolveResult
     Public Property IterationsRun As Integer
     Public Property ElapsedS As Double
     ''' <summary>Phase 2.25: how many of the IterationsRun solves were cut
-    ''' short by the stagnation-cutoff (see SolveWithStagnationCutoff) rather
+    ''' short by the stagnation-cutoff (see SolveRunner.RunSolve) rather
     ''' than running to their natural time limit or proving Optimal - lets a
     ''' caller see whether/how often the mechanism actually fired instead of
     ''' leaving it invisible. 0 whenever stagnationTimeoutS is Nothing.</summary>
@@ -965,16 +1031,32 @@ Public Module Solver
     Public Function Solve(data As JsonObject,
                            Optional timeLimitS As Double = 30.0,
                            Optional seed As Integer = 42,
-                           Optional numWorkers As Integer = 1) As SolveResult
+                           Optional numWorkers As Integer = 1,
+                           Optional cancellationToken As CancellationToken = Nothing,
+                           Optional progress As IProgress(Of SolveProgress) = Nothing) As SolveResult
+        ' Vor dem Modellbau pruefen: BuildModel ist bei grossen Szenarien
+        ' selbst schon teuer, und ein bereits abgebrochener Aufruf soll gar
+        ' nichts tun (arc42 8.11).
+        If cancellationToken.IsCancellationRequested Then
+            Return New SolveResult With {.Status = CpSolverStatus.Unknown, .Cancelled = True}
+        End If
+
         Dim built = BuildModel(data)
         Dim solver As New CpSolver()
         solver.StringParameters = $"max_time_in_seconds:{timeLimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
-        Dim status = solver.Solve(built.Model)
+
+        Dim sw = Stopwatch.StartNew()
+        Dim cb As ConvergenceCallback = If(progress Is Nothing, Nothing, New ConvergenceCallback())
+        Dim run = SolveRunner.RunSolve(built.Model, solver, cb,
+                                       SolveRunner.SingleStage(SolvePhase.Iteration, "Stundenplan wird gerechnet",
+                                                               timeLimitS, cancellationToken, progress, sw))
+        Dim status = run.Status
 
         Dim schedule = ExtractSchedule(built, solver, status)
         Dim kannFlags = ExtractKannFlags(built, solver, status)
 
-        Return New SolveResult With {.Status = status, .Solver = solver, .Schedule = schedule, .KannConstraintFlags = kannFlags}
+        Return New SolveResult With {.Status = status, .Solver = solver, .Schedule = schedule,
+                                     .KannConstraintFlags = kannFlags, .Cancelled = run.Cancelled}
     End Function
 
     ''' <summary>Phase 2.8: adds a hard "no-good" cut to `model` forbidding
@@ -1018,41 +1100,10 @@ Public Module Solver
         End If
     End Sub
 
-    ''' <summary>Phase 2.25: runs `solver.Solve(model, callback)` on a
-    ''' background Task and, if `stagnationTimeoutS` is set, polls the
-    ''' calling thread every 500ms for how long it has been since
-    ''' `callback`'s last recorded improvement (CpSolverSolutionCallback.
-    ''' OnSolutionCallback only fires on a NEW incumbent, never periodically -
-    ''' there is no way to observe "stuck for N seconds" from inside the
-    ''' callback itself, hence the separate polling thread). Once idle time
-    ''' exceeds the timeout AND at least one solution already exists, calls
-    ''' `solver.StopSearch()` - live-verified (Phase 2.25a) to make an
-    ''' in-progress cross-thread Solve() call return promptly with its
-    ''' best-found result rather than running out the full time budget on a
-    ''' plateau. `stagnationTimeoutS = Nothing` (or an iteration whose time
-    ''' budget is already shorter) reduces this to a plain, un-cutoff
-    ''' `solver.Solve(model, callback)` call - no behavior change from before
-    ''' this phase for that case.</summary>
-    Private Function SolveWithStagnationCutoff(model As CpModel, solver As CpSolver, callback As ConvergenceCallback,
-                                                 stagnationTimeoutS As Double?, ByRef triggered As Boolean) As CpSolverStatus
-        If Not stagnationTimeoutS.HasValue Then
-            Return solver.Solve(model, callback)
-        End If
-        Dim solveTask = Task.Run(Function() solver.Solve(model, callback))
-        Dim sw = Stopwatch.StartNew()
-        Do
-            If solveTask.Wait(500) Then Exit Do
-            Dim lastImprovementS = If(callback.Points.Count > 0, callback.Points.Last().ElapsedS, 0.0)
-            Dim idleS = sw.Elapsed.TotalSeconds - lastImprovementS
-            If callback.Points.Count > 0 AndAlso idleS >= stagnationTimeoutS.Value Then
-                triggered = True
-                solver.StopSearch()
-                solveTask.Wait()
-                Exit Do
-            End If
-        Loop
-        Return solveTask.Result
-    End Function
+    ' Phase 2.25s SolveWithStagnationCutoff ist in SolveRunner.RunSolve
+    ' (SolveControl.vb) aufgegangen: dieselbe Task-plus-Polling-Schleife,
+    ' erweitert um Abbruch und Fortschritt - und jetzt von ALLEN Solve-Stellen
+    ' des Kerns benutzt statt nur von der SolveTop-Iterationsschleife.
 
     ''' <summary>Phase 2.8: returns up to `maxSolutions` distinct candidate
     ''' schedules, ranked by ScheduleQuality.Score (ascending Total, best
@@ -1099,7 +1150,7 @@ Public Module Solver
     ''' Phase 2.25: `stagnationTimeoutS` (default 45.0s, ACTIVE BY DEFAULT -
     ''' a deliberate exception to this module's usual "Nothing = today's
     ''' behavior" convention, per explicit user decision) cuts an iteration
-    ''' short via SolveWithStagnationCutoff once it has gone that long
+    ''' short via SolveRunner.RunSolve once it has gone that long
     ''' without a new incumbent AND already has at least one solution -
     ''' motivated by a live-measured real scenario (bw-grundschule-beispiel)
     ''' where BestObjectiveBound sat completely flat for a full 30-minute
@@ -1158,10 +1209,20 @@ Public Module Solver
                               Optional lexSubjectWindowStage As Boolean = False,
                               Optional minDiversity As Integer = 0,
                               Optional rehintFoundSolutions As Boolean = True,
-                              Optional laterIterationsGapLimit As Double? = Nothing) As MultiSolveResult
+                              Optional laterIterationsGapLimit As Double? = Nothing,
+                              Optional cancellationToken As CancellationToken = Nothing,
+                              Optional progress As IProgress(Of SolveProgress) = Nothing) As MultiSolveResult
+        If cancellationToken.IsCancellationRequested Then
+            Return New MultiSolveResult With {.Solutions = New List(Of ScoredSolution)(),
+                                              .StopReason = MultiSolveStopReason.Cancelled}
+        End If
+
         Dim weights = If(qualityWeights, New QualityWeights())
         Dim built = BuildCoreModel(data)
         Dim sw = Stopwatch.StartNew()
+        ' Wird in der Vorphase (lexikografische Stufen / Warmstart) gesetzt -
+        ' dort gibt es noch keine Loesung, die man zurueckgeben koennte.
+        Dim cancelled = False
 
         If lexicographic Then
             ' Code-Review-Umsetzung (P2): lexikografische Stufen statt einer
@@ -1217,13 +1278,30 @@ Public Module Solver
             If terms.ClassGapsSum IsNot Nothing Then stageExprs.Add(terms.ClassGapsSum)
             If lexTeacherGapsStage AndAlso terms.TeacherGapsSum IsNot Nothing Then stageExprs.Add(terms.TeacherGapsSum)
 
+            Dim stageIndex = 0
             For Each stageExpr In stageExprs
+                stageIndex += 1
+                If cancellationToken.IsCancellationRequested Then
+                    cancelled = True
+                    Exit For
+                End If
                 Dim stageLimit = Math.Min(stage1TimeLimitS, Math.Max(totalTimeLimitS - sw.Elapsed.TotalSeconds, 0.0))
                 If stageLimit <= 0 Then Exit For
                 built.Model.Minimize(stageExpr)
                 Dim stageSolver As New CpSolver()
                 stageSolver.StringParameters = $"max_time_in_seconds:{stageLimit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
-                Dim stageStatus = stageSolver.Solve(built.Model)
+                Dim stageCb As ConvergenceCallback = If(progress Is Nothing, Nothing, New ConvergenceCallback())
+                Dim stageRun = SolveRunner.RunSolve(built.Model, stageSolver, stageCb,
+                    SolveRunner.Options(Nothing, cancellationToken, progress,
+                        New SolveProgress With {.Phase = SolvePhase.LexStufe, .PhaseIndex = stageIndex,
+                                                .PhaseCount = stageExprs.Count, .BudgetS = totalTimeLimitS,
+                                                .Label = $"Vorstufe {stageIndex} von {stageExprs.Count} wird optimiert"},
+                        sw))
+                If stageRun.Cancelled Then
+                    cancelled = True
+                    Exit For
+                End If
+                Dim stageStatus = stageRun.Status
                 If stageStatus <> CpSolverStatus.Optimal AndAlso stageStatus <> CpSolverStatus.Feasible Then Exit For
                 ' Auch ein nur-Feasible-Stufenwert ist eine ERREICHTE obere
                 ' Schranke - sie zu fixieren schneidet keine Loesung ab,
@@ -1253,7 +1331,14 @@ Public Module Solver
                     End If
                     Dim stage1Solver As New CpSolver()
                     stage1Solver.StringParameters = $"max_time_in_seconds:{stage1Limit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
-                    Dim stage1Status = stage1Solver.Solve(built.Model)
+                    Dim stage1Cb As ConvergenceCallback = If(progress Is Nothing, Nothing, New ConvergenceCallback())
+                    Dim stage1Run = SolveRunner.RunSolve(built.Model, stage1Solver, stage1Cb,
+                        SolveRunner.Options(Nothing, cancellationToken, progress,
+                            New SolveProgress With {.Phase = SolvePhase.WarmStart, .PhaseIndex = 1, .PhaseCount = 1,
+                                                    .BudgetS = totalTimeLimitS, .Label = "Warmstart wird gerechnet"},
+                            sw))
+                    If stage1Run.Cancelled Then cancelled = True
+                    Dim stage1Status = stage1Run.Status
                     If stage1Status = CpSolverStatus.Optimal OrElse stage1Status = CpSolverStatus.Feasible Then
                         ApplyLessonHints(built.Model, built.Lesson, stage1Solver)
                     End If
@@ -1262,6 +1347,15 @@ Public Module Solver
 
             SolveTopObjective.ApplyQualityObjective(built, data, weights)
         End If
+        ' Abbruch in der Vorphase: es existiert noch keine einzige Loesung.
+        ' Bewusst mit leerer Liste zurueck statt Exception - siehe
+        ' MultiSolveStopReason.Cancelled.
+        If cancelled Then
+            Return New MultiSolveResult With {.Solutions = New List(Of ScoredSolution)(),
+                                              .StopReason = MultiSolveStopReason.Cancelled,
+                                              .ElapsedS = sw.Elapsed.TotalSeconds}
+        End If
+
         Dim solutions As New List(Of ScoredSolution)
         Dim iterations = 0
         Dim stagnationTriggeredCount = 0
@@ -1269,8 +1363,17 @@ Public Module Solver
 
         Do
             Dim remaining = totalTimeLimitS - sw.Elapsed.TotalSeconds
+            ' Reihenfolge ist Absicht: maxSolutions ZUERST. Faellt der Abbruch
+            ' zufaellig mit dem Erreichen des Solls zusammen, waere die Suche
+            ' ohnehin hier zu Ende gewesen - dann ist MaxSolutionsReached die
+            ' wahrheitsgemaessere Auskunft. Cancelled meldet der Kern nur,
+            ' wenn tatsaechlich noch Arbeit offen war.
             If solutions.Count >= maxSolutions Then
                 stopReason = MultiSolveStopReason.MaxSolutionsReached
+                Exit Do
+            End If
+            If cancellationToken.IsCancellationRequested Then
+                stopReason = MultiSolveStopReason.Cancelled
                 Exit Do
             End If
             If remaining <= 0 Then
@@ -1295,11 +1398,26 @@ Public Module Solver
             Dim solver As New CpSolver()
             solver.StringParameters = paramsStr
             Dim convergenceCb As New ConvergenceCallback()
-            Dim triggered = False
             Dim thisStagnationTimeout = If(stagnationTimeoutS.HasValue AndAlso stagnationTimeoutS.Value < thisLimit, stagnationTimeoutS, Nothing)
-            Dim status = SolveWithStagnationCutoff(built.Model, solver, convergenceCb, thisStagnationTimeout, triggered)
-            If triggered Then stagnationTriggeredCount += 1
+            Dim run = SolveRunner.RunSolve(built.Model, solver, convergenceCb,
+                SolveRunner.Options(thisStagnationTimeout, cancellationToken, progress,
+                    New SolveProgress With {.Phase = SolvePhase.Iteration, .PhaseIndex = iterations + 1,
+                                            .SolutionsFound = solutions.Count, .BudgetS = totalTimeLimitS,
+                                            .Label = $"Loesung {solutions.Count + 1} wird gesucht"},
+                    sw))
+            Dim status = run.Status
+            If run.StagnationTriggered Then stagnationTriggeredCount += 1
             iterations += 1
+
+            ' Abbruch, BEVOR diese Iteration etwas Verwertbares hatte. Ohne
+            ' diesen Zweig fiele der Fall unten in den Unknown-Ast und
+            ' bekaeme faelschlich TimeLimitReached. Hatte die Iteration
+            ' dagegen schon eine Loesung, wird sie unten normal verwertet -
+            ' der Abbruch greift dann am Schleifenkopf der naechsten Runde.
+            If run.Cancelled AndAlso status <> CpSolverStatus.Optimal AndAlso status <> CpSolverStatus.Feasible Then
+                stopReason = MultiSolveStopReason.Cancelled
+                Exit Do
+            End If
 
             If status = CpSolverStatus.Infeasible OrElse status = CpSolverStatus.ModelInvalid Then
                 ' A genuine proof that no further distinct solution exists.
@@ -1360,20 +1478,47 @@ Public Module Solver
     Public Function SolveKursstufe(data As JsonObject,
                                     Optional timeLimitS As Double = 30.0,
                                     Optional seed As Integer = 42,
-                                    Optional numWorkers As Integer = 1) As KursstufeSolveResult
-        Dim kb = Kursblockung.SolveKursblockung(data, timeLimitS, seed, numWorkers)
+                                    Optional numWorkers As Integer = 1,
+                                    Optional cancellationToken As CancellationToken = Nothing,
+                                    Optional progress As IProgress(Of SolveProgress) = Nothing) As KursstufeSolveResult
+        If cancellationToken.IsCancellationRequested Then
+            Return New KursstufeSolveResult With {.KursblockungStatus = CpSolverStatus.Unknown, .Cancelled = True}
+        End If
+
+        ' Drei verkettete Stufen. Der Adapter etikettiert die Meldungen der
+        ' inneren Aufrufe als "Stufe n von 3" um und laesst die Uhr ueber alle
+        ' drei durchlaufen - sonst spraenge die Anzeige je Stufe auf 0 zurueck.
+        Dim sw = Stopwatch.StartNew()
+        Dim gesamt = timeLimitS * 3.0
+
+        Dim kb = Kursblockung.SolveKursblockung(data, timeLimitS, seed, numWorkers, cancellationToken,
+            StageProgressAdapter.Wrap(progress, SolvePhase.Stufe, 1, 3, "Kursblockung", sw, gesamt))
+        If kb.Cancelled Then
+            Return New KursstufeSolveResult With {.KursblockungStatus = kb.Status, .Cancelled = True}
+        End If
         If kb.Status <> CpSolverStatus.Optimal AndAlso kb.Status <> CpSolverStatus.Feasible Then
             Return New KursstufeSolveResult With {.KursblockungStatus = kb.Status}
         End If
 
         Dim schienenScenario = Schienenraster.BuildSchienenrasterScenario(data, kb.Assignment)
-        Dim schienenResult = Solve(schienenScenario, timeLimitS, seed, numWorkers)
+        Dim schienenResult = Solve(schienenScenario, timeLimitS, seed, numWorkers, cancellationToken,
+            StageProgressAdapter.Wrap(progress, SolvePhase.Stufe, 2, 3, "Schienenraster", sw, gesamt))
+        If schienenResult.Cancelled Then
+            Return New KursstufeSolveResult With {.KursblockungStatus = kb.Status,
+                                                  .SchienenrasterStatus = schienenResult.Status, .Cancelled = True}
+        End If
         If schienenResult.Status <> CpSolverStatus.Optimal AndAlso schienenResult.Status <> CpSolverStatus.Feasible Then
             Return New KursstufeSolveResult With {.KursblockungStatus = kb.Status, .SchienenrasterStatus = schienenResult.Status}
         End If
 
         Dim raumScenario = Raumzuordnung.BuildRaumzuordnungScenario(data, kb.Assignment, schienenResult.Schedule)
-        Dim raumResult = Solve(raumScenario, timeLimitS, seed, numWorkers)
+        Dim raumResult = Solve(raumScenario, timeLimitS, seed, numWorkers, cancellationToken,
+            StageProgressAdapter.Wrap(progress, SolvePhase.Stufe, 3, 3, "Raumzuordnung", sw, gesamt))
+        If raumResult.Cancelled Then
+            Return New KursstufeSolveResult With {
+                .KursblockungStatus = kb.Status, .SchienenrasterStatus = schienenResult.Status,
+                .RaumzuordnungStatus = raumResult.Status, .Cancelled = True}
+        End If
         If raumResult.Status <> CpSolverStatus.Optimal AndAlso raumResult.Status <> CpSolverStatus.Feasible Then
             Return New KursstufeSolveResult With {
                 .KursblockungStatus = kb.Status, .SchienenrasterStatus = schienenResult.Status, .RaumzuordnungStatus = raumResult.Status}
@@ -1398,5 +1543,9 @@ Public NotInheritable Class KursstufeSolveResult
     Public Property SchienenrasterStatus As CpSolverStatus?
     Public Property RaumzuordnungStatus As CpSolverStatus?
     Public Property Schedule As List(Of ScheduleEntry)
+    ''' <summary>Abbruch durch den Aufrufer (arc42 8.11). Welche Stufe es
+    ''' traf, zeigt das uebliche Muster: die Status-Properties der bereits
+    ''' gelaufenen Stufen sind gesetzt, die spaeteren Nothing.</summary>
+    Public Property Cancelled As Boolean
 End Class
 

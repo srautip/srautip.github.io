@@ -37,6 +37,8 @@
 ' entsprechenden Modellblock unten fuer die genaue Begruendung, warum das
 ' weiterhin ein weiches statt hartes Ziel bleibt.
 Imports System.Text.Json.Nodes
+Imports System.Diagnostics
+Imports System.Threading
 Imports Google.OrTools.Sat
 
 Public NotInheritable Class LehrereinsatzZuweisung
@@ -47,6 +49,9 @@ End Class
 
 Public NotInheritable Class LehrereinsatzResult
     Public Property Status As CpSolverStatus
+    ''' <summary>Abbruch durch den Aufrufer (arc42 8.11). War das Token schon
+    ''' beim Eintritt gesetzt, ist zusaetzlich Solver Nothing.</summary>
+    Public Property Cancelled As Boolean
     ''' <summary>Gleiches Muster wie Solver.SolveResult.Solver - erlaubt
     ''' Aufrufern/Tests, z.B. `Solver.ObjectiveValue` zur Diagnose
     ''' auszulesen, ohne dass dieses Modul selbst einen eigenen
@@ -141,12 +146,24 @@ Public Module Lehrereinsatzplanung
                                         Optional timeLimitS As Double = 30.0,
                                         Optional seed As Integer = 42,
                                         Optional numWorkers As Integer = 1,
-                                        Optional aequivalenzKlassen As List(Of List(Of String)) = Nothing) As LehrereinsatzResult
+                                        Optional aequivalenzKlassen As List(Of List(Of String)) = Nothing,
+                                        Optional cancellationToken As CancellationToken = Nothing,
+                                        Optional progress As IProgress(Of SolveProgress) = Nothing) As LehrereinsatzResult
+        If cancellationToken.IsCancellationRequested Then
+            Return New LehrereinsatzResult With {.Status = CpSolverStatus.Unknown, .Cancelled = True}
+        End If
+
         Dim modell = BuildLehrereinsatzModell(bestand, deputatToleranzStunden, vorjahresZuordnung, aequivalenzKlassen)
         Dim solver As New CpSolver()
         solver.StringParameters = $"max_time_in_seconds:{timeLimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
-        Dim status = solver.Solve(modell.Model)
-        Return ExtractLehrereinsatzResult(bestand, modell, solver, status)
+        Dim sw = Stopwatch.StartNew()
+        Dim cb As ConvergenceCallback = If(progress Is Nothing, Nothing, New ConvergenceCallback())
+        Dim run = SolveRunner.RunSolve(modell.Model, solver, cb,
+                                       SolveRunner.SingleStage(SolvePhase.Iteration, "Lehrereinsatz wird geplant",
+                                                               timeLimitS, cancellationToken, progress, sw))
+        Dim ergebnis = ExtractLehrereinsatzResult(bestand, modell, solver, run.Status)
+        ergebnis.Cancelled = run.Cancelled
+        Return ergebnis
     End Function
 
     ''' <summary>Mechanische Extraktion des bisherigen SolveLehrereinsatz-
@@ -692,7 +709,13 @@ Public Module Lehrereinsatzplanung
     ''' den Status des ersten Solve-Versuchs (auch bei Fehlschlag -
     ''' gleiche Semantik wie SolveLehrereinsatz); weitere Elemente sind
     ''' nur erfolgreiche, paarweise verschiedene Zuteilungen. Bricht ab,
-    ''' sobald keine weitere Alternative im Band existiert (Infeasible).</summary>
+    ''' sobald keine weitere Alternative im Band existiert (Infeasible).
+    '''
+    ''' ACHTUNG fuer Aufrufer MIT cancellationToken (arc42 8.11): das
+    ''' "erste Element gibt es immer" gilt dann NICHT mehr - wird vor der
+    ''' ersten fertigen Zuteilung abgebrochen, ist die Liste LEER. Ohne
+    ''' Token ist die Garantie unveraendert (SchoolTestRunner/Run.vb greift
+    ''' unbesehen auf einsaetze(0) zu und darf das weiterhin).</summary>
     Public Function SolveLehrereinsatzTop(bestand As Stammdatenbestand,
                                            Optional deputatToleranzStunden As Double = 2.0,
                                            Optional vorjahresZuordnung As Dictionary(Of (Klasse As String, Fach As String), String) = Nothing,
@@ -702,20 +725,48 @@ Public Module Lehrereinsatzplanung
                                            Optional maxAssignments As Integer = 1,
                                            Optional assignmentTolerance As Integer = 0,
                                            Optional assignmentMinDiversity As Integer = 1,
-                                           Optional aequivalenzKlassen As List(Of List(Of String)) = Nothing) As List(Of LehrereinsatzResult)
+                                           Optional aequivalenzKlassen As List(Of List(Of String)) = Nothing,
+                                           Optional cancellationToken As CancellationToken = Nothing,
+                                           Optional progress As IProgress(Of SolveProgress) = Nothing) As List(Of LehrereinsatzResult)
+        If cancellationToken.IsCancellationRequested Then Return New List(Of LehrereinsatzResult)()
+
         Dim modell = BuildLehrereinsatzModell(bestand, deputatToleranzStunden, vorjahresZuordnung, aequivalenzKlassen)
         Dim results As New List(Of LehrereinsatzResult)
+        Dim gesamt = Math.Max(maxAssignments, 1)
+        Dim sw = Stopwatch.StartNew()
+        Dim abgebrochen = False
 
-        For iteration = 0 To Math.Max(maxAssignments, 1) - 1
-            Dim solver As New CpSolver()
-            solver.StringParameters = $"max_time_in_seconds:{timeLimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
-            Dim status = solver.Solve(modell.Model)
-            Dim ok = status = CpSolverStatus.Optimal OrElse status = CpSolverStatus.Feasible
-            If Not ok Then
-                If iteration = 0 Then results.Add(New LehrereinsatzResult With {.Status = status, .Solver = solver})
+        For iteration = 0 To gesamt - 1
+            If cancellationToken.IsCancellationRequested Then
+                abgebrochen = True
                 Exit For
             End If
-            results.Add(ExtractLehrereinsatzResult(bestand, modell, solver, status))
+            Dim solver As New CpSolver()
+            solver.StringParameters = $"max_time_in_seconds:{timeLimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
+            Dim cb As ConvergenceCallback = If(progress Is Nothing, Nothing, New ConvergenceCallback())
+            Dim run = SolveRunner.RunSolve(modell.Model, solver, cb,
+                SolveRunner.Options(Nothing, cancellationToken, progress,
+                    New SolveProgress With {.Phase = SolvePhase.Zuteilung, .PhaseIndex = iteration + 1,
+                                            .PhaseCount = gesamt, .SolutionsFound = results.Count,
+                                            .BudgetS = timeLimitS * gesamt,
+                                            .Label = $"Zuteilung {iteration + 1} von {gesamt} wird geplant"},
+                    sw))
+            Dim status = run.Status
+            Dim ok = status = CpSolverStatus.Optimal OrElse status = CpSolverStatus.Feasible
+            If run.Cancelled Then abgebrochen = True
+            If Not ok Then
+                ' Bei Abbruch ohne Zwischenergebnis KEINEN Fehlschlag-Eintrag
+                ' erzeugen - Aufrufer werten results(0).Status als "nicht
+                ' loesbar", was hier falsch waere.
+                If iteration = 0 AndAlso Not abgebrochen Then
+                    results.Add(New LehrereinsatzResult With {.Status = status, .Solver = solver})
+                End If
+                Exit For
+            End If
+            Dim zuteilung = ExtractLehrereinsatzResult(bestand, modell, solver, status)
+            zuteilung.Cancelled = abgebrochen
+            results.Add(zuteilung)
+            If abgebrochen Then Exit For
 
             ' Band um das erste (beste) Objective - erst NACH der ersten
             ' Loesung, damit das Optimum selbst nie abgeschnitten wird.
