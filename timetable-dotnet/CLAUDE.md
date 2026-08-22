@@ -10,6 +10,16 @@ pauschal die volle Suite zu fahren:
   Lehrereinsatzplanung, ...): volle Suite ist Pflicht -
   `dotnet test TimetableCore.Tests` muss vollstaendig gruen bleiben
   (Definition-of-Done-Konvention aller Phasen-Berichte in `docs/`).
+- **Aenderungen NUR an der Klassenbildung** (`TimetableCore/
+  Klassenbildung.vb`, `TimetableCore/KlassenbildungQuality.vb`,
+  `SchoolTestRunner/KlassenRun.vb`, `SchoolTestRunner/
+  YamlKlassenbildung.vb`, `tests/*/input/klassenbildung.yaml`): die
+  EIGENE Suite genuegt - `dotnet test Klassenbildung.Tests` (laeuft in
+  unter einer Sekunde; die Klassenbildung ist ein eigenstaendiges
+  Modul ohne jede Kopplung an Solver/SolveTop, die teuren
+  Stundenplan-Tests exerzieren sie nicht und umgekehrt). Bei
+  querschneidenden Aenderungen (z.B. gemeinsame Helfer) beide Suiten
+  fahren; "volle Suite" heisst seither BEIDE Testprojekte.
 - **Aenderungen nur an `SchoolTestRunner/`-CLI oder
   `SchoolTestRunner/Templates/stundentafel.html`** (Viewer): die Suite
   deckt beides NICHT ab - stattdessen gezielt pruefen:
