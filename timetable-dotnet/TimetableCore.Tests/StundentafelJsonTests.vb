@@ -256,4 +256,56 @@ Public Class StundentafelJsonTests
         Assert.IsTrue(qwDefaults("include_subject_window").GetValue(Of Boolean)())
     End Sub
 
+    ''' <summary>Mehr-Zuteilungs-Export: Loesungen ZWEIER Zuteilungs-Laeufe
+    ''' werden global nach Quality.Total sortiert zusammengefuehrt, jede
+    ''' Loesung traegt ihren assignment_index, top-level stehen die
+    ''' Zuteilungs-Metadaten und die Aequivalenzklassen (nur Gruppen mit
+    ''' &gt;= 2 Mitgliedern; Singletons bleiben draussen).</summary>
+    <TestMethod>
+    Public Sub ExportsAssignmentsAndEquivalenceClasses()
+        Dim b As New Stammdatenbestand With {.SchulName = "Test"}
+        b.Klassenstufen.Add(New Klassenstufe With {.Nummer = 1, .Bezeichnung = "Klasse 1"})
+        b.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1})
+
+        Dim solOf = Function(total As Double) New ScoredSolution With {
+            .Schedule = New List(Of ScheduleEntry), .KannConstraintFlags = New List(Of KannConstraintFlag),
+            .Quality = New QualityScore With {.Total = total}, .Status = CpSolverStatus.Optimal}
+        Dim runOf = Function(idx As Integer, objective As Double, totals As Double()) New Formatting.AssignmentRun With {
+            .Data = Scenario(Mini({"1a"}, {}, {}, {}, {"Mo"}, 1), {}),
+            .AssignmentIndex = idx, .LehrereinsatzObjective = objective,
+            .Result = New MultiSolveResult With {
+                .Solutions = totals.Select(Function(t) solOf(t)).ToList(),
+                .StopReason = MultiSolveStopReason.MaxSolutionsReached, .IterationsRun = totals.Length, .ElapsedS = 1}}
+
+        Dim runs As New List(Of Formatting.AssignmentRun) From {
+            runOf(1, 20.0, {50.0, 90.0}),
+            runOf(2, 40.0, {30.0, 70.0})
+        }
+        Dim eq As New List(Of List(Of String)) From {
+            New List(Of String) From {"Lehrer A", "Lehrer B"},
+            New List(Of String) From {"Solo"}
+        }
+        Dim json = Formatting.ToStundentafelJsonMulti(b, runs, equivalenceClasses:=eq)
+
+        Dim sols = json("solutions").AsArray()
+        Assert.AreEqual(4, sols.Count)
+        ' global sortiert: 30 (Z2), 50 (Z1), 70 (Z2), 90 (Z1)
+        Assert.AreEqual(30.0, sols(0)("quality_total").GetValue(Of Double)(), 0.001)
+        Assert.AreEqual(2, JsonHelpers.GetInt(sols(0).AsObject(), "assignment_index").Value)
+        Assert.AreEqual(50.0, sols(1)("quality_total").GetValue(Of Double)(), 0.001)
+        Assert.AreEqual(1, JsonHelpers.GetInt(sols(1).AsObject(), "assignment_index").Value)
+        Assert.AreEqual(2, JsonHelpers.GetInt(sols(2).AsObject(), "assignment_index").Value)
+        Assert.AreEqual(1, JsonHelpers.GetInt(sols(3).AsObject(), "assignment_index").Value)
+
+        Dim assignments = json("assignments").AsArray()
+        Assert.AreEqual(2, assignments.Count)
+        Assert.AreEqual(20.0, assignments(0)("lehrereinsatz_objective").GetValue(Of Double)(), 0.001)
+        Assert.AreEqual(2, JsonHelpers.GetInt(assignments(1).AsObject(), "solution_count").Value)
+
+        Dim eqJson = json("teacher_equivalence_classes").AsArray()
+        Assert.AreEqual(1, eqJson.Count, "Singleton-Klassen duerfen nicht exportiert werden.")
+        Assert.AreEqual("Lehrer A", eqJson(0).AsArray()(0).GetValue(Of String)())
+        Assert.AreEqual("Lehrer B", eqJson(0).AsArray()(1).GetValue(Of String)())
+    End Sub
+
 End Class

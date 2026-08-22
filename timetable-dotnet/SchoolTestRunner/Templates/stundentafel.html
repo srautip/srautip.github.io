@@ -34,6 +34,9 @@
     font-size: 0.9rem;
     color: #000;
   }
+  #solution-summary a {
+    color: #1d4ed8;
+  }
   h2 {
     font-size: 1.05rem;
     margin: 1.2rem 0 0.4rem;
@@ -252,6 +255,16 @@
   #solutions-overview tbody tr.compare.active {
     background: #dcebff;
   }
+  /* Aequivalenz-Anzeige: Lehrkraefte, die per identischem
+     Pipeline-Profil direkt tauschbar sind. */
+  #tausch-legende {
+    margin: 0 0 0.6rem;
+    font-size: 0.8rem;
+    color: #555;
+  }
+  #lehrer-table-container th.tauschbar {
+    color: #1d4ed8;
+  }
   #convergence-panel {
     margin-bottom: 1rem;
     font-size: 0.85rem;
@@ -303,6 +316,7 @@
       <div id="lehrer-filter-menu" class="dropdown-menu" hidden></div>
     </div>
   </div>
+  <div id="tausch-legende" hidden></div>
   <div id="lehrer-table-container"></div>
 
   <script type="application/json" id="stundentafel-data">__STUNDENTAFEL_JSON__</script>
@@ -475,6 +489,20 @@
       var vectorFields = ['muss_violation_count', 'kann_violation_count', 'occupied_density_count',
         'subject_window_count', 'class_gap_count', 'teacher_gap_count', 'edge_period_count',
         'afternoon_day_count', 'class_load_variance', 'teacher_load_variance'];
+
+      // Mehr-Zuteilungs-Modus: mehrere Lehrer-Zuteilungen aus Stufe 1
+      // liefen als je eigener Stufe-2-Lauf; jede Loesung traegt dann
+      // assignment_index. Aeltere JSONs ohne die Felder: beides inaktiv.
+      var multiAssignments = !!(data.assignments && data.assignments.length > 1);
+      // Aequivalenzklassen: Lehrkraefte, die fuer die gesamte Pipeline
+      // ununterscheidbar sind - innerhalb einer Gruppe direkt tauschbar,
+      // ohne dass sich die Plan-Qualitaet aendert.
+      var eqPartner = {};
+      (data.teacher_equivalence_classes || []).forEach(function (group) {
+        group.forEach(function (name) {
+          eqPartner[name] = group.filter(function (o) { return o !== name; });
+        });
+      });
       var hasFullVector = data.solutions.length > 0 && data.solutions.every(function (s) {
         return vectorFields.every(function (f) { return s[f] !== undefined && s[f] !== null; });
       });
@@ -558,6 +586,9 @@
         { key: 'teacher_load_variance', label: 'Var. Lehrer', digits: 2, muted: isMuted('include_teacher_load_variance') },
         { key: 'quality_total', label: 'Total', digits: 1 }
       ];
+      if (multiAssignments) {
+        overviewColumns.splice(2, 0, { key: 'assignment_index', label: 'Zuteilung' });
+      }
       var mutedTitle = 'Suche war fuer dieses Kriterium blind (include-Flag aus) - Wert nur nachgelagert gezaehlt';
       var overviewSort = { key: 'quality_total', dir: 1 };
 
@@ -1045,6 +1076,14 @@
           visibleTeachers.forEach(function (t) {
             var th = document.createElement('th');
             th.textContent = t;
+            // Aequivalenz-Markierung: diese Lehrkraft ist mit anderen
+            // direkt tauschbar (identisches Pipeline-Profil).
+            if (eqPartner[t] && eqPartner[t].length > 0) {
+              th.textContent = t + ' ⇄';
+              th.className = 'tauschbar';
+              th.title = 'Direkt tauschbar mit: ' + eqPartner[t].join(', ') +
+                ' (identische Qualifikationen, Deputate, Verfuegbarkeiten und Constraints - ein Tausch aendert die Plan-Qualitaet nicht)';
+            }
             headRow2.appendChild(th);
           });
         });
@@ -1090,10 +1129,29 @@
         var totalLabel = (weightsEnabled && weightsDirty()) ? 'Quality (Total*)' : 'Quality (Total)';
         // Ohne das fruehere Dropdown traegt die Zusammenfassung die
         // Kennung der gewaehlten Loesung selbst.
-        document.getElementById('solution-summary').textContent =
-          'Loesung ' + (solIndex + 1) + ' (' + sol.status + ')' +
+        var summary = document.getElementById('solution-summary');
+        summary.textContent =
+          'Loesung ' + (solIndex + 1) + ' (' + sol.status +
+          (multiAssignments && sol.assignment_index ? ', Zuteilung ' + sol.assignment_index : '') + ')' +
           ' | Muss-Verstoesse: ' + sol.muss_violation_count + ' | Kann-Verstoesse: ' + sol.kann_violation_count +
           ' | ' + totalLabel + ': ' + displayTotal(sol).toFixed(1);
+        // Ist die Loesung Pareto-dominiert, nennt die Beschreibung die
+        // bessere Loesung direkt - unabhaengig davon, ob der
+        // Pareto-Filter aktiv ist (dominatedBy ist statisch
+        // vorberechnet). Der Link waehlt die dominierende Loesung.
+        if (hasFullVector && dominatedBy[solIndex] !== undefined) {
+          var better = dominatedBy[solIndex];
+          summary.appendChild(document.createTextNode(' | Pareto: dominiert von '));
+          var link = document.createElement('a');
+          link.href = '#';
+          link.textContent = 'Loesung ' + better;
+          link.title = 'Loesung ' + better + ' ist in allen Kriterien mindestens gleich gut und in mindestens einem besser - anklicken zum Wechseln';
+          link.addEventListener('click', function (e) {
+            e.preventDefault();
+            render(better - 1);
+          });
+          summary.appendChild(link);
+        }
       }
 
       function render(solIndex) {
@@ -1192,6 +1250,18 @@
         renderLehrerTable(sol, cmpSol);
         fitTable();
       }
+
+      // Tausch-Legende: einmalig befuellt - die Aequivalenz ist eine
+      // Eigenschaft der Eingabedaten (Stammdaten + Constraints), nicht
+      // der einzelnen Loesung.
+      (function () {
+        var groups = data.teacher_equivalence_classes || [];
+        if (groups.length === 0) return;
+        var div = document.getElementById('tausch-legende');
+        div.hidden = false;
+        div.textContent = 'Direkt tauschbare Lehrkraefte (aequivalent - ein Tausch aendert die Plan-Qualitaet nicht): ' +
+          groups.map(function (g) { return g.join(' ⇄ '); }).join('  |  ');
+      })();
 
       if (data.solutions.length > 0) {
         renderOverview();

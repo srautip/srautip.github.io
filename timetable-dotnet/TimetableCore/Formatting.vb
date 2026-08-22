@@ -156,7 +156,39 @@ Public Module Formatting
     ''' Default-Konstanten) zurueck.</summary>
     Public Function ToStundentafelJson(bestand As Stammdatenbestand, data As JsonObject, multiResult As MultiSolveResult,
                                         Optional weights As QualityWeights = Nothing) As JsonObject
+        Return ToStundentafelJsonMulti(bestand,
+            New List(Of AssignmentRun) From {
+                New AssignmentRun With {.Data = data, .Result = multiResult, .AssignmentIndex = 1}
+            }, weights)
+    End Function
+
+    ''' <summary>Mehr-Zuteilungs-Export: ein Stufe-2-Lauf PRO
+    ''' Lehrer-Zuteilung; die Loesungen aller Laeufe werden zu EINER nach
+    ''' Quality.Total sortierten Liste zusammengefuehrt (dieselbe Ordnung,
+    ''' die SolveTop innerhalb eines Laufs garantiert). `AssignmentIndex`
+    ''' (1-basiert) erscheint pro Loesung als `assignment_index`;
+    ''' Muss-Verifikation und Grids laufen je Loesung gegen die Daten
+    ''' IHRER Zuteilung.</summary>
+    Public NotInheritable Class AssignmentRun
+        Public Property Data As JsonObject
+        Public Property Result As MultiSolveResult
+        Public Property AssignmentIndex As Integer
+        ''' <summary>Objective der Lehrereinsatzplanung dieser Zuteilung -
+        ''' rein informativ fuer den Viewer (0, wenn unbekannt).</summary>
+        Public Property LehrereinsatzObjective As Double
+    End Class
+
+    ''' <summary>Siehe AssignmentRun. `equivalenceClasses` (optional):
+    ''' Aequivalenzklassen austauschbarer Lehrkraefte
+    ''' (Lehrereinsatzplanung.TeacherEquivalenceClasses) - nur Klassen mit
+    ''' &gt;= 2 Mitgliedern werden als `teacher_equivalence_classes`
+    ''' exportiert (Viewer: "direkt tauschbar").</summary>
+    Public Function ToStundentafelJsonMulti(bestand As Stammdatenbestand, runs As List(Of AssignmentRun),
+                                             Optional weights As QualityWeights = Nothing,
+                                             Optional equivalenceClasses As List(Of List(Of String)) = Nothing) As JsonObject
         Dim w = If(weights, New QualityWeights())
+        Dim data As JsonObject = runs(0).Data
+        Dim multiResult As MultiSolveResult = runs(0).Result
         Dim klassenstufenSorted = bestand.Klassenstufen.OrderBy(Function(ks) ks.Nummer).ToList()
         Dim klassenByKlassenstufe = bestand.Klassen.GroupBy(Function(k) k.Klassenstufe).
             ToDictionary(Function(g) g.Key, Function(g) g.ToList())
@@ -186,10 +218,19 @@ Public Module Formatting
             })
         Next
 
+        ' Loesungen aller Zuteilungen zu EINER Liste zusammenfuehren,
+        ' global nach Quality.Total sortiert (Tiebreaker: Zuteilung,
+        ' dann Original-Position - stabil und deterministisch).
+        Dim flattened = runs.
+            SelectMany(Function(r) r.Result.Solutions.Select(Function(s, pos) (Sol:=s, Run:=r, Pos:=pos))).
+            OrderBy(Function(e) e.Sol.Quality.Total).
+            ThenBy(Function(e) e.Run.AssignmentIndex).
+            ThenBy(Function(e) e.Pos).ToList()
         Dim solutionsJson As New JsonArray()
-        For i = 0 To multiResult.Solutions.Count - 1
-            Dim sol = multiResult.Solutions(i)
-            Dim grids = ToClassGrids(data, sol.Schedule)
+        For i = 0 To flattened.Count - 1
+            Dim sol = flattened(i).Sol
+            Dim solData = flattened(i).Run.Data
+            Dim grids = ToClassGrids(solData, sol.Schedule)
             Dim classesJson As New JsonObject()
             For Each name In alleKlassenNamen
                 If grids.ContainsKey(name) Then
@@ -209,9 +250,10 @@ Public Module Formatting
 
             solutionsJson.Add(New JsonObject From {
                 {"index", i},
+                {"assignment_index", flattened(i).Run.AssignmentIndex},
                 {"status", sol.Status.ToString()},
                 {"kann_violation_count", sol.Quality.KannViolationCount},
-                {"muss_violation_count", Verifier.VerifySchedule(data, sol.Schedule).Count},
+                {"muss_violation_count", Verifier.VerifySchedule(solData, sol.Schedule).Count},
                 {"quality_total", sol.Quality.Total},
                 {"occupied_density_count", sol.Quality.OccupiedDensityCount},
                 {"subject_window_count", sol.Quality.SubjectWindowCount},
@@ -229,13 +271,29 @@ Public Module Formatting
             })
         Next
 
+        ' Mehr-Zuteilungs-Metadaten: pro Zuteilung Index/Lehrereinsatz-
+        ' Objective/Loesungszahl; Aequivalenzklassen nur mit >= 2
+        ' Mitgliedern ("direkt tauschbar" im Viewer).
+        Dim assignmentsJson As New JsonArray(runs.Select(Function(r) CType(New JsonObject From {
+            {"index", r.AssignmentIndex},
+            {"lehrereinsatz_objective", r.LehrereinsatzObjective},
+            {"solution_count", r.Result.Solutions.Count}
+        }, JsonNode)).ToArray())
+        Dim equivalenceJson As New JsonArray(
+            If(equivalenceClasses, New List(Of List(Of String))).
+            Where(Function(k) k.Count >= 2).
+            Select(Function(k) CType(New JsonArray(k.Select(Function(n) CType(n, JsonNode)).ToArray()), JsonNode)).ToArray())
+        Dim stopReasons = String.Join("|", runs.Select(Function(r) r.Result.StopReason.ToString()).Distinct())
+
         Return New JsonObject From {
             {"schul_name", bestand.SchulName},
             {"tage", New JsonArray(bestand.Tage.Select(Function(t) CType(t, JsonNode)).ToArray())},
             {"periods_per_day", bestand.PeriodsPerDay},
             {"max_parallel_klassen", maxParallelKlassen},
             {"klassenstufen", klassenstufenJson},
-            {"stop_reason", multiResult.StopReason.ToString()},
+            {"stop_reason", stopReasons},
+            {"assignments", assignmentsJson},
+            {"teacher_equivalence_classes", equivalenceJson},
             {"quality_weights", New JsonObject From {
                 {"kann", w.Kann},
                 {"class_gaps", w.ClassGaps},

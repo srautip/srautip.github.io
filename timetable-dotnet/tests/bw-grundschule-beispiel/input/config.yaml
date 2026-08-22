@@ -73,6 +73,26 @@ lex_teacher_gaps_stage: false
 # echte Alternativen statt Ein-Slot-Nachbarn. Dazu passend das
 # Re-Hinting auf die jeweils letzte Loesung aus (das ist eine
 # Aehnlichkeits-, keine Diversitaetsheuristik).
+# Mehr-Zuteilungs-Modus: zwei nichtsymmetrische Lehrer-Zuteilungen aus
+# Stufe 1 (Toleranzband 0 = nur gleich gute Alternativen; die
+# Lex-Symmetriebrechung ueber die Aequivalenzklassen ist bei
+# max_assignments > 1 automatisch aktiv - reine Permutationen
+# austauschbarer Lehrkraefte zaehlen nicht als Alternative), jede mit
+# eigenem Stufe-2-Lauf: solve_time_limit_s und max_solutions werden
+# gleichmaessig aufgeteilt (hier: 90s / 15 Loesungen je Zuteilung).
+# BELEG-LAUF (180s gesamt): 2 Zuteilungen gefunden (beide
+# Lehrereinsatz-Objective 1010, Band haelt), je 15 Loesungen, alle
+# Optimal. Aequivalenzklasse: {Klassenlehrer-2,4,5,6,7,8} (6 direkt
+# tauschbare Lehrkraefte; -1 per feste_zuordnung gebunden, -3 hat die
+# zusaetzliche Ethik-Qualifikation). Zuteilung 2 unterscheidet sich
+# ECHT (kein Permutations-Duplikat): 3a/3b tauschen Klassenlehrer-6
+# gegen den NICHT aequivalenten Klassenlehrer-3 - und liefert die
+# global beste Loesung (Total 198.6 vs. 204.6 aus Zuteilung 1): der
+# Mehr-Zuteilungs-Modus fand einen besseren Plan, den der bisherige
+# Ein-Zuteilungs-Lauf (220.8) strukturell nicht erreichen konnte.
+max_assignments: 2
+assignment_tolerance: 0
+
 min_diversity: 8
 rehint_found_solutions: false
 

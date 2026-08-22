@@ -904,4 +904,103 @@ Public Class LehrereinsatzplanungTests
         Assert.ThrowsException(Of InvalidOperationException)(Sub() Lehrereinsatzplanung.SolveLehrereinsatz(b, timeLimitS:=10))
     End Sub
 
+    ''' <summary>Aequivalenzklassen: zwei identische Profile werden
+    ''' gruppiert, ein abweichendes Deputat trennt; identische (auf den
+    ''' Platzhalter normalisierte) Constraint-Erwaehnungen halten die
+    ''' Gruppe zusammen, waehrend eine nur EINE Lehrkraft betreffende
+    ''' Regel sie sauber trennt.</summary>
+    <TestMethod>
+    Public Sub EquivalenceClassesGroupIdenticalProfilesAndSplitOnDifferences()
+        Dim b = Bestand()
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 4})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer B", .DeputatSollstunden = 4})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer C", .DeputatSollstunden = 8})
+        For Each name In {"Lehrer A", "Lehrer B", "Lehrer C"}
+            b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = name, .FachName = "Deutsch"})
+        Next
+
+        Dim ohneConstraints = Lehrereinsatzplanung.TeacherEquivalenceClasses(b)
+        Dim gruppeAB = ohneConstraints.Single(Function(k) k.Contains("Lehrer A"))
+        CollectionAssert.AreEqual(New List(Of String) From {"Lehrer A", "Lehrer B"}, gruppeAB)
+        Assert.AreEqual(1, ohneConstraints.Single(Function(k) k.Contains("Lehrer C")).Count)
+
+        ' Beide mit INHALTSGLEICHER Verfuegbarkeitsregel -> bleiben gruppiert.
+        Dim gleicheRegeln As New List(Of JsonObject) From {
+            New JsonObject From {{"type", "teacher_availability"}, {"teacher", "Lehrer A"}, {"available_days", New JsonArray("Mo", "Di")}},
+            New JsonObject From {{"type", "teacher_availability"}, {"teacher", "Lehrer B"}, {"available_days", New JsonArray("Mo", "Di")}}
+        }
+        Dim mitGleichen = Lehrereinsatzplanung.TeacherEquivalenceClasses(b, gleicheRegeln)
+        Assert.AreEqual(2, mitGleichen.Single(Function(k) k.Contains("Lehrer A")).Count)
+
+        ' Regel nur fuer A -> trennt die Gruppe.
+        Dim nurA As New List(Of JsonObject) From {
+            New JsonObject From {{"type", "teacher_availability"}, {"teacher", "Lehrer A"}, {"available_days", New JsonArray("Mo", "Di")}}
+        }
+        Dim mitNurA = Lehrereinsatzplanung.TeacherEquivalenceClasses(b, nurA)
+        Assert.AreEqual(1, mitNurA.Single(Function(k) k.Contains("Lehrer A")).Count)
+        Assert.AreEqual(1, mitNurA.Single(Function(k) k.Contains("Lehrer B")).Count)
+    End Sub
+
+    ''' <summary>Lex-Symmetriebrechung: im 1:1-Aufteilungs-Szenario (siehe
+    ''' SplitAcrossTwoEquallyQualifiedTeachersAchievesZeroObjective) bleibt
+    ''' das Optimum 0 erhalten (die Ordnung schneidet nie das Optimum ab),
+    ''' und der Repraesentant ist KANONISCH: Lehrer A (erster der
+    ''' Stammdaten-Reihenfolge) bekommt die lexikografisch erste Einheit
+    ''' (1a) - die gespiegelte Permutation ist ausgeschlossen.</summary>
+    <TestMethod>
+    Public Sub SymmetryBreakingKeepsOptimumAndPicksCanonicalRepresentative()
+        Dim b = Bestand()
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 4, .KlassenlehrerFaehig = True})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer B", .DeputatSollstunden = 4, .KlassenlehrerFaehig = True})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = "Deutsch"})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer B", .FachName = "Deutsch"})
+
+        Dim eq = Lehrereinsatzplanung.TeacherEquivalenceClasses(b)
+        Dim result = Lehrereinsatzplanung.SolveLehrereinsatz(b, timeLimitS:=10, aequivalenzKlassen:=eq)
+        Assert.AreEqual(CpSolverStatus.Optimal, result.Status)
+        Assert.AreEqual(0.0, result.Solver.ObjectiveValue, 0.001)
+        Assert.AreEqual("Lehrer A", result.Zuweisungen.Single(Function(z) z.Klasse = "1a").Lehrer)
+        Assert.AreEqual("Lehrer B", result.Zuweisungen.Single(Function(z) z.Klasse = "1b").Lehrer)
+    End Sub
+
+    ''' <summary>Mehr-Zuteilungs-Enumeration: OHNE Symmetriebrechung sind
+    ''' die beiden Permutationen der austauschbaren Lehrkraefte zwei
+    ''' "verschiedene" gleich-optimale Zuteilungen (Count=2, beide
+    ''' Objective 0); MIT Aequivalenzklassen (Symmetriebrechung +
+    ''' invarianter Diversitaets-Cut) kollabieren sie zu EINER Zuteilung -
+    ''' bei Toleranz 0 existiert danach keine weitere Alternative im Band.
+    ''' Mit grossem Toleranzband findet die Enumeration stattdessen eine
+    ''' ECHTE (nichtsymmetrische) Alternative: ein Lehrer uebernimmt beide
+    ''' Klassen, mit entsprechend schlechterem Objective.</summary>
+    <TestMethod>
+    Public Sub SolveLehrereinsatzTopEnumeratesOnlyNonSymmetricAlternatives()
+        Dim b = Bestand()
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer A", .DeputatSollstunden = 4, .KlassenlehrerFaehig = True})
+        b.Lehrkraefte.Add(New Lehrer With {.Name = "Lehrer B", .DeputatSollstunden = 4, .KlassenlehrerFaehig = True})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer A", .FachName = "Deutsch"})
+        b.FachLehrerZuordnungen.Add(New FachLehrerZuordnung With {.LehrerName = "Lehrer B", .FachName = "Deutsch"})
+        Dim eq = Lehrereinsatzplanung.TeacherEquivalenceClasses(b)
+
+        ' Ohne Aequivalenzklassen: beide Permutationen zaehlen als verschieden.
+        Dim naiv = Lehrereinsatzplanung.SolveLehrereinsatzTop(b, timeLimitS:=10,
+            maxAssignments:=3, assignmentTolerance:=0, assignmentMinDiversity:=1)
+        Assert.AreEqual(2, naiv.Count, "Beide gleich-optimalen Permutationen erwartet.")
+        Assert.AreEqual(0.0, naiv(1).Solver.ObjectiveValue, 0.001)
+
+        ' Mit Aequivalenzklassen + Toleranz 0: genau EIN Repraesentant.
+        Dim symmetriefrei = Lehrereinsatzplanung.SolveLehrereinsatzTop(b, timeLimitS:=10,
+            maxAssignments:=3, assignmentTolerance:=0, assignmentMinDiversity:=1, aequivalenzKlassen:=eq)
+        Assert.AreEqual(1, symmetriefrei.Count, "Die Permutation ist keine echte Alternative.")
+
+        ' Mit grossem Band: die echte Alternative "einer nimmt beide
+        ' Klassen" erscheint (Objective > 0), keine blosse Permutation.
+        Dim mitBand = Lehrereinsatzplanung.SolveLehrereinsatzTop(b, timeLimitS:=10,
+            maxAssignments:=2, assignmentTolerance:=1000, assignmentMinDiversity:=1, aequivalenzKlassen:=eq)
+        Assert.AreEqual(2, mitBand.Count)
+        Assert.AreEqual(0.0, mitBand(0).Solver.ObjectiveValue, 0.001)
+        Assert.IsTrue(mitBand(1).Solver.ObjectiveValue > 0.0, "Echte Alternative muss messbar schlechter sein - eine Permutation waere 0.")
+        Assert.AreEqual(1, mitBand(1).Zuweisungen.Select(Function(z) z.Lehrer).Distinct().Count(),
+            "Erwartete Alternative: ein Lehrer uebernimmt beide Klassen.")
+    End Sub
+
 End Class

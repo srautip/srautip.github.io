@@ -103,12 +103,25 @@ Public Module Lehrereinsatzplanung
     ''' real Klasse.Name (Gruppen and Klassen are assumed to use disjoint
     ''' name spaces, same convention as everywhere else Klasse.Name is used
     ''' as a dictionary/lookup key in this project).</summary>
-    Private Structure AssignKey
+    Friend Structure AssignKey
         Public Lehrer As String
         Public Klasse As String
         Public Fach As String
         Public IstGruppe As Boolean
     End Structure
+
+    ''' <summary>Mehr-Zuteilungs-Umsetzung: das fertig gebaute (noch
+    ''' ungeloeste) Lehrereinsatz-Modell samt allem, was Solve-Schleife und
+    ''' Ergebnis-Extraktion brauchen - erlaubt SolveLehrereinsatzTop, auf
+    ''' DEMSELBEN Modell mehrfach zu loesen (No-Good-/Diversitaets-Cuts
+    ''' zwischen den Iterationen, exakt das SolveTop-Muster aus
+    ''' Solver.vb).</summary>
+    Friend NotInheritable Class LehrereinsatzModell
+        Public Property Model As CpModel
+        Public Property Assign As Dictionary(Of AssignKey, BoolVar)
+        Public Property Objective As LinearExpr
+        Public Property IstKlassenlehrer As Dictionary(Of (Lehrer As String, Klasse As String), BoolVar)
+    End Class
 
     ''' <summary>Loest die Lehrereinsatzplanung fuer einen kompletten
     ''' Stammdatenbestand (eine Schule). `deputatToleranzStunden`: Breite
@@ -127,7 +140,25 @@ Public Module Lehrereinsatzplanung
                                         Optional vorjahresZuordnung As Dictionary(Of (Klasse As String, Fach As String), String) = Nothing,
                                         Optional timeLimitS As Double = 30.0,
                                         Optional seed As Integer = 42,
-                                        Optional numWorkers As Integer = 1) As LehrereinsatzResult
+                                        Optional numWorkers As Integer = 1,
+                                        Optional aequivalenzKlassen As List(Of List(Of String)) = Nothing) As LehrereinsatzResult
+        Dim modell = BuildLehrereinsatzModell(bestand, deputatToleranzStunden, vorjahresZuordnung, aequivalenzKlassen)
+        Dim solver As New CpSolver()
+        solver.StringParameters = $"max_time_in_seconds:{timeLimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
+        Dim status = solver.Solve(modell.Model)
+        Return ExtractLehrereinsatzResult(bestand, modell, solver, status)
+    End Function
+
+    ''' <summary>Mechanische Extraktion des bisherigen SolveLehrereinsatz-
+    ''' Modellbaus (identisches Verhalten und identische Variablen-
+    ''' Erzeugungsreihenfolge) - liefert das ungeloeste Modell fuer die
+    ''' Ein-Loesungs-Fassade oben UND die Mehr-Zuteilungs-Schleife
+    ''' (SolveLehrereinsatzTop) darunter. `aequivalenzKlassen` (optional)
+    ''' aktiviert die Lex-Symmetriebrechung, siehe AddSymmetryBreaking.</summary>
+    Private Function BuildLehrereinsatzModell(bestand As Stammdatenbestand,
+                                               deputatToleranzStunden As Double,
+                                               vorjahresZuordnung As Dictionary(Of (Klasse As String, Fach As String), String),
+                                               aequivalenzKlassen As List(Of List(Of String))) As LehrereinsatzModell
         Dim model As New CpModel()
         Dim lehrerByName = bestand.Lehrkraefte.ToDictionary(Function(l) l.Name)
         Dim klasseByName = bestand.Klassen.ToDictionary(Function(k) k.Name)
@@ -510,7 +541,7 @@ Public Module Lehrereinsatzplanung
             End If
         End If
 
-        model.Minimize(
+        Dim objective As LinearExpr =
             LinearExpr.Sum(deputatUeberschuss) * CLng(WeightDeputatAbweichung) +
             LinearExpr.Sum(fehltKlassenlehrer) * CLng(WeightKlassenlehrerFehlt) +
             LinearExpr.Sum(buendelungVerletzt) * CLng(WeightBuendelungVerletzt) +
@@ -520,12 +551,84 @@ Public Module Lehrereinsatzplanung
             LinearExpr.Sum(maxFaecherUeberschuss) * CLng(WeightMaxFaecherVerletzt) +
             LinearExpr.Sum(tandemRanges) * CLng(WeightTandemBalance) +
             LinearExpr.Sum(praeferenzVerletzt) * CLng(WeightPraeferenzVerletzt) +
-            LinearExpr.Sum(unbeliebtRanges) * CLng(WeightUnbeliebteFaecherUngleichheit))
+            LinearExpr.Sum(unbeliebtRanges) * CLng(WeightUnbeliebteFaecherUngleichheit)
+        model.Minimize(objective)
 
-        Dim solver As New CpSolver()
-        solver.StringParameters = $"max_time_in_seconds:{timeLimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
-        Dim status = solver.Solve(model)
+        AddSymmetryBreaking(model, assign, aequivalenzKlassen)
 
+        Return New LehrereinsatzModell With {
+            .Model = model, .Assign = assign, .Objective = objective, .IstKlassenlehrer = istKlassenlehrer}
+    End Function
+
+    ''' <summary>Lex-Symmetriebrechung (opt-in): fuer jede Aequivalenzklasse
+    ''' {t1 &lt; t2 &lt; ...} (kanonische Reihenfolge = Stammdaten-Ordnung,
+    ''' siehe TeacherEquivalenceClasses) wird fuer jedes BENACHBARTE Paar
+    ''' der Zuweisungsvektor von t(i) lexikografisch &gt;= dem von t(i+1)
+    ''' erzwungen - pro Symmetrie-Orbit bleibt genau ein Repraesentant
+    ''' zulaessig. Korrektheit: die Klassenbildung schliesst alle
+    ''' Objective-relevanten Unterschiede aus (Deputat, Praeferenzen,
+    ''' Qualifikationen, individuelle Constraints), die Zielfunktion ist
+    ''' innerhalb einer Klasse also permutationsinvariant - die Ordnung
+    ''' schneidet nie das Optimum ab. Encoding: Standard-Kette mit
+    ''' "equal-so-far"-BoolVars (an Position j ist a_j &gt;= b_j nur
+    ''' erzwungen, solange alle frueheren Positionen gleich sind).
+    ''' Paare mit (defensiv: nie erwartet) unterschiedlichen
+    ''' Kandidaten-Keys werden uebersprungen statt falsch geordnet.</summary>
+    Private Sub AddSymmetryBreaking(model As CpModel, assign As Dictionary(Of AssignKey, BoolVar),
+                                     aequivalenzKlassen As List(Of List(Of String)))
+        If aequivalenzKlassen Is Nothing Then Return
+        For Each klasse In aequivalenzKlassen
+            If klasse.Count < 2 Then Continue For
+            For i = 0 To klasse.Count - 2
+                Dim a = klasse(i)
+                Dim b = klasse(i + 1)
+                Dim keysOf = Function(lehrer As String) assign.Keys.
+                    Where(Function(k) k.Lehrer = lehrer).
+                    Select(Function(k) (k.Klasse, k.Fach, k.IstGruppe)).
+                    OrderBy(Function(t) t.IstGruppe).
+                    ThenBy(Function(t) t.Klasse, StringComparer.Ordinal).
+                    ThenBy(Function(t) t.Fach, StringComparer.Ordinal).ToList()
+                Dim keysA = keysOf(a)
+                Dim keysB = keysOf(b)
+                If keysA.Count = 0 OrElse Not keysA.SequenceEqual(keysB) Then Continue For
+
+                Dim eqPrev As BoolVar = Nothing
+                For j = 0 To keysA.Count - 1
+                    Dim t = keysA(j)
+                    Dim va = assign(New AssignKey With {.Lehrer = a, .Klasse = t.Klasse, .Fach = t.Fach, .IstGruppe = t.IstGruppe})
+                    Dim vb = assign(New AssignKey With {.Lehrer = b, .Klasse = t.Klasse, .Fach = t.Fach, .IstGruppe = t.IstGruppe})
+                    If eqPrev Is Nothing Then
+                        model.Add(va >= vb)
+                    Else
+                        model.Add(va >= vb).OnlyEnforceIf(eqPrev)
+                    End If
+                    If j < keysA.Count - 1 Then
+                        Dim same = model.NewBoolVar($"symSame[{a},{b},{j}]")
+                        model.Add(va = vb).OnlyEnforceIf(same)
+                        model.Add(va + vb = 1L).OnlyEnforceIf(same.Not())
+                        If eqPrev Is Nothing Then
+                            eqPrev = same
+                        Else
+                            Dim eqNext = model.NewBoolVar($"symEq[{a},{b},{j}]")
+                            model.Add(eqNext <= eqPrev)
+                            model.Add(eqNext <= same)
+                            model.Add(eqNext >= eqPrev + same - 1L)
+                            eqPrev = eqNext
+                        End If
+                    End If
+                Next
+            Next
+        Next
+    End Sub
+
+    ''' <summary>Ergebnis-Extraktion (mechanisch aus SolveLehrereinsatz
+    ''' herausgeloest, identisches Verhalten) - von der Ein-Loesungs-Fassade
+    ''' und von SolveLehrereinsatzTop je Iteration aufgerufen.</summary>
+    Private Function ExtractLehrereinsatzResult(bestand As Stammdatenbestand, modell As LehrereinsatzModell,
+                                                 solver As CpSolver, status As CpSolverStatus) As LehrereinsatzResult
+        Dim gruppeByName = bestand.Gruppen.ToDictionary(Function(g) g.Name)
+        Dim assign = modell.Assign
+        Dim istKlassenlehrer = modell.IstKlassenlehrer
         Dim result As New LehrereinsatzResult With {.Status = status, .Solver = solver}
         If status = CpSolverStatus.Optimal OrElse status = CpSolverStatus.Feasible Then
             Dim zuweisungen As New List(Of LehrereinsatzZuweisung)
@@ -564,6 +667,203 @@ Public Module Lehrereinsatzplanung
         End If
         Return result
     End Function
+
+    ''' <summary>Mehr-Zuteilungs-Enumeration (SolveTop-Muster auf Stufe 1):
+    ''' loest das Lehrereinsatz-Modell bis zu `maxAssignments`-mal auf
+    ''' DEMSELBEN CpModel. Nach der ersten (optimalen) Loesung wird deren
+    ''' Objective als Band fixiert (`objective &lt;= opt +
+    ''' assignmentTolerance` - nur "hoechstens so viel schlechtere"
+    ''' Alternativen), jede gefundene Zuteilung per exaktem No-Good
+    ''' geblockt UND per Diversitaets-Cut: die naechste Zuteilung muss in
+    ''' mindestens `assignmentMinDiversity` (Klasse,Fach)-Einheiten eine
+    ''' ANDERE Lehrkraft waehlen (das minDiversity-Muster aus
+    ''' Solver.BlockSolution). Die NICHTSYMMETRIE liefert nicht der Cut,
+    ''' sondern `aequivalenzKlassen`: sie aktivieren die
+    ''' Lex-Symmetriebrechung im Modell (AddSymmetryBreaking), wodurch
+    ''' pro Symmetrie-Orbit nur der kanonische Repraesentant zulaessig
+    ''' ist - zwei enumerierte Zuteilungen liegen dann zwangslaeufig in
+    ''' verschiedenen Orbits, ein reiner Tausch austauschbarer
+    ''' Lehrkraefte kann gar nicht erst auftauchen. (Eine frueher
+    ''' erwogene "invariante" Distanz ueber die Aequivalenzklassen-
+    ''' Projektion je Einheit waere ZU GROB: der Wechsel von "A->1a,
+    ''' B->1b" zu "A uebernimmt beide" aendert die Projektion nicht,
+    ''' ist aber eine echte, nicht-symmetrische Alternative.)
+    ''' Rueckgabe: das erste Element traegt IMMER
+    ''' den Status des ersten Solve-Versuchs (auch bei Fehlschlag -
+    ''' gleiche Semantik wie SolveLehrereinsatz); weitere Elemente sind
+    ''' nur erfolgreiche, paarweise verschiedene Zuteilungen. Bricht ab,
+    ''' sobald keine weitere Alternative im Band existiert (Infeasible).</summary>
+    Public Function SolveLehrereinsatzTop(bestand As Stammdatenbestand,
+                                           Optional deputatToleranzStunden As Double = 2.0,
+                                           Optional vorjahresZuordnung As Dictionary(Of (Klasse As String, Fach As String), String) = Nothing,
+                                           Optional timeLimitS As Double = 30.0,
+                                           Optional seed As Integer = 42,
+                                           Optional numWorkers As Integer = 1,
+                                           Optional maxAssignments As Integer = 1,
+                                           Optional assignmentTolerance As Integer = 0,
+                                           Optional assignmentMinDiversity As Integer = 1,
+                                           Optional aequivalenzKlassen As List(Of List(Of String)) = Nothing) As List(Of LehrereinsatzResult)
+        Dim modell = BuildLehrereinsatzModell(bestand, deputatToleranzStunden, vorjahresZuordnung, aequivalenzKlassen)
+        Dim results As New List(Of LehrereinsatzResult)
+
+        For iteration = 0 To Math.Max(maxAssignments, 1) - 1
+            Dim solver As New CpSolver()
+            solver.StringParameters = $"max_time_in_seconds:{timeLimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
+            Dim status = solver.Solve(modell.Model)
+            Dim ok = status = CpSolverStatus.Optimal OrElse status = CpSolverStatus.Feasible
+            If Not ok Then
+                If iteration = 0 Then results.Add(New LehrereinsatzResult With {.Status = status, .Solver = solver})
+                Exit For
+            End If
+            results.Add(ExtractLehrereinsatzResult(bestand, modell, solver, status))
+
+            ' Band um das erste (beste) Objective - erst NACH der ersten
+            ' Loesung, damit das Optimum selbst nie abgeschnitten wird.
+            If iteration = 0 Then
+                modell.Model.Add(modell.Objective <= CLng(Math.Round(solver.ObjectiveValue)) + CLng(Math.Max(assignmentTolerance, 0)))
+            End If
+
+            ' Exakter No-Good ueber alle assign-Variablen.
+            Dim literals As New List(Of ILiteral)
+            For Each kvp In modell.Assign
+                literals.Add(If(solver.BooleanValue(kvp.Value), kvp.Value.Not(), CType(kvp.Value, ILiteral)))
+            Next
+            modell.Model.AddBoolOr(literals)
+
+            ' Diversitaets-Cut (minDiversity-Muster aus Solver.
+            ' BlockSolution): die naechste Zuteilung muss in mindestens
+            ' `assignmentMinDiversity` Einheiten eine andere Lehrkraft
+            ' waehlen. Permutations-Duplikate blockt nicht dieser Cut,
+            ' sondern die Lex-Symmetriebrechung im Modell (siehe
+            ' Funktionskommentar).
+            If assignmentMinDiversity >= 1 Then
+                Dim trueVars = modell.Assign.Values.Where(Function(v) solver.BooleanValue(v)).ToList()
+                If trueVars.Count > 0 Then
+                    modell.Model.Add(LinearExpr.Sum(trueVars) <= CLng(trueVars.Count) - CLng(assignmentMinDiversity))
+                End If
+            End If
+        Next
+        Return results
+    End Function
+
+    ''' <summary>Aequivalenzklassen austauschbarer Lehrkraefte - zwei
+    ''' Lehrkraefte sind aequivalent, wenn die GESAMTE Pipeline sie nicht
+    ''' unterscheiden kann: identische Stammdaten (Deputat inkl.
+    ''' Anrechnung/Springerreserve, Verfuegbarkeitstage, bevorzugte
+    ''' Klassenstufen, Klassenlehrer-Faehigkeit, Max-Klassen/-Faecher),
+    ''' identische Fach-Qualifikationen (inkl. Fachfremd-Markierung),
+    ''' identische feste_zuordnungen-Bindungen UND identische (auf einen
+    ''' Platzhalter normalisierte) Erwaehnungen in den handgeschriebenen
+    ''' Stufe-2-Constraints (z.B. teacher_availability) - zwei Lehrkraefte
+    ''' mit derselben Mo-Do-Verfuegbarkeitsregel bleiben so aequivalent,
+    ''' waehrend jede individuelle Abweichung sauber trennt. Konservativ:
+    ''' im Zweifel getrennt. Rueckgabe: vollstaendige Partition in
+    ''' Stammdaten-Reihenfolge (kanonische Ordnung fuer die
+    ''' Symmetriebrechung); Konsumenten, die nur Tauschbarkeit anzeigen,
+    ''' filtern auf Klassen mit &gt;= 2 Mitgliedern.</summary>
+    Public Function TeacherEquivalenceClasses(bestand As Stammdatenbestand,
+                                               Optional handConstraints As List(Of JsonObject) = Nothing) As List(Of List(Of String))
+        Dim inv = Globalization.CultureInfo.InvariantCulture
+        Dim signatureOf = Function(l As Lehrer) As String
+                              Dim parts As New List(Of String) From {
+                                  l.DeputatSollstunden.ToString(inv),
+                                  l.Anrechnungsstunden.ToString(inv),
+                                  l.SpringerReserveStunden.ToString(inv),
+                                  If(l.VerfuegbareTage Is Nothing, "<alle>", String.Join(",", l.VerfuegbareTage.OrderBy(Function(t) t, StringComparer.Ordinal))),
+                                  String.Join(",", l.BevorzugteKlassenstufen.OrderBy(Function(k) k)),
+                                  l.KlassenlehrerFaehig.ToString(),
+                                  If(l.MaxKlassen.HasValue, l.MaxKlassen.Value.ToString(inv), "<kein>"),
+                                  If(l.MaxFaecher.HasValue, l.MaxFaecher.Value.ToString(inv), "<kein>"),
+                                  String.Join(";", bestand.FachLehrerZuordnungen.
+                                      Where(Function(z) z.LehrerName = l.Name).
+                                      Select(Function(z) $"{z.FachName}|{z.Fachfremd}").
+                                      OrderBy(Function(s) s, StringComparer.Ordinal)),
+                                  String.Join(";", bestand.FesteZuordnungen.
+                                      Where(Function(fz) fz.LehrerName = l.Name).
+                                      Select(Function(fz) $"{fz.KlasseName}|{fz.FachName}").
+                                      OrderBy(Function(s) s, StringComparer.Ordinal)),
+                                  String.Join(";", NormalizedConstraintReferences(l.Name, handConstraints))
+                              }
+                              Return String.Join("||", parts)
+                          End Function
+
+        Dim bySignature As New Dictionary(Of String, List(Of String))
+        Dim order As New List(Of String)
+        For Each l In bestand.Lehrkraefte
+            Dim sig = signatureOf(l)
+            If Not bySignature.ContainsKey(sig) Then
+                bySignature(sig) = New List(Of String)
+                order.Add(sig)
+            End If
+            bySignature(sig).Add(l.Name)
+        Next
+        Return order.Select(Function(sig) bySignature(sig)).ToList()
+    End Function
+
+    ''' <summary>Alle handgeschriebenen Constraints, die `name` woertlich
+    ''' referenzieren, mit dem Namen durch einen Platzhalter ersetzt und
+    ''' kompakt serialisiert (sortiert) - der Constraint-INHALT trennt
+    ''' Aequivalenzklassen, die blosse Existenz einer Regel nicht.</summary>
+    Private Function NormalizedConstraintReferences(name As String, handConstraints As List(Of JsonObject)) As List(Of String)
+        Dim result As New List(Of String)
+        If handConstraints Is Nothing Then Return result
+        For Each c In handConstraints
+            If Not JsonReferencesString(c, name) Then Continue For
+            Dim clone = c.DeepClone().AsObject()
+            ReplaceStringValues(clone, name, "<SELF>")
+            result.Add(clone.ToJsonString())
+        Next
+        result.Sort(StringComparer.Ordinal)
+        Return result
+    End Function
+
+    Private Function JsonReferencesString(node As JsonNode, value As String) As Boolean
+        If node Is Nothing Then Return False
+        Dim asValue = TryCast(node, JsonValue)
+        If asValue IsNot Nothing Then
+            Dim s As String = Nothing
+            Return asValue.TryGetValue(Of String)(s) AndAlso s = value
+        End If
+        Dim asObj = TryCast(node, JsonObject)
+        If asObj IsNot Nothing Then
+            Return asObj.Any(Function(kvp) JsonReferencesString(kvp.Value, value))
+        End If
+        Dim asArr = TryCast(node, JsonArray)
+        If asArr IsNot Nothing Then
+            Return asArr.Any(Function(child) JsonReferencesString(child, value))
+        End If
+        Return False
+    End Function
+
+    Private Sub ReplaceStringValues(node As JsonNode, value As String, replacement As String)
+        Dim asObj = TryCast(node, JsonObject)
+        If asObj IsNot Nothing Then
+            For Each key In asObj.Select(Function(kvp) kvp.Key).ToList()
+                Dim child = asObj(key)
+                Dim childValue = TryCast(child, JsonValue)
+                Dim s As String = Nothing
+                If childValue IsNot Nothing AndAlso childValue.TryGetValue(Of String)(s) AndAlso s = value Then
+                    asObj(key) = replacement
+                Else
+                    ReplaceStringValues(child, value, replacement)
+                End If
+            Next
+            Return
+        End If
+        Dim asArr = TryCast(node, JsonArray)
+        If asArr IsNot Nothing Then
+            For i = 0 To asArr.Count - 1
+                Dim child = asArr(i)
+                Dim childValue = TryCast(child, JsonValue)
+                Dim s As String = Nothing
+                If childValue IsNot Nothing AndAlso childValue.TryGetValue(Of String)(s) AndAlso s = value Then
+                    asArr(i) = replacement
+                Else
+                    ReplaceStringValues(child, value, replacement)
+                End If
+            Next
+        End If
+    End Sub
 
     ''' <summary>Phase 2.15d: uebersetzt ein geloestes LehrereinsatzResult
     ''' rein deterministisch (kein CP-SAT) in das bestehende,
