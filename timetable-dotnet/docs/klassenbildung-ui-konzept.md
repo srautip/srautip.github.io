@@ -224,3 +224,24 @@ den Rahmen erweitert - alles davor funktioniert per Doppelklick.
 Verifikation je Schritt wie gehabt: Headless-Chromium-Interaktionstests
 gegen unabhaengige Python-Nachrechnungen (Badge-Zaehlung,
 Highlight-Mengen, Pin-Export-Inhalt, Live-Bewertung == Bewerte).
+
+## Umsetzungsstand
+
+- **U1-U3 umgesetzt** (Template-Redesign von klassenbildung.html):
+  Gruppenfarben + deterministische Kuerzel (Klassenbildung.
+  GruppenKuerzel, YAML-Feld `gruppen[].kuerzel` optional, Test),
+  Gruppen-/Wunsch-Badges mit Statuszeichen, Buendelungs-Stapel mit
+  x/y-Kopf, Hover-/Mehrfach-Kreuz-Highlight, Panel-Seitenleiste nach
+  Prio-Stufen mit Status-Sortierung und Mini-Balken (Gruppen, Balance,
+  Wuensche inkl. Verletzten-Liste), Varianten-Kacheln mit
+  "Arbeitsstand"-Uebernahme, Kapazitaetsbalken je Spalte,
+  Fortschrittsleiste mit Konsens-/Unkritisch-Bulk, Pins F1/F2/F4/F6
+  (Karte, Popover, Panel, Spaltenkopf), Fixierungen-Panel mit
+  YAML-Export (Bestand + Herkunfts-Kommentare) und
+  localStorage-Komfort. JSON dafuer um gruppen[].kuerzel, wuensche-
+  und fixierungen-Echo erweitert. Chromium-Interaktionstest: 116
+  Badges, 15 Stapel, Sektionen kritisch/wichtig/wenn moeglich/
+  Balance/Wuensche, Konsens-Bulk 27 -> Einzelpin 28 -> Gruppen-Pin 31,
+  YAML-Export 31 Eintraege inkl. Bestand, Filter "nur offene"
+  100 -> 69 Karten (exakt 100 - 31). Offen: U4 (Live-Bewertung +
+  Drag & Drop) und U5 (Re-Solve-Loop).

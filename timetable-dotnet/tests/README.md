@@ -660,7 +660,28 @@ Anzeige-Namen (`klassen.stufe: 1` generiert 1a/1b/…, `klassen.labels`
 setzt sie explizit; ohne beides "Klasse N"), und eine **Gruppen-Tabelle**
 zeigt das Regelwerk samt Ist-Verteilung über die Klassen und
 Erfüllungsstatus in der aktiven Variante - Zeilenklick hebt die
-Mitglieder-Karten im Board hervor. `render <schule>` baut
+Mitglieder-Karten im Board hervor.
+
+**UI-Ausbau U1-U3** (docs/klassenbildung-ui-konzept.md): Gruppen sind
+erstklassige sichtbare Objekte - jede trägt eine stabile Gruppenfarbe
+und ein Kürzel (`gruppen[].kuerzel` optional, sonst aus der Id
+abgeleitet), Karten tragen **Gruppen-Badges** (Gruppenfarbe +
+Statuszeichen ✓/!/✗) und W+/W−-Wunsch-Badges, Bündelungsgruppen
+erscheinen als **farbige Stapel** in den Klassen-Spalten („[K3] … 2/4
+hier" macht zerrissene Bündel sofort sichtbar), Hover/Klick auf Badge
+oder Panel-Zeile hebt alle Mitglieder hervor (mehrere Gruppen
+gleichzeitig). Das **Gruppen-Panel** ist eine Seitenleiste nach
+Prio-Stufen (kritisch/wichtig/wenn möglich, verletzte zuerst) mit
+Verteilungs-Mini-Balken, Balance- und Wunsch-Block. Der
+**Fixierungs-Workflow**: Fortschrittsleiste („n von m fixiert",
+Konsens-/Unkritisch-Bulk-Buttons), Pin je Karte (F1),
+Karten-Popover mit „Nicht in …" (F2), „Gruppe fixieren" (F4) im
+Panel, „Klasse einfrieren" (F6) am Spaltenkopf; alle Pins sammeln
+sich in einem Export-Panel als fertiger `fixierungen:`-YAML-Block
+(bestehende YAML-Fixierungen inklusive, Herkunft je Pin als
+Kommentar) für den nächsten `klassen`-Lauf - der Viewer selbst
+rechnet nicht. Pins überleben Reloads per localStorage (nur
+Browser-Komfort). `render <schule>` baut
 den Viewer aus vorhandener klassenbildung.json neu (ohne Solve). Der
 Bewertungslauf zählt alle Regeln unabhängig vom Solver nach
 (Verifier-Prinzip) - eine Abweichung wäre ein FAIL. Die Klassenbildung

@@ -50,6 +50,10 @@ Public NotInheritable Class KlassenbildungGruppe
     Public Property MaxProKlasse As Integer?
     Public Property Modus As String = "soft"
     Public Property Prio As Integer = 2
+    ''' <summary>UI-Konzept U1: optionales Anzeige-Kuerzel (2-3 Zeichen)
+    ''' fuer Badges im Viewer; fehlt es, wird deterministisch eines aus
+    ''' der Id abgeleitet (GruppenKuerzel).</summary>
+    Public Property Kuerzel As String = Nothing
 End Class
 
 ''' <summary>Balance-Kriterium (Konzept 3.4): Kinder mit
@@ -154,6 +158,45 @@ Public Module Klassenbildung
     }
 
     Private ReadOnly GueltigeModi As New HashSet(Of String) From {"hard", "soft"}
+
+    ''' <summary>UI-Konzept U1: Anzeige-Kuerzel je Gruppe (Id -&gt;
+    ''' Kuerzel), deterministisch und eindeutig. Explizites
+    ''' `gruppen[].kuerzel` (uppercased) gewinnt; sonst abgeleitet aus
+    ''' der Id ohne "G_"-Praefix: endet sie auf eine Zahl, Initial des
+    ''' ersten Namensteils + Zahl ("kita_sonnenblume_3" -&gt; "K3"),
+    ''' sonst die ersten drei Buchstaben ("sozialverhalten" -&gt; "SOZ").
+    ''' Kollisionen werden per angehaengter Laufnummer aufgeloest.</summary>
+    Public Function GruppenKuerzel(input As KlassenbildungInput) As Dictionary(Of String, String)
+        Dim result As New Dictionary(Of String, String)
+        Dim vergeben As New HashSet(Of String)
+        For Each g In input.Gruppen
+            Dim basis As String
+            If Not String.IsNullOrWhiteSpace(g.Kuerzel) Then
+                basis = g.Kuerzel.Trim().ToUpperInvariant()
+            Else
+                Dim id = If(g.Id, "")
+                If id.StartsWith("G_", StringComparison.OrdinalIgnoreCase) Then id = id.Substring(2)
+                Dim teile = id.Split("_"c).Where(Function(t) t.Length > 0).ToList()
+                Dim letzter = If(teile.Count > 0, teile(teile.Count - 1), "")
+                Dim zahl As Integer
+                If teile.Count >= 2 AndAlso Integer.TryParse(letzter, zahl) Then
+                    basis = teile(0).Substring(0, 1).ToUpperInvariant() & letzter
+                ElseIf teile.Count > 0 Then
+                    basis = teile(0).Substring(0, Math.Min(3, teile(0).Length)).ToUpperInvariant()
+                Else
+                    basis = "G"
+                End If
+            End If
+            Dim kuerzel = basis
+            Dim lauf = 2
+            While Not vergeben.Add(kuerzel)
+                kuerzel = basis & lauf
+                lauf += 1
+            End While
+            result(g.Id) = kuerzel
+        Next
+        Return result
+    End Function
 
     ''' <summary>Anzeige-Namen der Klassen (1-basiert indexiert):
     ''' explizite Labels &gt; Stufe+Buchstabe ("1a", "1b", ...) &gt;

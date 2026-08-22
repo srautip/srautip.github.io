@@ -87,6 +87,17 @@ Public Module KlassenRun
         Return True
     End Function
 
+    ''' <summary>UI-Konzept U1: Gruppen-Regelwerk-Echo inkl.
+    ''' deterministischem Anzeige-Kuerzel (Klassenbildung.GruppenKuerzel).</summary>
+    Private Function BaueGruppenJson(input As KlassenbildungInput) As JsonArray
+        Dim kuerzel = Klassenbildung.GruppenKuerzel(input)
+        Return New JsonArray(input.Gruppen.Select(Function(g) CType(New JsonObject From {
+            {"id", g.Id}, {"kuerzel", kuerzel(g.Id)}, {"typ", g.Typ}, {"modus", g.Modus}, {"prio", g.Prio},
+            {"max_pro_klasse", If(g.MaxProKlasse.HasValue, CType(g.MaxProKlasse.Value, JsonNode), Nothing)},
+            {"mitglieder", New JsonArray(g.Mitglieder.Select(Function(m) CType(m, JsonNode)).ToArray())}
+        }, JsonNode)).ToArray())
+    End Function
+
     Private Function DiffZuErster(erste As KlassenbildungResult, v As KlassenbildungResult) As Integer
         Return erste.Zuordnung.Keys.Where(Function(id) erste.Zuordnung(id) <> v.Zuordnung(id)).Count()
     End Function
@@ -225,10 +236,16 @@ Public Module KlassenRun
             {"max_groesse", input.Klassen.MaxGroesse},
             {"klassen_labels", New JsonArray(Klassenbildung.KlassenLabels(input).
                 Select(Function(l) CType(l, JsonNode)).ToArray())},
-            {"gruppen", New JsonArray(input.Gruppen.Select(Function(g) CType(New JsonObject From {
-                {"id", g.Id}, {"typ", g.Typ}, {"modus", g.Modus}, {"prio", g.Prio},
-                {"max_pro_klasse", If(g.MaxProKlasse.HasValue, CType(g.MaxProKlasse.Value, JsonNode), Nothing)},
-                {"mitglieder", New JsonArray(g.Mitglieder.Select(Function(m) CType(m, JsonNode)).ToArray())}
+            {"gruppen", BaueGruppenJson(input)},
+            {"wuensche", New JsonArray(input.Wuensche.Select(Function(w, wi) CType(New JsonObject From {
+                {"index", wi}, {"typ", w.Typ}, {"modus", w.Modus}, {"prio", w.Prio},
+                {"regel_id", $"wunsch[{wi}]:{w.Kinder(0)}+{w.Kinder(1)}"},
+                {"kinder", New JsonArray(w.Kinder.Select(Function(m) CType(m, JsonNode)).ToArray())}
+            }, JsonNode)).ToArray())},
+            {"fixierungen", New JsonArray(input.Fixierungen.Select(Function(fx) CType(New JsonObject From {
+                {"kind", fx.Kind},
+                {"klasse", If(fx.Klasse.HasValue, CType(fx.Klasse.Value, JsonNode), Nothing)},
+                {"nicht_klasse", If(fx.NichtKlasse.HasValue, CType(fx.NichtKlasse.Value, JsonNode), Nothing)}
             }, JsonNode)).ToArray())},
             {"parameter", New JsonObject From {
                 {"zeitlimit_s", zeitlimit}, {"epsilon", epsilon}, {"min_distanz", minDistanz}}},

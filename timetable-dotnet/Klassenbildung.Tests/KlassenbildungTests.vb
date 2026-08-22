@@ -308,6 +308,33 @@ Public Class KlassenbildungTests
         StringAssert.Contains(alle, "eindeutig")
     End Sub
 
+    ''' <summary>U1: Gruppen-Kuerzel - explizit gesetzt gewinnt
+    ''' (uppercased), Ids mit Zahl-Suffix werden zu Initial+Zahl,
+    ''' andere zu den ersten drei Buchstaben; Kollisionen bekommen eine
+    ''' Laufnummer. Deterministisch ueber die Gruppen-Reihenfolge.</summary>
+    <TestMethod>
+    Public Sub GruppenKuerzelSindDeterministischUndEindeutig()
+        Dim input = Basis(4, 2, 2, 2)
+        Dim addGruppe = Sub(id As String, kuerzel As String)
+                            input.Gruppen.Add(New KlassenbildungGruppe With {
+                                .Id = id, .Typ = "buendelung", .Kuerzel = kuerzel,
+                                .Mitglieder = New List(Of String) From {"S1", "S2"}})
+                        End Sub
+        addGruppe("G_zwillinge", Nothing)
+        addGruppe("G_kita_sonnenblume_3", Nothing)
+        addGruppe("G_sozialverhalten", Nothing)
+        addGruppe("G_schulbegleitung", "sbg")
+        addGruppe("G_sozialkompetenz", Nothing) ' Kollision mit SOZ -> SOZ2
+
+        Dim k = Klassenbildung.GruppenKuerzel(input)
+        Assert.AreEqual("ZWI", k("G_zwillinge"))
+        Assert.AreEqual("K3", k("G_kita_sonnenblume_3"))
+        Assert.AreEqual("SOZ", k("G_sozialverhalten"))
+        Assert.AreEqual("SBG", k("G_schulbegleitung"))
+        Assert.AreEqual("SOZ2", k("G_sozialkompetenz"))
+        Assert.AreEqual(k.Values.Count, k.Values.Distinct().Count())
+    End Sub
+
     ''' <summary>Symmetriebrechung: ohne Fixierungen sind die Klassen
     ''' austauschbar - die Praezedenz-Kette erzwingt den kanonischen
     ''' Repraesentanten (S1 sitzt in Klasse 1, und Klasse 2 wird
