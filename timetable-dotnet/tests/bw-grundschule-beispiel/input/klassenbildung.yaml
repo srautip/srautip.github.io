@@ -206,7 +206,7 @@ schueler:
   - id: S100
     attribute: {geschlecht: m, kann_kind: ja}
 
-klassen: {anzahl: 4, min_groesse: 22, max_groesse: 26}
+klassen: {anzahl: 4, min_groesse: 22, max_groesse: 26, stufe: 1}   # Anzeige-Labels 1a..1d
 
 gruppen:
   # Zwillinge - Elternwunsch: zusammen (hart, Konzept 12.1)

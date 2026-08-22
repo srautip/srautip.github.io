@@ -25,11 +25,17 @@ Public NotInheritable Class KlassenbildungSchueler
 End Class
 
 ''' <summary>Klassenrahmen: Anzahl zu bildender Klassen und
-''' Groessen-Korridor je Klasse (harte Grundconstraints).</summary>
+''' Groessen-Korridor je Klasse (harte Grundconstraints). Anzeige-Namen
+''' der Klassen: explizit ueber `Labels` (Laenge = Anzahl), oder per
+''' `Stufe` generiert ("1a", "1b", ...); ohne beides "Klasse N".
+''' Fixierungen referenzieren weiterhin den 1-basierten INDEX - die
+''' Labels sind reine Anzeige (md/JSON/Viewer).</summary>
 Public NotInheritable Class KlassenbildungKlassen
     Public Property Anzahl As Integer
     Public Property MinGroesse As Integer
     Public Property MaxGroesse As Integer
+    Public Property Stufe As Integer?
+    Public Property Labels As List(Of String) = Nothing
 End Class
 
 ''' <summary>Buendelungs- oder Verteilungsgruppe (Konzept 3.2/3.3).
@@ -149,6 +155,22 @@ Public Module Klassenbildung
 
     Private ReadOnly GueltigeModi As New HashSet(Of String) From {"hard", "soft"}
 
+    ''' <summary>Anzeige-Namen der Klassen (1-basiert indexiert):
+    ''' explizite Labels &gt; Stufe+Buchstabe ("1a", "1b", ...) &gt;
+    ''' "Klasse N". Fuer Anzahl &gt; 26 laufen die Buchstaben als
+    ''' aa/ab/... weiter (praktisch nie erreicht).</summary>
+    Public Function KlassenLabels(input As KlassenbildungInput) As List(Of String)
+        Dim k = input.Klassen
+        If k.Labels IsNot Nothing AndAlso k.Labels.Count > 0 Then Return k.Labels.ToList()
+        Dim result As New List(Of String)
+        For i = 0 To k.Anzahl - 1
+            Dim buchstabe = If(i < 26, ChrW(AscW("a"c) + i).ToString(),
+                               ChrW(AscW("a"c) + (i \ 26) - 1).ToString() & ChrW(AscW("a"c) + (i Mod 26)).ToString())
+            result.Add(If(k.Stufe.HasValue, $"{k.Stufe.Value}{buchstabe}", $"Klasse {i + 1}"))
+        Next
+        Return result
+    End Function
+
     ''' <summary>Fail-Fast-Validierung VOR dem Solve (gleiche Philosophie
     ''' wie Validation.ValidateEntities: eine Regel, die auf unbekannte
     ''' IDs zeigt oder strukturell wirkungslos waere, ist ein harter
@@ -163,6 +185,14 @@ Public Module Klassenbildung
         End If
         If k.MinGroesse < 0 Then errors.Add($"klassen.min_groesse={k.MinGroesse} darf nicht negativ sein")
         If k.MaxGroesse < k.MinGroesse Then errors.Add($"klassen.max_groesse={k.MaxGroesse} < min_groesse={k.MinGroesse}")
+        If k.Labels IsNot Nothing AndAlso k.Labels.Count > 0 Then
+            If k.Labels.Count <> k.Anzahl Then
+                errors.Add($"klassen.labels: {k.Labels.Count} Eintraege, aber anzahl={k.Anzahl}")
+            End If
+            If k.Labels.Distinct().Count() <> k.Labels.Count Then
+                errors.Add("klassen.labels: Eintraege muessen eindeutig sein")
+            End If
+        End If
 
         Dim ids As New HashSet(Of String)
         For i = 0 To input.Schueler.Count - 1

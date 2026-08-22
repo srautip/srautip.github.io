@@ -655,7 +655,12 @@ Diff zu V1, Ampel-Zähler), Board-Ansicht mit Klassen-Spalten und
 Kinder-Karten (Ampel-Chips ✓/!/✗ je betroffenem Kriterium mit
 Klartext-Tooltip, Worst-of-Kartenrand, Konsens-Markierung ●),
 Balance-Kennzahlen im Spaltenkopf, "Vergleichen mit"-Diff zwischen
-Varianten und Filter "nur Diskussionsbedarf". `render <schule>` baut
+Varianten und Filter "nur Diskussionsbedarf". Die Klassen tragen
+Anzeige-Namen (`klassen.stufe: 1` generiert 1a/1b/…, `klassen.labels`
+setzt sie explizit; ohne beides "Klasse N"), und eine **Gruppen-Tabelle**
+zeigt das Regelwerk samt Ist-Verteilung über die Klassen und
+Erfüllungsstatus in der aktiven Variante - Zeilenklick hebt die
+Mitglieder-Karten im Board hervor. `render <schule>` baut
 den Viewer aus vorhandener klassenbildung.json neu (ohne Solve). Der
 Bewertungslauf zählt alle Regeln unabhängig vom Solver nach
 (Verifier-Prinzip) - eine Abweichung wäre ein FAIL. Die Klassenbildung

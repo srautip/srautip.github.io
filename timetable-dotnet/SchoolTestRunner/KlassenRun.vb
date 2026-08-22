@@ -143,10 +143,11 @@ Public Module KlassenRun
 
             z.Add("| Klasse | Groesse | Kinder |")
             z.Add("|---|---|---|")
+            Dim labels = Klassenbildung.KlassenLabels(input)
             For klasse = 1 To input.Klassen.Anzahl
                 Dim kk = klasse
                 Dim mitglieder = input.Schueler.Where(Function(s) v.Zuordnung(s.Id) = kk).Select(Function(s) s.Id).ToList()
-                z.Add($"| {klasse} | {mitglieder.Count} | {String.Join(", ", mitglieder)} |")
+                z.Add($"| {labels(klasse - 1)} | {mitglieder.Count} | {String.Join(", ", mitglieder)} |")
             Next
             z.Add("")
 
@@ -222,6 +223,13 @@ Public Module KlassenRun
             {"klassen_anzahl", input.Klassen.Anzahl},
             {"min_groesse", input.Klassen.MinGroesse},
             {"max_groesse", input.Klassen.MaxGroesse},
+            {"klassen_labels", New JsonArray(Klassenbildung.KlassenLabels(input).
+                Select(Function(l) CType(l, JsonNode)).ToArray())},
+            {"gruppen", New JsonArray(input.Gruppen.Select(Function(g) CType(New JsonObject From {
+                {"id", g.Id}, {"typ", g.Typ}, {"modus", g.Modus}, {"prio", g.Prio},
+                {"max_pro_klasse", If(g.MaxProKlasse.HasValue, CType(g.MaxProKlasse.Value, JsonNode), Nothing)},
+                {"mitglieder", New JsonArray(g.Mitglieder.Select(Function(m) CType(m, JsonNode)).ToArray())}
+            }, JsonNode)).ToArray())},
             {"parameter", New JsonObject From {
                 {"zeitlimit_s", zeitlimit}, {"epsilon", epsilon}, {"min_distanz", minDistanz}}},
             {"konsens_kern", New JsonArray(top.KonsensKern.Select(Function(id) CType(id, JsonNode)).ToArray())},

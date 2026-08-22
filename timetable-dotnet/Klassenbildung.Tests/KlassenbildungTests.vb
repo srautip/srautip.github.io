@@ -283,6 +283,31 @@ Public Class KlassenbildungTests
         Next
     End Sub
 
+    ''' <summary>Anzeige-Labels: explizite `labels` gewinnen, `stufe`
+    ''' generiert 1a/1b/..., ohne beides bleibt "Klasse N"; Labels mit
+    ''' falscher Anzahl oder Duplikaten sind Validierungsfehler.</summary>
+    <TestMethod>
+    Public Sub KlassenLabelsFolgenStufeUndExplizitenLabels()
+        Dim mitStufe = Basis(4, 2, 2, 2)
+        mitStufe.Klassen.Stufe = 1
+        CollectionAssert.AreEqual(New List(Of String) From {"1a", "1b"}, Klassenbildung.KlassenLabels(mitStufe))
+
+        Dim explizit = Basis(4, 2, 2, 2)
+        explizit.Klassen.Stufe = 1
+        explizit.Klassen.Labels = New List(Of String) From {"Igel", "Fuchs"}
+        CollectionAssert.AreEqual(New List(Of String) From {"Igel", "Fuchs"}, Klassenbildung.KlassenLabels(explizit))
+
+        Dim ohne = Basis(4, 2, 2, 2)
+        CollectionAssert.AreEqual(New List(Of String) From {"Klasse 1", "Klasse 2"}, Klassenbildung.KlassenLabels(ohne))
+
+        Dim kaputt = Basis(4, 2, 2, 2)
+        kaputt.Klassen.Labels = New List(Of String) From {"1a", "1a", "1b"}
+        Dim errors = Klassenbildung.ValidateKlassenbildung(kaputt)
+        Dim alle = String.Join(vbLf, errors)
+        StringAssert.Contains(alle, "3 Eintraege, aber anzahl=2")
+        StringAssert.Contains(alle, "eindeutig")
+    End Sub
+
     ''' <summary>Symmetriebrechung: ohne Fixierungen sind die Klassen
     ''' austauschbar - die Praezedenz-Kette erzwingt den kanonischen
     ''' Repraesentanten (S1 sitzt in Klasse 1, und Klasse 2 wird

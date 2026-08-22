@@ -4,6 +4,206 @@
   "klassen_anzahl": 4,
   "min_groesse": 22,
   "max_groesse": 26,
+  "klassen_labels": [
+    "1a",
+    "1b",
+    "1c",
+    "1d"
+  ],
+  "gruppen": [
+    {
+      "id": "G_zwillinge",
+      "typ": "buendelung",
+      "modus": "hard",
+      "prio": 3,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S031",
+        "S062"
+      ]
+    },
+    {
+      "id": "G_kita_sonnenblume_1",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S007",
+        "S084",
+        "S012",
+        "S053"
+      ]
+    },
+    {
+      "id": "G_kita_regenbogen_2",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S057",
+        "S003"
+      ]
+    },
+    {
+      "id": "G_kita_pusteblume_3",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S023",
+        "S065"
+      ]
+    },
+    {
+      "id": "G_kita_wirbelwind_4",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S013",
+        "S040",
+        "S074"
+      ]
+    },
+    {
+      "id": "G_kita_loewenzahn_5",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S002",
+        "S066",
+        "S020"
+      ]
+    },
+    {
+      "id": "G_kita_villakunterbunt_6",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S097",
+        "S092",
+        "S067"
+      ]
+    },
+    {
+      "id": "G_kita_sonnenblume_7",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S047",
+        "S014"
+      ]
+    },
+    {
+      "id": "G_kita_regenbogen_8",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S044",
+        "S098",
+        "S079"
+      ]
+    },
+    {
+      "id": "G_kita_pusteblume_9",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S085",
+        "S043"
+      ]
+    },
+    {
+      "id": "G_kita_wirbelwind_10",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S050",
+        "S037"
+      ]
+    },
+    {
+      "id": "G_kita_loewenzahn_11",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S018",
+        "S080",
+        "S093",
+        "S045"
+      ]
+    },
+    {
+      "id": "G_kita_villakunterbunt_12",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S001",
+        "S058"
+      ]
+    },
+    {
+      "id": "G_nordstadt",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 1,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S068",
+        "S077",
+        "S054",
+        "S025",
+        "S076",
+        "S039",
+        "S055"
+      ]
+    },
+    {
+      "id": "G_sozialverhalten",
+      "typ": "verteilung",
+      "modus": "soft",
+      "prio": 3,
+      "max_pro_klasse": 1,
+      "mitglieder": [
+        "S011",
+        "S070",
+        "S091",
+        "S094",
+        "S004"
+      ]
+    },
+    {
+      "id": "G_schulbegleitung",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S006",
+        "S096"
+      ]
+    }
+  ],
   "parameter": {
     "zeitlimit_s": 20,
     "epsilon": 0.05,
@@ -11,28 +211,33 @@
   },
   "konsens_kern": [
     "S001",
-    "S004",
-    "S006",
+    "S003",
     "S009",
-    "S011",
-    "S021",
+    "S019",
     "S026",
     "S028",
     "S029",
     "S030",
     "S033",
+    "S035",
     "S042",
-    "S046",
+    "S044",
+    "S048",
+    "S049",
     "S055",
+    "S057",
     "S058",
     "S067",
+    "S069",
     "S070",
     "S071",
     "S076",
+    "S079",
+    "S089",
     "S092",
-    "S095",
-    "S096",
-    "S097"
+    "S094",
+    "S097",
+    "S098"
   ],
   "varianten": [
     {
@@ -45,25 +250,25 @@
         "S002": 2,
         "S003": 2,
         "S004": 3,
-        "S005": 3,
-        "S006": 4,
-        "S007": 4,
-        "S008": 3,
+        "S005": 4,
+        "S006": 3,
+        "S007": 2,
+        "S008": 4,
         "S009": 1,
         "S010": 2,
         "S011": 4,
-        "S012": 4,
-        "S013": 4,
-        "S014": 2,
+        "S012": 2,
+        "S013": 2,
+        "S014": 4,
         "S015": 3,
-        "S016": 4,
-        "S017": 3,
-        "S018": 3,
-        "S019": 2,
+        "S016": 2,
+        "S017": 4,
+        "S018": 4,
+        "S019": 3,
         "S020": 2,
         "S021": 3,
         "S022": 3,
-        "S023": 2,
+        "S023": 4,
         "S024": 3,
         "S025": 1,
         "S026": 1,
@@ -71,29 +276,29 @@
         "S028": 1,
         "S029": 1,
         "S030": 1,
-        "S031": 2,
-        "S032": 4,
-        "S033": 2,
+        "S031": 3,
+        "S032": 2,
+        "S033": 4,
         "S034": 3,
         "S035": 3,
-        "S036": 2,
+        "S036": 3,
         "S037": 1,
         "S038": 3,
         "S039": 1,
-        "S040": 4,
-        "S041": 2,
+        "S040": 2,
+        "S041": 4,
         "S042": 4,
-        "S043": 3,
+        "S043": 4,
         "S044": 2,
-        "S045": 3,
+        "S045": 4,
         "S046": 3,
-        "S047": 2,
+        "S047": 4,
         "S048": 2,
-        "S049": 4,
+        "S049": 3,
         "S050": 1,
-        "S051": 2,
-        "S052": 4,
-        "S053": 4,
+        "S051": 4,
+        "S052": 2,
+        "S053": 2,
         "S054": 1,
         "S055": 1,
         "S056": 4,
@@ -101,45 +306,45 @@
         "S058": 1,
         "S059": 2,
         "S060": 3,
-        "S061": 4,
-        "S062": 2,
-        "S063": 4,
-        "S064": 1,
-        "S065": 2,
+        "S061": 2,
+        "S062": 3,
+        "S063": 2,
+        "S064": 4,
+        "S065": 4,
         "S066": 2,
         "S067": 1,
         "S068": 1,
         "S069": 2,
         "S070": 1,
         "S071": 1,
-        "S072": 3,
+        "S072": 4,
         "S073": 1,
-        "S074": 4,
+        "S074": 2,
         "S075": 1,
         "S076": 1,
         "S077": 1,
         "S078": 1,
         "S079": 2,
-        "S080": 3,
-        "S081": 3,
+        "S080": 4,
+        "S081": 4,
         "S082": 3,
         "S083": 4,
-        "S084": 4,
-        "S085": 3,
-        "S086": 4,
+        "S084": 2,
+        "S085": 4,
+        "S086": 2,
         "S087": 3,
-        "S088": 4,
-        "S089": 2,
-        "S090": 4,
+        "S088": 1,
+        "S089": 4,
+        "S090": 3,
         "S091": 2,
         "S092": 1,
-        "S093": 3,
-        "S094": 2,
-        "S095": 4,
-        "S096": 4,
+        "S093": 4,
+        "S094": 4,
+        "S095": 3,
+        "S096": 3,
         "S097": 1,
         "S098": 2,
-        "S099": 3,
+        "S099": 4,
         "S100": 1
       },
       "balance_kennzahlen": [
@@ -149,9 +354,9 @@
           "toleranz": 2,
           "counts": [
             14,
-            13,
-            11,
-            10
+            12,
+            10,
+            12
           ]
         },
         {
@@ -171,9 +376,9 @@
           "toleranz": 1,
           "counts": [
             3,
-            3,
             2,
-            1
+            1,
+            3
           ]
         }
       ],
@@ -497,42 +702,42 @@
           "regel_id": "G_zwillinge",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_zwillinge: alle in Klasse 2"
+          "text": "Buendelung G_zwillinge: alle in Klasse 3"
         },
         {
           "kind": "S062",
           "regel_id": "G_zwillinge",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_zwillinge: alle in Klasse 2"
+          "text": "Buendelung G_zwillinge: alle in Klasse 3"
         },
         {
           "kind": "S007",
           "regel_id": "G_kita_sonnenblume_1",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 4"
+          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 2"
         },
         {
           "kind": "S084",
           "regel_id": "G_kita_sonnenblume_1",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 4"
+          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 2"
         },
         {
           "kind": "S012",
           "regel_id": "G_kita_sonnenblume_1",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 4"
+          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 2"
         },
         {
           "kind": "S053",
           "regel_id": "G_kita_sonnenblume_1",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 4"
+          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 2"
         },
         {
           "kind": "S057",
@@ -553,35 +758,35 @@
           "regel_id": "G_kita_pusteblume_3",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_pusteblume_3: alle in Klasse 2"
+          "text": "Buendelung G_kita_pusteblume_3: alle in Klasse 4"
         },
         {
           "kind": "S065",
           "regel_id": "G_kita_pusteblume_3",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_pusteblume_3: alle in Klasse 2"
+          "text": "Buendelung G_kita_pusteblume_3: alle in Klasse 4"
         },
         {
           "kind": "S013",
           "regel_id": "G_kita_wirbelwind_4",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_wirbelwind_4: alle in Klasse 4"
+          "text": "Buendelung G_kita_wirbelwind_4: alle in Klasse 2"
         },
         {
           "kind": "S040",
           "regel_id": "G_kita_wirbelwind_4",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_wirbelwind_4: alle in Klasse 4"
+          "text": "Buendelung G_kita_wirbelwind_4: alle in Klasse 2"
         },
         {
           "kind": "S074",
           "regel_id": "G_kita_wirbelwind_4",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_wirbelwind_4: alle in Klasse 4"
+          "text": "Buendelung G_kita_wirbelwind_4: alle in Klasse 2"
         },
         {
           "kind": "S002",
@@ -630,14 +835,14 @@
           "regel_id": "G_kita_sonnenblume_7",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_sonnenblume_7: alle in Klasse 2"
+          "text": "Buendelung G_kita_sonnenblume_7: alle in Klasse 4"
         },
         {
           "kind": "S014",
           "regel_id": "G_kita_sonnenblume_7",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_sonnenblume_7: alle in Klasse 2"
+          "text": "Buendelung G_kita_sonnenblume_7: alle in Klasse 4"
         },
         {
           "kind": "S044",
@@ -665,14 +870,14 @@
           "regel_id": "G_kita_pusteblume_9",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_pusteblume_9: alle in Klasse 3"
+          "text": "Buendelung G_kita_pusteblume_9: alle in Klasse 4"
         },
         {
           "kind": "S043",
           "regel_id": "G_kita_pusteblume_9",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_pusteblume_9: alle in Klasse 3"
+          "text": "Buendelung G_kita_pusteblume_9: alle in Klasse 4"
         },
         {
           "kind": "S050",
@@ -693,28 +898,28 @@
           "regel_id": "G_kita_loewenzahn_11",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 3"
+          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 4"
         },
         {
           "kind": "S080",
           "regel_id": "G_kita_loewenzahn_11",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 3"
+          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 4"
         },
         {
           "kind": "S093",
           "regel_id": "G_kita_loewenzahn_11",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 3"
+          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 4"
         },
         {
           "kind": "S045",
           "regel_id": "G_kita_loewenzahn_11",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 3"
+          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 4"
         },
         {
           "kind": "S001",
@@ -783,8 +988,8 @@
           "kind": "S011",
           "regel_id": "G_sozialverhalten",
           "regel_typ": "verteilung",
-          "status": "gelb",
-          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
+          "status": "rot",
+          "text": "Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"
         },
         {
           "kind": "S070",
@@ -797,8 +1002,8 @@
           "kind": "S091",
           "regel_id": "G_sozialverhalten",
           "regel_typ": "verteilung",
-          "status": "rot",
-          "text": "Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"
+          "status": "gelb",
+          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
         },
         {
           "kind": "S094",
@@ -819,14 +1024,14 @@
           "regel_id": "G_schulbegleitung",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_schulbegleitung: alle in Klasse 4"
+          "text": "Buendelung G_schulbegleitung: alle in Klasse 3"
         },
         {
           "kind": "S096",
           "regel_id": "G_schulbegleitung",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_schulbegleitung: alle in Klasse 4"
+          "text": "Buendelung G_schulbegleitung: alle in Klasse 3"
         },
         {
           "kind": "S001",
@@ -840,21 +1045,21 @@
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S004",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S005",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S006",
@@ -867,64 +1072,64 @@
           "kind": "S007",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S012",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S014",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S015",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S017",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S018",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S020",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S021",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S023",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S025",
@@ -965,15 +1170,15 @@
           "kind": "S032",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S036",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S039",
@@ -987,14 +1192,14 @@
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S052",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S054",
@@ -1022,21 +1227,21 @@
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S063",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S065",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S068",
@@ -1050,7 +1255,7 @@
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S070",
@@ -1064,7 +1269,7 @@
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S076",
@@ -1085,42 +1290,42 @@
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S082",
-          "regel_id": "geschlecht=w",
-          "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
-        },
-        {
-          "kind": "S083",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gelb",
           "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
+          "kind": "S083",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
           "kind": "S085",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S087",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S089",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S090",
@@ -1134,14 +1339,14 @@
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S094",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S095",
@@ -1162,14 +1367,14 @@
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S006",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
           "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S009",
@@ -1218,7 +1423,7 @@
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
           "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S059",
@@ -1253,14 +1458,14 @@
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
           "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S081",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
           "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S091",
@@ -1287,29 +1492,29 @@
           "kind": "S017",
           "regel_id": "kann_kind=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
         },
         {
           "kind": "S035",
-          "regel_id": "kann_kind=ja",
-          "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
-        },
-        {
-          "kind": "S042",
           "regel_id": "kann_kind=ja",
           "regel_typ": "balance",
           "status": "gelb",
           "text": "Balance kann_kind=ja: 1 in dieser Klasse (Ziel 2 \u002B/- 1)"
         },
         {
-          "kind": "S044",
+          "kind": "S042",
           "regel_id": "kann_kind=ja",
           "regel_typ": "balance",
           "status": "gelb",
           "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S044",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
         },
         {
           "kind": "S055",
@@ -1322,8 +1527,8 @@
           "kind": "S057",
           "regel_id": "kann_kind=ja",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+          "status": "gruen",
+          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
         },
         {
           "kind": "S068",
@@ -1821,59 +2026,59 @@
       "index": 2,
       "status": "Optimal",
       "objective": 1001,
-      "diff_zu_v1": 54,
+      "diff_zu_v1": 72,
       "zuordnung": {
         "S001": 1,
         "S002": 1,
         "S003": 2,
-        "S004": 3,
-        "S005": 2,
+        "S004": 2,
+        "S005": 3,
         "S006": 4,
         "S007": 3,
         "S008": 2,
         "S009": 1,
         "S010": 1,
-        "S011": 4,
+        "S011": 3,
         "S012": 3,
         "S013": 1,
-        "S014": 4,
-        "S015": 3,
+        "S014": 3,
+        "S015": 2,
         "S016": 1,
-        "S017": 2,
-        "S018": 2,
-        "S019": 2,
+        "S017": 3,
+        "S018": 3,
+        "S019": 3,
         "S020": 1,
-        "S021": 3,
-        "S022": 3,
+        "S021": 2,
+        "S022": 4,
         "S023": 2,
-        "S024": 3,
+        "S024": 4,
         "S025": 4,
         "S026": 1,
-        "S027": 2,
+        "S027": 4,
         "S028": 1,
         "S029": 1,
         "S030": 1,
-        "S031": 3,
+        "S031": 2,
         "S032": 1,
-        "S033": 2,
-        "S034": 3,
+        "S033": 4,
+        "S034": 4,
         "S035": 3,
-        "S036": 3,
+        "S036": 2,
         "S037": 4,
-        "S038": 3,
+        "S038": 2,
         "S039": 4,
         "S040": 1,
-        "S041": 4,
+        "S041": 2,
         "S042": 4,
-        "S043": 2,
+        "S043": 3,
         "S044": 2,
-        "S045": 2,
-        "S046": 3,
-        "S047": 4,
+        "S045": 3,
+        "S046": 4,
+        "S047": 3,
         "S048": 2,
         "S049": 3,
         "S050": 4,
-        "S051": 4,
+        "S051": 3,
         "S052": 1,
         "S053": 3,
         "S054": 4,
@@ -1882,11 +2087,11 @@
         "S057": 2,
         "S058": 1,
         "S059": 3,
-        "S060": 3,
+        "S060": 2,
         "S061": 1,
-        "S062": 3,
+        "S062": 2,
         "S063": 3,
-        "S064": 4,
+        "S064": 2,
         "S065": 2,
         "S066": 1,
         "S067": 1,
@@ -1894,35 +2099,35 @@
         "S069": 2,
         "S070": 1,
         "S071": 1,
-        "S072": 4,
-        "S073": 4,
+        "S072": 3,
+        "S073": 3,
         "S074": 1,
-        "S075": 4,
+        "S075": 2,
         "S076": 1,
         "S077": 4,
         "S078": 4,
         "S079": 2,
-        "S080": 2,
+        "S080": 3,
         "S081": 2,
-        "S082": 3,
-        "S083": 4,
+        "S082": 4,
+        "S083": 3,
         "S084": 3,
-        "S085": 2,
+        "S085": 3,
         "S086": 3,
-        "S087": 3,
-        "S088": 3,
-        "S089": 2,
-        "S090": 4,
+        "S087": 2,
+        "S088": 4,
+        "S089": 4,
+        "S090": 2,
         "S091": 1,
         "S092": 1,
-        "S093": 2,
-        "S094": 2,
-        "S095": 4,
+        "S093": 3,
+        "S094": 4,
+        "S095": 2,
         "S096": 4,
         "S097": 1,
         "S098": 2,
-        "S099": 2,
-        "S100": 3
+        "S099": 3,
+        "S100": 4
       },
       "balance_kennzahlen": [
         {
@@ -1932,8 +2137,8 @@
           "counts": [
             13,
             13,
-            10,
-            12
+            12,
+            10
           ]
         },
         {
@@ -1942,9 +2147,9 @@
           "toleranz": 1,
           "counts": [
             5,
-            4,
             3,
-            4
+            5,
+            3
           ]
         },
         {
@@ -1953,8 +2158,8 @@
           "toleranz": 1,
           "counts": [
             1,
-            3,
             2,
+            3,
             3
           ]
         }
@@ -2279,14 +2484,14 @@
           "regel_id": "G_zwillinge",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_zwillinge: alle in Klasse 3"
+          "text": "Buendelung G_zwillinge: alle in Klasse 2"
         },
         {
           "kind": "S062",
           "regel_id": "G_zwillinge",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_zwillinge: alle in Klasse 3"
+          "text": "Buendelung G_zwillinge: alle in Klasse 2"
         },
         {
           "kind": "S007",
@@ -2412,14 +2617,14 @@
           "regel_id": "G_kita_sonnenblume_7",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_sonnenblume_7: alle in Klasse 4"
+          "text": "Buendelung G_kita_sonnenblume_7: alle in Klasse 3"
         },
         {
           "kind": "S014",
           "regel_id": "G_kita_sonnenblume_7",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_sonnenblume_7: alle in Klasse 4"
+          "text": "Buendelung G_kita_sonnenblume_7: alle in Klasse 3"
         },
         {
           "kind": "S044",
@@ -2447,14 +2652,14 @@
           "regel_id": "G_kita_pusteblume_9",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_pusteblume_9: alle in Klasse 2"
+          "text": "Buendelung G_kita_pusteblume_9: alle in Klasse 3"
         },
         {
           "kind": "S043",
           "regel_id": "G_kita_pusteblume_9",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_pusteblume_9: alle in Klasse 2"
+          "text": "Buendelung G_kita_pusteblume_9: alle in Klasse 3"
         },
         {
           "kind": "S050",
@@ -2475,28 +2680,28 @@
           "regel_id": "G_kita_loewenzahn_11",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 2"
+          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 3"
         },
         {
           "kind": "S080",
           "regel_id": "G_kita_loewenzahn_11",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 2"
+          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 3"
         },
         {
           "kind": "S093",
           "regel_id": "G_kita_loewenzahn_11",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 2"
+          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 3"
         },
         {
           "kind": "S045",
           "regel_id": "G_kita_loewenzahn_11",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 2"
+          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 3"
         },
         {
           "kind": "S001",
@@ -2628,36 +2833,36 @@
           "kind": "S004",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S005",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S006",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S007",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
           "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
-          "kind": "S007",
-          "regel_id": "geschlecht=w",
-          "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
-        },
-        {
           "kind": "S012",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S014",
@@ -2670,22 +2875,22 @@
           "kind": "S015",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S017",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S018",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S020",
@@ -2698,8 +2903,8 @@
           "kind": "S021",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S023",
@@ -2712,8 +2917,8 @@
           "kind": "S025",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S026",
@@ -2754,15 +2959,15 @@
           "kind": "S036",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S039",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S044",
@@ -2782,8 +2987,8 @@
           "kind": "S054",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S055",
@@ -2803,15 +3008,15 @@
           "kind": "S059",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S063",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S065",
@@ -2824,8 +3029,8 @@
           "kind": "S068",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S069",
@@ -2859,15 +3064,15 @@
           "kind": "S078",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S080",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S082",
@@ -2888,28 +3093,28 @@
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S087",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S089",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gelb",
           "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
-          "kind": "S089",
-          "regel_id": "geschlecht=w",
-          "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
-        },
-        {
           "kind": "S090",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S091",
@@ -2922,22 +3127,22 @@
           "kind": "S094",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S095",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S096",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S098",
@@ -2950,8 +3155,8 @@
           "kind": "S006",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S009",
@@ -2964,8 +3169,8 @@
           "kind": "S011",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S016",
@@ -2978,8 +3183,8 @@
           "kind": "S025",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S038",
@@ -2992,29 +3197,29 @@
           "kind": "S047",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S049",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
           "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S059",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
           "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S069",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S071",
@@ -3034,15 +3239,15 @@
           "kind": "S080",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S081",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S091",
@@ -3055,8 +3260,8 @@
           "kind": "S094",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S014",
@@ -3076,8 +3281,8 @@
           "kind": "S035",
           "regel_id": "kann_kind=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
         },
         {
           "kind": "S042",
@@ -3090,8 +3295,8 @@
           "kind": "S044",
           "regel_id": "kann_kind=ja",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+          "status": "gruen",
+          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
         },
         {
           "kind": "S055",
@@ -3104,8 +3309,8 @@
           "kind": "S057",
           "regel_id": "kann_kind=ja",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+          "status": "gruen",
+          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
         },
         {
           "kind": "S068",
@@ -3118,8 +3323,8 @@
           "kind": "S100",
           "regel_id": "kann_kind=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
         },
         {
           "kind": "S098",
@@ -3603,108 +3808,108 @@
       "index": 3,
       "status": "Optimal",
       "objective": 1001,
-      "diff_zu_v1": 61,
+      "diff_zu_v1": 72,
       "zuordnung": {
         "S001": 1,
-        "S002": 2,
-        "S003": 3,
-        "S004": 3,
-        "S005": 2,
-        "S006": 4,
-        "S007": 2,
-        "S008": 3,
+        "S002": 1,
+        "S003": 2,
+        "S004": 2,
+        "S005": 3,
+        "S006": 2,
+        "S007": 3,
+        "S008": 2,
         "S009": 1,
-        "S010": 2,
-        "S011": 4,
-        "S012": 2,
+        "S010": 1,
+        "S011": 3,
+        "S012": 3,
         "S013": 1,
-        "S014": 4,
+        "S014": 3,
         "S015": 4,
         "S016": 1,
-        "S017": 2,
-        "S018": 2,
-        "S019": 4,
-        "S020": 2,
-        "S021": 3,
+        "S017": 3,
+        "S018": 3,
+        "S019": 3,
+        "S020": 1,
+        "S021": 4,
         "S022": 4,
-        "S023": 4,
+        "S023": 2,
         "S024": 4,
-        "S025": 4,
+        "S025": 2,
         "S026": 1,
         "S027": 4,
         "S028": 1,
         "S029": 1,
         "S030": 1,
-        "S031": 2,
+        "S031": 4,
         "S032": 1,
-        "S033": 2,
+        "S033": 4,
         "S034": 4,
-        "S035": 2,
-        "S036": 2,
-        "S037": 3,
-        "S038": 2,
-        "S039": 1,
+        "S035": 3,
+        "S036": 4,
+        "S037": 2,
+        "S038": 4,
+        "S039": 2,
         "S040": 1,
-        "S041": 4,
+        "S041": 3,
         "S042": 4,
-        "S043": 2,
-        "S044": 3,
-        "S045": 2,
-        "S046": 3,
-        "S047": 4,
-        "S048": 3,
-        "S049": 1,
-        "S050": 3,
-        "S051": 4,
+        "S043": 3,
+        "S044": 2,
+        "S045": 3,
+        "S046": 4,
+        "S047": 3,
+        "S048": 2,
+        "S049": 3,
+        "S050": 2,
+        "S051": 3,
         "S052": 1,
-        "S053": 2,
-        "S054": 4,
+        "S053": 3,
+        "S054": 2,
         "S055": 1,
-        "S056": 4,
-        "S057": 3,
+        "S056": 2,
+        "S057": 2,
         "S058": 1,
-        "S059": 3,
-        "S060": 4,
+        "S059": 4,
+        "S060": 2,
         "S061": 1,
-        "S062": 2,
-        "S063": 2,
-        "S064": 3,
-        "S065": 4,
-        "S066": 2,
+        "S062": 4,
+        "S063": 3,
+        "S064": 2,
+        "S065": 2,
+        "S066": 1,
         "S067": 1,
-        "S068": 1,
-        "S069": 3,
+        "S068": 2,
+        "S069": 2,
         "S070": 1,
         "S071": 1,
         "S072": 3,
         "S073": 3,
         "S074": 1,
-        "S075": 3,
+        "S075": 2,
         "S076": 1,
-        "S077": 1,
-        "S078": 1,
-        "S079": 3,
-        "S080": 2,
-        "S081": 3,
+        "S077": 2,
+        "S078": 2,
+        "S079": 2,
+        "S080": 3,
+        "S081": 2,
         "S082": 4,
         "S083": 3,
-        "S084": 2,
-        "S085": 2,
-        "S086": 2,
+        "S084": 3,
+        "S085": 3,
+        "S086": 3,
         "S087": 4,
-        "S088": 3,
+        "S088": 4,
         "S089": 4,
-        "S090": 3,
-        "S091": 2,
+        "S090": 4,
+        "S091": 1,
         "S092": 1,
-        "S093": 2,
+        "S093": 3,
         "S094": 4,
         "S095": 4,
-        "S096": 4,
+        "S096": 2,
         "S097": 1,
-        "S098": 3,
-        "S099": 2,
-        "S100": 3
+        "S098": 2,
+        "S099": 3,
+        "S100": 4
       },
       "balance_kennzahlen": [
         {
@@ -3712,10 +3917,10 @@
           "ziel": 12,
           "toleranz": 2,
           "counts": [
+            13,
             14,
             11,
-            10,
-            13
+            10
           ]
         },
         {
@@ -3724,9 +3929,9 @@
           "toleranz": 1,
           "counts": [
             5,
-            3,
-            3,
-            5
+            4,
+            4,
+            3
           ]
         },
         {
@@ -3734,8 +3939,8 @@
           "ziel": 2,
           "toleranz": 1,
           "counts": [
-            2,
-            2,
+            1,
+            3,
             3,
             2
           ]
@@ -4061,70 +4266,70 @@
           "regel_id": "G_zwillinge",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_zwillinge: alle in Klasse 2"
+          "text": "Buendelung G_zwillinge: alle in Klasse 4"
         },
         {
           "kind": "S062",
           "regel_id": "G_zwillinge",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_zwillinge: alle in Klasse 2"
+          "text": "Buendelung G_zwillinge: alle in Klasse 4"
         },
         {
           "kind": "S007",
           "regel_id": "G_kita_sonnenblume_1",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 2"
+          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 3"
         },
         {
           "kind": "S084",
           "regel_id": "G_kita_sonnenblume_1",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 2"
+          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 3"
         },
         {
           "kind": "S012",
           "regel_id": "G_kita_sonnenblume_1",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 2"
+          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 3"
         },
         {
           "kind": "S053",
           "regel_id": "G_kita_sonnenblume_1",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 2"
+          "text": "Buendelung G_kita_sonnenblume_1: alle in Klasse 3"
         },
         {
           "kind": "S057",
           "regel_id": "G_kita_regenbogen_2",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_regenbogen_2: alle in Klasse 3"
+          "text": "Buendelung G_kita_regenbogen_2: alle in Klasse 2"
         },
         {
           "kind": "S003",
           "regel_id": "G_kita_regenbogen_2",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_regenbogen_2: alle in Klasse 3"
+          "text": "Buendelung G_kita_regenbogen_2: alle in Klasse 2"
         },
         {
           "kind": "S023",
           "regel_id": "G_kita_pusteblume_3",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_pusteblume_3: alle in Klasse 4"
+          "text": "Buendelung G_kita_pusteblume_3: alle in Klasse 2"
         },
         {
           "kind": "S065",
           "regel_id": "G_kita_pusteblume_3",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_pusteblume_3: alle in Klasse 4"
+          "text": "Buendelung G_kita_pusteblume_3: alle in Klasse 2"
         },
         {
           "kind": "S013",
@@ -4152,21 +4357,21 @@
           "regel_id": "G_kita_loewenzahn_5",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_5: alle in Klasse 2"
+          "text": "Buendelung G_kita_loewenzahn_5: alle in Klasse 1"
         },
         {
           "kind": "S066",
           "regel_id": "G_kita_loewenzahn_5",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_5: alle in Klasse 2"
+          "text": "Buendelung G_kita_loewenzahn_5: alle in Klasse 1"
         },
         {
           "kind": "S020",
           "regel_id": "G_kita_loewenzahn_5",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_5: alle in Klasse 2"
+          "text": "Buendelung G_kita_loewenzahn_5: alle in Klasse 1"
         },
         {
           "kind": "S097",
@@ -4194,91 +4399,91 @@
           "regel_id": "G_kita_sonnenblume_7",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_sonnenblume_7: alle in Klasse 4"
+          "text": "Buendelung G_kita_sonnenblume_7: alle in Klasse 3"
         },
         {
           "kind": "S014",
           "regel_id": "G_kita_sonnenblume_7",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_sonnenblume_7: alle in Klasse 4"
+          "text": "Buendelung G_kita_sonnenblume_7: alle in Klasse 3"
         },
         {
           "kind": "S044",
           "regel_id": "G_kita_regenbogen_8",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_regenbogen_8: alle in Klasse 3"
+          "text": "Buendelung G_kita_regenbogen_8: alle in Klasse 2"
         },
         {
           "kind": "S098",
           "regel_id": "G_kita_regenbogen_8",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_regenbogen_8: alle in Klasse 3"
+          "text": "Buendelung G_kita_regenbogen_8: alle in Klasse 2"
         },
         {
           "kind": "S079",
           "regel_id": "G_kita_regenbogen_8",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_regenbogen_8: alle in Klasse 3"
+          "text": "Buendelung G_kita_regenbogen_8: alle in Klasse 2"
         },
         {
           "kind": "S085",
           "regel_id": "G_kita_pusteblume_9",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_pusteblume_9: alle in Klasse 2"
+          "text": "Buendelung G_kita_pusteblume_9: alle in Klasse 3"
         },
         {
           "kind": "S043",
           "regel_id": "G_kita_pusteblume_9",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_pusteblume_9: alle in Klasse 2"
+          "text": "Buendelung G_kita_pusteblume_9: alle in Klasse 3"
         },
         {
           "kind": "S050",
           "regel_id": "G_kita_wirbelwind_10",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_wirbelwind_10: alle in Klasse 3"
+          "text": "Buendelung G_kita_wirbelwind_10: alle in Klasse 2"
         },
         {
           "kind": "S037",
           "regel_id": "G_kita_wirbelwind_10",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_wirbelwind_10: alle in Klasse 3"
+          "text": "Buendelung G_kita_wirbelwind_10: alle in Klasse 2"
         },
         {
           "kind": "S018",
           "regel_id": "G_kita_loewenzahn_11",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 2"
+          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 3"
         },
         {
           "kind": "S080",
           "regel_id": "G_kita_loewenzahn_11",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 2"
+          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 3"
         },
         {
           "kind": "S093",
           "regel_id": "G_kita_loewenzahn_11",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 2"
+          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 3"
         },
         {
           "kind": "S045",
           "regel_id": "G_kita_loewenzahn_11",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 2"
+          "text": "Buendelung G_kita_loewenzahn_11: alle in Klasse 3"
         },
         {
           "kind": "S001",
@@ -4347,29 +4552,29 @@
           "kind": "S011",
           "regel_id": "G_sozialverhalten",
           "regel_typ": "verteilung",
-          "status": "rot",
-          "text": "Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"
+          "status": "gelb",
+          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
         },
         {
           "kind": "S070",
           "regel_id": "G_sozialverhalten",
           "regel_typ": "verteilung",
-          "status": "gelb",
-          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
+          "status": "rot",
+          "text": "Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"
         },
         {
           "kind": "S091",
           "regel_id": "G_sozialverhalten",
           "regel_typ": "verteilung",
-          "status": "gelb",
-          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
+          "status": "rot",
+          "text": "Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"
         },
         {
           "kind": "S094",
           "regel_id": "G_sozialverhalten",
           "regel_typ": "verteilung",
-          "status": "rot",
-          "text": "Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"
+          "status": "gelb",
+          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
         },
         {
           "kind": "S004",
@@ -4383,35 +4588,35 @@
           "regel_id": "G_schulbegleitung",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_schulbegleitung: alle in Klasse 4"
+          "text": "Buendelung G_schulbegleitung: alle in Klasse 2"
         },
         {
           "kind": "S096",
           "regel_id": "G_schulbegleitung",
           "regel_typ": "buendelung",
           "status": "gruen",
-          "text": "Buendelung G_schulbegleitung: alle in Klasse 4"
+          "text": "Buendelung G_schulbegleitung: alle in Klasse 2"
         },
         {
           "kind": "S001",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S003",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S004",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S005",
@@ -4424,8 +4629,8 @@
           "kind": "S006",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S007",
@@ -4446,14 +4651,14 @@
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S015",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S017",
@@ -4474,7 +4679,7 @@
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S021",
@@ -4487,57 +4692,57 @@
           "kind": "S023",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S025",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S026",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S028",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S029",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S030",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S032",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S036",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S039",
@@ -4551,35 +4756,35 @@
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
-        },
-        {
-          "kind": "S052",
-          "regel_id": "geschlecht=w",
-          "regel_typ": "balance",
-          "status": "gelb",
           "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
-          "kind": "S054",
+          "kind": "S052",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
           "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
-          "kind": "S055",
+          "kind": "S054",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gelb",
           "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
+          "kind": "S055",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
           "kind": "S058",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S059",
@@ -4599,8 +4804,8 @@
           "kind": "S065",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S068",
@@ -4614,28 +4819,28 @@
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S070",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S072",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S076",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S078",
@@ -4655,15 +4860,15 @@
           "kind": "S082",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S083",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S085",
@@ -4676,15 +4881,15 @@
           "kind": "S087",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S089",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S090",
@@ -4698,42 +4903,42 @@
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gruen",
-          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
           "kind": "S094",
-          "regel_id": "geschlecht=w",
-          "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
-        },
-        {
-          "kind": "S095",
-          "regel_id": "geschlecht=w",
-          "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
-        },
-        {
-          "kind": "S096",
-          "regel_id": "geschlecht=w",
-          "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
-        },
-        {
-          "kind": "S098",
           "regel_id": "geschlecht=w",
           "regel_typ": "balance",
           "status": "gelb",
           "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
         },
         {
+          "kind": "S095",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S096",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S098",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
           "kind": "S006",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S009",
@@ -4746,8 +4951,8 @@
           "kind": "S011",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S016",
@@ -4760,8 +4965,8 @@
           "kind": "S025",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S038",
@@ -4774,15 +4979,15 @@
           "kind": "S047",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S049",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S059",
@@ -4795,8 +5000,8 @@
           "kind": "S069",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S071",
@@ -4816,50 +5021,50 @@
           "kind": "S080",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S081",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S091",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
           "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S094",
           "regel_id": "sprachfoerderung=ja",
           "regel_typ": "balance",
           "status": "gelb",
-          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
         },
         {
           "kind": "S014",
           "regel_id": "kann_kind=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
         },
         {
           "kind": "S017",
           "regel_id": "kann_kind=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
         },
         {
           "kind": "S035",
           "regel_id": "kann_kind=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
         },
         {
           "kind": "S042",
@@ -4879,8 +5084,8 @@
           "kind": "S055",
           "regel_id": "kann_kind=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 1 in dieser Klasse (Ziel 2 \u002B/- 1)"
         },
         {
           "kind": "S057",
@@ -4893,15 +5098,15 @@
           "kind": "S068",
           "regel_id": "kann_kind=ja",
           "regel_typ": "balance",
-          "status": "gruen",
-          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
         },
         {
           "kind": "S100",
           "regel_id": "kann_kind=ja",
           "regel_typ": "balance",
-          "status": "gelb",
-          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+          "status": "gruen",
+          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
         },
         {
           "kind": "S098",

@@ -160,6 +160,36 @@
     padding: 0 2px;
     cursor: default;
   }
+  /* Gruppen-Tabelle: Zeilenklick hebt die Mitglieder-Karten hervor. */
+  #gruppen {
+    margin-bottom: 1rem;
+    overflow-x: auto;
+    border: 1px solid #ccc;
+  }
+  #gruppen table {
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+    width: 100%;
+  }
+  #gruppen th, #gruppen td {
+    border: 1px solid #ccc;
+    padding: 3px 8px;
+    text-align: left;
+    white-space: nowrap;
+  }
+  #gruppen tbody tr {
+    cursor: pointer;
+  }
+  #gruppen tbody tr:hover {
+    background: #f2f2f2;
+  }
+  #gruppen tbody tr.active {
+    background: #dcebff;
+  }
+  .karte.highlight {
+    box-shadow: 0 0 0 2px #1d4ed8;
+  }
   .chip.gruen { background: #dcfce7; color: #15803d; }
   .chip.gelb  { background: #fef9c3; color: #a16207; }
   .chip.rot   { background: #fee2e2; color: #b91c1c; }
@@ -175,6 +205,8 @@
     <span id="compare-info"></span>
   </div>
   <div id="varianten-overview"></div>
+  <h2 style="font-size:1.05rem; margin:1.2rem 0 0.4rem;">Gruppen</h2>
+  <div id="gruppen"></div>
   <div id="board"></div>
 
   <script type="application/json" id="klassenbildung-data">__KLASSENBILDUNG_JSON__</script>
@@ -195,6 +227,21 @@
 
       var aktuelleVariante = 0;
       var compareIndex = null;
+      var aktiveGruppe = null; // Gruppen-Id, deren Mitglieder hervorgehoben werden
+
+      // Anzeige-Namen der Klassen ("1a", "1b", ...); defensiv gegen
+      // aeltere JSONs ohne klassen_labels.
+      var labels = data.klassen_labels || [];
+      function labelVon(klasse) {
+        return labels[klasse - 1] || ('Klasse ' + klasse);
+      }
+      var gruppen = data.gruppen || [];
+      var mitgliedVon = {}; // gruppen-id -> {kind: true}
+      gruppen.forEach(function (g) {
+        var m = {};
+        g.mitglieder.forEach(function (id) { m[id] = true; });
+        mitgliedVon[g.id] = m;
+      });
 
       // Feste Chip-Reihenfolge je Karte (Konzept 11.1):
       // Buendelung -> Verteilung -> Balance -> Wunsch.
@@ -309,9 +356,72 @@
       document.getElementById('filter-kritisch').addEventListener('change', render);
       document.getElementById('konsens-toggle').addEventListener('change', render);
 
+      // ---- Gruppen-Tabelle ------------------------------------------
+      // Zeigt das Regelwerk der Gruppen samt Ist-Verteilung in der
+      // aktiven Variante; Zeilenklick hebt die Mitglieder-Karten im
+      // Board hervor (erneuter Klick hebt auf).
+      function renderGruppen() {
+        var container = document.getElementById('gruppen');
+        container.innerHTML = '';
+        if (gruppen.length === 0) {
+          container.textContent = 'Keine Gruppen definiert.';
+          return;
+        }
+        var v = varianten[aktuelleVariante];
+        var verletzungVon = {};
+        v.verletzungen.forEach(function (x) { verletzungVon[x.regel_id] = x.mass; });
+
+        var table = document.createElement('table');
+        var thead = document.createElement('thead');
+        var hr = document.createElement('tr');
+        ['Gruppe', 'Typ', 'Modus', 'Prio', 'Kappe', 'Mitglieder', 'Verteilung (aktive Variante)', 'Status'].forEach(function (h) {
+          var th = document.createElement('th');
+          th.textContent = h;
+          hr.appendChild(th);
+        });
+        thead.appendChild(hr);
+        table.appendChild(thead);
+
+        var tbody = document.createElement('tbody');
+        gruppen.forEach(function (g) {
+          var tr = document.createElement('tr');
+          if (aktiveGruppe === g.id) tr.className = 'active';
+          // Ist-Verteilung: Mitglieder je Klasse zaehlen.
+          var counts = {};
+          g.mitglieder.forEach(function (id) {
+            var klasse = v.zuordnung[id];
+            counts[klasse] = (counts[klasse] || 0) + 1;
+          });
+          var verteilung = Object.keys(counts).sort(function (a, b) { return a - b; }).
+            map(function (klasse) { return labelVon(parseInt(klasse, 10)) + '\u00d7' + counts[klasse]; }).join(', ');
+          var mass = verletzungVon[g.id];
+          var status = (g.modus === 'hard') ? 'hart erfuellt' :
+            (mass > 0 ? '\u2717 verletzt (Mass ' + mass + ')' : '\u2713 erfuellt');
+          [g.id, g.typ, g.modus, g.prio,
+           (g.max_pro_klasse === null || g.max_pro_klasse === undefined) ? '-' : g.max_pro_klasse,
+           g.mitglieder.length, verteilung, status].forEach(function (val) {
+            var td = document.createElement('td');
+            td.textContent = val;
+            tr.appendChild(td);
+          });
+          tr.addEventListener('click', function () {
+            aktiveGruppe = (aktiveGruppe === g.id) ? null : g.id;
+            render();
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+        var note = document.createElement('div');
+        note.className = 'overview-note';
+        note.textContent = 'Zeile anklicken = Mitglieder dieser Gruppe im Board hervorheben (erneut klicken hebt auf).';
+        container.appendChild(note);
+      }
+
       // ---- Board ----------------------------------------------------
       function render() {
         renderOverview();
+        renderGruppen();
         updateCompareInfo();
         var v = varianten[aktuelleVariante];
         var chipMap = chipsJeKind(v);
@@ -336,7 +446,7 @@
           kopf.className = 'klasse-kopf';
           var name = document.createElement('div');
           name.className = 'name';
-          name.textContent = 'Klasse ' + klasse + ' - ' + mitglieder.length + ' Kinder';
+          name.textContent = labelVon(klasse) + ' - ' + mitglieder.length + ' Kinder';
           kopf.appendChild(name);
           (v.balance_kennzahlen || []).forEach(function (b) {
             var count = b.counts[klasse - 1];
@@ -356,9 +466,12 @@
             if (nurKritisch && agg !== 'rot' && agg !== 'gelb') return;
             var karte = document.createElement('div');
             karte.className = 'karte' + (agg === 'frei' ? '' : ' agg-' + agg);
+            if (aktiveGruppe !== null && mitgliedVon[aktiveGruppe][id]) {
+              karte.className += ' highlight';
+            }
             if (cmp && cmp.zuordnung[id] !== klasse) {
               karte.className += ' diff';
-              karte.title = 'In Variante ' + cmp.index + ': Klasse ' + cmp.zuordnung[id];
+              karte.title = 'In Variante ' + cmp.index + ': ' + labelVon(cmp.zuordnung[id]);
             }
             var kindId = document.createElement('span');
             kindId.className = 'kind-id';
