@@ -608,8 +608,9 @@ Lösung, dazu die Klassenstufen-/Parallelklassen-Struktur der Schule
 (siehe Feldschema unten). `output/stundentafel.html` ist ein
 eigenständiger, wiederverwendbarer JavaScript-Viewer: die JSON-Daten sind
 inline eingebettet (kein `fetch()`, funktioniert deshalb auch bei
-direktem Öffnen per Doppelklick ohne lokalen Webserver), ein
-Dropdown-Menü schaltet zwischen den gefundenen Lösungen um. Die Tabelle
+direktem Öffnen per Doppelklick ohne lokalen Webserver); die
+Lösungsauswahl läuft über die sortierbare Lösungsübersicht (Zeilenklick,
+siehe unten - das frühere Lösungs-Dropdown ist ersetzt). Die Tabelle
 zeigt Wochentage in Spalten (unterteilt durch Klassenstufen) und
 Schulstunden in Zeilen (unterteilt durch die Parallelklassen a/b/c/...
 jeder Klassenstufe) - eine Gesamtübersicht über alle Klassen zugleich,

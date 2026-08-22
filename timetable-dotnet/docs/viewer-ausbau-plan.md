@@ -159,3 +159,8 @@ zweiter, 5 nach Bedarf.
   Python-Nachrechnung exakt - und entspricht genau dem
   min_diversity=8-Cut der Enumeration. Damit ist der Plan vollstaendig
   umgesetzt.
+- **Nachtrag (Nutzerentscheidung):** das "Loesung N"-Dropdown ist
+  ENTFERNT - die Uebersichtstabelle ist der einzige Auswahlweg
+  (Zeilenklick aktualisiert Klassen- UND Lehrerraster; die
+  Zusammenfassung im Kopf nennt jetzt selbst die gewaehlte Loesung).
+  Die "Vergleichen mit"-Auswahl (Schritt 5) bleibt als Dropdown.

@@ -277,8 +277,6 @@
   <h1 id="schul-name">Stundentafel</h1>
   <div id="meta"></div>
   <div id="controls">
-    <label for="solution-select">Loesung:</label>
-    <select id="solution-select"></select>
     <label for="compare-select">Vergleichen mit:</label>
     <select id="compare-select"></select>
     <div class="dropdown">
@@ -355,17 +353,12 @@
       }
       window.addEventListener('resize', fitTable);
 
-      var select = document.getElementById('solution-select');
-      data.solutions.forEach(function (sol, i) {
-        var opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = 'Loesung ' + (i + 1) + ': ' + sol.status +
-          ', ' + sol.kann_violation_count + ' Kann-Verstoesse, Quality ' + sol.quality_total.toFixed(1);
-        select.appendChild(opt);
-      });
-      select.addEventListener('change', function () {
-        render(parseInt(select.value, 10));
-      });
+      // Die Loesungsauswahl laeuft ausschliesslich ueber die
+      // Uebersichtstabelle (Zeilenklick, siehe renderOverview) - das
+      // fruehere "Loesung:"-Dropdown ist ersetzt. currentIndex ist die
+      // eine Quelle der Wahrheit fuer die aktuell gewaehlte Loesung und
+      // wird zentral in render() gesetzt.
+      var currentIndex = 0;
 
       // ---- Loesungs-Diff (Viewer-Ausbau Schritt 5) ---------------------
       // Zweite Auswahl "Vergleichen mit": markiert im Klassen- UND
@@ -389,7 +382,7 @@
         });
         compareSelect.addEventListener('change', function () {
           compareIndex = compareSelect.value === '' ? null : parseInt(compareSelect.value, 10);
-          render(parseInt(select.value, 10));
+          render(currentIndex);
         });
       })();
 
@@ -643,9 +636,7 @@
             tr.appendChild(td);
           });
           tr.addEventListener('click', function () {
-            var idx = sol.__nr - 1;
-            select.value = idx;
-            render(idx);
+            render(sol.__nr - 1);
           });
           tbody.appendChild(tr);
         });
@@ -656,7 +647,7 @@
         note.className = 'overview-note';
         note.textContent = 'Zeile anklicken = Loesung waehlen; Spaltenkopf anklicken = sortieren. Gedaempfte Spalten waren fuer die Suche strukturell abgeschaltet.';
         container.appendChild(note);
-        updateOverviewActive(parseInt(select.value, 10) || 0);
+        updateOverviewActive(currentIndex);
       }
 
       function updateOverviewActive(solIndex) {
@@ -693,7 +684,7 @@
             var v = parseFloat(input.value);
             currentWeights[d.key] = isFinite(v) && v >= 0 ? v : 0;
             renderOverview();
-            updateSummary(parseInt(select.value, 10) || 0);
+            updateSummary(currentIndex);
           });
           weightInputs[d.key] = input;
           row.appendChild(span);
@@ -714,7 +705,7 @@
             weightInputs[d.key].value = schoolWeights[d.key];
           });
           renderOverview();
-          updateSummary(parseInt(select.value, 10) || 0);
+          updateSummary(currentIndex);
         });
         weightsMenu.appendChild(resetBtn);
 
@@ -766,7 +757,7 @@
           stufeVisible[ksIndex] = checkbox.checked;
           updateFilterBtnLabel();
           syncLehrerFilterToStufen();
-          render(parseInt(select.value, 10));
+          render(currentIndex);
         });
         label.appendChild(checkbox);
         label.appendChild(document.createTextNode(ks.bezeichnung));
@@ -856,7 +847,7 @@
         checkbox.addEventListener('change', function () {
           lehrerVisible[t] = checkbox.checked;
           updateLehrerFilterBtnLabel();
-          render(parseInt(select.value, 10));
+          render(currentIndex);
         });
         label.appendChild(checkbox);
         label.appendChild(document.createTextNode(t));
@@ -1087,12 +1078,16 @@
         var sol = data.solutions[solIndex];
         if (!sol) return;
         var totalLabel = (weightsEnabled && weightsDirty()) ? 'Quality (Total*)' : 'Quality (Total)';
+        // Ohne das fruehere Dropdown traegt die Zusammenfassung die
+        // Kennung der gewaehlten Loesung selbst.
         document.getElementById('solution-summary').textContent =
-          'Muss-Verstoesse: ' + sol.muss_violation_count + ' | Kann-Verstoesse: ' + sol.kann_violation_count +
+          'Loesung ' + (solIndex + 1) + ' (' + sol.status + ')' +
+          ' | Muss-Verstoesse: ' + sol.muss_violation_count + ' | Kann-Verstoesse: ' + sol.kann_violation_count +
           ' | ' + totalLabel + ': ' + displayTotal(sol).toFixed(1);
       }
 
       function render(solIndex) {
+        currentIndex = solIndex;
         var sol = data.solutions[solIndex];
         var cmpSol = activeCompareSol(solIndex);
         updateSummary(solIndex);
@@ -1189,7 +1184,6 @@
       }
 
       if (data.solutions.length > 0) {
-        select.value = 0;
         renderOverview();
         render(0);
       } else {
