@@ -250,3 +250,22 @@ dritter. K6 einzeln auf Zuruf.
 - **Kein `enumerate_all_solutions`, kein SolutionCallback fuer
   Varianten** — die Diversifikations-Schleife ist das im Repo
   vielfach validierte Werkzeug (Konzept 8.2 kommt zum selben Schluss).
+
+## Umsetzungsstand
+
+- **K1 umgesetzt:** Datenmodell (`KlassenbildungInput` mit Schueler/
+  Klassen/Gruppen/Balance/Wuensche/Fixierungen inkl. F2
+  `nicht_klasse`), YAML-Loader (`YamlKlassenbildung`,
+  SchoolTestRunner) und Fail-Fast-Validierung
+  (`ValidateKlassenbildung`: unbekannte IDs, Verteilung ohne Kappe,
+  treffer-lose Balance, Kapazitaets-/Fixierungs-Widersprueche).
+- **K2 umgesetzt:** `SolveKlassenbildung` mit allen vier Regeltypen
+  hart/weich (Buendelung y-/used-Encoding, Verteilungs-Kappe/-Ueberlauf,
+  Balance-Korridor bzw. einseitige |diff|-Schranken, Wunsch-Paar-
+  Linearisierung), Gewichtsstufen-Modus (Default 1000/50/1 statt
+  10000/100/1 - P6-Befund), Praezedenz-Symmetriebrechung ueber die
+  freien Klassen, Fixierungen F1/F2, Verletzungsreport je weicher
+  Regel. Bewusst nur die im Repo live verifizierten CP-SAT-Primitiven.
+  9 handnachgerechnete Tests (Regeltyp-Encodings, Prio-Dominanz,
+  kanonischer Repraesentant, Fixierungs-Vertraeglichkeit der
+  Symmetriekette); volle Suite 271/271 gruen.
