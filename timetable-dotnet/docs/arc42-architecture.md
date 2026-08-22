@@ -75,7 +75,7 @@ entscheidet) und sie keinerlei Code mit der Stundenplan-Pipeline teilt.
 
 | Randbedingung | Konsequenz |
 |---|---|
-| Zielplattform GUI: **Windows** (Mac/Linux optional/später) | GUI-Technologie WinForms geplant (Phase 3, noch nicht begonnen); der Kern selbst bleibt plattformneutral. |
+| Zielplattform GUI: **Windows** (Mac/Linux optional/später) | GUI-Technologie **WPF + WebView2** geplant (Phase 3, noch nicht begonnen; ersetzt den früheren WinForms-Vermerk): WPF für Formulare/Editoren mit Databinding auf das typisierte `Stammdaten.vb`-Modell, WebView2 hostet die bestehenden Self-contained-HTML-Viewer für Klassenzuordnung und Stundenplan-Interaktion unverändert (siehe 8.10 und `docs/gui-datenhaltung-konzept.md`). Der Kern selbst bleibt plattformneutral. |
 | Entwickler kennt sich mit **VB.NET** aus | Sprachwahl VB.NET statt C#/F# für den gesamten .NET-Code. |
 | **Kein Python** im finalen Produkt | Kompletter Python-Prototyp (`timetable/`) 1:1 nach VB.NET portiert; Python bleibt nur als eingefrorenes Referenz-Orakel im Repo, wird nicht mitausgeliefert. |
 | Entwicklung/Test so lange wie möglich **in der Sandbox** (Linux, kein Windows verfügbar) | `Google.OrTools` läuft unter Linux via `Google.OrTools.runtime.linux-x64` (transitive NuGet-Abhängigkeit); GUI-Bau explizit nachgelagert. |
@@ -117,7 +117,8 @@ entscheidet) und sie keinerlei Code mit der Stundenplan-Pipeline teilt.
 |---|---|---|
 | Ollama-Server (lokal) | TimetableCore → Ollama | HTTP `POST /api/chat`, `GET /api/tags` - JSON, `format`=striktes JSON-Schema pro Constraint-Typ, `think:false` |
 | Google OR-Tools CP-SAT (eingebettete native Bibliothek) | TimetableCore → OrTools | In-Process-Aufruf über `Google.OrTools.Sat`-NuGet-Paket (kein Netzwerk) |
-| (Nachgelagert) WinForms-GUI | GUI → TimetableCore | Direkter .NET-Projektverweis (`ProjectReference`), keine Netzwerkgrenze |
+| (Nachgelagert) WPF-GUI | GUI → TimetableCore | Direkter .NET-Projektverweis (`ProjectReference`), keine Netzwerkgrenze |
+| (Nachgelagert) WebView2 (eingebetteter Browser) | GUI → WebView2 | In-Process-Hosting der generierten Viewer-HTML (`NavigateToString`/virtuelles Host-Mapping aus dem entschlüsselten Projektbestand - keine Klartext-Datei, kein Netzzugriff; User-Data-Folder app-lokal, siehe `docs/gui-datenhaltung-konzept.md` 7.6) |
 | Dateisystem | RobustnessRunner → Dateisystem | Ergebnis-Log (`docs/phase2-results-raw.log`) wird nach jedem Einzellauf sofort angehängt |
 
 ## 4. Lösungsstrategie
@@ -175,7 +176,10 @@ timetable-dotnet/
 │                             Resources (Templates/stundentafel.html,
 │                             Templates/klassenbildung.html - siehe 8.10;
 │                             6.7 und docs/schooltestrunner-benutzerhandbuch.md)
-└── (nachgelagert) TimetableGui/   WinForms-GUI, referenziert TimetableCore direkt
+└── (nachgelagert) TimetableGui/   WPF-GUI mit WebView2-gehosteten Viewern,
+                              referenziert TimetableCore direkt; Datenhaltung
+                              als verschlüsselte Ein-Datei-Projektablage
+                              (Konzept: docs/gui-datenhaltung-konzept.md)
 ```
 
 `TimetableCore` hat keine Abhängigkeit auf `TimetableCore.Tests`,
@@ -511,7 +515,7 @@ Varianten liegen aber stets im ε-Band).
 | Umgebung | Inhalt | Status |
 |---|---|---|
 | Linux-Sandbox (aktuelle Entwicklungsumgebung) | `TimetableCore`, `TimetableCore.Tests`, `RobustnessRunner`, `SchoolTestRunner`, lokaler Ollama-Server | Aktiv, vollständig lauffähig (`dotnet test`, `dotnet run --project RobustnessRunner`, `dotnet run --project SchoolTestRunner`) - `SchoolTestRunner` braucht KEINEN Ollama-Server (rein YAML-basiert, keine LLM-Extraktion) |
-| Windows-Zielumgebung (nachgelagert) | `TimetableGui` (WinForms) + `TimetableCore` (per `ProjectReference`) + lokaler Ollama-Server | Noch nicht begonnen (Phase 3) |
+| Windows-Zielumgebung (nachgelagert) | `TimetableGui` (WPF + WebView2) + `TimetableCore` (per `ProjectReference`) + lokaler Ollama-Server; Nutzdaten als verschlüsselte Ein-Datei-Projektablage (`.splanx`-Arbeitstitel, `docs/gui-datenhaltung-konzept.md`); WebView2 nutzt die auf aktuellen Windows-10/11-Systemen vorhandene Evergreen-Runtime (sonst Bootstrapper) | Noch nicht begonnen (Phase 3); Datenhaltungskonzept liegt vor |
 
 `Google.OrTools` läuft nativ unter beiden Plattformen (`Google.OrTools.runtime.linux-x64`
 bzw. `...win-x64` als transitive NuGet-Abhängigkeit) - derselbe
@@ -698,7 +702,9 @@ Python-Nachrechnung derselben Rohdaten prüft die Browser-Ergebnisse
 Ampel-Zähler nach einer simulierten Verschiebung exakt wie
 vorhergesagt). Verteilungs-Detail siehe 7: die generierten Seiten
 werden als GitHub-Pages-Kopien (main-Stand) und als Claude-Artifacts
-(Zwischenstände) bereitgestellt.
+(Zwischenstände) bereitgestellt; die geplante WPF-GUI hostet dieselben
+Viewer als dritten Kanal in WebView2 (siehe 2 und
+`docs/gui-datenhaltung-konzept.md`), statt sie in XAML nachzubauen.
 
 ## 9. Architekturentscheidungen
 
@@ -769,7 +775,7 @@ Qualität
 | **Viewer-JS-Formel-Duplikate können vom VB-Kern divergieren**, wenn eine Formel nur auf einer Seite geändert wird. | Akzeptiertes, aktiv verifiziertes Risiko: Chromium-Interaktionstests prüfen die Duplikate zeichengleich gegen den VB-Export (siehe 8.10); der nächste CLI-Lauf bleibt in jedem Fall die Ground Truth, ein divergenter Viewer kann also fehlleiten, aber kein falsches Endergebnis erzeugen. |
 | **Klassenbildung: Konfliktkern-Analyse (Plan K6) und Re-Solve aus dem Viewer (UI-Konzept U5) offen.** Bei kollidierenden harten Regeln/Fixierungen meldet der Lauf nur Infeasible ohne Benennung des minimalen Konfliktkerns; der Viewer-Loop läuft über YAML-Export + erneuten CLI-Lauf. | Offen, in `docs/klassenbildung-plan.md` bzw. `docs/klassenbildung-ui-konzept.md` als nächste Ausbaustufen beschrieben; das UI ist so geschnitten, dass U5 nur den Export-Teil ersetzt. |
 | **`klassen`-Läufe sind trotz festem Seed nicht run-zu-run-stabil** (Wandzeit-Limits beeinflussen, welche Varianten im ε-Band gefunden werden - beobachtet: Konsens-Kern 27 vs. 54 von 100 bei identischem Input). | Bekannt und in 6.9 dokumentiert; die Zielwerte akzeptierter Varianten liegen stets im ε-Band, der Konsens-Kern ist als Arbeitshilfe (Bulk-Fixierung), nicht als stabile Kennzahl zu lesen. |
-| **GUI (Phase 3) noch nicht begonnen.** | Geplant, nachgelagert unter Windows; der Kern ist bereits GUI-unabhängig entworfen (siehe 4, 7). |
+| **GUI (Phase 3) noch nicht begonnen.** | Geplant, nachgelagert unter Windows als WPF + WebView2 (siehe 2, 7); der Kern ist bereits GUI-unabhängig entworfen (siehe 4, 7), das Datenhaltungskonzept inkl. DSGVO-Betrachtung liegt vor (`docs/gui-datenhaltung-konzept.md`). |
 
 ## 12. Glossar
 

@@ -5,8 +5,9 @@ Constraints verwaltet und Ergebnisse sichert - **lokal, ohne Backend/
 Server**, DSGVO-konform und möglichst einfach wartbar. Es vergleicht
 filebasierte und datenbankbasierte Ansätze und empfiehlt eine
 verschlüsselte Ein-Datei-Projektablage. Es ist ein Konzept-, kein
-Umsetzungsdokument: es ändert keinen Code; die betroffenen
-arc42-Abschnitte (§2, §5.1, §7) werden bei Umsetzungsbeginn nachgezogen.
+Umsetzungsdokument: es ändert keinen Code. Die betroffenen
+arc42-Abschnitte (§2, §3.2, §5.1, §7, §8.10, §11) sind auf
+WPF + WebView2 und dieses Konzept nachgezogen.
 
 Vorab geklärte Nutzerentscheidungen (Dialograunde zu diesem Konzept):
 
@@ -26,8 +27,9 @@ Vorab geklärte Nutzerentscheidungen (Dialograunde zu diesem Konzept):
 
 ### 1.1 GUI-Technologie: WPF + WebView2
 
-Die arc42-Doku vermerkt bisher "GUI-Technologie WinForms geplant"
-(arc42 §2). Neue Vorgabe: **WPF** als Anwendungsrahmen (Formulare,
+Die arc42-Doku vermerkte bis zu diesem Konzept "GUI-Technologie
+WinForms geplant" (arc42 §2 - inzwischen nachgezogen). Neue Vorgabe:
+**WPF** als Anwendungsrahmen (Formulare,
 Stammdaten-/Constraint-Editoren, Databinding auf das typisierte
 `Stammdaten.vb`-Modell - genau der in arc42 §8.7 vorgesehene Weg) plus
 **WebView2** für die interaktiven Anteile **Klassenzuordnung** und
@@ -452,11 +454,11 @@ unverschlüsselt (synthetische Daten, kein Personenbezug).
 2. **Dateiendung/Branding** (`.splanx` ist Arbeitstitel) und
    Explorer-Verknüpfung.
 3. **`reason`-Export-Vorschau** (6.3): UI-Detail des Export-Dialogs.
-4. **arc42-Nachzug** bei Umsetzungsbeginn: §2 (WinForms → WPF+WebView2),
-   §5.1 (TimetableGui/TimetableYaml/TimetableProjekt), §7
-   (Projektdatei + WebView2-Runtime als Verteilungsartefakte - WebView2
-   Evergreen-Runtime ist auf aktuellen Windows-10/11-Systemen
-   vorhanden, sonst Bootstrapper), §8 (dieses Konzept als neues
-   Querschnittskonzept referenzieren).
+4. **arc42-Nachzug**: für die Technologie- und Verteilungsangaben
+   erledigt (§2 WPF+WebView2, §3.2 WebView2-Kontextzeile, §5.1, §7
+   inkl. Projektdatei + Evergreen-Runtime, §8.10, §11). Bei
+   Umsetzungsbeginn verbleibt der Feinschnitt der neuen Projekte
+   (TimetableGui/TimetableYaml/TimetableProjekt) in §5.1 sowie ggf.
+   ein eigenes Querschnittskonzept in §8.
 5. **Muster-Eintrag fürs Verzeichnis von Verarbeitungstätigkeiten** der
    Schule als Handbuch-Anhang (Hilfestellung, keine Rechtsberatung).
