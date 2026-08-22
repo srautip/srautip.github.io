@@ -155,6 +155,12 @@ quality_weights:
   # harte Fenster-Garantie zurueckwill: priority auf must setzen (haerter
   # als vorher) oder occupied_density weiter anheben.
   occupied_density: 100.0
+  # Rhythmisierung: Gewicht pro Kernfach-Stunde (Mathematik/Deutsch, je
+  # Klasse) ausserhalb des Vormittagsblocks 1-4 (16 should-
+  # subject_period_window-Regeln in constraints.yaml). Startwert 100 =
+  # gleicher Tier wie occupied_density - eine spuerbare, aber gegen
+  # ClassGaps (1000) klar untergeordnete Praeferenz.
+  subject_window: 100.0
   include_edge_period: false
   include_afternoon_day_count: false
   include_class_load_variance: false
