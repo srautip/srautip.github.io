@@ -47,3 +47,20 @@ waren dort die tatsaechlich tragende Validierung.
   Einzellaeufe entsprechend vorsichtig interpretieren.
 - Lange Laeufe (>10 Min) nicht direkt im Tool-Aufruf starten, sondern
   als `setsid nohup`-Skript entkoppeln und per Log ueberwachen.
+
+## Viewer-Artifacts (schneller Vorschau-Kanal ohne main-Merge)
+
+Neben den GitHub-Pages-Kopien (main-Stand) werden die beiden
+Stundentafel-Viewer als Claude-Artifacts bereitgestellt - private,
+stabil verlinkte Seiten fuer Zwischenstaende direkt nach einem Lauf:
+
+- Grundschule: https://claude.ai/code/artifact/d644d791-48e1-4bbd-89fa-02d2cf13fe09
+- GMS: https://claude.ai/code/artifact/ae942861-a1ae-4664-a1f5-51ac9ce702d1
+
+Aktualisierung nach jedem `run`-Lauf: den aeusseren Dokumentrahmen der
+generierten `output/stundentafel.html` strippen (doctype/html/head/
+body-Tags entfernen - das Artifact ergaenzt den Rahmen selbst; den
+`<title>` dabei auf "Stundentafel Grundschule" bzw. "Stundentafel GMS"
+setzen) und per Artifact-Tool mit `url` = obiger Link publizieren -
+NIE ohne `url` (das erzeugte ein neues, separates Artifact). Favicons
+stabil halten: Grundschule 🎒, GMS 🏫.
