@@ -649,7 +649,10 @@ Dazu kommen zwei Auswahl-Werkzeuge:
   "n von m Lösungen Pareto-optimal". Dominanz wird gewichtsunabhängig
   über den ECHTEN Vektor geprüft (inkl. Muss und der strukturell
   abgeschalteten Kriterien): Lösung B dominiert A, wenn B in allen
-  Kriterien <= und in mindestens einem < ist.
+  Kriterien <= und in mindestens einem < ist. Unabhängig vom Filter
+  nennt die Lösungsbeschreibung im Kopf bei einer dominierten Lösung
+  die bessere Pareto-Lösung direkt ("Pareto: dominiert von Lösung X",
+  anklickbar zum Wechseln).
 
 - **Lösungs-Diff ("Vergleichen mit"):** eine zweite Auswahl legt eine
   Vergleichslösung fest - im Klassen- UND Lehrerraster wird jede Zelle

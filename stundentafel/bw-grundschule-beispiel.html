@@ -34,6 +34,9 @@
     font-size: 0.9rem;
     color: #000;
   }
+  #solution-summary a {
+    color: #1d4ed8;
+  }
   h2 {
     font-size: 1.05rem;
     margin: 1.2rem 0 0.4rem;
@@ -1090,10 +1093,28 @@
         var totalLabel = (weightsEnabled && weightsDirty()) ? 'Quality (Total*)' : 'Quality (Total)';
         // Ohne das fruehere Dropdown traegt die Zusammenfassung die
         // Kennung der gewaehlten Loesung selbst.
-        document.getElementById('solution-summary').textContent =
+        var summary = document.getElementById('solution-summary');
+        summary.textContent =
           'Loesung ' + (solIndex + 1) + ' (' + sol.status + ')' +
           ' | Muss-Verstoesse: ' + sol.muss_violation_count + ' | Kann-Verstoesse: ' + sol.kann_violation_count +
           ' | ' + totalLabel + ': ' + displayTotal(sol).toFixed(1);
+        // Ist die Loesung Pareto-dominiert, nennt die Beschreibung die
+        // bessere Loesung direkt - unabhaengig davon, ob der
+        // Pareto-Filter aktiv ist (dominatedBy ist statisch
+        // vorberechnet). Der Link waehlt die dominierende Loesung.
+        if (hasFullVector && dominatedBy[solIndex] !== undefined) {
+          var better = dominatedBy[solIndex];
+          summary.appendChild(document.createTextNode(' | Pareto: dominiert von '));
+          var link = document.createElement('a');
+          link.href = '#';
+          link.textContent = 'Loesung ' + better;
+          link.title = 'Loesung ' + better + ' ist in allen Kriterien mindestens gleich gut und in mindestens einem besser - anklicken zum Wechseln';
+          link.addEventListener('click', function (e) {
+            e.preventDefault();
+            render(better - 1);
+          });
+          summary.appendChild(link);
+        }
       }
 
       function render(solIndex) {
