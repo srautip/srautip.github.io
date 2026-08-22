@@ -117,6 +117,30 @@ Public NotInheritable Class RunConfig
     ''' Verhalten). Ueberstimmt ab Iteration 2 ein gesetztes
     ''' relative_gap_limit.</summary>
     Public Property LaterIterationsGapLimit As Double? = Nothing
+    ''' <summary>Mehr-Zuteilungs-Modus (Nothing -> 1 = bisheriges
+    ''' Verhalten): Anzahl unterschiedlicher Lehrer-Zuteilungen aus
+    ''' Stufe 1, die jeweils einen EIGENEN Stufe-2-Lauf bekommen
+    ''' (Gesamtbudget solve_time_limit_s und max_solutions werden
+    ''' gleichmaessig aufgeteilt). Bei &gt; 1 ist die
+    ''' Lex-Symmetriebrechung automatisch aktiv (siehe
+    ''' assignment_symmetry_breaking).</summary>
+    Public Property MaxAssignments As Integer? = Nothing
+    ''' <summary>Band um das beste Lehrereinsatz-Objective, innerhalb
+    ''' dessen alternative Zuteilungen akzeptiert werden (Nothing -> 0 =
+    ''' nur gleich gute Alternativen).</summary>
+    Public Property AssignmentTolerance As Integer? = Nothing
+    ''' <summary>Mindestanzahl (Klasse,Fach)-Einheiten, in denen jede
+    ''' weitere Zuteilung eine ANDERE Lehrkraft waehlen muss (das
+    ''' minDiversity-Muster der Stufe 2). Reine Permutationen
+    ''' austauschbarer Lehrkraefte blockt nicht dieser Cut, sondern die
+    ''' automatisch aktive Lex-Symmetriebrechung. Nothing -> 1.</summary>
+    Public Property AssignmentMinDiversity As Integer? = Nothing
+    ''' <summary>Lex-Symmetriebrechung ueber die Aequivalenzklassen
+    ''' austauschbarer Lehrkraefte (TeacherEquivalenceClasses). Nothing ->
+    ''' automatisch: aktiv genau dann, wenn max_assignments &gt; 1 (im
+    ''' Ein-Zuteilungs-Modus bleibt der bisherige Repraesentant
+    ''' unveraendert). Explizit true/false erzwingt an/aus.</summary>
+    Public Property AssignmentSymmetryBreaking As Boolean? = Nothing
     ''' <summary>Budget je lexikografischer Stufe bzw. (im gewichteten
     ''' Modus) fuer den Kann-Warm-Start - Nothing faellt auf SolveTops
     ''' eigenen Default (60s) zurueck. Relevant fuer grosse Szenarien,
@@ -259,9 +283,21 @@ Public Module Run
             Return False
         End If
 
-        Dim lehrereinsatz = Lehrereinsatzplanung.SolveLehrereinsatz(
+        ' Mehr-Zuteilungs-Modus: Aequivalenzklassen austauschbarer
+        ' Lehrkraefte (fuer Symmetriebrechung, invariante Diversitaet und
+        ' die "direkt tauschbar"-Anzeige im Viewer) + bis zu
+        ' max_assignments Zuteilungen als je eigener Stufe-2-Input.
+        Dim eqKlassen = Lehrereinsatzplanung.TeacherEquivalenceClasses(bestand, handConstraints)
+        Dim maxAssignments = Math.Max(If(cfg.MaxAssignments, 1), 1)
+        Dim symBreak = If(cfg.AssignmentSymmetryBreaking, maxAssignments > 1)
+        Dim einsaetze = Lehrereinsatzplanung.SolveLehrereinsatzTop(
             bestand, deputatToleranzStunden:=cfg.DeputatToleranzStunden, timeLimitS:=cfg.LehrereinsatzTimeLimitS,
-            seed:=cfg.Seed, numWorkers:=cfg.NumWorkers)
+            seed:=cfg.Seed, numWorkers:=cfg.NumWorkers,
+            maxAssignments:=maxAssignments,
+            assignmentTolerance:=If(cfg.AssignmentTolerance, 0),
+            assignmentMinDiversity:=If(cfg.AssignmentMinDiversity, 1),
+            aequivalenzKlassen:=If(symBreak, eqKlassen, Nothing))
+        Dim lehrereinsatz = einsaetze(0)
         Dim lehrereinsatzOk = lehrereinsatz.Status = CpSolverStatus.Optimal OrElse lehrereinsatz.Status = CpSolverStatus.Feasible
 
         If Not lehrereinsatzOk Then
@@ -271,36 +307,57 @@ Public Module Run
             Return False
         End If
 
-        Dim lehrereinsatzViolations = Verifier.VerifyLehrereinsatz(bestand, lehrereinsatz)
-        Dim lehrerzuteilungMd = Formatting.FormatLehrereinsatzMarkdown(bestand, lehrereinsatz)
-        If lehrereinsatzViolations.Count > 0 Then
-            lehrerzuteilungMd &= vbLf & vbLf & "## Verstoesse (Verifier.VerifyLehrereinsatz)" & vbLf & vbLf &
-                String.Join(vbLf, lehrereinsatzViolations.Select(Function(v) $"- {v}"))
-            erfolg = False
+        Dim lehrereinsatzViolationsTotal = 0
+        Dim mdParts As New List(Of String)
+        For i = 0 To einsaetze.Count - 1
+            Dim part = Formatting.FormatLehrereinsatzMarkdown(bestand, einsaetze(i))
+            If einsaetze.Count > 1 Then
+                part = $"# Zuteilung {i + 1} von {einsaetze.Count} (Lehrereinsatz-Objective {einsaetze(i).Solver.ObjectiveValue})" & vbLf & vbLf & part
+            End If
+            Dim violations = Verifier.VerifyLehrereinsatz(bestand, einsaetze(i))
+            If violations.Count > 0 Then
+                part &= vbLf & vbLf & "## Verstoesse (Verifier.VerifyLehrereinsatz)" & vbLf & vbLf &
+                    String.Join(vbLf, violations.Select(Function(v) $"- {v}"))
+                lehrereinsatzViolationsTotal += violations.Count
+                erfolg = False
+            End If
+            mdParts.Add(part)
+        Next
+        Dim tauschbare = eqKlassen.Where(Function(k) k.Count >= 2).ToList()
+        If tauschbare.Count > 0 Then
+            mdParts.Add("## Aequivalente (direkt tauschbare) Lehrkraefte" & vbLf & vbLf &
+                "Diese Lehrkraefte sind fuer die GESAMTE Pipeline ununterscheidbar (identische Qualifikationen, Deputate, Verfuegbarkeiten und Constraint-Erwaehnungen) - innerhalb einer Gruppe koennen sie ohne jede Auswirkung auf die Plan-Qualitaet direkt getauscht werden:" & vbLf & vbLf &
+                String.Join(vbLf, tauschbare.Select(Function(k) $"- {String.Join(" <-> ", k)}")))
         End If
-        IO.File.WriteAllText(IO.Path.Combine(outputDir, "lehrerzuteilung.md"), lehrerzuteilungMd)
+        IO.File.WriteAllText(IO.Path.Combine(outputDir, "lehrerzuteilung.md"), String.Join(vbLf & vbLf & "---" & vbLf & vbLf, mdParts))
 
-        If lehrereinsatzViolations.Count > 0 Then
-            Console.WriteLine($"[{schule}] FAIL - VerifyLehrereinsatz: {lehrereinsatzViolations.Count} Verstoesse")
+        If lehrereinsatzViolationsTotal > 0 Then
+            Console.WriteLine($"[{schule}] FAIL - VerifyLehrereinsatz: {lehrereinsatzViolationsTotal} Verstoesse")
             Return False
         End If
 
-        Dim derivedConstraints = Lehrereinsatzplanung.BuildAssignmentConstraints(lehrereinsatz, bestand)
         Dim ent = Stammdaten.BuildEntitiesFragment(bestand)
-        Dim alleConstraints = derivedConstraints.Concat(handConstraints).ToList()
-        Dim data As New JsonObject From {
-            {"entities", ent},
-            {"constraints", New JsonArray(alleConstraints.Select(Function(c) CType(c, JsonNode)).ToArray())}
-        }
-
-        Dim validationErrors = Validation.ValidateEntities(data)
-        If validationErrors.Count > 0 Then
-            IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.md"),
-                $"# Stundenplan: {bestand.SchulName}{vbLf}{vbLf}**Status:** Validation.ValidateEntities FEHLGESCHLAGEN{vbLf}{vbLf}" &
-                String.Join(vbLf, validationErrors.Select(Function(e) $"- {e}")))
-            Console.WriteLine($"[{schule}] FAIL - Validation.ValidateEntities: {validationErrors.Count} Fehler")
-            Return False
-        End If
+        Dim dataOfEinsatz As New List(Of JsonObject)
+        For i = 0 To einsaetze.Count - 1
+            Dim derivedConstraints = Lehrereinsatzplanung.BuildAssignmentConstraints(einsaetze(i), bestand)
+            Dim alleConstraints = derivedConstraints.Concat(handConstraints).ToList()
+            ' DeepClone: die handConstraints-Knoten wuerden sonst beim
+            ' zweiten Datenobjekt erneut angehaengt ("node already has a
+            ' parent") - jede Zuteilung bekommt ihre eigene Kopie.
+            Dim dataI As New JsonObject From {
+                {"entities", ent.DeepClone().AsObject()},
+                {"constraints", New JsonArray(alleConstraints.Select(Function(c) CType(c.DeepClone(), JsonNode)).ToArray())}
+            }
+            Dim validationErrors = Validation.ValidateEntities(dataI)
+            If validationErrors.Count > 0 Then
+                IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.md"),
+                    $"# Stundenplan: {bestand.SchulName}{vbLf}{vbLf}**Status:** Validation.ValidateEntities FEHLGESCHLAGEN (Zuteilung {i + 1}){vbLf}{vbLf}" &
+                    String.Join(vbLf, validationErrors.Select(Function(e) $"- {e}")))
+                Console.WriteLine($"[{schule}] FAIL - Validation.ValidateEntities (Zuteilung {i + 1}): {validationErrors.Count} Fehler")
+                Return False
+            End If
+            dataOfEinsatz.Add(dataI)
+        Next
 
         ' Nutzt SolveTop statt Solve: dieselbe volle Qualitaets-Zielfunktion
         ' (Luecken/Randstunden/Tagesausgewogenheit, siehe ScheduleQuality.vb)
@@ -337,24 +394,42 @@ Public Module Run
         Dim minDiversity = If(cfg.MinDiversity, 0)
         Dim rehintFoundSolutions = If(cfg.RehintFoundSolutions, True)
         Dim stage1TimeLimitS = If(cfg.Stage1TimeLimitS, 60.0)
-        Dim topResult = Solver.SolveTop(data, maxSolutions:=cfg.MaxSolutions, totalTimeLimitS:=cfg.SolveTimeLimitS,
-            perSolveTimeLimitS:=perSolveLimit, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers, qualityWeights:=qualityWeights,
-            stage1TimeLimitS:=stage1TimeLimitS,
-            stagnationTimeoutS:=stagnationTimeoutS, diversifySeed:=diversifySeed, randomizeSearch:=randomizeSearch,
-            relativeGapLimit:=cfg.RelativeGapLimit,
-            lexicographic:=lexicographic, lexTolerance:=lexTolerance, lexTeacherGapsStage:=lexTeacherGapsStage,
-            lexOccupiedDensityStage:=lexOccupiedDensityStage,
-            lexSubjectWindowStage:=lexSubjectWindowStage,
-            minDiversity:=minDiversity, rehintFoundSolutions:=rehintFoundSolutions,
-            laterIterationsGapLimit:=cfg.LaterIterationsGapLimit)
-        Dim solveOk = topResult.Solutions.Count > 0
-        If Not solveOk Then
+        ' Mehr-Zuteilungs-Modus: ein Stufe-2-Lauf PRO Zuteilung;
+        ' Gesamtbudget und max_solutions werden gleichmaessig aufgeteilt
+        ' (Ein-Zuteilungs-Modus: identisch zum bisherigen Verhalten).
+        Dim perAssignmentBudget = cfg.SolveTimeLimitS / einsaetze.Count
+        Dim perAssignmentMaxSolutions = Math.Max(1, (cfg.MaxSolutions + einsaetze.Count - 1) \ einsaetze.Count)
+        Dim runs As New List(Of Formatting.AssignmentRun)
+        For i = 0 To einsaetze.Count - 1
+            Dim topResultI = Solver.SolveTop(dataOfEinsatz(i), maxSolutions:=perAssignmentMaxSolutions, totalTimeLimitS:=perAssignmentBudget,
+                perSolveTimeLimitS:=perSolveLimit, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers, qualityWeights:=qualityWeights,
+                stage1TimeLimitS:=stage1TimeLimitS,
+                stagnationTimeoutS:=stagnationTimeoutS, diversifySeed:=diversifySeed, randomizeSearch:=randomizeSearch,
+                relativeGapLimit:=cfg.RelativeGapLimit,
+                lexicographic:=lexicographic, lexTolerance:=lexTolerance, lexTeacherGapsStage:=lexTeacherGapsStage,
+                lexOccupiedDensityStage:=lexOccupiedDensityStage,
+                lexSubjectWindowStage:=lexSubjectWindowStage,
+                minDiversity:=minDiversity, rehintFoundSolutions:=rehintFoundSolutions,
+                laterIterationsGapLimit:=cfg.LaterIterationsGapLimit)
+            runs.Add(New Formatting.AssignmentRun With {
+                .Data = dataOfEinsatz(i), .Result = topResultI, .AssignmentIndex = i + 1,
+                .LehrereinsatzObjective = einsaetze(i).Solver.ObjectiveValue})
+        Next
+        Dim successfulRuns = runs.Where(Function(r) r.Result.Solutions.Count > 0).ToList()
+        If successfulRuns.Count = 0 Then
+            Dim reasons = String.Join("|", runs.Select(Function(r) r.Result.StopReason.ToString()).Distinct())
             IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.md"),
-                $"# Stundenplan: {bestand.SchulName}{vbLf}{vbLf}**Status:** {topResult.StopReason} (Solver.SolveTop fand keine Loesung){vbLf}")
-            Console.WriteLine($"[{schule}] FAIL - Solver.SolveTop: {topResult.StopReason}")
+                $"# Stundenplan: {bestand.SchulName}{vbLf}{vbLf}**Status:** {reasons} (Solver.SolveTop fand keine Loesung){vbLf}")
+            Console.WriteLine($"[{schule}] FAIL - Solver.SolveTop: {reasons}")
             Return False
         End If
 
+        ' stundenplan.md dokumentiert die global beste Loesung - der Lauf,
+        ' der sie enthaelt, liefert auch data/topResult fuer die
+        ' nachfolgenden (unveraenderten) Markdown-Abschnitte.
+        Dim bestRun = successfulRuns.OrderBy(Function(r) r.Result.Solutions(0).Quality.Total).First()
+        Dim data = bestRun.Data
+        Dim topResult = bestRun.Result
         Dim best = topResult.Solutions(0)
         Dim schedule = best.Schedule
         Dim scheduleViolations = Verifier.VerifySchedule(data, schedule)
@@ -363,6 +438,10 @@ Public Module Run
         stundenplanLines.Add("")
         stundenplanLines.Add($"**Status:** SolveTop ({topResult.StopReason})  |  **CP-SAT-Status:** {best.Status}  |  **Kann-Verstoesse:** {best.Quality.KannViolationCount}  |  **Qualitaet (Total):** {best.Quality.Total:F1}  |  **Verstoesse:** {scheduleViolations.Count}")
         stundenplanLines.Add("")
+        If einsaetze.Count > 1 Then
+            stundenplanLines.Add($"*Mehr-Zuteilungs-Modus: {einsaetze.Count} Lehrer-Zuteilungen mit je eigenem Stufe-2-Lauf ({perAssignmentBudget:F0}s / {perAssignmentMaxSolutions} Loesungen pro Zuteilung); die hier dokumentierte beste Loesung stammt aus Zuteilung {bestRun.AssignmentIndex}. Alle Loesungen aller Zuteilungen: output/stundentafel.html (Spalte 'Zuteilung').*")
+            stundenplanLines.Add("")
+        End If
         If topResult.StagnationTriggeredCount > 0 Then
             stundenplanLines.Add($"*Phase 2.25: die Stagnationserkennung hat {topResult.StagnationTriggeredCount} von {topResult.IterationsRun} Solve-Iteration(en) vorzeitig abgebrochen, weil ueber `stagnation_timeout_s` hinweg keine Verbesserung mehr gefunden wurde - spart Zeit fuer weitere Iterationen statt eine stehende Suche bis zum Zeitlimit weiterlaufen zu lassen.*")
             stundenplanLines.Add("")
@@ -444,13 +523,14 @@ Public Module Run
         ' JS-Viewer-HTML, die dieselben Daten inline eingebettet enthaelt
         ' (kein fetch() noetig, funktioniert daher auch bei direktem
         ' Doeffnen per Doppelklick ohne lokalen Webserver).
-        Dim stundentafelJson = Formatting.ToStundentafelJson(bestand, data, topResult, qualityWeights)
+        Dim stundentafelJson = Formatting.ToStundentafelJsonMulti(bestand, runs, qualityWeights, eqKlassen)
         Dim stundentafelJsonText = stundentafelJson.ToJsonString(New JsonSerializerOptions With {.WriteIndented = True})
         IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.json"), stundentafelJsonText)
         IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundentafel.html"),
             StundentafelHtml.BuildStundentafelHtml(stundentafelJson.ToJsonString()))
 
-        Console.WriteLine($"[{schule}] {If(erfolg, "PASS", "FAIL")} - Lehrereinsatzplanung={lehrereinsatz.Status} (Objective={lehrereinsatz.Solver.ObjectiveValue}), Solver.SolveTop={topResult.StopReason}, CP-SAT-Status={best.Status} (Kann-Verstoesse={best.Quality.KannViolationCount}, Quality.Total={best.Quality.Total:F1}), Verstoesse={scheduleViolations.Count}")
+        Dim zuteilungsInfo = If(einsaetze.Count > 1, $", Zuteilungen={einsaetze.Count} (beste={bestRun.AssignmentIndex})", "")
+        Console.WriteLine($"[{schule}] {If(erfolg, "PASS", "FAIL")} - Lehrereinsatzplanung={lehrereinsatz.Status} (Objective={lehrereinsatz.Solver.ObjectiveValue}){zuteilungsInfo}, Solver.SolveTop={topResult.StopReason}, CP-SAT-Status={best.Status} (Kann-Verstoesse={best.Quality.KannViolationCount}, Quality.Total={best.Quality.Total:F1}), Verstoesse={scheduleViolations.Count}")
         Return erfolg
     End Function
 

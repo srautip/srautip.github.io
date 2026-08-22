@@ -344,6 +344,10 @@ lex_subject_window_stage: false   # Optional, Default false - Fach-Fenster-Stufe
 min_diversity: 0   # Optional, Default 0 - Code-Review-Umsetzung P3, siehe unten
 rehint_found_solutions: true   # Optional, Default true - Code-Review-Umsetzung P3, siehe unten
 later_iterations_gap_limit: null   # Optional, Default nicht gesetzt - Code-Review-Umsetzung P6, siehe unten
+max_assignments: 1   # Optional, Default 1 - Mehr-Zuteilungs-Modus, siehe unten
+assignment_tolerance: 0   # Optional, Default 0 - Band um das beste Lehrereinsatz-Objective
+assignment_min_diversity: 1   # Optional, Default 1 - Mindestdistanz zwischen Zuteilungen ((Klasse,Fach)-Einheiten mit anderer Lehrkraft)
+assignment_symmetry_breaking: null   # Optional, Default automatisch (aktiv bei max_assignments > 1) - Lex-Symmetriebrechung ueber Aequivalenzklassen
 stage1_time_limit_s: 60.0   # Optional, Default 60.0 - Budget je lexikografischer Stufe bzw. Kann-Warm-Start; bei grossen Szenarien erhoehen, wenn eine Stufe in 60s keine Loesung findet (Folge-Iterationen starten sonst ohne Warm-Start-Hint kalt)
 quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe unten
   kann: 100.0
@@ -476,6 +480,25 @@ gibt dem kompakten `occupied_window`-Kriterium denselben Vorteil. Mit
 aktiver Stufe steuert `occupied_density` nur noch das nachgelagerte
 Ranking, nicht mehr die Suche; ohne sie bleibt die Dichte gewichtet in
 der Rest-Zielfunktion abwägbar.
+
+**`max_assignments` / `assignment_tolerance` /
+`assignment_min_diversity` / `assignment_symmetry_breaking`
+(Mehr-Zuteilungs-Modus):** bei `max_assignments > 1` enumeriert Stufe 1
+mehrere NICHTSYMMETRISCHE Lehrer-Zuteilungen (SolveTop-Muster:
+No-Good- und Diversitäts-Cuts auf demselben Modell, Objective-Band
+`optimum + assignment_tolerance`), und jede Zuteilung bekommt einen
+eigenen Stufe-2-Lauf - `solve_time_limit_s` und `max_solutions` werden
+gleichmäßig aufgeteilt, die Lösungen aller Zuteilungen landen global
+nach Total sortiert im Export (Spalte "Zuteilung" im Viewer).
+Nichtsymmetrie: vorab werden Äquivalenzklassen austauschbarer
+Lehrkräfte berechnet (identische Qualifikationen, Deputate,
+Verfügbarkeiten, `feste_zuordnungen` und - auf einen Platzhalter
+normalisiert - Constraint-Erwähnungen); die automatisch aktive
+Lex-Symmetriebrechung lässt pro Symmetrie-Orbit nur den kanonischen
+Repräsentanten zu, reine Permutationen austauschbarer Lehrkräfte können
+also gar nicht erst als "Alternative" auftauchen. Die Klassen mit >= 2
+Mitgliedern erscheinen in `lehrerzuteilung.md` und im Viewer als
+"direkt tauschbar" (⇄ im Lehrerplan-Kopf samt Legende).
 
 **`lex_subject_window_stage`** (Default `false`): gleiches Muster für
 die Fach-Fenster-Verstöße von should-`subject_period_window`-Regeln
@@ -653,6 +676,15 @@ Dazu kommen zwei Auswahl-Werkzeuge:
   nennt die Lösungsbeschreibung im Kopf bei einer dominierten Lösung
   die bessere Pareto-Lösung direkt ("Pareto: dominiert von Lösung X",
   anklickbar zum Wechseln).
+
+- **Mehr-Zuteilungs-Modus im Viewer:** bei `max_assignments > 1` zeigt
+  die Übersicht eine sortierbare Spalte "Zuteilung" (aus welcher
+  Lehrer-Zuteilung stammt die Lösung), und die Lösungsbeschreibung
+  nennt sie mit. Unabhängig davon markiert der Lehrerstundenplan
+  **direkt tauschbare Lehrkräfte** (Äquivalenzklassen, siehe
+  `max_assignments` oben) mit ⇄ im Spaltenkopf samt Tooltip und einer
+  Legende über dem Raster - ein Tausch innerhalb einer Gruppe ändert
+  die Plan-Qualität nicht.
 
 - **Lösungs-Diff ("Vergleichen mit"):** eine zweite Auswahl legt eine
   Vergleichslösung fest - im Klassen- UND Lehrerraster wird jede Zelle
