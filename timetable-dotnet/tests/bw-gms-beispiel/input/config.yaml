@@ -130,6 +130,14 @@ quality_weights:
   # fuer diese Schule auch die Rueckkehr zur Batterie eine legitime
   # Option (occupied_slot ist als Typ vollstaendig erhalten).
   occupied_density: 500.0
+  # Rhythmisierung: Gewicht pro Kernfach-Stunde (Deutsch/Mathematik/
+  # Englisch inkl. Niveaukurse 7-10) ausserhalb des Vormittagsblocks 1-6
+  # (224 should-subject_period_window-Regeln in constraints.yaml,
+  # klassengenau aus den realen Sessions abgeleitet). Startwert 100 =
+  # gleicher Tier wie das TeacherGaps-Default - eine spuerbare
+  # Praeferenz in der Rest-Zielfunktion, ohne eigene Lex-Stufe; die
+  # Dichte behaelt ihre Stufe (lex_occupied_density_stage).
+  subject_window: 100.0
   include_edge_period: false
   include_afternoon_day_count: false
   include_class_load_variance: false

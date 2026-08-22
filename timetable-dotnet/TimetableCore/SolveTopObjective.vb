@@ -44,6 +44,14 @@ Friend NotInheritable Class QualityTerms
     ''' Kann-BoolVar samt halbreifizierter Summe erzeugte). Gehoert zur
     ''' Rest-Zielfunktion, nie zu den lexikografischen Stufen.</summary>
     Public Property OccupiedDensitySum As LinearExpr
+    ''' <summary>Rhythmisierung: Summe der Lesson-Variablen, die AUSSERHALB
+    ''' des erlaubten Bereichs eines should-`subject_period_window`-
+    ''' Constraints ihres (Klasse,Fach)-Paars liegen - wie OccupiedDensitySum
+    ''' eine reine Linearsumme, hier sogar direkt ueber die ohnehin
+    ''' existierenden Lesson-Variablen (nicht einmal Scaffolding noetig).
+    ''' Standardmaessig Teil der Rest-Zielfunktion; per
+    ''' lexSubjectWindowStage optional eine eigene Stufe.</summary>
+    Public Property SubjectWindowSum As LinearExpr
 End Class
 
 Friend Module SolveTopObjective
@@ -402,6 +410,34 @@ Friend Module SolveTopObjective
             Next
         End If
 
+        ' Rhythmisierung: should-subject_period_window -> Summe der
+        ' Lesson-Variablen des (Klasse,Fach)-Paars ausserhalb des
+        ' erlaubten Bereichs (days x from..to; ein Tag ausserhalb von
+        ' `days` liegt vollstaendig ausserhalb). Kein Scaffolding, keine
+        ' einzige neue Variable - die Lesson-Variablen selbst sind die
+        ' Indikatoren. must-Fenster sind harte Constraints
+        ' (Solver.ApplySubjectPeriodWindow) und tauchen hier nicht auf.
+        Dim subjectWindowParts As New List(Of LinearExpr)
+        If w.IncludeSubjectWindow Then
+            For Each c In JsonHelpers.Constraints(data)
+                If JsonHelpers.GetString(c, "type") <> "subject_period_window" OrElse
+                   JsonHelpers.GetPriority(c) <> JsonHelpers.PriorityShould Then Continue For
+                Dim spwClass = JsonHelpers.GetString(c, "class")
+                Dim spwSubject = JsonHelpers.GetString(c, "subject")
+                Dim spwFrom = JsonHelpers.GetInt(c, "from_period")
+                Dim spwTo = JsonHelpers.GetInt(c, "to_period")
+                If Not spwFrom.HasValue OrElse Not spwTo.HasValue Then Continue For
+                Dim spwDaysList = JsonHelpers.AsStringList(c, "days")
+                Dim spwDays As New HashSet(Of String)(If(spwDaysList.Any(), spwDaysList, built.Days))
+                For Each kv In built.Lesson
+                    If kv.Key.ClassName = spwClass AndAlso kv.Key.Subject = spwSubject AndAlso
+                       (Not spwDays.Contains(kv.Key.Day) OrElse kv.Key.Period < spwFrom.Value OrElse kv.Key.Period > spwTo.Value) Then
+                        subjectWindowParts.Add(CType(kv.Value, LinearExpr))
+                    End If
+                Next
+            Next
+        End If
+
         Dim result As New QualityTerms()
         If built.KannVars.Count > 0 Then
             result.KannSum = LinearExpr.Sum(built.KannVars.Values.Select(Function(kv) kv.Var))
@@ -417,6 +453,7 @@ Friend Module SolveTopObjective
         If classRangeVars.Count > 0 Then result.ClassRangeSum = LinearExpr.Sum(classRangeVars)
         If teacherRangeVars.Count > 0 Then result.TeacherRangeSum = LinearExpr.Sum(teacherRangeVars)
         If occupiedDensityParts.Count > 0 Then result.OccupiedDensitySum = occupiedDensityParts.Aggregate(Function(a, b) a + b)
+        If subjectWindowParts.Count > 0 Then result.SubjectWindowSum = LinearExpr.Sum(subjectWindowParts)
         Return result
     End Function
 
@@ -468,6 +505,7 @@ Friend Module SolveTopObjective
         If terms.ClassRangeSum IsNot Nothing Then parts.Add((CLng(w.ClassLoadVariance), terms.ClassRangeSum))
         If terms.TeacherRangeSum IsNot Nothing Then parts.Add((CLng(w.TeacherLoadVariance), terms.TeacherRangeSum))
         If terms.OccupiedDensitySum IsNot Nothing Then parts.Add((CLng(w.OccupiedDensity), terms.OccupiedDensitySum))
+        If terms.SubjectWindowSum IsNot Nothing Then parts.Add((CLng(w.SubjectWindow), terms.SubjectWindowSum))
         Return CombineGcdNormalized(parts)
     End Function
 
@@ -483,7 +521,8 @@ Friend Module SolveTopObjective
     ''' wenn kein einziges Rest-Kriterium aktiv ist.</summary>
     Friend Function WeightedResidual(terms As QualityTerms, w As QualityWeights,
                                       Optional teacherGapsInResidual As Boolean = False,
-                                      Optional occupiedDensityInResidual As Boolean = True) As LinearExpr
+                                      Optional occupiedDensityInResidual As Boolean = True,
+                                      Optional subjectWindowInResidual As Boolean = True) As LinearExpr
         Dim parts As New List(Of (Weight As Long, Expr As LinearExpr))
         If teacherGapsInResidual AndAlso terms.TeacherGapsSum IsNot Nothing Then
             parts.Add((CLng(w.TeacherGaps), terms.TeacherGapsSum))
@@ -491,6 +530,9 @@ Friend Module SolveTopObjective
         ' occupiedDensityInResidual=False = "Dichte ist eigene Stufe"
         ' (lexOccupiedDensityStage): gleiches Muster wie TeacherGaps oben.
         If occupiedDensityInResidual AndAlso terms.OccupiedDensitySum IsNot Nothing Then parts.Add((CLng(w.OccupiedDensity), terms.OccupiedDensitySum))
+        ' subjectWindowInResidual=False = "Fach-Fenster ist eigene Stufe"
+        ' (lexSubjectWindowStage): gleiches Muster.
+        If subjectWindowInResidual AndAlso terms.SubjectWindowSum IsNot Nothing Then parts.Add((CLng(w.SubjectWindow), terms.SubjectWindowSum))
         If terms.EdgeSum IsNot Nothing Then parts.Add((CLng(w.EdgePeriod), terms.EdgeSum))
         If terms.AfternoonSum IsNot Nothing Then parts.Add((CLng(w.AfternoonDayCount), terms.AfternoonSum))
         If terms.ClassRangeSum IsNot Nothing Then parts.Add((CLng(w.ClassLoadVariance), terms.ClassRangeSum))

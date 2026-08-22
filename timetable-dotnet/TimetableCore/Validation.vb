@@ -48,7 +48,7 @@ Public Module Validation
     ' physically/structurally necessary and must always stay "must".
     Private ReadOnly KannCapableTypes As New HashSet(Of String) From {
         "teacher_availability", "forbidden_slot", "room_requirement", "consecutive_required", "weekly_hours",
-        "required_slot", "occupied_slot", "occupied_window"
+        "required_slot", "occupied_slot", "occupied_window", "subject_period_window"
     }
 
     ' occupied_slot only supports "class"/"teacher" scope (unlike
@@ -250,6 +250,41 @@ Public Module Validation
                     For Each d In JsonHelpers.AsStringList(c, "days")
                         If Not knownDays.Contains(d) Then
                             errors.Add(WithReason($"constraints[{i}] (type=occupied_window): day='{d}' ist kein Tag aus entities.timeslots.days", c))
+                        End If
+                    Next
+                End If
+            End If
+
+            ' Rhythmisierung: subject_period_window - (Klasse,Fach)-Paar
+            ' muss eine teacher_subject_assignment haben (wie required_slot,
+            ' sonst stiller No-Op), plus dieselbe Fensterkonsistenz wie
+            ' occupied_window (from <= to, im Periodenraster, days-Teilmenge
+            ' der bekannten Tage). Die Entity-Existenz von class/subject
+            ' prueft bereits der generische FieldEntityKey-Pass oben.
+            If constraintType = "subject_period_window" Then
+                Dim spwClass = JsonHelpers.GetString(c, "class")
+                Dim spwSubject = JsonHelpers.GetString(c, "subject")
+                If spwClass IsNot Nothing AndAlso spwSubject IsNot Nothing AndAlso
+                   known("classes").Contains(spwClass) AndAlso known("subjects").Contains(spwSubject) AndAlso
+                   Not classSubjectPairs.Contains((spwClass, spwSubject)) Then
+                    errors.Add(WithReason($"constraints[{i}]: subject_period_window referenziert (class='{spwClass}', subject='{spwSubject}') ohne zugehoerige teacher_subject_assignment - die Regel wuerde im Solver wirkungslos fallengelassen", c))
+                End If
+                Dim spwFrom = JsonHelpers.GetInt(c, "from_period")
+                Dim spwTo = JsonHelpers.GetInt(c, "to_period")
+                If Not spwFrom.HasValue OrElse Not spwTo.HasValue Then
+                    errors.Add(WithReason($"constraints[{i}] (type=subject_period_window): from_period/to_period muessen beide gesetzt sein", c))
+                Else
+                    If spwFrom.Value > spwTo.Value Then
+                        errors.Add(WithReason($"constraints[{i}] (type=subject_period_window): from_period={spwFrom.Value} > to_period={spwTo.Value}", c))
+                    End If
+                    If periodsPerDay.HasValue AndAlso (spwFrom.Value < 1 OrElse spwTo.Value > periodsPerDay.Value) Then
+                        errors.Add(WithReason($"constraints[{i}] (type=subject_period_window): Fenster {spwFrom.Value}..{spwTo.Value} liegt nicht vollstaendig in 1..{periodsPerDay.Value}", c))
+                    End If
+                End If
+                If knownDays IsNot Nothing Then
+                    For Each d In JsonHelpers.AsStringList(c, "days")
+                        If Not knownDays.Contains(d) Then
+                            errors.Add(WithReason($"constraints[{i}] (type=subject_period_window): day='{d}' ist kein Tag aus entities.timeslots.days", c))
                         End If
                     Next
                 End If

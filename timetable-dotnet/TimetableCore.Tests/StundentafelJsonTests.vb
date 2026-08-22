@@ -198,7 +198,7 @@ Public Class StundentafelJsonTests
             .KannViolationCount = 1, .ClassGapCount = 2, .TeacherGapCount = 3,
             .EdgePeriodCount = 4, .AfternoonDayCount = 5,
             .ClassLoadVariance = 6.25, .TeacherLoadVariance = 7.5,
-            .OccupiedDensityCount = 8, .Total = 9.75}
+            .OccupiedDensityCount = 8, .SubjectWindowCount = 11, .Total = 9.75}
         Dim sol As New ScoredSolution With {
             .Schedule = New List(Of ScheduleEntry), .KannConstraintFlags = New List(Of KannConstraintFlag),
             .Quality = quality, .Status = CpSolverStatus.Optimal}
@@ -216,6 +216,7 @@ Public Class StundentafelJsonTests
         Assert.AreEqual(6.25, s0("class_load_variance").GetValue(Of Double)(), 0.0001)
         Assert.AreEqual(7.5, s0("teacher_load_variance").GetValue(Of Double)(), 0.0001)
         Assert.AreEqual(8, JsonHelpers.GetInt(s0, "occupied_density_count").Value)
+        Assert.AreEqual(11, JsonHelpers.GetInt(s0, "subject_window_count").Value)
         Assert.AreEqual(9.75, s0("quality_total").GetValue(Of Double)(), 0.0001)
     End Sub
 
@@ -231,6 +232,7 @@ Public Class StundentafelJsonTests
         b.Klassen.Add(New Klasse With {.Name = "1a", .Klassenstufe = 1})
         Dim weights As New QualityWeights With {
             .ClassGaps = 1000.0, .TeacherGaps = 50.0, .OccupiedDensity = 500.0,
+            .SubjectWindow = 42.0, .IncludeSubjectWindow = False,
             .IncludeEdgePeriod = False, .IncludeTeacherLoadVariance = False}
 
         Dim json = Formatting.ToStundentafelJson(b, EmptyData(), LeeresMultiResult(), weights)
@@ -238,6 +240,8 @@ Public Class StundentafelJsonTests
         Assert.AreEqual(1000.0, qw("class_gaps").GetValue(Of Double)(), 0.0001)
         Assert.AreEqual(50.0, qw("teacher_gaps").GetValue(Of Double)(), 0.0001)
         Assert.AreEqual(500.0, qw("occupied_density").GetValue(Of Double)(), 0.0001)
+        Assert.AreEqual(42.0, qw("subject_window").GetValue(Of Double)(), 0.0001)
+        Assert.IsFalse(qw("include_subject_window").GetValue(Of Boolean)())
         Assert.IsFalse(qw("include_edge_period").GetValue(Of Boolean)())
         Assert.IsFalse(qw("include_teacher_load_variance").GetValue(Of Boolean)())
         Assert.IsTrue(qw("include_class_gaps").GetValue(Of Boolean)())
@@ -247,7 +251,9 @@ Public Class StundentafelJsonTests
         Dim qwDefaults = jsonDefaults("quality_weights").AsObject()
         Assert.AreEqual(ScheduleQuality.WeightKann, qwDefaults("kann").GetValue(Of Double)(), 0.0001)
         Assert.AreEqual(ScheduleQuality.WeightOccupiedDensity, qwDefaults("occupied_density").GetValue(Of Double)(), 0.0001)
+        Assert.AreEqual(ScheduleQuality.WeightSubjectWindow, qwDefaults("subject_window").GetValue(Of Double)(), 0.0001)
         Assert.IsTrue(qwDefaults("include_occupied_density").GetValue(Of Boolean)())
+        Assert.IsTrue(qwDefaults("include_subject_window").GetValue(Of Boolean)())
     End Sub
 
 End Class

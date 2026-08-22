@@ -23,6 +23,14 @@ Public NotInheritable Class QualityScore
     ''' nachgelagert gezaehlte Dichte-Defizit). 0, wenn das Szenario keine
     ''' occupied_window-Constraints enthaelt.</summary>
     Public Property OccupiedDensityCount As Integer
+    ''' <summary>Rhythmisierung: Anzahl Unterrichtsstunden, die AUSSERHALB
+    ''' des erlaubten Bereichs (days x from_period..to_period) eines
+    ''' `subject_period_window`-Constraints ihres (Klasse,Fach)-Paars
+    ''' liegen - ueber alle solchen Constraints summiert, unabhaengig von
+    ''' der Prioritaet (bei must garantiert der Solver 0, bei should ist
+    ''' dies der nachgelagert exakt gezaehlte Fenster-Verstoss). 0, wenn
+    ''' das Szenario keine subject_period_window-Constraints enthaelt.</summary>
+    Public Property SubjectWindowCount As Integer
     Public Property Total As Double
 End Class
 
@@ -56,6 +64,13 @@ Public NotInheritable Class QualityWeights
     ''' frueheren Kann-Gewichtswert seiner abgeloesten
     ''' occupied_slot-Batterie).</summary>
     Public Property OccupiedDensity As Double = ScheduleQuality.WeightOccupiedDensity
+    ''' <summary>Rhythmisierung: Gewicht pro Unterrichtsstunde ausserhalb
+    ''' ihres `subject_period_window`-Bereichs (siehe QualityScore.
+    ''' SubjectWindowCount) - Default im selben "mildly disruptive"-Tier
+    ''' wie EdgePeriod/OccupiedDensity; eine Schule, die z.B. "Kernfaecher
+    ''' vormittags" hart priorisieren will, hebt es per config.yaml an
+    ''' oder nutzt die dedizierte Lex-Stufe (lex_subject_window_stage).</summary>
+    Public Property SubjectWindow As Double = ScheduleQuality.WeightSubjectWindow
     ''' <summary>Phase 2.25-Nachtrag-2: whether SolveTopObjective.
     ''' ApplyQualityObjective builds TeacherGaps' auxiliary variables/
     ''' constraints into the CP-SAT model at all - a structural on/off
@@ -99,6 +114,14 @@ Public NotInheritable Class QualityWeights
     ''' schalten). Beeinflusst nie den immer berechneten
     ''' OccupiedDensityCount der Anzeige.</summary>
     Public Property IncludeOccupiedDensity As Boolean = True
+    ''' <summary>Strukturelles An/Aus fuer den SubjectWindow-Term in
+    ''' SolveTops Zielfunktion (wie IncludeOccupiedDensity erzeugt der
+    ''' Term selbst KEINE neuen Variablen - er ist eine reine Linearsumme
+    ''' ueber die ohnehin existierenden Lesson-Variablen; das Flag
+    ''' existiert fuer Symmetrie und um die Suche gezielt blind zu
+    ''' schalten). Beeinflusst nie den immer berechneten
+    ''' SubjectWindowCount der Anzeige.</summary>
+    Public Property IncludeSubjectWindow As Boolean = True
 End Class
 
 Public Module ScheduleQuality
@@ -156,6 +179,13 @@ Public Module ScheduleQuality
     ' Dichte-Anforderung heben das Gewicht per config.yaml an.
     Public Const WeightOccupiedDensity As Double = 5.0
 
+    ' Rhythmisierung: Kosten pro Unterrichtsstunde ausserhalb des
+    ' erlaubten Bereichs eines should-subject_period_window-Constraints
+    ' ("Kernfach bevorzugt vormittags", "AG bevorzugt Mo-Do nachmittags").
+    ' Gleicher Tier wie EdgePeriod/OccupiedDensity - eine Praeferenz, kein
+    ' hartes Verbot (das waere priority=must).
+    Public Const WeightSubjectWindow As Double = 5.0
+
     ''' <summary>Periods &gt;= this count as "Nachmittag" for the
     ''' Randstunden metric - matches the convention already used in this
     ''' project's own fixture prompts (Gymnasium/MussKann explicitly call
@@ -188,20 +218,57 @@ Public Module ScheduleQuality
         Dim teacherVariance = LoadVarianceOverWorkingDaysOnly(schedule.GroupBy(Function(l) l.Teacher))
 
         Dim occupiedDensity = OccupiedWindowDeficit(data, schedule, allDays)
+        Dim subjectWindow = SubjectWindowOutsideCount(data, schedule, allDays)
 
         Dim total = w.Kann * kannViolationCount +
                     w.ClassGaps * classGaps + w.TeacherGaps * teacherGaps +
                     w.EdgePeriod * edgeCount + w.AfternoonDayCount * afternoonDayCount +
                     w.ClassLoadVariance * classVariance + w.TeacherLoadVariance * teacherVariance +
-                    w.OccupiedDensity * occupiedDensity
+                    w.OccupiedDensity * occupiedDensity +
+                    w.SubjectWindow * subjectWindow
 
         Return New QualityScore With {
             .KannViolationCount = kannViolationCount, .ClassGapCount = classGaps, .TeacherGapCount = teacherGaps,
             .EdgePeriodCount = edgeCount, .AfternoonDayCount = afternoonDayCount,
             .ClassLoadVariance = classVariance, .TeacherLoadVariance = teacherVariance,
-            .OccupiedDensityCount = occupiedDensity,
+            .OccupiedDensityCount = occupiedDensity, .SubjectWindowCount = subjectWindow,
             .Total = total
         }
+    End Function
+
+    ''' <summary>Rhythmisierung: zaehlt ueber alle `subject_period_window`-
+    ''' Constraints in `data` die Unterrichtsstunden des jeweiligen
+    ''' (Klasse,Fach)-Paars, die AUSSERHALB des erlaubten Bereichs (days x
+    ''' from_period..to_period) liegen - unabhaengig von der Prioritaet
+    ''' (bei must garantiert der Solver 0, bei should ist dies der
+    ''' nachgelagert exakt gezaehlte Fenster-Verstoss). Ein Tag, der nicht
+    ''' in `days` steht, liegt VOLLSTAENDIG ausserhalb (der erlaubte
+    ''' Bereich ist das Kreuzprodukt, nicht nur die Periodengrenze).
+    ''' Unabhaengig re-deriviert aus Schedule + JSON, teilt keinen Code
+    ''' mit SolveTopObjectives In-Modell-Term (gleiche Philosophie wie
+    ''' Verifier.vb).</summary>
+    Private Function SubjectWindowOutsideCount(data As JsonObject, schedule As List(Of ScheduleEntry), allDays As List(Of String)) As Integer
+        Dim outside = 0
+        For Each c In JsonHelpers.Constraints(data)
+            If JsonHelpers.GetString(c, "type") <> "subject_period_window" Then Continue For
+            Dim className = JsonHelpers.GetString(c, "class")
+            Dim subject = JsonHelpers.GetString(c, "subject")
+            Dim fromPeriod = JsonHelpers.GetInt(c, "from_period")
+            Dim toPeriod = JsonHelpers.GetInt(c, "to_period")
+            If Not fromPeriod.HasValue OrElse Not toPeriod.HasValue Then Continue For
+            Dim windowDaysList = JsonHelpers.AsStringList(c, "days")
+            Dim windowDays As New HashSet(Of String)(If(windowDaysList.Any(), windowDaysList, allDays))
+
+            ' DISTINCT ueber (Tag, Periode) - eine parallel_group kann
+            ' mehrere ScheduleEntry-Zeilen auf denselben Slot legen
+            ' (gleiche Falle wie in GapsOverEntities, Phase 2.22).
+            outside += schedule.
+                Where(Function(l) l.ClassName = className AndAlso l.Subject = subject).
+                Select(Function(l) (l.Day, l.Period)).Distinct().
+                Count(Function(slot) Not windowDays.Contains(slot.Day) OrElse
+                                     slot.Period < fromPeriod.Value OrElse slot.Period > toPeriod.Value)
+        Next
+        Return outside
     End Function
 
     ''' <summary>P1: zaehlt ueber alle `occupied_window`-Constraints in

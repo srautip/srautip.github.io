@@ -340,6 +340,7 @@ lexicographic: true   # Optional, Default TRUE (Nutzerentscheidung) - Code-Revie
 lex_tolerance: 0   # Optional, Default 0 - nur wirksam mit lexicographic: true
 lex_teacher_gaps_stage: false   # Optional, Default false - TeacherGaps-Stufe ist opt-in, siehe unten
 lex_occupied_density_stage: false   # Optional, Default false - Dichte-Stufe fuer occupied_window, siehe unten
+lex_subject_window_stage: false   # Optional, Default false - Fach-Fenster-Stufe fuer subject_period_window, siehe unten
 min_diversity: 0   # Optional, Default 0 - Code-Review-Umsetzung P3, siehe unten
 rehint_found_solutions: true   # Optional, Default true - Code-Review-Umsetzung P3, siehe unten
 later_iterations_gap_limit: null   # Optional, Default nicht gesetzt - Code-Review-Umsetzung P6, siehe unten
@@ -353,8 +354,10 @@ quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe un
   class_load_variance: 3.0
   teacher_load_variance: 3.0
   occupied_density: 5.0   # Optional, Default 5.0 - Code-Review-Umsetzung P1: Gewicht pro unbelegtem occupied_window-Slot
+  subject_window: 5.0   # Optional, Default 5.0 - Rhythmisierung: Gewicht pro Stunde ausserhalb ihres subject_period_window-Bereichs
   include_class_gaps: true   # Optional, Default true - Code-Review-Umsetzung R3
   include_occupied_density: true   # Optional, Default true - P1, strukturelles An/Aus des Dichte-Terms
+  include_subject_window: true   # Optional, Default true - strukturelles An/Aus des Fach-Fenster-Terms
   include_teacher_gaps: true   # Optional, Default true - Phase 2.25-Nachtrag-2, siehe unten
   include_edge_period: true   # Optional, Default true - siehe unten
   include_afternoon_day_count: true   # Optional, Default true - siehe unten
@@ -473,6 +476,14 @@ gibt dem kompakten `occupied_window`-Kriterium denselben Vorteil. Mit
 aktiver Stufe steuert `occupied_density` nur noch das nachgelagerte
 Ranking, nicht mehr die Suche; ohne sie bleibt die Dichte gewichtet in
 der Rest-Zielfunktion abwägbar.
+
+**`lex_subject_window_stage`** (Default `false`): gleiches Muster für
+die Fach-Fenster-Verstöße von should-`subject_period_window`-Regeln
+(Rhythmisierung: "Kernfächer vormittags", "AGs Mo-Do nachmittags") -
+als eigene lexikografische Stufe NACH der Dichte-Stufe und VOR
+ClassGaps wird ihr Minimum als hartes Band fixiert, bevor die
+Gewichte zum Zug kommen. Ohne die Stufe bleiben die Verstöße mit
+`quality_weights.subject_window` in der Rest-Zielfunktion abwägbar.
 
 **`min_diversity`/`rehint_found_solutions`** (Code-Review-Umsetzung P3):
 Werkzeuge für "möglichst VERSCHIEDENE Alternativen statt
@@ -619,8 +630,8 @@ statt der separaten Pro-Klasse-Raster aus `stundenplan.md`.
 **Viewer-Ausbau (siehe `docs/viewer-ausbau-plan.md`):** über dem
 Stundenplan zeigt der Viewer eine **sortierbare Lösungsübersicht** -
 eine Zeile pro Lösung mit dem vollen Qualitätsvektor (Muss/Kann,
-Fenster-Defizit, Springstunden Klassen/Lehrer, Randstunden,
-Nachmittags-Tage, Varianzen, Total). Zeilenklick wählt die Lösung,
+Fenster-Defizit, Fach-Fenster-Verstöße, Springstunden Klassen/Lehrer,
+Randstunden, Nachmittags-Tage, Varianzen, Total). Zeilenklick wählt die Lösung,
 Spaltenkopf sortiert; Kriterien, die per `include_*: false` strukturell
 aus der SUCHE ausgeschlossen waren, erscheinen gedämpft (Tooltip).
 Dazu kommen zwei Auswahl-Werkzeuge:

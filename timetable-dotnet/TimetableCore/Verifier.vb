@@ -284,6 +284,30 @@ Public Module Verifier
                         Next
                     End If
 
+                Case "subject_period_window"
+                    ' Rhythmisierung: unabhaengige Gegenpruefung NUR fuer
+                    ' must-Fenster (keine Stunde des (Klasse,Fach)-Paars
+                    ' darf ausserhalb von days x from..to liegen). Ein
+                    ' should-Fenster ist bewusst KEIN Kann-Constraint,
+                    ' sondern ein Qualitaetskriterium - sein Verstoss wird
+                    ' exakt (und ebenfalls unabhaengig) von ScheduleQuality
+                    ' gezaehlt und erscheint als QualityScore.
+                    ' SubjectWindowCount, nicht hier.
+                    If JsonHelpers.GetPriority(c) = JsonHelpers.PriorityMust Then
+                        Dim spwClass = JsonHelpers.GetString(c, "class")
+                        Dim spwSubject = JsonHelpers.GetString(c, "subject")
+                        Dim spwFrom = JsonHelpers.GetInt(c, "from_period").Value
+                        Dim spwTo = JsonHelpers.GetInt(c, "to_period").Value
+                        Dim spwDaysList = JsonHelpers.AsStringList(c, "days")
+                        Dim spwDays As New HashSet(Of String)(If(spwDaysList.Any(), spwDaysList, allDays))
+                        For Each l In Find(schedule, cls:=spwClass, subject:=spwSubject)
+                            If Not spwDays.Contains(l.Day) OrElse l.Period < spwFrom OrElse l.Period > spwTo Then
+                                violations.Add((i, t, WithReason(
+                                    $"{spwClass}/{spwSubject} findet am {l.Day}/{l.Period} AUSSERHALB des erlaubten Fach-Fensters statt (erlaubt: {String.Join(",", spwDays)} Stunde {spwFrom}..{spwTo})", c)))
+                            End If
+                        Next
+                    End If
+
                 Case "consecutive_required"
                     Dim className = JsonHelpers.GetString(c, "class")
                     Dim subject = JsonHelpers.GetString(c, "subject")
