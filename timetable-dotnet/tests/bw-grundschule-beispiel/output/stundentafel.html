@@ -229,6 +229,29 @@
     font-size: 0.8rem;
     color: #555;
   }
+  /* Viewer-Ausbau Schritt 5: Loesungs-Diff - Zellen, die sich zwischen
+     der gewaehlten und der Vergleichsloesung unterscheiden, bekommen
+     einen deutlichen Rahmen (Inhalt bleibt der der gewaehlten Loesung;
+     der Tooltip zeigt die Belegung der Vergleichsloesung). */
+  td.diff-cell {
+    outline: 3px solid #c2410c;
+    outline-offset: -3px;
+  }
+  #compare-info {
+    margin: 0 0 0.6rem;
+    font-size: 0.85rem;
+    color: #000;
+  }
+  #compare-info .compare-hint {
+    color: #555;
+    font-size: 0.78rem;
+  }
+  #solutions-overview tbody tr.compare {
+    background: #fdf0e5;
+  }
+  #solutions-overview tbody tr.compare.active {
+    background: #dcebff;
+  }
   #convergence-panel {
     margin-bottom: 1rem;
     font-size: 0.85rem;
@@ -254,8 +277,8 @@
   <h1 id="schul-name">Stundentafel</h1>
   <div id="meta"></div>
   <div id="controls">
-    <label for="solution-select">Loesung:</label>
-    <select id="solution-select"></select>
+    <label for="compare-select">Vergleichen mit:</label>
+    <select id="compare-select"></select>
     <div class="dropdown">
       <button type="button" id="stufe-filter-btn" class="dropdown-btn"></button>
       <div id="stufe-filter-menu" class="dropdown-menu" hidden></div>
@@ -269,6 +292,7 @@
     <span id="pareto-count" hidden></span>
   </div>
   <div id="solutions-overview"></div>
+  <div id="compare-info" hidden></div>
   <div id="convergence-panel"></div>
   <div id="table-container"></div>
 
@@ -329,17 +353,99 @@
       }
       window.addEventListener('resize', fitTable);
 
-      var select = document.getElementById('solution-select');
-      data.solutions.forEach(function (sol, i) {
-        var opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = 'Loesung ' + (i + 1) + ': ' + sol.status +
-          ', ' + sol.kann_violation_count + ' Kann-Verstoesse, Quality ' + sol.quality_total.toFixed(1);
-        select.appendChild(opt);
-      });
-      select.addEventListener('change', function () {
-        render(parseInt(select.value, 10));
-      });
+      // Die Loesungsauswahl laeuft ausschliesslich ueber die
+      // Uebersichtstabelle (Zeilenklick, siehe renderOverview) - das
+      // fruehere "Loesung:"-Dropdown ist ersetzt. currentIndex ist die
+      // eine Quelle der Wahrheit fuer die aktuell gewaehlte Loesung und
+      // wird zentral in render() gesetzt.
+      var currentIndex = 0;
+
+      // ---- Loesungs-Diff (Viewer-Ausbau Schritt 5) ---------------------
+      // Zweite Auswahl "Vergleichen mit": markiert im Klassen- UND
+      // Lehrerraster jede Zelle, deren Belegung sich von der
+      // Vergleichsloesung unterscheidet (Inhalt bleibt der der aktuell
+      // gewaehlten Loesung, der Tooltip zeigt die Belegung der
+      // Vergleichsloesung), und zeigt die Slot-Distanz an - dieselbe
+      // Groessenordnung, die min_diversity beim Enumerieren erzwingt.
+      var compareSelect = document.getElementById('compare-select');
+      var compareIndex = null;
+      (function () {
+        var noneOpt = document.createElement('option');
+        noneOpt.value = '';
+        noneOpt.textContent = '- kein Vergleich -';
+        compareSelect.appendChild(noneOpt);
+        data.solutions.forEach(function (sol, i) {
+          var opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = 'Loesung ' + (i + 1);
+          compareSelect.appendChild(opt);
+        });
+        compareSelect.addEventListener('change', function () {
+          compareIndex = compareSelect.value === '' ? null : parseInt(compareSelect.value, 10);
+          render(currentIndex);
+        });
+      })();
+
+      function getCell(sol, klasse, tag, periode) {
+        var perClass = sol.classes[klasse];
+        return perClass && perClass[tag] ? perClass[tag][String(periode)] : null;
+      }
+      function cellSignature(cell) {
+        if (!cell) return '';
+        return (cell.subject || '') + '|' + (cell.teacher || '') + '|' + (cell.room || '');
+      }
+      // Der Vergleich laeuft ueber die tatsaechliche Belegung
+      // (Fach/Lehrkraft/Raum) je (Klasse, Tag, Stunde) - "frei" vs.
+      // "belegt" zaehlt ebenso als Unterschied wie andere Inhalte.
+      function cellsDiffer(solA, solB, klasse, tag, periode) {
+        return cellSignature(getCell(solA, klasse, tag, periode)) !==
+               cellSignature(getCell(solB, klasse, tag, periode));
+      }
+      function computeDiffCount(solA, solB) {
+        var count = 0;
+        var klassen = {};
+        Object.keys(solA.classes).forEach(function (k) { klassen[k] = true; });
+        Object.keys(solB.classes).forEach(function (k) { klassen[k] = true; });
+        Object.keys(klassen).forEach(function (klasse) {
+          data.tage.forEach(function (tag) {
+            for (var p = 1; p <= data.periods_per_day; p++) {
+              if (cellsDiffer(solA, solB, klasse, tag, p)) count++;
+            }
+          });
+        });
+        return count;
+      }
+      function compareTitle(cellB) {
+        if (!cellB) return 'Vergleichsloesung: frei';
+        var text = cellB.subject + (cellB.teacher ? ' (' + cellB.teacher + ')' : '');
+        if (cellB.room) text += ' [' + cellB.room + ']';
+        return 'Vergleichsloesung ' + (compareIndex + 1) + ': ' + text;
+      }
+      function activeCompareSol(solIndex) {
+        if (compareIndex === null || compareIndex === solIndex) return null;
+        return data.solutions[compareIndex];
+      }
+      function updateCompareInfo(solIndex) {
+        var info = document.getElementById('compare-info');
+        var cmp = activeCompareSol(solIndex);
+        if (!cmp) {
+          info.hidden = true;
+          info.innerHTML = '';
+          return;
+        }
+        var diffCount = computeDiffCount(data.solutions[solIndex], cmp);
+        info.hidden = false;
+        info.innerHTML = '';
+        var line = document.createElement('div');
+        line.textContent = 'Vergleich Loesung ' + (solIndex + 1) + ' mit Loesung ' + (compareIndex + 1) +
+          ': ' + diffCount + ' unterschiedlich belegte Slots';
+        info.appendChild(line);
+        var hint = document.createElement('div');
+        hint.className = 'compare-hint';
+        hint.textContent = 'Markierte Zellen unterscheiden sich - der Tooltip zeigt die Belegung der Vergleichsloesung.';
+        info.appendChild(hint);
+      }
+      // ------------------------------------------------------------------
 
       // ---- Loesungsuebersicht (Viewer-Ausbau Schritt 2) ----------------
       // Eine Zeile pro Loesung mit dem vollen Qualitaetsvektor; Klick auf
@@ -530,9 +636,7 @@
             tr.appendChild(td);
           });
           tr.addEventListener('click', function () {
-            var idx = sol.__nr - 1;
-            select.value = idx;
-            render(idx);
+            render(sol.__nr - 1);
           });
           tbody.appendChild(tr);
         });
@@ -543,7 +647,7 @@
         note.className = 'overview-note';
         note.textContent = 'Zeile anklicken = Loesung waehlen; Spaltenkopf anklicken = sortieren. Gedaempfte Spalten waren fuer die Suche strukturell abgeschaltet.';
         container.appendChild(note);
-        updateOverviewActive(parseInt(select.value, 10) || 0);
+        updateOverviewActive(currentIndex);
       }
 
       function updateOverviewActive(solIndex) {
@@ -553,6 +657,7 @@
           var classes = [];
           if (trs[i].getAttribute('data-dominated') === '1') classes.push('dominated');
           if (idx === solIndex) classes.push('active');
+          if (compareIndex !== null && compareIndex !== solIndex && idx === compareIndex) classes.push('compare');
           trs[i].className = classes.join(' ');
         }
       }
@@ -579,7 +684,7 @@
             var v = parseFloat(input.value);
             currentWeights[d.key] = isFinite(v) && v >= 0 ? v : 0;
             renderOverview();
-            updateSummary(parseInt(select.value, 10) || 0);
+            updateSummary(currentIndex);
           });
           weightInputs[d.key] = input;
           row.appendChild(span);
@@ -600,7 +705,7 @@
             weightInputs[d.key].value = schoolWeights[d.key];
           });
           renderOverview();
-          updateSummary(parseInt(select.value, 10) || 0);
+          updateSummary(currentIndex);
         });
         weightsMenu.appendChild(resetBtn);
 
@@ -652,7 +757,7 @@
           stufeVisible[ksIndex] = checkbox.checked;
           updateFilterBtnLabel();
           syncLehrerFilterToStufen();
-          render(parseInt(select.value, 10));
+          render(currentIndex);
         });
         label.appendChild(checkbox);
         label.appendChild(document.createTextNode(ks.bezeichnung));
@@ -742,7 +847,7 @@
         checkbox.addEventListener('change', function () {
           lehrerVisible[t] = checkbox.checked;
           updateLehrerFilterBtnLabel();
-          render(parseInt(select.value, 10));
+          render(currentIndex);
         });
         label.appendChild(checkbox);
         label.appendChild(document.createTextNode(t));
@@ -882,7 +987,20 @@
         });
       }
 
-      function renderLehrerTable(sol) {
+      // Schritt 5: Signatur der Lehrer-Zelle (alle Eintraege sortiert
+      // zusammengefasst) fuer den Diff-Vergleich im Lehrerraster.
+      function teacherEntriesSignature(sol, teacherName, tag, period) {
+        return teacherSlotEntries(sol, teacherName, tag, period).
+          map(function (e) { return e.subject + '|' + e.classes.join(','); }).
+          sort().join(';');
+      }
+      function teacherEntriesText(sol, teacherName, tag, period) {
+        var entries = teacherSlotEntries(sol, teacherName, tag, period);
+        if (entries.length === 0) return 'frei';
+        return entries.map(function (e) { return e.subject + ' (' + e.classes.join(', ') + ')'; }).join('; ');
+      }
+
+      function renderLehrerTable(sol, cmpSol) {
         var container = document.getElementById('lehrer-table-container');
         var visibleTeachers = allTeachers.filter(function (t) { return lehrerVisible[t]; });
         if (visibleTeachers.length === 0) {
@@ -940,6 +1058,10 @@
                   return '<div class="subject">' + e.subject + '</div><div class="teacher">' + e.classes.join(', ') + '</div>';
                 }).join('');
               }
+              if (cmpSol && teacherEntriesSignature(sol, t, tag, period) !== teacherEntriesSignature(cmpSol, t, tag, period)) {
+                td.className += (td.className ? ' ' : '') + 'diff-cell';
+                td.title = 'Vergleichsloesung ' + (compareIndex + 1) + ': ' + teacherEntriesText(cmpSol, t, tag, period);
+              }
               tr.appendChild(td);
             });
           });
@@ -956,15 +1078,21 @@
         var sol = data.solutions[solIndex];
         if (!sol) return;
         var totalLabel = (weightsEnabled && weightsDirty()) ? 'Quality (Total*)' : 'Quality (Total)';
+        // Ohne das fruehere Dropdown traegt die Zusammenfassung die
+        // Kennung der gewaehlten Loesung selbst.
         document.getElementById('solution-summary').textContent =
-          'Muss-Verstoesse: ' + sol.muss_violation_count + ' | Kann-Verstoesse: ' + sol.kann_violation_count +
+          'Loesung ' + (solIndex + 1) + ' (' + sol.status + ')' +
+          ' | Muss-Verstoesse: ' + sol.muss_violation_count + ' | Kann-Verstoesse: ' + sol.kann_violation_count +
           ' | ' + totalLabel + ': ' + displayTotal(sol).toFixed(1);
       }
 
       function render(solIndex) {
+        currentIndex = solIndex;
         var sol = data.solutions[solIndex];
+        var cmpSol = activeCompareSol(solIndex);
         updateSummary(solIndex);
         updateOverviewActive(solIndex);
+        updateCompareInfo(solIndex);
         renderConvergence(sol);
 
         var container = document.getElementById('table-container');
@@ -977,7 +1105,7 @@
           msg.style.padding = '1rem';
           msg.textContent = 'Keine Klassenstufe ausgewaehlt.';
           container.appendChild(msg);
-          renderLehrerTable(sol);
+          renderLehrerTable(sol, cmpSol);
           fitTable();
           return;
         }
@@ -1036,6 +1164,10 @@
                   td.style.backgroundColor = stufeColor(entry.index, rowIndex);
                   td.innerHTML = cellContentHtml(klasse, cell);
                 }
+                if (klasse !== null && cmpSol && cellsDiffer(sol, cmpSol, klasse, tag, period)) {
+                  td.className += (td.className ? ' ' : '') + 'diff-cell';
+                  td.title = compareTitle(getCell(cmpSol, klasse, tag, period));
+                }
                 tr.appendChild(td);
               });
             });
@@ -1047,12 +1179,11 @@
         container.innerHTML = '';
         container.appendChild(table);
         lastTable = table;
-        renderLehrerTable(sol);
+        renderLehrerTable(sol, cmpSol);
         fitTable();
       }
 
       if (data.solutions.length > 0) {
-        select.value = 0;
         renderOverview();
         render(0);
       } else {
