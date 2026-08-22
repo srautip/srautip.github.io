@@ -138,5 +138,16 @@ zweiter, 5 nach Bedarf.
   strukturell abgeschaltete Kriterien, defensiv gegen alte JSONs) -
   per Headless-Chromium-Smoke gegen altes UND neues Schema sowie gegen
   beide regenerierten Beispiele verifiziert.
-- Schritte 3 (Gewichts-Regler), 4 (Pareto-Filter) und 5 (Loesungs-Diff)
-  offen.
+- **Schritt 3 umgesetzt:** Gewichte-Panel mit Zahlenfeld je Kriterium
+  (Start = exportierte Schulgewichte, Reset-Knopf, `Total*`-Markierung
+  bei Abweichung, Hinweis "wirkt nur aufs Ranking"); Total wird live per
+  JS-Duplikat der Score-Formel neu berechnet - beim Laden identisch mit
+  `quality_total` (gegen beide Beispiele auf 0.0 Abweichung geprueft).
+- **Schritt 4 umgesetzt:** Pareto-Filter (gewichtsunabhaengige Dominanz
+  ueber den echten Vektor, dominierte Zeilen abgedunkelt + Tooltip mit
+  dominierender Loesung, Zaehler "n von m Pareto-optimal") - die
+  JS-Dominanz wurde per Headless-Chromium-Interaktionstest gegen eine
+  unabhaengige Python-Nachrechnung verifiziert (Grundschule: 10/30,
+  GMS: 25/28 Pareto-optimal). Neues CLI-Subkommando `render <schule>`
+  baut stundentafel.html ohne Solver-Lauf aus vorhandener JSON neu.
+- Schritt 5 (Loesungs-Diff) offen.

@@ -180,6 +180,55 @@
     color: #555;
     padding: 3px 8px;
   }
+  /* Viewer-Ausbau Schritt 4: dominierte Loesungen werden abgedunkelt
+     statt entfernt (Transparenz: sichtbar bleibt, WAS aussortiert
+     wurde). */
+  #solutions-overview tbody tr.dominated {
+    opacity: 0.42;
+  }
+  /* Viewer-Ausbau Schritt 3: Gewichts-Panel - gleiche Dropdown-Optik wie
+     die bestehenden Filter. */
+  #weights-menu {
+    min-width: 16rem;
+  }
+  #weights-menu .weight-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.15rem 0;
+  }
+  #weights-menu .weight-row input {
+    width: 5.5rem;
+    font: inherit;
+    text-align: right;
+  }
+  #weights-menu .weight-row.muted-crit span {
+    color: #999;
+  }
+  #weights-menu .weights-note {
+    font-size: 0.72rem;
+    color: #555;
+    max-width: 18rem;
+    margin-top: 0.3rem;
+  }
+  #weights-menu .weights-reset {
+    margin-top: 0.4rem;
+    font: inherit;
+    padding: 0.15rem 0.5rem;
+    cursor: pointer;
+  }
+  #pareto-label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  #pareto-count {
+    font-size: 0.8rem;
+    color: #555;
+  }
   #convergence-panel {
     margin-bottom: 1rem;
     font-size: 0.85rem;
@@ -212,6 +261,12 @@
       <div id="stufe-filter-menu" class="dropdown-menu" hidden></div>
     </div>
     <span id="solution-summary"></span>
+    <div class="dropdown">
+      <button type="button" id="weights-btn" class="dropdown-btn" hidden>Gewichte ▾</button>
+      <div id="weights-menu" class="dropdown-menu" hidden></div>
+    </div>
+    <label id="pareto-label" hidden><input type="checkbox" id="pareto-toggle">Pareto-Filter</label>
+    <span id="pareto-count" hidden></span>
   </div>
   <div id="solutions-overview"></div>
   <div id="convergence-panel"></div>
@@ -298,6 +353,81 @@
       function isMuted(includeKey) {
         return qw[includeKey] === false;
       }
+
+      // ---- Gewichts-Regler + Pareto-Filter (Viewer-Ausbau 3+4) ---------
+      // Beide brauchen den vollen Qualitaetsvektor pro Loesung; bei
+      // aelteren stundenplan.json ohne die Felder bleiben Panel und
+      // Filter ausgeblendet (defensiv, wie die '-'-Spalten).
+      var vectorFields = ['muss_violation_count', 'kann_violation_count', 'occupied_density_count',
+        'class_gap_count', 'teacher_gap_count', 'edge_period_count', 'afternoon_day_count',
+        'class_load_variance', 'teacher_load_variance'];
+      var hasFullVector = data.solutions.length > 0 && data.solutions.every(function (s) {
+        return vectorFields.every(function (f) { return s[f] !== undefined && s[f] !== null; });
+      });
+
+      // Schritt 3: Total wird client-seitig aus Vektor x Gewichten neu
+      // berechnet - bewusste, dokumentierte Duplikation der Formel aus
+      // ScheduleQuality.Score, damit der Viewer eine per Doppelklick
+      // oeffenbare statische Datei ohne Server bleibt. Die Regler aendern
+      // NUR das Ranking/die Anzeige der bereits gefundenen Loesungen,
+      // nie die Suche (die lief mit den Schulgewichten bzw. Stufen).
+      var weightDefs = [
+        { key: 'kann', label: 'Kann-Verstoss', field: 'kann_violation_count' },
+        { key: 'class_gaps', label: 'Springstd. Klassen', field: 'class_gap_count', includeKey: 'include_class_gaps' },
+        { key: 'teacher_gaps', label: 'Springstd. Lehrer', field: 'teacher_gap_count', includeKey: 'include_teacher_gaps' },
+        { key: 'occupied_density', label: 'Fenster-Slot frei', field: 'occupied_density_count', includeKey: 'include_occupied_density' },
+        { key: 'edge_period', label: 'Randstunde', field: 'edge_period_count', includeKey: 'include_edge_period' },
+        { key: 'afternoon_day_count', label: 'Nachmittags-Tag', field: 'afternoon_day_count', includeKey: 'include_afternoon_day_count' },
+        { key: 'class_load_variance', label: 'Var. Klassen', field: 'class_load_variance', includeKey: 'include_class_load_variance' },
+        { key: 'teacher_load_variance', label: 'Var. Lehrer', field: 'teacher_load_variance', includeKey: 'include_teacher_load_variance' }
+      ];
+      var weightsEnabled = hasFullVector && !!data.quality_weights;
+      var schoolWeights = {};
+      var currentWeights = {};
+      weightDefs.forEach(function (d) {
+        schoolWeights[d.key] = (typeof qw[d.key] === 'number') ? qw[d.key] : 0;
+        currentWeights[d.key] = schoolWeights[d.key];
+      });
+      function computeTotal(sol, weights) {
+        var total = 0;
+        weightDefs.forEach(function (d) { total += weights[d.key] * sol[d.field]; });
+        return total;
+      }
+      function displayTotal(sol) {
+        return weightsEnabled ? computeTotal(sol, currentWeights) : sol.quality_total;
+      }
+      function weightsDirty() {
+        return weightDefs.some(function (d) { return currentWeights[d.key] !== schoolWeights[d.key]; });
+      }
+
+      // Schritt 4: Dominanz ueber den ECHTEN Vektor (inkl. Muss und der
+      // strukturell abgeschalteten Kriterien), gewichtsunabhaengig - der
+      // Filter ergaenzt die Regler, statt sie zu doppeln. Loesung b
+      // dominiert a, wenn b in ALLEN Feldern <= a und in mindestens
+      // einem < a ist. Einmal berechnet (statische Daten).
+      var dominatedBy = {};
+      if (hasFullVector) {
+        data.solutions.forEach(function (a, i) {
+          for (var j = 0; j < data.solutions.length; j++) {
+            if (i === j) continue;
+            var b = data.solutions[j];
+            var allLe = true;
+            var oneLt = false;
+            for (var f = 0; f < vectorFields.length; f++) {
+              var fa = a[vectorFields[f]];
+              var fb = b[vectorFields[f]];
+              if (fb > fa) { allLe = false; break; }
+              if (fb < fa) oneLt = true;
+            }
+            if (allLe && oneLt) {
+              dominatedBy[i] = j + 1;
+              break;
+            }
+          }
+        });
+      }
+      var paretoActive = false;
+      // ------------------------------------------------------------------
       var overviewColumns = [
         { key: '__nr', label: 'Nr.', txt: true },
         { key: 'status', label: 'Status', txt: true },
@@ -317,6 +447,7 @@
 
       function overviewValue(sol, col) {
         if (col.key === '__nr') return sol.__nr;
+        if (col.key === 'quality_total') return displayTotal(sol);
         return sol[col.key];
       }
       function formatOverviewValue(v, col) {
@@ -355,7 +486,12 @@
           var th = document.createElement('th');
           var arrow = '';
           if (overviewSort.key === col.key) arrow = overviewSort.dir === 1 ? ' ▲' : ' ▼';
-          th.textContent = col.label + arrow;
+          var label = col.label;
+          if (col.key === 'quality_total' && weightsEnabled && weightsDirty()) {
+            label = col.label + '*';
+            th.title = 'Total mit den aktuell eingestellten (vom Schul-Default abweichenden) Gewichten berechnet';
+          }
+          th.textContent = label + arrow;
           if (col.txt) th.className = 'txt';
           if (col.muted) {
             th.className = (th.className ? th.className + ' ' : '') + 'muted-col';
@@ -379,6 +515,10 @@
         rows.forEach(function (sol) {
           var tr = document.createElement('tr');
           tr.setAttribute('data-sol-index', sol.__nr - 1);
+          if (paretoActive && dominatedBy[sol.__nr - 1] !== undefined) {
+            tr.setAttribute('data-dominated', '1');
+            tr.title = 'Dominiert von Loesung ' + dominatedBy[sol.__nr - 1] + ' (in allen Kriterien mindestens gleich gut, in mindestens einem besser)';
+          }
           overviewColumns.forEach(function (col) {
             var td = document.createElement('td');
             td.textContent = formatOverviewValue(overviewValue(sol, col), col);
@@ -410,12 +550,87 @@
         var trs = document.getElementById('solutions-overview').querySelectorAll('tbody tr');
         for (var i = 0; i < trs.length; i++) {
           var idx = parseInt(trs[i].getAttribute('data-sol-index'), 10);
-          if (idx === solIndex) {
-            trs[i].className = 'active';
-          } else {
-            trs[i].className = '';
-          }
+          var classes = [];
+          if (trs[i].getAttribute('data-dominated') === '1') classes.push('dominated');
+          if (idx === solIndex) classes.push('active');
+          trs[i].className = classes.join(' ');
         }
+      }
+
+      // Gewichts-Panel (Schritt 3) aufbauen - nur bei vollem Vektor +
+      // exportierten Gewichten sichtbar.
+      var weightsBtn = document.getElementById('weights-btn');
+      var weightsMenu = document.getElementById('weights-menu');
+      if (weightsEnabled) {
+        weightsBtn.hidden = false;
+        var weightInputs = {};
+        weightDefs.forEach(function (d) {
+          var row = document.createElement('div');
+          row.className = 'weight-row' + (d.includeKey && isMuted(d.includeKey) ? ' muted-crit' : '');
+          var span = document.createElement('span');
+          span.textContent = d.label;
+          if (d.includeKey && isMuted(d.includeKey)) span.title = mutedTitle;
+          var input = document.createElement('input');
+          input.type = 'number';
+          input.min = '0';
+          input.step = 'any';
+          input.value = currentWeights[d.key];
+          input.addEventListener('input', function () {
+            var v = parseFloat(input.value);
+            currentWeights[d.key] = isFinite(v) && v >= 0 ? v : 0;
+            renderOverview();
+            updateSummary(parseInt(select.value, 10) || 0);
+          });
+          weightInputs[d.key] = input;
+          row.appendChild(span);
+          row.appendChild(input);
+          weightsMenu.appendChild(row);
+        });
+        var weightsNote = document.createElement('div');
+        weightsNote.className = 'weights-note';
+        weightsNote.textContent = 'Gewichte wirken nur auf Total/Ranking der bereits gefundenen Loesungen - nicht auf die Suche (die lief mit den Schulgewichten bzw. den lexikografischen Stufen).';
+        weightsMenu.appendChild(weightsNote);
+        var resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'weights-reset';
+        resetBtn.textContent = 'Schulgewichte zuruecksetzen';
+        resetBtn.addEventListener('click', function () {
+          weightDefs.forEach(function (d) {
+            currentWeights[d.key] = schoolWeights[d.key];
+            weightInputs[d.key].value = schoolWeights[d.key];
+          });
+          renderOverview();
+          updateSummary(parseInt(select.value, 10) || 0);
+        });
+        weightsMenu.appendChild(resetBtn);
+
+        weightsBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          weightsMenu.hidden = !weightsMenu.hidden;
+        });
+        document.addEventListener('click', function (e) {
+          if (!weightsMenu.hidden && e.target !== weightsBtn && !weightsMenu.contains(e.target)) {
+            weightsMenu.hidden = true;
+          }
+        });
+      }
+
+      // Pareto-Toggle (Schritt 4) - nur bei vollem Vektor sichtbar.
+      var paretoToggle = document.getElementById('pareto-toggle');
+      var paretoCount = document.getElementById('pareto-count');
+      if (hasFullVector) {
+        document.getElementById('pareto-label').hidden = false;
+        paretoToggle.addEventListener('change', function () {
+          paretoActive = paretoToggle.checked;
+          if (paretoActive) {
+            var dominatedCount = Object.keys(dominatedBy).length;
+            paretoCount.textContent = (data.solutions.length - dominatedCount) + ' von ' + data.solutions.length + ' Loesungen Pareto-optimal';
+            paretoCount.hidden = false;
+          } else {
+            paretoCount.hidden = true;
+          }
+          renderOverview();
+        });
       }
       // ------------------------------------------------------------------
 
@@ -737,11 +952,18 @@
         lastLehrerTable = table;
       }
 
-      function render(solIndex) {
+      function updateSummary(solIndex) {
         var sol = data.solutions[solIndex];
+        if (!sol) return;
+        var totalLabel = (weightsEnabled && weightsDirty()) ? 'Quality (Total*)' : 'Quality (Total)';
         document.getElementById('solution-summary').textContent =
           'Muss-Verstoesse: ' + sol.muss_violation_count + ' | Kann-Verstoesse: ' + sol.kann_violation_count +
-          ' | Quality (Total): ' + sol.quality_total.toFixed(1);
+          ' | ' + totalLabel + ': ' + displayTotal(sol).toFixed(1);
+      }
+
+      function render(solIndex) {
+        var sol = data.solutions[solIndex];
+        updateSummary(solIndex);
         updateOverviewActive(solIndex);
         renderConvergence(sol);
 

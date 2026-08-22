@@ -615,6 +615,37 @@ Schulstunden in Zeilen (unterteilt durch die Parallelklassen a/b/c/...
 jeder Klassenstufe) - eine Gesamtübersicht über alle Klassen zugleich,
 statt der separaten Pro-Klasse-Raster aus `stundenplan.md`.
 
+**Viewer-Ausbau (siehe `docs/viewer-ausbau-plan.md`):** über dem
+Stundenplan zeigt der Viewer eine **sortierbare Lösungsübersicht** -
+eine Zeile pro Lösung mit dem vollen Qualitätsvektor (Muss/Kann,
+Fenster-Defizit, Springstunden Klassen/Lehrer, Randstunden,
+Nachmittags-Tage, Varianzen, Total). Zeilenklick wählt die Lösung,
+Spaltenkopf sortiert; Kriterien, die per `include_*: false` strukturell
+aus der SUCHE ausgeschlossen waren, erscheinen gedämpft (Tooltip).
+Dazu kommen zwei Auswahl-Werkzeuge:
+
+- **Gewichte-Panel:** Zahlenfelder je Kriterium, initialisiert mit den
+  exportierten Schulgewichten; Änderungen berechnen `Total` je Lösung
+  live neu (identische Formel wie `ScheduleQuality.Score`, bewusst als
+  dokumentierte JS-Duplikation, damit der Viewer serverlos bleibt) und
+  sortieren die Übersicht um - abweichende Gewichte markieren die
+  Spalte als `Total*`. Die Regler ändern NUR das Ranking der bereits
+  gefundenen Lösungen, nie die Suche. "Schulgewichte zurücksetzen"
+  stellt den Ausgangszustand wieder her.
+- **Pareto-Filter:** blendet dominierte Lösungen gedämpft ab (statt sie
+  zu entfernen - der Tooltip nennt die dominierende Lösung) und zeigt
+  "n von m Lösungen Pareto-optimal". Dominanz wird gewichtsunabhängig
+  über den ECHTEN Vektor geprüft (inkl. Muss und der strukturell
+  abgeschalteten Kriterien): Lösung B dominiert A, wenn B in allen
+  Kriterien <= und in mindestens einem < ist.
+
+Beide Werkzeuge erscheinen nur, wenn die eingebettete JSON den vollen
+Vektor + `quality_weights` enthält - ältere `stundenplan.json` bleiben
+öffenbar (Spalten zeigen dann `-`). Nach reinen Template-Änderungen am
+Viewer lässt sich `stundentafel.html` ohne neuen Solver-Lauf aus der
+vorhandenen JSON neu bauen:
+`dotnet run --project SchoolTestRunner -- render <schule>`.
+
 **JSON-Feldschema** (Ausschnitt, snake_case):
 ```jsonc
 {
