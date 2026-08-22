@@ -92,6 +92,14 @@ Public NotInheritable Class RunConfig
     ''' Stufe bleibt die Dichte gewichtet in der Rest-Zielfunktion
     ''' (abwaegbar gegen die uebrigen Restkriterien).</summary>
     Public Property LexOccupiedDensityStage As Boolean? = Nothing
+    ''' <summary>Rhythmisierung (opt-in, Nothing -> False): Fach-Fenster-
+    ''' Verstoesse (subject_period_window, should) als eigene
+    ''' lexikografische Stufe nach der Dichte-Stufe und vor ClassGaps -
+    ''' dediziertes Budget + hartes Band fuer "Kernfaecher vormittags"/
+    ''' "AGs nachmittags". Ohne die Stufe bleiben die Verstoesse mit
+    ''' quality_weights.subject_window gewichtet in der Rest-Zielfunktion
+    ''' (abwaegbar gegen die uebrigen Restkriterien).</summary>
+    Public Property LexSubjectWindowStage As Boolean? = Nothing
     ''' <summary>Code-Review-Umsetzung (P3): Mindestanzahl bisher belegter
     ''' Slots, die jede WEITERE Loesung anders belegen muss (echter
     ''' Distanz-Cut statt nur des exakten No-Goods). Nothing/0 = heutiges
@@ -136,6 +144,10 @@ Public NotInheritable Class QualityWeightsConfig
     ''' <summary>P1: Gewicht pro unbelegtem occupied_window-Slot (Default
     ''' 5.0 - siehe ScheduleQuality.WeightOccupiedDensity).</summary>
     Public Property OccupiedDensity As Double? = Nothing
+    ''' <summary>Rhythmisierung: Gewicht pro Unterrichtsstunde ausserhalb
+    ''' ihres subject_period_window-Bereichs (Default 5.0 - siehe
+    ''' ScheduleQuality.WeightSubjectWindow).</summary>
+    Public Property SubjectWindow As Double? = Nothing
     ''' <summary>Phase 2.25-Nachtrag-2: Nothing -&gt; Default True (unveraendertes
     ''' Verhalten). `false` schaltet TeacherGaps strukturell aus SolveTops
     ''' Zielfunktion aus (keine Hilfsvariablen/-Constraints, nicht nur
@@ -153,6 +165,7 @@ Public NotInheritable Class QualityWeightsConfig
     Public Property IncludeClassLoadVariance As Boolean? = Nothing
     Public Property IncludeTeacherLoadVariance As Boolean? = Nothing
     Public Property IncludeOccupiedDensity As Boolean? = Nothing
+    Public Property IncludeSubjectWindow As Boolean? = Nothing
 End Class
 
 Public Module Run
@@ -185,6 +198,7 @@ Public Module Run
         If cfg.ClassLoadVariance.HasValue Then w.ClassLoadVariance = cfg.ClassLoadVariance.Value
         If cfg.TeacherLoadVariance.HasValue Then w.TeacherLoadVariance = cfg.TeacherLoadVariance.Value
         If cfg.OccupiedDensity.HasValue Then w.OccupiedDensity = cfg.OccupiedDensity.Value
+        If cfg.SubjectWindow.HasValue Then w.SubjectWindow = cfg.SubjectWindow.Value
         If cfg.IncludeTeacherGaps.HasValue Then w.IncludeTeacherGaps = cfg.IncludeTeacherGaps.Value
         If cfg.IncludeClassGaps.HasValue Then w.IncludeClassGaps = cfg.IncludeClassGaps.Value
         If cfg.IncludeEdgePeriod.HasValue Then w.IncludeEdgePeriod = cfg.IncludeEdgePeriod.Value
@@ -192,6 +206,7 @@ Public Module Run
         If cfg.IncludeClassLoadVariance.HasValue Then w.IncludeClassLoadVariance = cfg.IncludeClassLoadVariance.Value
         If cfg.IncludeTeacherLoadVariance.HasValue Then w.IncludeTeacherLoadVariance = cfg.IncludeTeacherLoadVariance.Value
         If cfg.IncludeOccupiedDensity.HasValue Then w.IncludeOccupiedDensity = cfg.IncludeOccupiedDensity.Value
+        If cfg.IncludeSubjectWindow.HasValue Then w.IncludeSubjectWindow = cfg.IncludeSubjectWindow.Value
         Return w
     End Function
 
@@ -318,6 +333,7 @@ Public Module Run
         Dim lexTolerance = If(cfg.LexTolerance, 0)
         Dim lexTeacherGapsStage = If(cfg.LexTeacherGapsStage, False)
         Dim lexOccupiedDensityStage = If(cfg.LexOccupiedDensityStage, False)
+        Dim lexSubjectWindowStage = If(cfg.LexSubjectWindowStage, False)
         Dim minDiversity = If(cfg.MinDiversity, 0)
         Dim rehintFoundSolutions = If(cfg.RehintFoundSolutions, True)
         Dim stage1TimeLimitS = If(cfg.Stage1TimeLimitS, 60.0)
@@ -328,6 +344,7 @@ Public Module Run
             relativeGapLimit:=cfg.RelativeGapLimit,
             lexicographic:=lexicographic, lexTolerance:=lexTolerance, lexTeacherGapsStage:=lexTeacherGapsStage,
             lexOccupiedDensityStage:=lexOccupiedDensityStage,
+            lexSubjectWindowStage:=lexSubjectWindowStage,
             minDiversity:=minDiversity, rehintFoundSolutions:=rehintFoundSolutions,
             laterIterationsGapLimit:=cfg.LaterIterationsGapLimit)
         Dim solveOk = topResult.Solutions.Count > 0

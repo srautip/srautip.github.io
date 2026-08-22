@@ -1003,6 +1003,85 @@ Public Class SolverTests
         StringAssert.Contains(errors(1), "liegt nicht vollstaendig in 1..4")
     End Sub
 
+    ''' <summary>Rhythmisierung: ein must-subject_period_window erzwingt
+    ''' alle Stunden des (Klasse,Fach)-Paars hart in den erlaubten
+    ''' Bereich days x from..to - inklusive der Tages-Dimension: der
+    ''' zweite Tag (Di) steht nicht in `days` und liegt damit
+    ''' VOLLSTAENDIG ausserhalb, beide Mathe-Stunden muessen auf Mo/1..2
+    ''' landen. Das freie Fach (Kunst) bleibt unbeschraenkt.</summary>
+    <TestMethod>
+    Public Sub SubjectPeriodWindowMustForcesSubjectIntoWindow()
+        Dim data = Scenario(Mini({"5a"}, {"T1", "T2"}, {"Mathe", "Kunst"}, {}, {"Mo", "Di"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Kunst"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T2"}, {"class", "5a"}, {"subject", "Kunst"}},
+            New JsonObject From {{"type", "no_overlap"}, {"resource", "class"}, {"entity", "5a"}},
+            New JsonObject From {{"type", "subject_period_window"}, {"class", "5a"}, {"subject", "Mathe"},
+                                 {"days", New JsonArray("Mo")}, {"from_period", 1}, {"to_period", 2}}
+        })
+        Dim result = Solver.Solve(data)
+        Assert.IsTrue(IsFeasibleOrOptimal(result.Status))
+        Dim matheSlots = result.Schedule.Where(Function(l) l.Subject = "Mathe").
+            Select(Function(l) (l.Day, l.Period)).OrderBy(Function(s) s.Period).ToList()
+        Assert.AreEqual(2, matheSlots.Count)
+        Assert.IsTrue(matheSlots.All(Function(s) s.Day = "Mo" AndAlso s.Period >= 1 AndAlso s.Period <= 2),
+            "Alle Mathe-Stunden muessen im Fenster Mo/1..2 liegen, tatsaechlich: " &
+            String.Join(", ", matheSlots.Select(Function(s) $"{s.Day}/{s.Period}")))
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Schedule).Count)
+    End Sub
+
+    ''' <summary>Rhythmisierung: der Verifier prueft subject_period_window/
+    ''' must unabhaengig nach - ein OHNE die Regel geloester Plan wird
+    ''' gegen ein nachtraeglich ergaenztes 1..1-Fenster geprueft; jede
+    ''' Mathe-Stunde ausserhalb von Periode 1 ist genau ein Verstoss
+    ''' (2 Stunden auf 2 verschiedenen Perioden -> mindestens einer).</summary>
+    <TestMethod>
+    Public Sub VerifierDetectsSubjectPeriodWindowViolationIndependently()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim result = Solver.Solve(data)
+        Assert.IsTrue(IsFeasibleOrOptimal(result.Status))
+
+        Dim withWindow = data.DeepClone().AsObject()
+        withWindow("constraints").AsArray().Add(New JsonObject From {
+            {"type", "subject_period_window"}, {"class", "5a"}, {"subject", "Mathe"}, {"from_period", 1}, {"to_period", 1}})
+        Dim expected = result.Schedule.Where(Function(l) l.Subject = "Mathe" AndAlso l.Period <> 1).Count()
+        Assert.IsTrue(expected >= 1, "2 Stunden auf verschiedenen Perioden - mindestens eine liegt ausserhalb 1..1.")
+        Dim violations = Verifier.VerifySchedule(withWindow, result.Schedule)
+        Assert.AreEqual(expected, violations.Count, String.Join(vbLf, violations))
+        For Each v In violations
+            StringAssert.Contains(v, "AUSSERHALB des erlaubten Fach-Fensters")
+        Next
+    End Sub
+
+    ''' <summary>Rhythmisierung: Validierung inkonsistenter
+    ''' subject_period_window-Regeln - from &gt; to, Fenster ausserhalb
+    ''' des Periodenrasters, unbekannter Tag und ein (Klasse,Fach)-Paar
+    ''' ohne teacher_subject_assignment sind harte Fehler (sonst stille
+    ''' No-Ops im Solver/Objective). Eine konsistente should-Regel
+    ''' erzeugt dagegen keinen Fehler (Kann-faehiger Typ).</summary>
+    <TestMethod>
+    Public Sub ValidationRejectsInconsistentSubjectPeriodWindow()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe", "Kunst"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "subject_period_window"}, {"class", "5a"}, {"subject", "Mathe"}, {"from_period", 3}, {"to_period", 2}},
+            New JsonObject From {{"type", "subject_period_window"}, {"class", "5a"}, {"subject", "Mathe"}, {"from_period", 2}, {"to_period", 9}},
+            New JsonObject From {{"type", "subject_period_window"}, {"class", "5a"}, {"subject", "Mathe"}, {"from_period", 1}, {"to_period", 2}, {"days", New JsonArray("Fr")}},
+            New JsonObject From {{"type", "subject_period_window"}, {"class", "5a"}, {"subject", "Kunst"}, {"from_period", 1}, {"to_period", 2}},
+            New JsonObject From {{"type", "subject_period_window"}, {"class", "5a"}, {"subject", "Mathe"}, {"from_period", 1}, {"to_period", 2}, {"priority", "should"}}
+        })
+        Dim errors = Validation.ValidateEntities(data)
+        Assert.AreEqual(4, errors.Count, String.Join(vbLf, errors))
+        StringAssert.Contains(errors(0), "from_period=3 > to_period=2")
+        StringAssert.Contains(errors(1), "liegt nicht vollstaendig in 1..4")
+        StringAssert.Contains(errors(2), "day='Fr' ist kein Tag")
+        StringAssert.Contains(errors(3), "ohne zugehoerige teacher_subject_assignment")
+    End Sub
+
     ' --- shared helpers ---
 
     Private Shared Function IsFeasibleOrOptimal(status As CpSolverStatus) As Boolean

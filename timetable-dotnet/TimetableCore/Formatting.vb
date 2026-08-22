@@ -214,6 +214,7 @@ Public Module Formatting
                 {"muss_violation_count", Verifier.VerifySchedule(data, sol.Schedule).Count},
                 {"quality_total", sol.Quality.Total},
                 {"occupied_density_count", sol.Quality.OccupiedDensityCount},
+                {"subject_window_count", sol.Quality.SubjectWindowCount},
                 {"class_gap_count", sol.Quality.ClassGapCount},
                 {"teacher_gap_count", sol.Quality.TeacherGapCount},
                 {"edge_period_count", sol.Quality.EdgePeriodCount},
@@ -244,13 +245,15 @@ Public Module Formatting
                 {"class_load_variance", w.ClassLoadVariance},
                 {"teacher_load_variance", w.TeacherLoadVariance},
                 {"occupied_density", w.OccupiedDensity},
+                {"subject_window", w.SubjectWindow},
                 {"include_class_gaps", w.IncludeClassGaps},
                 {"include_teacher_gaps", w.IncludeTeacherGaps},
                 {"include_edge_period", w.IncludeEdgePeriod},
                 {"include_afternoon_day_count", w.IncludeAfternoonDayCount},
                 {"include_class_load_variance", w.IncludeClassLoadVariance},
                 {"include_teacher_load_variance", w.IncludeTeacherLoadVariance},
-                {"include_occupied_density", w.IncludeOccupiedDensity}
+                {"include_occupied_density", w.IncludeOccupiedDensity},
+                {"include_subject_window", w.IncludeSubjectWindow}
             }},
             {"solutions", solutionsJson}
         }

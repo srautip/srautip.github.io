@@ -446,6 +446,72 @@ unbekannte `days`-Einträge sind harte Fehler.
 
 ---
 
+### `subject_period_window` (Rhythmisierung)
+
+Das FACH-bezogene Gegenstück zu `occupied_window`: EIN Constraint-Objekt
+beschreibt den erlaubten Zeitbereich für alle Stunden eines
+(Klasse,Fach)-Paars - das Kreuzprodukt `days` × `from_period..to_period`
+(Default-`days`: alle Tage). Wichtig: ein Tag, der nicht in `days` steht,
+liegt VOLLSTÄNDIG außerhalb - "Sport-AG nur Mo-Do nachmittags" heißt
+also automatisch auch: nicht freitags. Typische Rhythmisierungs-Fälle:
+Nachmittagsfächer (AGs, Wahlpflicht, Profilfach, Lernzeiten) in die
+Nachmittagsblöcke Mo-Do; Kernfächer (Mathe, Deutsch) bevorzugt in den
+Vormittagsblock.
+
+Die beiden Prioritäten verhalten sich bewusst unterschiedlich (gleiches
+Muster wie `occupied_window`):
+
+- **`must`**: jeder Slot außerhalb des Bereichs wird hart verboten
+  (`lesson = 0`) - wie ein fach-bezogenes `forbidden_slot` pro
+  Außen-Slot, nur als ein Objekt. Der Verifier prüft jede Stunde des
+  Paars unabhängig nach.
+- **`should`**: erzeugt KEINE Kann-Verletzungs-BoolVars. Stattdessen
+  zählt jede außerhalb platzierte Stunde im Qualitätskriterium
+  **SubjectWindow** - eine reine Linearsumme direkt über die ohnehin
+  existierenden Lesson-Variablen (keine einzige zusätzliche Variable,
+  nicht einmal Scaffolding). Gewicht: `quality_weights.subject_window`
+  (Default 5.0), strukturell abschaltbar per
+  `include_subject_window: false`, optional als eigene lexikografische
+  Stufe per `lex_subject_window_stage: true` (nach der Dichte-Stufe,
+  vor ClassGaps). Der exakte Zähler erscheint nachgelagert als
+  `QualityScore.SubjectWindowCount` (bzw. `subject_window_count` im
+  `stundenplan.json`-Export), NICHT als Kann-Verstoß. Konsequenz: im
+  reinen `Solver.Solve`-Pfad hat ein should-Fenster keine Wirkung - es
+  ist ein `SolveTop`-Qualitätskriterium.
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `class` | string | ja |
+| `subject` | string | ja |
+| `from_period` | int | ja |
+| `to_period` | int | ja (>= `from_period`) |
+| `days` | string[] | nein (Default: alle Tage) |
+| `priority` | `"must"`\|`"should"` | nein |
+| `reason` | string | nein |
+
+```json
+{ "type": "subject_period_window", "class": "5a", "subject": "Mathematik",
+  "from_period": 1, "to_period": 6, "priority": "should",
+  "reason": "Kernfach bevorzugt im Vormittagsblock" }
+```
+
+```json
+{ "type": "subject_period_window", "class": "5a", "subject": "Sport-AG",
+  "days": ["Mo", "Di", "Mi", "Do"], "from_period": 7, "to_period": 8,
+  "priority": "must",
+  "reason": "AG nur in den Nachmittagsbloecken Mo-Do, nicht freitags" }
+```
+
+Validierung (Fail-Fast): unbekannte Klasse/Fach, (Klasse,Fach)-Paar ohne
+`teacher_subject_assignment`, `from_period > to_period`, Fenster
+außerhalb `1..periods_per_day` und unbekannte `days`-Einträge sind harte
+Fehler. Zu beachten bei `must`: bietet der erlaubte Bereich weniger
+Slots als `hours_per_week` (oder kollidiert er mit
+`consecutive_required`-Blöcken), wird das Szenario unlösbar - das ist
+gewollt (harte Regel), für Präferenzen `should` verwenden.
+
+---
+
 ### `consecutive_required`
 
 Ein Fach muss an jedem Tag, an dem es stattfindet, als zusammenhängender

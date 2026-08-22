@@ -464,9 +464,17 @@
       // Beide brauchen den vollen Qualitaetsvektor pro Loesung; bei
       // aelteren stundenplan.json ohne die Felder bleiben Panel und
       // Filter ausgeblendet (defensiv, wie die '-'-Spalten).
+      // subject_window_count kam nachtraeglich dazu (Rhythmisierung:
+      // subject_period_window-Constraint). Fehlt das Feld, stammt die
+      // JSON aus einer Zeit, in der der Constraint-Typ nicht existierte -
+      // 0 ist dann der KORREKTE Wert (nicht "unbekannt"), deshalb wird
+      // er normalisiert statt die Vektor-Features zu deaktivieren.
+      data.solutions.forEach(function (s) {
+        if (s.subject_window_count === undefined || s.subject_window_count === null) s.subject_window_count = 0;
+      });
       var vectorFields = ['muss_violation_count', 'kann_violation_count', 'occupied_density_count',
-        'class_gap_count', 'teacher_gap_count', 'edge_period_count', 'afternoon_day_count',
-        'class_load_variance', 'teacher_load_variance'];
+        'subject_window_count', 'class_gap_count', 'teacher_gap_count', 'edge_period_count',
+        'afternoon_day_count', 'class_load_variance', 'teacher_load_variance'];
       var hasFullVector = data.solutions.length > 0 && data.solutions.every(function (s) {
         return vectorFields.every(function (f) { return s[f] !== undefined && s[f] !== null; });
       });
@@ -482,6 +490,7 @@
         { key: 'class_gaps', label: 'Springstd. Klassen', field: 'class_gap_count', includeKey: 'include_class_gaps' },
         { key: 'teacher_gaps', label: 'Springstd. Lehrer', field: 'teacher_gap_count', includeKey: 'include_teacher_gaps' },
         { key: 'occupied_density', label: 'Fenster-Slot frei', field: 'occupied_density_count', includeKey: 'include_occupied_density' },
+        { key: 'subject_window', label: 'Fach-Fenster-Verstoss', field: 'subject_window_count', includeKey: 'include_subject_window' },
         { key: 'edge_period', label: 'Randstunde', field: 'edge_period_count', includeKey: 'include_edge_period' },
         { key: 'afternoon_day_count', label: 'Nachmittags-Tag', field: 'afternoon_day_count', includeKey: 'include_afternoon_day_count' },
         { key: 'class_load_variance', label: 'Var. Klassen', field: 'class_load_variance', includeKey: 'include_class_load_variance' },
@@ -540,6 +549,7 @@
         { key: 'muss_violation_count', label: 'Muss' },
         { key: 'kann_violation_count', label: 'Kann' },
         { key: 'occupied_density_count', label: 'Fenster frei', muted: isMuted('include_occupied_density') },
+        { key: 'subject_window_count', label: 'Fach-Fenster', muted: isMuted('include_subject_window') },
         { key: 'class_gap_count', label: 'Springstd. Kl.', muted: isMuted('include_class_gaps') },
         { key: 'teacher_gap_count', label: 'Springstd. Lehrer', muted: isMuted('include_teacher_gaps') },
         { key: 'edge_period_count', label: 'Randstd.', muted: isMuted('include_edge_period') },

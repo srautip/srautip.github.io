@@ -522,6 +522,8 @@ Public Module Solver
                     ApplyOccupiedSlot(model, c, ci, priority, sessions, lesson, kannVars)
                 Case "occupied_window"
                     ApplyOccupiedWindow(model, c, priority, sessions, lesson, days)
+                Case "subject_period_window"
+                    ApplySubjectPeriodWindow(model, c, priority, sessions, lesson, days, periods)
                 Case "consecutive_required"
                     ApplyConsecutiveRequired(model, c, ci, priority, sessions, lesson, days, periods, kannVars)
                 Case "teacher_subject_assignment", "room_requirement", "parallel_group"
@@ -843,6 +845,46 @@ Public Module Solver
         Next
     End Sub
 
+    ''' <summary>Rhythmisierung: fach-bezogenes Zeitfenster - der erlaubte
+    ''' Bereich fuer alle Stunden des (Klasse,Fach)-Paars ist das
+    ''' Kreuzprodukt `days x from_period..to_period` (Default-days: alle
+    ''' Tage). Ein Tag, der nicht in `days` steht, liegt VOLLSTAENDIG
+    ''' ausserhalb - "Sport-AG nur Mo-Do nachmittags" heisst also auch:
+    ''' nicht freitags. `must` verbietet jeden Slot ausserhalb hart
+    ''' (lesson = 0, wie ein fach-scoped forbidden_slot je Aussen-Slot).
+    ''' `should` erzeugt - dem occupied_window/P1-Muster folgend -
+    ''' BEWUSST KEINE Kann-BoolVars: die Fenster-Verstoesse fliessen als
+    ''' reine Linearsumme ueber die ohnehin existierenden
+    ''' Lesson-Variablen in SolveTops Zielfunktion ein
+    ''' (SolveTopObjective.BuildQualityTerms, QualityWeights.
+    ''' SubjectWindow) und werden nachgelagert exakt als
+    ''' QualityScore.SubjectWindowCount gezaehlt. Konsequenz: ein
+    ''' should-subject_period_window hat im reinen Solve()/BuildModel-
+    ''' Pfad (Kann-only-Objective) keine Wirkung - es ist ein
+    ''' SolveTop-Qualitaetskriterium.</summary>
+    Private Sub ApplySubjectPeriodWindow(model As CpModel, c As JsonObject, priority As String,
+                                          sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                          days As List(Of String), periods As List(Of Integer))
+        If priority = JsonHelpers.PriorityShould Then Return
+
+        Dim className = JsonHelpers.GetString(c, "class")
+        Dim subject = JsonHelpers.GetString(c, "subject")
+        Dim fromPeriod = JsonHelpers.GetInt(c, "from_period").Value
+        Dim toPeriod = JsonHelpers.GetInt(c, "to_period").Value
+        Dim windowDaysList = JsonHelpers.AsStringList(c, "days")
+        Dim windowDays As New HashSet(Of String)(If(windowDaysList.Any(), windowDaysList, days))
+
+        For Each s In sessions.Where(Function(x) x.ClassName = className AndAlso x.Subject = subject)
+            For Each d In days
+                For Each p In periods
+                    If Not windowDays.Contains(d) OrElse p < fromPeriod OrElse p > toPeriod Then
+                        model.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)) = 0)
+                    End If
+                Next
+            Next
+        Next
+    End Sub
+
     Private Sub ApplyConsecutiveRequired(model As CpModel, c As JsonObject, ci As Integer, priority As String,
                                           sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
                                           days As List(Of String), periods As List(Of Integer),
@@ -1113,6 +1155,7 @@ Public Module Solver
                               Optional lexTolerance As Integer = 0,
                               Optional lexTeacherGapsStage As Boolean = False,
                               Optional lexOccupiedDensityStage As Boolean = False,
+                              Optional lexSubjectWindowStage As Boolean = False,
                               Optional minDiversity As Integer = 0,
                               Optional rehintFoundSolutions As Boolean = True,
                               Optional laterIterationsGapLimit As Double? = Nothing) As MultiSolveResult
@@ -1166,6 +1209,11 @@ Public Module Solver
             ' Stufe 1, ClassGaps folgte) und damit dem Verhalten, gegen das
             ' der Vergleich gemessen wurde.
             If lexOccupiedDensityStage AndAlso terms.OccupiedDensitySum IsNot Nothing Then stageExprs.Add(terms.OccupiedDensitySum)
+            ' Fach-Fenster-Stufe (opt-in, gleiches Muster wie die
+            ' Dichte-Stufe): fixiert die minimale Zahl von Stunden
+            ' ausserhalb ihrer subject_period_window-Bereiche als hartes
+            ' Band, bevor ClassGaps optimiert wird.
+            If lexSubjectWindowStage AndAlso terms.SubjectWindowSum IsNot Nothing Then stageExprs.Add(terms.SubjectWindowSum)
             If terms.ClassGapsSum IsNot Nothing Then stageExprs.Add(terms.ClassGapsSum)
             If lexTeacherGapsStage AndAlso terms.TeacherGapsSum IsNot Nothing Then stageExprs.Add(terms.TeacherGapsSum)
 
@@ -1192,7 +1240,8 @@ Public Module Solver
             ' ObjectiveValue/Bound-Semantik.
             Dim finalObjective = SolveTopObjective.WeightedResidual(terms, weights,
                 teacherGapsInResidual:=Not lexTeacherGapsStage,
-                occupiedDensityInResidual:=Not lexOccupiedDensityStage)
+                occupiedDensityInResidual:=Not lexOccupiedDensityStage,
+                subjectWindowInResidual:=Not lexSubjectWindowStage)
             If finalObjective Is Nothing Then finalObjective = SolveTopObjective.WeightedTotal(terms, weights)
             If finalObjective IsNot Nothing Then built.Model.Minimize(finalObjective)
         Else
