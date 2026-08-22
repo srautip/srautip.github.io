@@ -150,4 +150,12 @@ zweiter, 5 nach Bedarf.
   unabhaengige Python-Nachrechnung verifiziert (Grundschule: 10/30,
   GMS: 25/28 Pareto-optimal). Neues CLI-Subkommando `render <schule>`
   baut stundentafel.html ohne Solver-Lauf aus vorhandener JSON neu.
-- Schritt 5 (Loesungs-Diff) offen.
+- **Schritt 5 umgesetzt:** "Vergleichen mit"-Auswahl - Diff-Markierung
+  abweichender Zellen im Klassen- UND Lehrerraster (Tooltip zeigt die
+  Belegung der Vergleichsloesung), Slot-Distanz-Anzeige,
+  Vergleichszeilen-Markierung in der Uebersicht. Per Chromium-
+  Interaktionstest verifiziert: die angezeigte Distanz (8 Slots
+  zwischen Loesung 1 und 2 der Grundschule) trifft die unabhaengige
+  Python-Nachrechnung exakt - und entspricht genau dem
+  min_diversity=8-Cut der Enumeration. Damit ist der Plan vollstaendig
+  umgesetzt.

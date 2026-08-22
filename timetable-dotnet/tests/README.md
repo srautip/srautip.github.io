@@ -639,9 +639,20 @@ Dazu kommen zwei Auswahl-Werkzeuge:
   abgeschalteten Kriterien): Lösung B dominiert A, wenn B in allen
   Kriterien <= und in mindestens einem < ist.
 
-Beide Werkzeuge erscheinen nur, wenn die eingebettete JSON den vollen
-Vektor + `quality_weights` enthält - ältere `stundenplan.json` bleiben
-öffenbar (Spalten zeigen dann `-`). Nach reinen Template-Änderungen am
+- **Lösungs-Diff ("Vergleichen mit"):** eine zweite Auswahl legt eine
+  Vergleichslösung fest - im Klassen- UND Lehrerraster wird jede Zelle
+  markiert, deren Belegung sich unterscheidet (der Inhalt bleibt der der
+  gewählten Lösung, der Tooltip zeigt die Belegung der
+  Vergleichslösung), darüber steht die Slot-Distanz ("n unterschiedlich
+  belegte Slots" - dieselbe Größenordnung, die `min_diversity` beim
+  Enumerieren erzwingt). Die Vergleichszeile ist in der
+  Lösungsübersicht farblich markiert.
+
+Gewichte-Panel und Pareto-Filter erscheinen nur, wenn die eingebettete
+JSON den vollen Vektor + `quality_weights` enthält - ältere
+`stundenplan.json` bleiben öffenbar (Spalten zeigen dann `-`; der
+Lösungs-Diff funktioniert auch mit älteren Dateien). Nach reinen
+Template-Änderungen am
 Viewer lässt sich `stundentafel.html` ohne neuen Solver-Lauf aus der
 vorhandenen JSON neu bauen:
 `dotnet run --project SchoolTestRunner -- render <schule>`.
