@@ -196,11 +196,12 @@ dessen Abhängigkeitsoberfläche minimal bleibt (siehe 8.7).
 |---|---|---|
 | **Models.vb** | `JsonHelpers` (Zugriff auf das rohe `System.Text.Json.Nodes`-JSON, Python-`dict.get`-artig statt starrem Typmodell - minimiert Übersetzungsrisiko beim Portieren), Muss/Kann-Konstanten, Kursstufe-Zugriffshelfer (`GetKurse`/`GetSchienen`). | - |
 | **Validation.vb** | Deterministische Vorab-Prüfung: harte Cross-Reference-Fehler (unbekannte Entity-Referenz) vs. weiche Coverage-Warnungen (fehlende `no_overlap`-Regel). `ValidateKursstufeEntities` erweitert das um Kurs-/Schienen-/Wahlprofil-Konsistenz. | Models.vb |
-| **Solver.vb** | CP-SAT-Modellbau (`BuildCoreModel`/`BuildModel`/`ApplyConstraints`/`AddBlockConstraint`) und -Lösung (`Solve`, `SolveTop`, `SolveKursstufe`). Größtes Modul - bewusst der einzige Ort, der `model.Add(...)` für die inzwischen 13 klassenbasierten Constraint-Typen aufruft (u.a. `parallel_group` seit Phase 2.20, `required_slot` seit 2.23, `occupied_window` seit Code-Review P1, `subject_period_window` für die Rhythmisierung - vollständige Liste in `json-constraints-reference.md`). Seit der Code-Review-Umsetzung P2 ist `lexicographic:=True` der `SolveTop`-Default: statt einer gewichteten Gesamtsumme werden Stufen nacheinander optimiert und jeweils als hartes Band (`<= opt + lexTolerance`) fixiert - Kann → (Dichte, opt-in `lexOccupiedDensityStage`) → (Fach-Fenster, opt-in `lexSubjectWindowStage`) → ClassGaps → (TeacherGaps, opt-in) - der gewichtete Rest bildet die letzte Stufe; `lexicographic:=False` liefert weiterhin den früheren Ein-Summen-Modus. P3 ergänzt `minDiversity` (Distanz-Cuts: jede weitere Lösung muss sich in mindestens n Belegungen unterscheiden, statt nur per No-Good "nicht identisch" zu sein), `laterIterationsGapLimit` erlaubt späteren Iterationen ein früheres Abbrechen bei akzeptierter Optimalitätslücke. Phase 2.22: `SolveTop`s Iterationsschleife übergibt einen `CpSolverSolutionCallback` an `Solve()`, der jede gefundene Verbesserung (Zeit + Objective) aufzeichnet; `ScoredSolution` trägt zusätzlich `ObjectiveValue`/`BestObjectiveBound` (die Optimalitäts-Lücke) mit. Phase 2.25: `SolveWithStagnationCutoff` löst jede Iteration auf einem separaten `Task`, pollt periodisch gegen die `ConvergenceCallback`-Historie und ruft `solver.StopSearch()` (dokumentiert cross-thread-sicher), sobald `stagnationTimeoutS` (Default 45s, standardmäßig aktiv) ohne neue Verbesserung verstrichen ist - die gesparte Zeit steht der nächsten `SolveTop`-Iteration zur Verfügung, statt eine stehende Suche bis zum Zeitlimit weiterlaufen zu lassen (`StagnationTriggeredCount` macht sichtbar, ob/wie oft das griff). `diversifySeed`/`randomizeSearch` streuen aufeinanderfolgende Iterationen zusätzlich, bleiben aber für denselben Basis-`seed` deterministisch. | Models.vb, Validation.vb, Verifier.vb (für `SolveTop`s Kann-Neuberechnung), ScheduleQuality.vb, SolveTopObjective.vb, Kursblockung.vb, Schienenraster.vb, Raumzuordnung.vb |
+| **Solver.vb** | CP-SAT-Modellbau (`BuildCoreModel`/`BuildModel`/`ApplyConstraints`/`AddBlockConstraint`) und -Lösung (`Solve`, `SolveTop`, `SolveKursstufe`). Größtes Modul - bewusst der einzige Ort, der `model.Add(...)` für die inzwischen 13 klassenbasierten Constraint-Typen aufruft (u.a. `parallel_group` seit Phase 2.20, `required_slot` seit 2.23, `occupied_window` seit Code-Review P1, `subject_period_window` für die Rhythmisierung - vollständige Liste in `json-constraints-reference.md`). Seit der Code-Review-Umsetzung P2 ist `lexicographic:=True` der `SolveTop`-Default: statt einer gewichteten Gesamtsumme werden Stufen nacheinander optimiert und jeweils als hartes Band (`<= opt + lexTolerance`) fixiert - Kann → (Dichte, opt-in `lexOccupiedDensityStage`) → (Fach-Fenster, opt-in `lexSubjectWindowStage`) → ClassGaps → (TeacherGaps, opt-in) - der gewichtete Rest bildet die letzte Stufe; `lexicographic:=False` liefert weiterhin den früheren Ein-Summen-Modus. P3 ergänzt `minDiversity` (Distanz-Cuts: jede weitere Lösung muss sich in mindestens n Belegungen unterscheiden, statt nur per No-Good "nicht identisch" zu sein), `laterIterationsGapLimit` erlaubt späteren Iterationen ein früheres Abbrechen bei akzeptierter Optimalitätslücke. Phase 2.22: `SolveTop`s Iterationsschleife übergibt einen `CpSolverSolutionCallback` an `Solve()`, der jede gefundene Verbesserung (Zeit + Objective) aufzeichnet; `ScoredSolution` trägt zusätzlich `ObjectiveValue`/`BestObjectiveBound` (die Optimalitäts-Lücke) mit. Phase 2.25: `SolveRunner.RunSolve` (seit dem Abbruchkanal in `SolveControl.vb`, siehe 8.11 - vorher `SolveWithStagnationCutoff`) löst jede Iteration auf einem separaten `Task`, pollt periodisch gegen die `ConvergenceCallback`-Historie und ruft `solver.StopSearch()` (dokumentiert cross-thread-sicher), sobald `stagnationTimeoutS` (Default 45s, standardmäßig aktiv) ohne neue Verbesserung verstrichen ist - die gesparte Zeit steht der nächsten `SolveTop`-Iteration zur Verfügung, statt eine stehende Suche bis zum Zeitlimit weiterlaufen zu lassen (`StagnationTriggeredCount` macht sichtbar, ob/wie oft das griff). `diversifySeed`/`randomizeSearch` streuen aufeinanderfolgende Iterationen zusätzlich, bleiben aber für denselben Basis-`seed` deterministisch. | Models.vb, Validation.vb, Verifier.vb (für `SolveTop`s Kann-Neuberechnung), ScheduleQuality.vb, SolveTopObjective.vb, Kursblockung.vb, Schienenraster.vb, Raumzuordnung.vb |
 | **Verifier.vb** | Unabhängiger Solution-Checker - teilt bewusst KEINEN Code mit Solver.vb (siehe 8.2). `VerifySchedule`/`VerifyScheduleDetailed` (Muss/Kann getrennt), `VerifyKursblockung` (Stufe-A-Ergebnis unabhängig re-prüfen), `VerifyLehrereinsatz`. Phase 2.20 ergänzt einen unabhängig re-derivierten `parallel_group`-Check plus eine Gruppen-bewusste `VerifyLehrereinsatz`-Erweiterung (alle real umspannten Klassen einer Gruppe müssen vom selben Lehrer unterrichtet werden). | Models.vb |
 | **Formatting.vb** | Rohes `ScheduleEntry`-Ergebnis → Klassen-/Lehrer-/Wahlprofil-Raster (`GridCell`), ASCII-Tabellen, JSON-Export. Reine Präsentationsschicht, keine GUI-Abhängigkeit. Seit Phase 2.20 kollisionsbewusst: mehrere gleichzeitige Sessions derselben Klasse (Parallelgruppe) werden in `ToClassGrids` zu einer kombinierten Zelle zusammengeführt statt einander zu überschreiben. Phase 2.21 ergänzt `ToStundentafelJson` (Klassenstufen-/Parallelklassen-gruppierter Multi-Lösungs-Export für den SchoolTestRunner) - erste Stelle, an der `Formatting.vb` `Verifier.vb` aufruft (pro Lösung ein unabhängiger Muss-Verstoß-Recheck). Phase 2.22: `ToStundentafelJson` exportiert pro Lösung zusätzlich `objective_value`/`best_objective_bound`/`gap_percent` (Optimalitäts-Lücke) und `convergence` (Zeit-vs-Objective-Verlauf). Viewer-Ausbau: der Export trägt den vollen Qualitätsvektor + `quality_weights` je Lösung (Grundlage für Sortierung, Gewichte-Regler und Pareto-Filter im Viewer, siehe 8.10); `ToStundentafelJsonMulti` (Mehr-Zuteilungs-Modus, siehe 6.8) fasst mehrere `AssignmentRun`s (je: Stammdaten-abgeleitetes Szenario + `MultiSolveResult` + Zuteilungs-Index) zu EINEM Export mit global nach Qualität sortierten Lösungen zusammen und exportiert `teacher_equivalence_classes` (nur Klassen mit ≥2 Mitgliedern) für die Tausch-Anzeige. | Models.vb, Verifier.vb |
 | **LlmExtraction.vb** | Freitext → strukturierte Constraints via Ollama/Qwen. Ein Call pro Constraint-Typ mit eigenem JSON-Schema; `period_exception` wird deterministisch zu `forbidden_slot`-Einträgen expandiert (`ExpandPeriodException`); `DropContradictoryConsecutiveRequired` als deterministisches Sicherheitsnetz gegen unmögliche Block-Kombinationen. | Models.vb |
 | **ScheduleQuality.vb** | Post-hoc-Bewertungsschema für Kandidaten-Stundenpläne, 9 Kriterien (Kann-Verstöße, Klassen-/Lehrer-Lücken, Randstunden, Nachmittags-Tage, Klassen-/Lehrer-Tagesausgewogenheit, Dichte-Defizit `OccupiedDensity` für should-`occupied_window`, Fenster-Verstöße `SubjectWindow` für should-`subject_period_window`) - unabhängig von der CP-SAT-Modellierung, dient als "Wahrheit" für `SolveTop`s Endsortierung. `QualityWeights` (Phase 2.24 über `SchoolTestRunner/Run.vb`s `config.yaml` konfigurierbar, siehe `tests/README.md`) gewichtet jedes Kriterium; seit Phase 2.25-Nachtrag-2 sind `ClassGaps`/`TeacherGaps`-Gewicht mit `Kann` vereinheitlicht (früher war `ClassGaps` bewusst 10x höher gewichtet - Live-Experimente zeigten, dass nicht das Gewicht, sondern `TeacherGaps`' CP-SAT-Kodierung die eigentliche Ursache schlecht beweisbarer Lösungsschranken war, siehe `docs/phase2-25-stagnation-heuristik.md` Nachtrag 2). Neues `IncludeTeacherGaps`-Flag (Default `true`) - ein Sicherheitsventil, das den Aufbau der `TeacherGaps`-Hilfskonstrukte im CP-SAT-Modell komplett unterdrücken kann. | Models.vb |
+| **SolveControl.vb** | Querschnittlicher Abbruch- und Fortschrittskanal (siehe 8.11): die öffentlichen Typen `SolvePhase`/`SolveProgress` und der gemeinsame Ausführungspfad `SolveRunner.RunSolve`, über den seither JEDER Solve-Aufruf des Kerns läuft - Fast-Path ohne Token/Progress unverändert direkt und blockierend, sonst `Task` + 500ms-Polling mit `solver.StopSearch()`. `StageProgressAdapter` etikettiert die Meldungen verketteter Aufrufe (`SolveKursstufe`, `SolveCombinedSchool`) auf die Sicht des Gesamtlaufs um. Keine UI-Abhängigkeit: `CancellationToken` und `IProgress(Of T)` sind BCL-Typen. | Solver.vb (für `ConvergenceCallback`) |
 | **SolveTopObjective.vb** | Baut dieselben Bewertungskriterien zusätzlich direkt ins CP-SAT-Modell (`Friend`, nur von `Solver.SolveTop` genutzt), damit die Suche selbst dorthin gelenkt wird, statt nur die gefundenen Kandidaten hinterher zu sortieren: Randstunden/Nachmittags-Tage/Tagesausgewogenheit über eine CP-SAT-freundliche Näherung (Spannweite statt echter Varianz, teils weiterhin über den Sentinel-Min/Max-Trick, siehe 9). `ClassGaps`/`TeacherGaps` nutzen seit Phase 2.25-Nachtrag-2 `BuildGapFlags` - eine Big-M-freie Kodierung (Präfix/Suffix-OR-Ketten `anyBefore`/`anyAfter` + lineare Reifikation jeder einzelnen Lücken-PERIODE als eigene `BoolVar`), die die vorherige `AddMinEquality`/`AddMaxEquality`-Sentinel-Konstruktion ersetzt, siehe 9. `BuildGapFlags` wird für Lehrkräfte nur aufgerufen, wenn `QualityWeights.IncludeTeacherGaps = True` ist (strukturelles Abschalten, nicht nur Gewicht 0). `BuildQualityTerms` liefert die Stufen-Terme (`KannSum`/`OccupiedDensitySum`/`SubjectWindowSum`/`ClassGapsSum`/`TeacherGapsSum`) einzeln an `SolveTop`s lexikografischen Modus; `OccupiedDensitySum`/`SubjectWindowSum` sind reine Linearsummen über ohnehin existierende Variablen (keine zusätzlichen Verletzungs-BoolVars - der Kern von P1). | Models.vb |
 | **Kursblockung.vb** | Kursstufe Stufe A: Kurs→Schiene-Zuordnung (CP-SAT-Teilmodell, eigenständig, kein Tag/Periode-Bezug). | Models.vb |
 | **Schienenraster.vb** | Kursstufe Stufe B: Schiene→Tag/Periode. Konstruiert ein synthetisches Szenario und ruft `Solver.Solve()` unverändert auf. | Models.vb |
@@ -603,6 +604,14 @@ reproduzierbar dieselbe Lösung - Grundlage sowohl für
 Determinismus-Regressionstests als auch für nachvollziehbares
 Nutzerverhalten ("derselbe Input liefert denselben Plan").
 
+Zwei Einschränkungen, beide zeitgesteuert und daher naturgemäß nicht
+reproduzierbar: der Stagnations-Cutoff (8.5-Nachtrag zu Phase 2.25) und
+ein Abbruch per `CancellationToken` (8.11) beenden eine Suche nach
+Wanduhrzeit statt nach Suchzustand. Der Aufrufpfad **ohne** Token und
+ohne `IProgress` ist davon nicht berührt - er läuft unverändert direkt
+und blockierend, und genau darauf zielt der Test
+`DefaultCallPathUnchangedAndDeterministic`.
+
 ### 8.6 Wiederverwendung durch synthetische Szenario-Konstruktion
 
 Ein durchgängiges Architekturmuster seit Phase 2.11: statt `Solver.vb`
@@ -700,6 +709,87 @@ vorhergesagt). Verteilungs-Detail siehe 7: die generierten Seiten
 werden als GitHub-Pages-Kopien (main-Stand) und als Claude-Artifacts
 (Zwischenstände) bereitgestellt.
 
+### 8.11 Abbruch und Fortschritt
+
+Jeder langlaufende Einstiegspunkt des Kerns nimmt zwei zusätzliche
+optionale Parameter entgegen:
+
+```vb
+Optional cancellationToken As CancellationToken = Nothing,
+Optional progress As IProgress(Of SolveProgress) = Nothing
+```
+
+Betroffen sind alle neun: `Solve`, `SolveTop`, `SolveKursstufe`,
+`SolveKlassenbildung`, `SolveKlassenbildungTop`, `SolveKursblockung`,
+`SolveLehrereinsatz`, `SolveLehrereinsatzTop`, `SolveCombinedSchool`.
+Motiv ist die GUI (Phase 3): ein GMS-Lauf mit
+`solve_time_limit_s: 1200` lief vorher 20 Minuten ohne Lebenszeichen
+und ohne Abbruchmöglichkeit.
+
+**Ein gemeinsamer Ausführungspfad.** `SolveRunner.RunSolve`
+(`SolveControl.vb`) ist die verallgemeinerte Fassung von Phase 2.25s
+`SolveWithStagnationCutoff`: dieselbe Task-plus-500ms-Polling-Schleife,
+jetzt zusätzlich um Abbruch und Fortschritt erweitert - und von *allen*
+Solve-Stellen benutzt statt nur von der `SolveTop`-Iterationsschleife.
+`solver.StopSearch()` bleibt der Abbruchmechanismus (in 2.25a
+cross-thread live verifiziert).
+
+**Der Pfad ohne Token und ohne Progress ist unverändert.** `RunSolve`
+erkennt diesen Fall und ruft `solver.Solve(model)` direkt und
+blockierend auf dem aufrufenden Thread - kein `Task`, kein Polling.
+Das hält die Zusage aus 8.5 (`numWorkers:=1` + fester `seed` =
+reproduzierbar dieselbe Lösung) und verhindert, dass sich die
+Benchmark-Laufzeiten verschieben. Ein bereits gesetztes Token wird noch
+vor dem Modellbau erkannt; der Aufruf rechnet dann gar nichts.
+
+**Abbruch wirft nicht, sondern liefert das Teilergebnis.** Das
+entspricht dem etablierten Stagnations-Cutoff (früh stoppen, Bestes
+behalten) und der Konvention des Kerns, Fehlerzustände als
+Ergebnisobjekte zu liefern statt als Exception (vgl. 8.1). Konkret:
+`MultiSolveStopReason` hat den Wert `Cancelled`, alle übrigen
+Ergebnistypen tragen ein `Cancelled As Boolean`. Ein abgebrochenes
+`SolveKlassenbildungTop` gibt die bereits fertigen Varianten zurück,
+ein abgebrochenes `SolveTop` die bereits gefundenen Lösungen -
+weiterhin nach `Quality.Total` sortiert. Erfolgt der Abbruch in der
+Vorphase (lexikographische Stufen, Warmstart), ist `Solutions` **leer**,
+ohne dass das Szenario unlösbar wäre - Aufrufer dürfen aus einer leeren
+Liste bei `Cancelled` also nicht auf Unlösbarkeit schließen (anders als
+bei `SearchSpaceExhausted`). Fällt ein Abbruch mit dem Erreichen von
+`maxSolutions` zusammen, gewinnt `MaxSolutionsReached`: die Suche wäre
+ohnehin zu Ende gewesen.
+
+**Gemeldet wird ausschließlich vom aufrufenden Thread.**
+`OnSolutionCallback` läuft auf einem CP-SAT-Workerthread *innerhalb* des
+nativen SWIG-Aufrufs; fremden Handler-Code von dort zu rufen wäre
+doppelt riskant (eine Exception propagierte über die native Grenze, und
+ein langsamer Handler bremste die Suche). `ConvergenceCallback` sammelt
+deshalb weiterhin nur Datenpunkte - threadsicher unter einer Sperre,
+inklusive `BestObjectiveBound()` für die Live-Optimalitätslücke - und
+die Polling-Schleife liest den Stand und meldet ihn. Jeder
+`Report`-Aufruf ist zusätzlich in `Try/Catch` gekapselt: ein fehlerhafter
+GUI-Handler darf keinen laufenden Solve abbrechen. `IProgress(Of T)` und
+nicht ein Event, weil `Progress(Of T)` den `SynchronizationContext` beim
+Konstruieren einfängt und selbsttätig auf den UI-Thread marshallt -
+ein Event feuerte auf dem Pollingthread und löste in WinForms sofort
+eine Cross-Thread-Exception aus. `ConvergenceCallback` bleibt bewusst
+`Friend`: sie öffentlich zu machen hieße, den OrTools-Basistyp
+`CpSolverSolutionCallback` in den GUI-Vertrag zu heben und Aufrufern zu
+erlauben, beliebigen Code auf den CP-SAT-Thread zu legen.
+
+Verkettete Einstiegspunkte (`SolveKursstufe`, `SolveCombinedSchool`)
+rechnen nicht selbst, sondern reichen Token und Progress durch. Damit
+die Anzeige dabei nicht je Stufe auf 0 zurückspringt, etikettiert
+`StageProgressAdapter` die Meldungen der inneren Aufrufe auf die Sicht
+des Gesamtlaufs um ("Stufe 2 von 4", durchlaufende Uhr).
+
+Getestet wird ohne jede Timing-Annahme (`CancellationProgressTests.vb`,
+`KlassenbildungCancellationTests.vb`): Abbruch wird entweder vorab
+gesetzt oder deterministisch aus einem **synchron** aufgerufenen
+`IProgress` ausgelöst - möglich, weil `RunSolve` beim Phasenstart
+garantiert einmal meldet, unabhängig von der Solve-Dauer. Zu jedem
+Abbruchtest gehört eine Gegenprobe, die belegt, dass dasselbe Szenario
+ohne Token tatsächlich lösbar ist.
+
 ## 9. Architekturentscheidungen
 
 Ausgewählte, besonders folgenreiche Entscheidungen (ausführliche
@@ -769,7 +859,8 @@ Qualität
 | **Viewer-JS-Formel-Duplikate können vom VB-Kern divergieren**, wenn eine Formel nur auf einer Seite geändert wird. | Akzeptiertes, aktiv verifiziertes Risiko: Chromium-Interaktionstests prüfen die Duplikate zeichengleich gegen den VB-Export (siehe 8.10); der nächste CLI-Lauf bleibt in jedem Fall die Ground Truth, ein divergenter Viewer kann also fehlleiten, aber kein falsches Endergebnis erzeugen. |
 | **Klassenbildung: Konfliktkern-Analyse (Plan K6) und Re-Solve aus dem Viewer (UI-Konzept U5) offen.** Bei kollidierenden harten Regeln/Fixierungen meldet der Lauf nur Infeasible ohne Benennung des minimalen Konfliktkerns; der Viewer-Loop läuft über YAML-Export + erneuten CLI-Lauf. | Offen, in `docs/klassenbildung-plan.md` bzw. `docs/klassenbildung-ui-konzept.md` als nächste Ausbaustufen beschrieben; das UI ist so geschnitten, dass U5 nur den Export-Teil ersetzt. |
 | **`klassen`-Läufe sind trotz festem Seed nicht run-zu-run-stabil** (Wandzeit-Limits beeinflussen, welche Varianten im ε-Band gefunden werden - beobachtet: Konsens-Kern 27 vs. 54 von 100 bei identischem Input). | Bekannt und in 6.9 dokumentiert; die Zielwerte akzeptierter Varianten liegen stets im ε-Band, der Konsens-Kern ist als Arbeitshilfe (Bulk-Fixierung), nicht als stabile Kennzahl zu lesen. |
-| **GUI (Phase 3) noch nicht begonnen.** | Geplant, nachgelagert unter Windows; der Kern ist bereits GUI-unabhängig entworfen (siehe 4, 7). |
+| **Ein abgebrochenes `SolveTop` kann ein LEERES `Solutions` liefern** (Abbruch während der lexikographischen Vorphase, bevor die erste Lösung existiert) - ununterscheidbar von "nichts gefunden", wenn ein Aufrufer nur die Listenlänge prüft. | Bewusste Semantik, in 8.11 und am Enum-Wert `MultiSolveStopReason.Cancelled` dokumentiert: `StopReason` unterscheidet den Fall eindeutig von `SearchSpaceExhausted`. Die GUI muss den Leerfall behandeln. |
+| **GUI (Phase 3) noch nicht begonnen.** | Der Kern ist GUI-unabhängig entworfen (siehe 4, 7) und seit 8.11 zusätzlich abbrechbar und beobachtbar - die Voraussetzung für eine bedienbare Oberfläche steht damit. Die Oberfläche selbst ist weiterhin geplant, nachgelagert unter Windows. |
 
 ## 12. Glossar
 

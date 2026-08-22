@@ -14,6 +14,8 @@
 '   bzw. excess >= diff - tol UND excess >= -diff - tol) statt
 '   AddAbsEquality - unter Minimierung exakt, und im harten Modus
 '   direkt als Korridor -tol <= diff <= tol formuliert.
+Imports System.Diagnostics
+Imports System.Threading
 Imports Google.OrTools.Sat
 
 ''' <summary>Ein Kind - nur Pseudonym-ID plus frei definierbare
@@ -118,6 +120,8 @@ Public NotInheritable Class KlassenbildungResult
     Public Property Objective As Double
     Public Property Zuordnung As Dictionary(Of String, Integer)
     Public Property Verletzungen As List(Of KlassenbildungVerletzung)
+    ''' <summary>Abbruch durch den Aufrufer (arc42 8.11).</summary>
+    Public Property Cancelled As Boolean
 End Class
 
 ''' <summary>K3 (Konzept Abschnitt 8): Ergebnis der Varianten-Schleife -
@@ -129,6 +133,12 @@ End Class
 Public NotInheritable Class KlassenbildungTopResult
     Public Property Varianten As List(Of KlassenbildungResult)
     Public Property KonsensKern As List(Of String)
+    ''' <summary>Abbruch durch den Aufrufer (arc42 8.11). Varianten enthaelt
+    ''' die bis dahin fertig gerechneten - eine abgebrochene Suche nach
+    ''' Variante 3 wirft die Varianten 1 und 2 also NICHT weg. Der
+    ''' KonsensKern ist dann folgerichtig nur ueber diese Teilmenge
+    ''' gebildet.</summary>
+    Public Property Cancelled As Boolean
 End Class
 
 ''' <summary>Das fertig gebaute (ungeloeste) Modell samt allem, was die
@@ -373,12 +383,24 @@ Public Module Klassenbildung
                                          Optional seed As Integer = 42,
                                          Optional numWorkers As Integer = 1,
                                          Optional prioGewichte As Dictionary(Of Integer, Long) = Nothing,
-                                         Optional symmetriebrechung As Boolean = True) As KlassenbildungResult
+                                         Optional symmetriebrechung As Boolean = True,
+                                         Optional cancellationToken As CancellationToken = Nothing,
+                                         Optional progress As IProgress(Of SolveProgress) = Nothing) As KlassenbildungResult
+        If cancellationToken.IsCancellationRequested Then
+            Return New KlassenbildungResult With {.Status = CpSolverStatus.Unknown, .Cancelled = True}
+        End If
+
         Dim modell = BuildKlassenbildungModell(input, prioGewichte, symmetriebrechung)
         Dim solver As New CpSolver()
         solver.StringParameters = $"max_time_in_seconds:{zeitlimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
-        Dim status = solver.Solve(modell.Model)
-        Return ExtractKlassenbildungResult(input, modell, solver, status)
+        Dim sw = Stopwatch.StartNew()
+        Dim cb As ConvergenceCallback = If(progress Is Nothing, Nothing, New ConvergenceCallback())
+        Dim run = SolveRunner.RunSolve(modell.Model, solver, cb,
+                                       SolveRunner.SingleStage(SolvePhase.Iteration, "Klassen werden gebildet",
+                                                               zeitlimitS, cancellationToken, progress, sw))
+        Dim ergebnis = ExtractKlassenbildungResult(input, modell, solver, run.Status)
+        ergebnis.Cancelled = run.Cancelled
+        Return ergebnis
     End Function
 
     ''' <summary>K3 (Konzept 8.1): Optimum + Diversifikations-Schleife auf
@@ -401,21 +423,50 @@ Public Module Klassenbildung
                                             Optional symmetriebrechung As Boolean = True,
                                             Optional nVarianten As Integer = 3,
                                             Optional epsilon As Double = 0.05,
-                                            Optional minDistanz As Integer = 8) As KlassenbildungTopResult
+                                            Optional minDistanz As Integer = 8,
+                                            Optional cancellationToken As CancellationToken = Nothing,
+                                            Optional progress As IProgress(Of SolveProgress) = Nothing) As KlassenbildungTopResult
+        If cancellationToken.IsCancellationRequested Then
+            Return New KlassenbildungTopResult With {.Varianten = New List(Of KlassenbildungResult)(),
+                                                     .KonsensKern = New List(Of String)(), .Cancelled = True}
+        End If
+
         Dim modell = BuildKlassenbildungModell(input, prioGewichte, symmetriebrechung)
         Dim varianten As New List(Of KlassenbildungResult)
+        Dim gesamt = Math.Max(nVarianten, 1)
+        Dim sw = Stopwatch.StartNew()
+        Dim abgebrochen = False
 
-        For iteration = 0 To Math.Max(nVarianten, 1) - 1
+        For iteration = 0 To gesamt - 1
+            If cancellationToken.IsCancellationRequested Then
+                abgebrochen = True
+                Exit For
+            End If
             Dim solver As New CpSolver()
             solver.StringParameters = $"max_time_in_seconds:{zeitlimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
-            Dim status = solver.Solve(modell.Model)
+            Dim cb As ConvergenceCallback = If(progress Is Nothing, Nothing, New ConvergenceCallback())
+            Dim run = SolveRunner.RunSolve(modell.Model, solver, cb,
+                SolveRunner.Options(Nothing, cancellationToken, progress,
+                    New SolveProgress With {.Phase = SolvePhase.Variante, .PhaseIndex = iteration + 1,
+                                            .PhaseCount = gesamt, .SolutionsFound = varianten.Count,
+                                            .BudgetS = zeitlimitS * gesamt,
+                                            .Label = $"Variante {iteration + 1} von {gesamt} wird gerechnet"},
+                    sw))
+            Dim status = run.Status
             Dim ok = status = CpSolverStatus.Optimal OrElse status = CpSolverStatus.Feasible
+            If run.Cancelled Then abgebrochen = True
             If Not ok Then
-                If iteration = 0 Then varianten.Add(New KlassenbildungResult With {.Status = status})
+                ' Bei Abbruch OHNE Zwischenergebnis keinen Fehlschlag-Status
+                ' als Variante 1 einreihen - das waere als "unloesbar"
+                ' fehlzudeuten. Der Abbruch steht in .Cancelled.
+                If iteration = 0 AndAlso Not abgebrochen Then
+                    varianten.Add(New KlassenbildungResult With {.Status = status})
+                End If
                 Exit For
             End If
             Dim variante = ExtractKlassenbildungResult(input, modell, solver, status)
             varianten.Add(variante)
+            If abgebrochen Then Exit For
 
             ' Qualitaetsschranke nach der ersten Variante (nur wenn es
             ' ueberhaupt eine Zielfunktion gibt).
@@ -445,7 +496,8 @@ Public Module Klassenbildung
                 If geloeste.All(Function(v) v.Zuordnung(s.Id) = erste) Then konsens.Add(s.Id)
             Next
         End If
-        Return New KlassenbildungTopResult With {.Varianten = varianten, .KonsensKern = konsens}
+        Return New KlassenbildungTopResult With {.Varianten = varianten, .KonsensKern = konsens,
+                                                 .Cancelled = abgebrochen}
     End Function
 
     ''' <summary>Modellbau (mechanisch aus SolveKlassenbildung

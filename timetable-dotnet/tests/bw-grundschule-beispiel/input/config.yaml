@@ -14,7 +14,7 @@ solve_time_limit_s: 180.0
 # Anzahl paralleler CP-SAT-Suchpfade (Portfolio-Threading). Hoeher kann
 # helfen, ueberhaupt schneller eine erste Loesung zu finden, geht aber zu
 # Lasten der pro Suchpfad verfuegbaren Zeit.
-num_workers: 4
+num_workers: 2
 
 # Begrenzt (getrennt von solve_time_limit_s) jede EINZELNE Solve-
 # Iteration in Solver.SolveTop. Nutzervorgabe: 3 Min - damit deckt eine

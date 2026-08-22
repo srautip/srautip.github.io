@@ -36,6 +36,8 @@
 ' existing 3-stage design, not a bug in this module; a dedicated test
 ' documents it rather than letting it surface as a surprise later.
 Imports System.Text.Json.Nodes
+Imports System.Diagnostics
+Imports System.Threading
 Imports Google.OrTools.Sat
 
 Public Enum SolveOrder
@@ -52,6 +54,9 @@ Public NotInheritable Class CombinedSolveResult
     ''' concatenation of SekISchedule and KursstufeResult.Schedule, ready
     ''' to pass to BuildMergedVerificationScenario's caller.</summary>
     Public Property CombinedSchedule As List(Of ScheduleEntry)
+    ''' <summary>Abbruch durch den Aufrufer (arc42 8.11). Wie weit die Kette
+    ''' kam, zeigen SekIStatus/KursstufeResult wie im Fehlerfall auch.</summary>
+    Public Property Cancelled As Boolean
 End Class
 
 Public Module CombinedSchool
@@ -78,16 +83,31 @@ Public Module CombinedSchool
                                          Optional order As SolveOrder = SolveOrder.SekIFirst,
                                          Optional timeLimitS As Double = 30.0,
                                          Optional seed As Integer = 42,
-                                         Optional numWorkers As Integer = 1) As CombinedSolveResult
-        If order = SolveOrder.KursstufeFirst Then
-            Return SolveKursstufeFirst(sekIData, kursstufeData, timeLimitS, seed, numWorkers)
+                                         Optional numWorkers As Integer = 1,
+                                         Optional cancellationToken As CancellationToken = Nothing,
+                                         Optional progress As IProgress(Of SolveProgress) = Nothing) As CombinedSolveResult
+        If cancellationToken.IsCancellationRequested Then
+            Return New CombinedSolveResult With {.Order = order, .SekIStatus = CpSolverStatus.Unknown, .Cancelled = True}
         End If
-        Return SolveSekIFirst(sekIData, kursstufeData, timeLimitS, seed, numWorkers)
+        If order = SolveOrder.KursstufeFirst Then
+            Return SolveKursstufeFirst(sekIData, kursstufeData, timeLimitS, seed, numWorkers, cancellationToken, progress)
+        End If
+        Return SolveSekIFirst(sekIData, kursstufeData, timeLimitS, seed, numWorkers, cancellationToken, progress)
     End Function
 
     Private Function SolveKursstufeFirst(sekIData As JsonObject, kursstufeData As JsonObject,
-                                          timeLimitS As Double, seed As Integer, numWorkers As Integer) As CombinedSolveResult
-        Dim kursResult = Solver.SolveKursstufe(kursstufeData, timeLimitS, seed, numWorkers)
+                                          timeLimitS As Double, seed As Integer, numWorkers As Integer,
+                                          ct As CancellationToken, progress As IProgress(Of SolveProgress)) As CombinedSolveResult
+        ' Zwei Aussenstufen (die Kursstufe buendelt ihre eigenen drei intern).
+        Dim sw = Stopwatch.StartNew()
+        Dim gesamt = timeLimitS * 4.0
+
+        Dim kursResult = Solver.SolveKursstufe(kursstufeData, timeLimitS, seed, numWorkers, ct,
+            StageProgressAdapter.Wrap(progress, SolvePhase.Stufe, 1, 2, "Kursstufe", sw, gesamt))
+        If kursResult.Cancelled Then
+            Return New CombinedSolveResult With {.Order = SolveOrder.KursstufeFirst, .KursstufeResult = kursResult,
+                                                 .Cancelled = True}
+        End If
         If kursResult.Schedule Is Nothing Then
             Return New CombinedSolveResult With {.Order = SolveOrder.KursstufeFirst, .KursstufeResult = kursResult}
         End If
@@ -114,7 +134,12 @@ Public Module CombinedSchool
             Next
         Next
 
-        Dim sekIResult = Solver.Solve(clonedSekI, timeLimitS, seed, numWorkers)
+        Dim sekIResult = Solver.Solve(clonedSekI, timeLimitS, seed, numWorkers, ct,
+            StageProgressAdapter.Wrap(progress, SolvePhase.Stufe, 2, 2, "Sek I", sw, gesamt))
+        If sekIResult.Cancelled Then
+            Return New CombinedSolveResult With {.Order = SolveOrder.KursstufeFirst, .KursstufeResult = kursResult,
+                                                 .SekIStatus = sekIResult.Status, .Cancelled = True}
+        End If
         Dim combined As List(Of ScheduleEntry) = Nothing
         If sekIResult.Status = CpSolverStatus.Optimal OrElse sekIResult.Status = CpSolverStatus.Feasible Then
             combined = sekIResult.Schedule.Concat(kursResult.Schedule).ToList()
@@ -126,8 +151,17 @@ Public Module CombinedSchool
     End Function
 
     Private Function SolveSekIFirst(sekIData As JsonObject, kursstufeData As JsonObject,
-                                     timeLimitS As Double, seed As Integer, numWorkers As Integer) As CombinedSolveResult
-        Dim sekIResult = Solver.Solve(sekIData, timeLimitS, seed, numWorkers)
+                                     timeLimitS As Double, seed As Integer, numWorkers As Integer,
+                                     ct As CancellationToken, progress As IProgress(Of SolveProgress)) As CombinedSolveResult
+        Dim sw = Stopwatch.StartNew()
+        Dim gesamt = timeLimitS * 4.0
+
+        Dim sekIResult = Solver.Solve(sekIData, timeLimitS, seed, numWorkers, ct,
+            StageProgressAdapter.Wrap(progress, SolvePhase.Stufe, 1, 4, "Sek I", sw, gesamt))
+        If sekIResult.Cancelled Then
+            Return New CombinedSolveResult With {.Order = SolveOrder.SekIFirst, .SekIStatus = sekIResult.Status,
+                                                 .Cancelled = True}
+        End If
         If sekIResult.Status <> CpSolverStatus.Optimal AndAlso sekIResult.Status <> CpSolverStatus.Feasible Then
             Return New CombinedSolveResult With {.Order = SolveOrder.SekIFirst, .SekIStatus = sekIResult.Status}
         End If
@@ -137,7 +171,14 @@ Public Module CombinedSchool
         Dim teacherBusy = BusySlotsFor(sekIResult.Schedule, sharedTeachers, Function(e) e.Teacher)
         Dim roomBusy = BusySlotsFor(sekIResult.Schedule, sharedRooms, Function(e) e.Room)
 
-        Dim kb = Kursblockung.SolveKursblockung(kursstufeData, timeLimitS, seed, numWorkers)
+        Dim kb = Kursblockung.SolveKursblockung(kursstufeData, timeLimitS, seed, numWorkers, ct,
+            StageProgressAdapter.Wrap(progress, SolvePhase.Stufe, 2, 4, "Kursblockung", sw, gesamt))
+        If kb.Cancelled Then
+            Return New CombinedSolveResult With {
+                .Order = SolveOrder.SekIFirst, .SekIStatus = sekIResult.Status, .SekISchedule = sekIResult.Schedule,
+                .KursstufeResult = New KursstufeSolveResult With {.KursblockungStatus = kb.Status, .Cancelled = True},
+                .Cancelled = True}
+        End If
         If kb.Status <> CpSolverStatus.Optimal AndAlso kb.Status <> CpSolverStatus.Feasible Then
             Return New CombinedSolveResult With {
                 .Order = SolveOrder.SekIFirst, .SekIStatus = sekIResult.Status, .SekISchedule = sekIResult.Schedule,
@@ -146,7 +187,16 @@ Public Module CombinedSchool
         End If
 
         Dim schienenScenario = Schienenraster.BuildSchienenrasterScenario(kursstufeData, kb.Assignment, teacherBusy)
-        Dim schienenResult = Solver.Solve(schienenScenario, timeLimitS, seed, numWorkers)
+        Dim schienenResult = Solver.Solve(schienenScenario, timeLimitS, seed, numWorkers, ct,
+            StageProgressAdapter.Wrap(progress, SolvePhase.Stufe, 3, 4, "Schienenraster", sw, gesamt))
+        If schienenResult.Cancelled Then
+            Return New CombinedSolveResult With {
+                .Order = SolveOrder.SekIFirst, .SekIStatus = sekIResult.Status, .SekISchedule = sekIResult.Schedule,
+                .KursstufeResult = New KursstufeSolveResult With {.KursblockungStatus = kb.Status,
+                                                                 .SchienenrasterStatus = schienenResult.Status,
+                                                                 .Cancelled = True},
+                .Cancelled = True}
+        End If
         If schienenResult.Status <> CpSolverStatus.Optimal AndAlso schienenResult.Status <> CpSolverStatus.Feasible Then
             Return New CombinedSolveResult With {
                 .Order = SolveOrder.SekIFirst, .SekIStatus = sekIResult.Status, .SekISchedule = sekIResult.Schedule,
@@ -156,10 +206,17 @@ Public Module CombinedSchool
 
         Dim raumScenario = Raumzuordnung.BuildRaumzuordnungScenario(kursstufeData, kb.Assignment, schienenResult.Schedule,
                                                                       externalRoomBusySlots:=roomBusy)
-        Dim raumResult = Solver.Solve(raumScenario, timeLimitS, seed, numWorkers)
+        Dim raumResult = Solver.Solve(raumScenario, timeLimitS, seed, numWorkers, ct,
+            StageProgressAdapter.Wrap(progress, SolvePhase.Stufe, 4, 4, "Raumzuordnung", sw, gesamt))
         Dim kursResult As New KursstufeSolveResult With {
-            .KursblockungStatus = kb.Status, .SchienenrasterStatus = schienenResult.Status, .RaumzuordnungStatus = raumResult.Status
+            .KursblockungStatus = kb.Status, .SchienenrasterStatus = schienenResult.Status, .RaumzuordnungStatus = raumResult.Status,
+            .Cancelled = raumResult.Cancelled
         }
+        If raumResult.Cancelled Then
+            Return New CombinedSolveResult With {
+                .Order = SolveOrder.SekIFirst, .SekIStatus = sekIResult.Status, .SekISchedule = sekIResult.Schedule,
+                .KursstufeResult = kursResult, .Cancelled = True}
+        End If
         If raumResult.Status <> CpSolverStatus.Optimal AndAlso raumResult.Status <> CpSolverStatus.Feasible Then
             Return New CombinedSolveResult With {
                 .Order = SolveOrder.SekIFirst, .SekIStatus = sekIResult.Status, .SekISchedule = sekIResult.Schedule,

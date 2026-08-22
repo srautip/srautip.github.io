@@ -17,6 +17,8 @@
 ' ValidateKursstufeEntities's "keine Schiene mit kursart=...gefunden"
 ' check exists to catch beforehand.
 Imports System.Text.Json.Nodes
+Imports System.Diagnostics
+Imports System.Threading
 Imports Google.OrTools.Sat
 
 
@@ -25,6 +27,8 @@ Public NotInheritable Class KursblockungResult
     ''' <summary>KursId -> SchieneId. Nothing unless Status is
     ''' Optimal/Feasible.</summary>
     Public Property Assignment As Dictionary(Of String, String)
+    ''' <summary>Abbruch durch den Aufrufer (arc42 8.11).</summary>
+    Public Property Cancelled As Boolean
 End Class
 
 Public Module Kursblockung
@@ -103,7 +107,13 @@ Public Module Kursblockung
     Public Function SolveKursblockung(data As JsonObject,
                                        Optional timeLimitS As Double = 30.0,
                                        Optional seed As Integer = 42,
-                                       Optional numWorkers As Integer = 1) As KursblockungResult
+                                       Optional numWorkers As Integer = 1,
+                                       Optional cancellationToken As CancellationToken = Nothing,
+                                       Optional progress As IProgress(Of SolveProgress) = Nothing) As KursblockungResult
+        If cancellationToken.IsCancellationRequested Then
+            Return New KursblockungResult With {.Status = CpSolverStatus.Unknown, .Cancelled = True}
+        End If
+
         Dim ent = JsonHelpers.Entities(data)
         Dim kurse = KurseFrom(ent)
         Dim schienen = SchienenFrom(ent)
@@ -173,9 +183,14 @@ Public Module Kursblockung
 
         Dim solver As New CpSolver()
         solver.StringParameters = $"max_time_in_seconds:{timeLimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
-        Dim status = solver.Solve(model)
+        Dim sw = Stopwatch.StartNew()
+        Dim cb As ConvergenceCallback = If(progress Is Nothing, Nothing, New ConvergenceCallback())
+        Dim run = SolveRunner.RunSolve(model, solver, cb,
+                                       SolveRunner.SingleStage(SolvePhase.Iteration, "Kursblockung wird gerechnet",
+                                                               timeLimitS, cancellationToken, progress, sw))
+        Dim status = run.Status
 
-        Dim result As New KursblockungResult With {.Status = status}
+        Dim result As New KursblockungResult With {.Status = status, .Cancelled = run.Cancelled}
         If status = CpSolverStatus.Optimal OrElse status = CpSolverStatus.Feasible Then
             Dim assignment As New Dictionary(Of String, String)
             For Each kvp In assign
