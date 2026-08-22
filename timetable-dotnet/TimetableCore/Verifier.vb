@@ -254,6 +254,36 @@ Public Module Verifier
                         violations.Add((i, t, WithReason($"{occEntity} ({occScope}) hat KEINEN Unterricht im geforderten Slot {occDay}/{occPeriod}", c)))
                     End If
 
+                Case "occupied_window"
+                    ' P1: unabhaengige Gegenpruefung NUR fuer must-Fenster
+                    ' (jeder Slot des Fensters muss belegt sein). Ein
+                    ' should-Fenster ist bewusst KEIN Kann-Constraint,
+                    ' sondern ein Qualitaetskriterium - sein Defizit wird
+                    ' exakt (und ebenfalls unabhaengig) von ScheduleQuality.
+                    ' OccupiedWindowDeficit gezaehlt und erscheint als
+                    ' QualityScore.OccupiedDensityCount, nicht hier.
+                    If JsonHelpers.GetPriority(c) = JsonHelpers.PriorityMust Then
+                        Dim owScope = JsonHelpers.GetString(c, "scope")
+                        Dim owEntity = JsonHelpers.GetString(c, "entity")
+                        Dim owFrom = JsonHelpers.GetInt(c, "from_period").Value
+                        Dim owTo = JsonHelpers.GetInt(c, "to_period").Value
+                        Dim owDaysList = JsonHelpers.AsStringList(c, "days")
+                        Dim owDays = If(owDaysList.Any(), owDaysList, allDays)
+                        For Each d In owDays
+                            For p = owFrom To owTo
+                                Dim owFound As Boolean
+                                Select Case owScope
+                                    Case "class" : owFound = Find(schedule, cls:=owEntity, day:=d, period:=p).Any()
+                                    Case "teacher" : owFound = Find(schedule, teacher:=owEntity, day:=d, period:=p).Any()
+                                    Case Else : owFound = True
+                                End Select
+                                If Not owFound Then
+                                    violations.Add((i, t, WithReason($"{owEntity} ({owScope}) hat KEINEN Unterricht im geforderten Fenster-Slot {d}/{p} (Fenster {owFrom}..{owTo})", c)))
+                                End If
+                            Next
+                        Next
+                    End If
+
                 Case "consecutive_required"
                     Dim className = JsonHelpers.GetString(c, "class")
                     Dim subject = JsonHelpers.GetString(c, "subject")

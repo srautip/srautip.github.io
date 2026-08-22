@@ -62,6 +62,61 @@ Public NotInheritable Class RunConfig
     ''' changes WHEN a solution is accepted as proven-final, not just how
     ''' long a stagnant search runs.</summary>
     Public Property RelativeGapLimit As Double? = Nothing
+    ''' <summary>Code-Review-Umsetzung (P2): Solver.SolveTops
+    ''' lexikografischer Modus (Kann -> ClassGaps als einzeln beweisbare
+    ''' Stufen, Optimum je Stufe als Constraint fixiert, danach Iterationen
+    ''' ueber die gewichtete Rest-Zielfunktion). Nothing -> True: seit der
+    ''' expliziten Nutzerentscheidung dieser Review-Runde DEFAULT (bewusste
+    ''' Ausnahme vom "fehlt das Feld, bleibt das Verhalten unveraendert"-
+    ''' Prinzip, wie zuvor stagnation_timeout_s). `false` liefert den
+    ''' frueheren gewichteten Summenmodus, in dem quality_weights auch die
+    ''' relative Prioritaet von Kann/ClassGaps/TeacherGaps frei steuern.</summary>
+    Public Property Lexicographic As Boolean? = Nothing
+    ''' <summary>P2: Toleranzband je fixierter Stufe (`<= Stufenoptimum +
+    ''' lex_tolerance`) - 0 (Default) haelt jede Stufe exakt auf ihrem
+    ''' gefundenen Optimum, ein kleiner Wert (z.B. 1) erlaubt den
+    ''' Folgestufen/der Diversitaets-Enumeration mehr Spielraum.</summary>
+    Public Property LexTolerance As Integer? = Nothing
+    ''' <summary>P2 (Nutzerentscheidung): TeacherGaps als DRITTE
+    ''' lexikografische Stufe ist opt-in (Nothing -> False). Ohne die
+    ''' Stufe wird TeacherGaps nicht hart auf sein Optimum fixiert,
+    ''' sondern flieSSt mit seinem quality_weights-Gewicht in die
+    ''' Rest-Zielfunktion ein - Lehrer-Springstunden bleiben so gegen
+    ''' Randstunden/Nachmittage/Ausgewogenheit abwaegbar.</summary>
+    Public Property LexTeacherGapsStage As Boolean? = Nothing
+    ''' <summary>Dichte-STUFE (opt-in, Nothing -> False): occupied_window-
+    ''' Dichte als eigene lexikografische Stufe zwischen Kann und
+    ''' ClassGaps - dediziertes Budget + hartes Band, exakt der
+    ''' strukturelle Vorteil, mit dem die fruehere occupied_slot-Batterie
+    ''' den P1-Langvergleich auf der Fensterabdeckung gewann. Ohne die
+    ''' Stufe bleibt die Dichte gewichtet in der Rest-Zielfunktion
+    ''' (abwaegbar gegen die uebrigen Restkriterien).</summary>
+    Public Property LexOccupiedDensityStage As Boolean? = Nothing
+    ''' <summary>Code-Review-Umsetzung (P3): Mindestanzahl bisher belegter
+    ''' Slots, die jede WEITERE Loesung anders belegen muss (echter
+    ''' Distanz-Cut statt nur des exakten No-Goods). Nothing/0 = heutiges
+    ''' Verhalten; sinnvolle Werte liegen bei ~5-10% der Wochenstunden.</summary>
+    Public Property MinDiversity As Integer? = Nothing
+    ''' <summary>P3: `false` schaltet das Re-Hinting jeder Iteration auf die
+    ''' soeben gefundene Loesung ab (das ist eine Aehnlichkeits-Heuristik -
+    ''' fuer Laeufe, deren Ziel moeglichst VERSCHIEDENE Alternativen sind,
+    ''' abschalten). Nothing/true = heutiges Verhalten.</summary>
+    Public Property RehintFoundSolutions As Boolean? = Nothing
+    ''' <summary>Code-Review-Umsetzung (P6): relatives Gap-Limit NUR fuer
+    ''' Iterationen ab der zweiten - die erste darf sorgfaeltig beweisen,
+    ''' Folge-Iterationen (Zweck: Alternativen) akzeptieren frueher.
+    ''' Sinnvolle Werte ~0.05-0.2; Nothing = kein Limit (unveraendertes
+    ''' Verhalten). Ueberstimmt ab Iteration 2 ein gesetztes
+    ''' relative_gap_limit.</summary>
+    Public Property LaterIterationsGapLimit As Double? = Nothing
+    ''' <summary>Budget je lexikografischer Stufe bzw. (im gewichteten
+    ''' Modus) fuer den Kann-Warm-Start - Nothing faellt auf SolveTops
+    ''' eigenen Default (60s) zurueck. Relevant fuer grosse Szenarien,
+    ''' bei denen eine Stufe in 60s nicht einmal Feasibility erreicht
+    ''' und die Folge-Iterationen dann ohne Warm-Start-Hint kalt
+    ''' starten (live beobachteter GMS-Fehlermodus: TimeLimitReached
+    ''' ohne eine einzige Loesung).</summary>
+    Public Property Stage1TimeLimitS As Double? = Nothing
 End Class
 
 ''' <summary>Phase 2.24: die sieben Gewichte aus ScheduleQuality.
@@ -78,12 +133,18 @@ Public NotInheritable Class QualityWeightsConfig
     Public Property AfternoonDayCount As Double? = Nothing
     Public Property ClassLoadVariance As Double? = Nothing
     Public Property TeacherLoadVariance As Double? = Nothing
+    ''' <summary>P1: Gewicht pro unbelegtem occupied_window-Slot (Default
+    ''' 5.0 - siehe ScheduleQuality.WeightOccupiedDensity).</summary>
+    Public Property OccupiedDensity As Double? = Nothing
     ''' <summary>Phase 2.25-Nachtrag-2: Nothing -&gt; Default True (unveraendertes
     ''' Verhalten). `false` schaltet TeacherGaps strukturell aus SolveTops
     ''' Zielfunktion aus (keine Hilfsvariablen/-Constraints, nicht nur
     ''' Gewicht 0) - Sicherheitsventil fuer Schulen, bei denen selbst die
     ''' gefixte Kodierung noch zu teuer ist.</summary>
     Public Property IncludeTeacherGaps As Boolean? = Nothing
+    ''' <summary>Code-Review-Umsetzung (R3): gleiches Muster jetzt auch fuer
+    ''' ClassGaps - vorher das einzige Kriterium ohne strukturelles Flag.</summary>
+    Public Property IncludeClassGaps As Boolean? = Nothing
     ''' <summary>Gleiches strukturelles An/Aus-Muster wie IncludeTeacherGaps
     ''' oben, auf die verbleibenden vier Sekundaerkriterien erweitert -
     ''' Nothing -&gt; Default True (unveraendertes Verhalten) je Feld.</summary>
@@ -91,6 +152,7 @@ Public NotInheritable Class QualityWeightsConfig
     Public Property IncludeAfternoonDayCount As Boolean? = Nothing
     Public Property IncludeClassLoadVariance As Boolean? = Nothing
     Public Property IncludeTeacherLoadVariance As Boolean? = Nothing
+    Public Property IncludeOccupiedDensity As Boolean? = Nothing
 End Class
 
 Public Module Run
@@ -122,11 +184,14 @@ Public Module Run
         If cfg.AfternoonDayCount.HasValue Then w.AfternoonDayCount = cfg.AfternoonDayCount.Value
         If cfg.ClassLoadVariance.HasValue Then w.ClassLoadVariance = cfg.ClassLoadVariance.Value
         If cfg.TeacherLoadVariance.HasValue Then w.TeacherLoadVariance = cfg.TeacherLoadVariance.Value
+        If cfg.OccupiedDensity.HasValue Then w.OccupiedDensity = cfg.OccupiedDensity.Value
         If cfg.IncludeTeacherGaps.HasValue Then w.IncludeTeacherGaps = cfg.IncludeTeacherGaps.Value
+        If cfg.IncludeClassGaps.HasValue Then w.IncludeClassGaps = cfg.IncludeClassGaps.Value
         If cfg.IncludeEdgePeriod.HasValue Then w.IncludeEdgePeriod = cfg.IncludeEdgePeriod.Value
         If cfg.IncludeAfternoonDayCount.HasValue Then w.IncludeAfternoonDayCount = cfg.IncludeAfternoonDayCount.Value
         If cfg.IncludeClassLoadVariance.HasValue Then w.IncludeClassLoadVariance = cfg.IncludeClassLoadVariance.Value
         If cfg.IncludeTeacherLoadVariance.HasValue Then w.IncludeTeacherLoadVariance = cfg.IncludeTeacherLoadVariance.Value
+        If cfg.IncludeOccupiedDensity.HasValue Then w.IncludeOccupiedDensity = cfg.IncludeOccupiedDensity.Value
         Return w
     End Function
 
@@ -245,10 +310,26 @@ Public Module Run
         Dim stagnationTimeoutS = If(cfg.StagnationTimeoutS.HasValue, cfg.StagnationTimeoutS, New Double?(45.0))
         Dim diversifySeed = If(cfg.DiversifySeed, True)
         Dim randomizeSearch = If(cfg.RandomizeSearch, True)
+        ' Code-Review-Umsetzung (P2/P3): Nothing loest jeweils zu SolveTops
+        ' eigenem Default auf (lexicographic=True per Nutzerentscheidung,
+        ' lex_tolerance=0, lex_teacher_gaps_stage=False, min_diversity=0,
+        ' rehint_found_solutions=True).
+        Dim lexicographic = If(cfg.Lexicographic, True)
+        Dim lexTolerance = If(cfg.LexTolerance, 0)
+        Dim lexTeacherGapsStage = If(cfg.LexTeacherGapsStage, False)
+        Dim lexOccupiedDensityStage = If(cfg.LexOccupiedDensityStage, False)
+        Dim minDiversity = If(cfg.MinDiversity, 0)
+        Dim rehintFoundSolutions = If(cfg.RehintFoundSolutions, True)
+        Dim stage1TimeLimitS = If(cfg.Stage1TimeLimitS, 60.0)
         Dim topResult = Solver.SolveTop(data, maxSolutions:=cfg.MaxSolutions, totalTimeLimitS:=cfg.SolveTimeLimitS,
             perSolveTimeLimitS:=perSolveLimit, seed:=cfg.Seed, numWorkers:=cfg.NumWorkers, qualityWeights:=qualityWeights,
+            stage1TimeLimitS:=stage1TimeLimitS,
             stagnationTimeoutS:=stagnationTimeoutS, diversifySeed:=diversifySeed, randomizeSearch:=randomizeSearch,
-            relativeGapLimit:=cfg.RelativeGapLimit)
+            relativeGapLimit:=cfg.RelativeGapLimit,
+            lexicographic:=lexicographic, lexTolerance:=lexTolerance, lexTeacherGapsStage:=lexTeacherGapsStage,
+            lexOccupiedDensityStage:=lexOccupiedDensityStage,
+            minDiversity:=minDiversity, rehintFoundSolutions:=rehintFoundSolutions,
+            laterIterationsGapLimit:=cfg.LaterIterationsGapLimit)
         Dim solveOk = topResult.Solutions.Count > 0
         If Not solveOk Then
             IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.md"),
@@ -346,7 +427,7 @@ Public Module Run
         ' JS-Viewer-HTML, die dieselben Daten inline eingebettet enthaelt
         ' (kein fetch() noetig, funktioniert daher auch bei direktem
         ' Doeffnen per Doppelklick ohne lokalen Webserver).
-        Dim stundentafelJson = Formatting.ToStundentafelJson(bestand, data, topResult)
+        Dim stundentafelJson = Formatting.ToStundentafelJson(bestand, data, topResult, qualityWeights)
         Dim stundentafelJsonText = stundentafelJson.ToJsonString(New JsonSerializerOptions With {.WriteIndented = True})
         IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundenplan.json"), stundentafelJsonText)
         IO.File.WriteAllText(IO.Path.Combine(outputDir, "stundentafel.html"),

@@ -76,7 +76,13 @@ Public Class SolveTopTests
             New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}, {"priority", "should"}},
             New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
         })
-        Dim result = Solver.SolveTop(data, maxSolutions:=10, totalTimeLimitS:=30, perSolveTimeLimitS:=10)
+        ' lexicographic:=False: dieser Test prueft die Enumeration ueber
+        ' MEHRERE Kann-Stufen hinweg (0- und 1-Verstoss-Loesung in einer
+        ' Liste) - im seit der Review-Runde defaulten lexikografischen
+        ' Modus wuerde die Kann-Stufe auf 0 fixiert und die Mo-Loesung
+        ' gar nicht mehr enumeriert (dieses Band-Verhalten deckt
+        ' LexicographicKannStageBoundsTheEnumeration ab).
+        Dim result = Solver.SolveTop(data, maxSolutions:=10, totalTimeLimitS:=30, perSolveTimeLimitS:=10, lexicographic:=False)
         Assert.AreEqual(2, result.Solutions.Count)
         Assert.AreEqual(MultiSolveStopReason.SearchSpaceExhausted, result.StopReason)
 
@@ -342,14 +348,20 @@ Public Class SolveTopTests
             New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
         })
 
-        Dim defaultResult = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10)
+        ' lexicographic:=False: dieser Test sichert genau die Garantie des
+        ' GEWICHTETEN Modus zu, dass quality_weights die relative
+        ' Prioritaet von Gaps vs. EdgePeriod frei tauschen koennen - im
+        ' lexikografischen Default-Modus ist die ClassGaps-Stufe fix vor
+        ' der Rest-Zielfunktion und dieser Tausch bewusst nicht moeglich
+        ' (siehe SolveTops Doc-Kommentar zur Nutzerentscheidung).
+        Dim defaultResult = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, lexicographic:=False)
         Assert.AreEqual(CpSolverStatus.Optimal, defaultResult.Solutions(0).Status)
         Dim defaultPeriods = defaultResult.Solutions(0).Schedule.Select(Function(l) l.Period).OrderBy(Function(p) p).ToList()
         CollectionAssert.AreEqual(New List(Of Integer) From {1, 2}, defaultPeriods)
         Assert.AreEqual(5.0, defaultResult.Solutions(0).Quality.Total, 0.0000001)
 
         Dim customWeights As New QualityWeights With {.EdgePeriod = 100.0, .ClassGaps = 1.0, .TeacherGaps = 1.0}
-        Dim customResult = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, qualityWeights:=customWeights)
+        Dim customResult = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, qualityWeights:=customWeights, lexicographic:=False)
         Assert.AreEqual(CpSolverStatus.Optimal, customResult.Solutions(0).Status)
         Dim customPeriods = customResult.Solutions(0).Schedule.Select(Function(l) l.Period).OrderBy(Function(p) p).ToList()
         CollectionAssert.AreEqual(New List(Of Integer) From {2, 4}, customPeriods)
@@ -380,7 +392,14 @@ Public Class SolveTopTests
     ''' (0 Verifier violations) despite being cut short mid-search.</summary>
     <TestMethod>
     Public Sub StagnationCutoffFiresAndReturnsEarly()
-        Dim data = CoupledTeacherContentionScenario()
+        ' classCount:=15 statt des geteilten 9er-Defaults: die P4-Umsetzung
+        ' (kein totes hasAnyClass-Scaffolding mehr) machte das 9er-Szenario
+        ' erneut zu schnell fuer die 500ms-Poll-Granularitaet - derselbe
+        ' live dokumentierte Timing-Effekt wie schon beim Phase-2.25-
+        ' Nachtrag-2-Encoding-Wechsel (siehe Methoden-Doc oben). Die
+        ' Companion-Tests behalten bewusst das kleinere Szenario, da sie
+        ' echtes Optimal im 20s-Budget brauchen.
+        Dim data = CoupledTeacherContentionScenario(classCount:=15)
         Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=20, perSolveTimeLimitS:=20, stagnationTimeoutS:=0.5, numWorkers:=1)
         Assert.AreEqual(1, result.Solutions.Count)
         Assert.IsTrue(result.StagnationTriggeredCount >= 1, "Stagnation cutoff should have fired at least once.")
@@ -580,6 +599,334 @@ Public Class SolveTopTests
         Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Solutions(0).Schedule).Count)
     End Sub
 
+    ''' <summary>Code-Review-Umsetzung (P2): der lexikografische Modus muss
+    ''' im "alles ist gleichzeitig erreichbar"-Szenario dasselbe beweisbare
+    ''' Gesamtoptimum liefern wie der gewichtete Modus (Quality.Total=0 ist
+    ''' hier der bewiesene Boden, siehe
+    ''' SolveTopSingleIterationFindsSecondaryOptimalSchedule): Stufe
+    ''' ClassGaps wird auf 0 fixiert, TeacherGaps auf 0, die Rest-
+    ''' Zielfunktion (EdgePeriod/AfternoonDayCount/Ranges) treibt den Rest
+    ''' auf 0. Prueft damit den kompletten Stufen-Pfad (BuildQualityTerms ->
+    ''' Stufen-Minimize -> Bound-Fixierung -> Rest-Minimize) end-to-end.</summary>
+    <TestMethod>
+    Public Sub LexicographicModeReachesProvenJointOptimum()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1, lexicographic:=True)
+        Assert.AreEqual(1, result.Solutions.Count)
+        Assert.AreEqual(0.0, result.Solutions(0).Quality.Total, 0.0000001)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Solutions(0).Schedule).Count)
+    End Sub
+
+    ''' <summary>P2: die Kann-Stufe wird als ERSTE fixiert - im 2-Slot-
+    ''' Szenario mit einem "should"-forbidden_slot auf Mo muss die beste
+    ''' Loesung des lexikografischen Modus Kann=0 (Di) sein, und die
+    ''' zweite (jetzt nur noch im Toleranzband lexTolerance:=1 erlaubte)
+    ''' Alternative Kann=1 (Mo). Mit lexTolerance:=0 (Default) waere die
+    ''' Mo-Loesung nach der Kann-Fixierung auf 0 gar nicht mehr zulaessig -
+    ''' genau das prueft der zweite Aufruf: das Band begrenzt die
+    ''' Enumeration auf Stufen-optimale Loesungen.</summary>
+    <TestMethod>
+    Public Sub LexicographicKannStageBoundsTheEnumeration()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di"}, 1), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 1}, {"priority", "should"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+
+        ' lexTolerance:=1: beide Loesungen liegen im Band, beste zuerst.
+        Dim tolerant = Solver.SolveTop(data, maxSolutions:=10, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1,
+                                        lexicographic:=True, lexTolerance:=1)
+        Assert.AreEqual(2, tolerant.Solutions.Count)
+        Assert.AreEqual(0, tolerant.Solutions(0).Quality.KannViolationCount)
+        Assert.AreEqual("Di", tolerant.Solutions(0).Schedule(0).Day)
+        Assert.AreEqual(1, tolerant.Solutions(1).Quality.KannViolationCount)
+
+        ' lexTolerance:=0 (Default): nur die Kann-optimale Di-Loesung ist
+        ' nach der Stufen-Fixierung noch zulaessig.
+        Dim exact = Solver.SolveTop(data, maxSolutions:=10, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1,
+                                     lexicographic:=True)
+        Assert.AreEqual(1, exact.Solutions.Count)
+        Assert.AreEqual(0, exact.Solutions(0).Quality.KannViolationCount)
+        Assert.AreEqual("Di", exact.Solutions(0).Schedule(0).Day)
+        Assert.AreEqual(MultiSolveStopReason.SearchSpaceExhausted, exact.StopReason)
+    End Sub
+
+    ''' <summary>Code-Review-Umsetzung (P3): minDiversity:=2 bei 2
+    ''' Wochenstunden verlangt vollstaendig disjunkte Slot-Mengen zu JEDER
+    ''' bereits gefundenen Loesung. 5 Tage x 1 Periode, 2 Stunden -> nach
+    ''' der ersten Loesung {a,b} bleiben 3 freie Tage (eine zweite
+    ''' disjunkte Loesung existiert), danach nur noch 1 freier Tag (keine
+    ''' dritte). Exakt 2 Loesungen, paarweise disjunkt,
+    ''' SearchSpaceExhausted - deterministisch aus der Kombinatorik,
+    ''' unabhaengig von Seeds/Suchreihenfolge. Der Gegenlauf ohne
+    ''' minDiversity findet dieselbe Menge NICHT disjunkt (10 = C(5,2)
+    ''' Loesungen existieren insgesamt).</summary>
+    <TestMethod>
+    Public Sub MinDiversityForcesDisjointSolutions()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di", "Mi", "Do", "Fr"}, 1), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim diverse = Solver.SolveTop(data, maxSolutions:=10, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1, minDiversity:=2)
+        Assert.AreEqual(2, diverse.Solutions.Count)
+        Assert.AreEqual(MultiSolveStopReason.SearchSpaceExhausted, diverse.StopReason)
+        Dim days0 = diverse.Solutions(0).Schedule.Select(Function(l) l.Day).ToHashSet()
+        Dim days1 = diverse.Solutions(1).Schedule.Select(Function(l) l.Day).ToHashSet()
+        Assert.AreEqual(0, days0.Intersect(days1).Count(),
+            "minDiversity:=2 bei 2 Wochenstunden muss vollstaendig disjunkte Belegungen erzwingen.")
+
+        Dim undiverse = Solver.SolveTop(data, maxSolutions:=10, totalTimeLimitS:=60, perSolveTimeLimitS:=10, numWorkers:=1)
+        Assert.IsTrue(undiverse.Solutions.Count > 2,
+            $"Ohne minDiversity existieren mehr als 2 distinct Loesungen (gefunden: {undiverse.Solutions.Count}) - der Cut, nicht die Kombinatorik, begrenzt oben.")
+    End Sub
+
+    ''' <summary>P3: rehintFoundSolutions:=False (Re-Hinting auf die soeben
+    ''' gefundene Loesung aus) darf Korrektheit/Vollstaendigkeit nicht
+    ''' beruehren - Hints beeinflussen nur die Suchreihenfolge. Gleiche
+    ''' Enumeration wie MaxSolutionsCapTest, alle Kandidaten verifier-clean
+    ''' und weiterhin distinct.</summary>
+    <TestMethod>
+    Public Sub RehintOffStillEnumeratesValidDistinctSolutions()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di", "Mi", "Do", "Fr"}, 1), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim result = Solver.SolveTop(data, maxSolutions:=3, totalTimeLimitS:=60, perSolveTimeLimitS:=10, numWorkers:=1, rehintFoundSolutions:=False)
+        Assert.AreEqual(3, result.Solutions.Count)
+        Dim distinctDays = result.Solutions.Select(Function(s) s.Schedule(0).Day).Distinct().Count()
+        Assert.AreEqual(3, distinctDays, "Jede Loesung muss weiterhin distinct sein (No-Good bleibt aktiv).")
+        For Each s In result.Solutions
+            Assert.AreEqual(0, Verifier.VerifySchedule(data, s.Schedule).Count)
+        Next
+    End Sub
+
+    ''' <summary>Code-Review-Umsetzung (R3): IncludeClassGaps:=False muss
+    ''' die SUCHE strukturell blind fuer Klassen-Springstunden machen,
+    ''' waehrend ScheduleQuality.Score sie weiterhin exakt ausweist -
+    ''' gleiches "opposite pull"-Muster wie die bestehenden Include*-Tests:
+    ''' Periode 3 ist hart verboten, {1,2} hat 0 Luecken aber 1 Randstunde
+    ''' (Kosten 5), {2,4} hat 1 Klassen+1 Lehrer-Luecke (Kosten 200) aber 0
+    ''' Randstunden. Ohne ClassGaps UND TeacherGaps im Modell gewinnt {2,4}
+    ''' (Kosten 0 vs. 5), obwohl dessen nachgelagertes Quality.Total (200)
+    ''' schlechter ist.</summary>
+    <TestMethod>
+    Public Sub IncludeClassGapsControlsWhetherSolverSteersAroundClassGaps()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 3}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim blindWeights As New QualityWeights With {.IncludeClassGaps = False, .IncludeTeacherGaps = False}
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1, qualityWeights:=blindWeights)
+        Assert.AreEqual(CpSolverStatus.Optimal, result.Solutions(0).Status)
+        Dim periods = result.Solutions(0).Schedule.Select(Function(l) l.Period).OrderBy(Function(p) p).ToList()
+        CollectionAssert.AreEqual(New List(Of Integer) From {2, 4}, periods,
+            "Mit IncludeClassGaps/IncludeTeacherGaps:=False muss der Solver die Luecke in Kauf nehmen, um die Randstunde zu vermeiden.")
+        Assert.AreEqual(1, result.Solutions(0).Quality.ClassGapCount,
+            "Der nachgelagerte Score sieht die echte Luecke weiterhin - nur die Suche war blind.")
+    End Sub
+
+    ''' <summary>Code-Review-Umsetzung (P1): occupied_window/should steuert
+    ''' die SUCHE als Dichte-Kriterium (OccupiedDensity in der Rest-
+    ''' Zielfunktion), ohne eine einzige Kann-BoolVar zu erzeugen.
+    ''' Gegenlaeufiger Zug zu EdgePeriod: Fenster 1..2 verlangt die
+    ''' Randstunde Periode 1, EdgePeriod (5) bestraft sie. Mit
+    ''' occupied_density=100 gewinnt das Fenster ({1,2}, Defizit 0);
+    ''' mit IncludeOccupiedDensity:=False ist die Suche fenster-blind,
+    ''' meidet Periode 1 und der nachgelagerte OccupiedDensityCount
+    ''' zeigt das echte Defizit trotzdem an.</summary>
+    <TestMethod>
+    Public Sub OccupiedWindowShouldSteersDensityViaResidualObjective()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "occupied_window"}, {"scope", "class"}, {"entity", "5a"}, {"from_period", 1}, {"to_period", 2}, {"priority", "should"}}
+        })
+
+        Dim denseWeights As New QualityWeights With {.OccupiedDensity = 100.0}
+        Dim steered = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1, qualityWeights:=denseWeights)
+        Assert.AreEqual(CpSolverStatus.Optimal, steered.Solutions(0).Status)
+        Dim steeredPeriods = steered.Solutions(0).Schedule.Select(Function(l) l.Period).OrderBy(Function(p) p).ToList()
+        CollectionAssert.AreEqual(New List(Of Integer) From {1, 2}, steeredPeriods,
+            "Mit occupied_density=100 muss das Fenster gefuellt werden, obwohl Periode 1 eine Randstunde kostet.")
+        Assert.AreEqual(0, steered.Solutions(0).Quality.OccupiedDensityCount)
+
+        Dim blindWeights As New QualityWeights With {.OccupiedDensity = 100.0, .IncludeOccupiedDensity = False}
+        Dim blind = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1, qualityWeights:=blindWeights)
+        Assert.AreEqual(CpSolverStatus.Optimal, blind.Solutions(0).Status)
+        Assert.IsFalse(blind.Solutions(0).Schedule.Any(Function(l) l.Period = 1),
+            "Fenster-blind meidet die Suche die Randstunde Periode 1.")
+        Assert.IsTrue(blind.Solutions(0).Quality.OccupiedDensityCount >= 1,
+            "Der nachgelagerte Score zaehlt das echte Fenster-Defizit weiterhin - nur die Suche war blind.")
+
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, steered.Solutions(0).Schedule).Count)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, blind.Solutions(0).Schedule).Count)
+    End Sub
+
+    ''' <summary>Code-Review-Umsetzung (P6): die gewichtete Zielfunktion
+    ''' wird GCD-normalisiert - Gewichte 50/50/250 (GCD 50) ergeben
+    ''' effektive Koeffizienten 1/1/5. Das aendert weder Optimum noch
+    ''' Ranking (reine positive Skalierung), aber der vom Solver
+    ''' berichtete ObjectiveValue liegt auf der KLEINEREN Skala:
+    ''' Optimum {2,4} kostet roh 1 Klassen- + 1 Lehrer-Luecke = 100,
+    ''' normalisiert 2. Quality.Total (nachgelagert, unnormalisiert)
+    ''' bleibt 100 - genau diese Diskrepanz beweist die Normalisierung.</summary>
+    <TestMethod>
+    Public Sub WeightedObjectiveIsGcdNormalized()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 3}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim weights As New QualityWeights With {
+            .ClassGaps = 50.0, .TeacherGaps = 50.0, .EdgePeriod = 250.0,
+            .IncludeAfternoonDayCount = False, .IncludeClassLoadVariance = False, .IncludeTeacherLoadVariance = False}
+        Dim result = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1,
+                                      qualityWeights:=weights, lexicographic:=False)
+        Assert.AreEqual(CpSolverStatus.Optimal, result.Solutions(0).Status)
+        Dim periods = result.Solutions(0).Schedule.Select(Function(l) l.Period).OrderBy(Function(p) p).ToList()
+        CollectionAssert.AreEqual(New List(Of Integer) From {2, 4}, periods,
+            "Bei 50/50/250 (Randstunde teurer als beide Luecken zusammen) muss der Solver die Luecke waehlen.")
+        Assert.AreEqual(2.0, result.Solutions(0).ObjectiveValue, 0.0000001,
+            "In-Modell-Objective muss GCD-normalisiert sein (roh 100, GCD 50).")
+        Assert.AreEqual(100.0, result.Solutions(0).Quality.Total, 0.0000001,
+            "Die nachgelagerte Quality.Total-Skala bleibt unnormalisiert.")
+    End Sub
+
+    ''' <summary>P6: `laterIterationsGapLimit` setzt CP-SATs
+    ''' relative_gap_limit erst ab der ZWEITEN Iteration - Korrektheits-/
+    ''' Vollstaendigkeits-Smoke (Gap-Limits aendern nur, WANN eine Loesung
+    ''' als final akzeptiert wird, nie die Zulaessigkeit): Enumeration
+    ''' bleibt distinct und verifier-clean.</summary>
+    <TestMethod>
+    Public Sub LaterIterationsGapLimitStillEnumeratesValidDistinctSolutions()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di", "Mi", "Do", "Fr"}, 1), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim result = Solver.SolveTop(data, maxSolutions:=3, totalTimeLimitS:=60, perSolveTimeLimitS:=10, numWorkers:=1,
+                                      laterIterationsGapLimit:=0.5)
+        Assert.AreEqual(3, result.Solutions.Count)
+        Assert.AreEqual(3, result.Solutions.Select(Function(s) s.Schedule(0).Day).Distinct().Count())
+        For Each s In result.Solutions
+            Assert.AreEqual(0, Verifier.VerifySchedule(data, s.Schedule).Count)
+        Next
+    End Sub
+
+    ''' <summary>Code-Review-Umsetzung (P4): sind ALLE Qualitaetskriterien
+    ''' strukturell abgeschaltet und existiert kein Kann-Constraint, wird
+    ''' seit P4 gar kein Scaffolding mehr gebaut und das Modell hat KEINE
+    ''' Zielfunktion - SolveTop muss dann als reine (deterministische)
+    ''' Feasibility-Enumeration weiterlaufen. Vorher entstanden in dieser
+    ''' Konstellation trotzdem occupied/hasAny/dailyCount-Variablen fuer
+    ''' jede Klasse und Lehrkraft (tote Modellmasse).</summary>
+    <TestMethod>
+    Public Sub AllCriteriaOffEnumeratesWithoutAnyObjective()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo", "Di", "Mi", "Do", "Fr"}, 1), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim weights As New QualityWeights With {
+            .IncludeClassGaps = False, .IncludeTeacherGaps = False,
+            .IncludeEdgePeriod = False, .IncludeAfternoonDayCount = False,
+            .IncludeClassLoadVariance = False, .IncludeTeacherLoadVariance = False,
+            .IncludeOccupiedDensity = False}
+        Dim result = Solver.SolveTop(data, maxSolutions:=3, totalTimeLimitS:=60, perSolveTimeLimitS:=10, numWorkers:=1,
+                                      qualityWeights:=weights)
+        Assert.AreEqual(3, result.Solutions.Count)
+        For Each s In result.Solutions
+            Assert.AreEqual(0.0, s.ObjectiveValue, 0.0000001, "Ohne einen einzigen Zielfunktionsterm meldet CP-SAT Objective 0.")
+            Assert.AreEqual(0, Verifier.VerifySchedule(data, s.Schedule).Count)
+        Next
+    End Sub
+
+    ''' <summary>Dichte-STUFE (Antwort auf den P1-Langvergleich): mit
+    ''' lexOccupiedDensityStage wird das Fenster-Defizit als eigene
+    ''' lexikografische Stufe auf sein Optimum fixiert, BEVOR die
+    ''' Gewichte der Rest-Zielfunktion zum Zug kommen - gleiches
+    ''' Beweis-Muster wie LexTeacherGapsStageOverridesWeightsWhenEnabled:
+    ''' invertierte Gewichte (EdgePeriod=100 >> OccupiedDensity=1) lassen
+    ''' die Suche OHNE Stufe die Randstunde meiden (Fenster-Slot 1 bleibt
+    ''' frei, Defizit 1); MIT Stufe ist das Dichte-Optimum 0 hart fixiert
+    ''' und die Randstunde erzwungen, obwohl die Gewichte das Gegenteil
+    ''' verlangen.</summary>
+    <TestMethod>
+    Public Sub LexOccupiedDensityStageOverridesWeightsWhenEnabled()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "occupied_window"}, {"scope", "class"}, {"entity", "5a"}, {"from_period", 1}, {"to_period", 2}, {"priority", "should"}}
+        })
+        Dim invertedWeights As New QualityWeights With {.OccupiedDensity = 1.0, .EdgePeriod = 100.0}
+
+        Dim withoutStage = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1,
+                                            qualityWeights:=invertedWeights)
+        Assert.AreEqual(CpSolverStatus.Optimal, withoutStage.Solutions(0).Status)
+        Assert.IsFalse(withoutStage.Solutions(0).Schedule.Any(Function(l) l.Period = 1),
+            "Ohne Dichte-Stufe entscheidet das Gewicht: die billige unbelegte Fensterstunde (1) schlaegt die teure Randstunde (100).")
+        Assert.IsTrue(withoutStage.Solutions(0).Quality.OccupiedDensityCount >= 1)
+
+        Dim withStage = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1,
+                                         qualityWeights:=invertedWeights, lexOccupiedDensityStage:=True)
+        Assert.AreEqual(CpSolverStatus.Optimal, withStage.Solutions(0).Status)
+        Dim stagePeriods = withStage.Solutions(0).Schedule.Select(Function(l) l.Period).OrderBy(Function(p) p).ToList()
+        CollectionAssert.AreEqual(New List(Of Integer) From {1, 2}, stagePeriods,
+            "Mit Dichte-Stufe ist deren Optimum 0 fixiert, bevor die Gewichte zum Zug kommen - das Fenster ist erzwungen.")
+        Assert.AreEqual(0, withStage.Solutions(0).Quality.OccupiedDensityCount)
+
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, withoutStage.Solutions(0).Schedule).Count)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, withStage.Solutions(0).Schedule).Count)
+    End Sub
+
+    ''' <summary>Nutzerentscheidung "TeacherGaps-Stufe opt-in": ohne
+    ''' lexTeacherGapsStage bleibt TeacherGaps gewichtet in der
+    ''' Rest-Zielfunktion und ist gegen andere Restkriterien abwaegbar;
+    ''' MIT der Stufe wird sein Optimum hart fixiert, BEVOR die Gewichte
+    ''' ueberhaupt zum Zug kommen. Gleiches Szenario wie
+    ''' IncludeTeacherGapsControlsWhetherSolverSteersAroundTeacherGaps,
+    ''' aber mit invertierten Gewichten (EdgePeriod=100 >> TeacherGaps=1):
+    ''' - Default (Stufe aus): Rest-Zielfunktion waegt ab - 5a@4 kostet 1
+    '''   (TeacherGap), 5a@1 kostet 100 (Randstunde) -> Solver waehlt 5a@4.
+    ''' - lexTeacherGapsStage:=True: die Stufe fixiert TeacherGaps auf
+    '''   sein Optimum 0, 5a@4 ist danach unzulaessig -> Solver MUSS 5a@1
+    '''   waehlen, obwohl die Gewichte das Gegenteil verlangen - der
+    '''   Beweis, dass die Stufe (nicht das Gewicht) entscheidet.</summary>
+    <TestMethod>
+    Public Sub LexTeacherGapsStageOverridesWeightsWhenEnabled()
+        Dim data = Scenario(Mini({"5a", "5b"}, {"T1"}, {"Mathe", "Deutsch"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5b"}, {"subject", "Deutsch"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5b"}, {"subject", "Deutsch"}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5b"}, {"day", "Mo"}, {"period", 1}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5b"}, {"day", "Mo"}, {"period", 3}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5b"}, {"day", "Mo"}, {"period", 4}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 2}},
+            New JsonObject From {{"type", "forbidden_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 3}}
+        })
+        Dim invertedWeights As New QualityWeights With {.EdgePeriod = 100.0, .TeacherGaps = 1.0}
+
+        Dim withoutStage = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1,
+                                            qualityWeights:=invertedWeights)
+        Assert.AreEqual(CpSolverStatus.Optimal, withoutStage.Solutions(0).Status)
+        Assert.AreEqual(4, withoutStage.Solutions(0).Schedule.Single(Function(l) l.ClassName = "5a").Period,
+            "Ohne TeacherGaps-Stufe entscheidet das Gewicht: die billige Luecke (1) schlaegt die teure Randstunde (100).")
+        Assert.AreEqual(1, withoutStage.Solutions(0).Quality.TeacherGapCount)
+
+        Dim withStage = Solver.SolveTop(data, maxSolutions:=1, totalTimeLimitS:=30, perSolveTimeLimitS:=10, numWorkers:=1,
+                                         qualityWeights:=invertedWeights, lexTeacherGapsStage:=True)
+        Assert.AreEqual(CpSolverStatus.Optimal, withStage.Solutions(0).Status)
+        Assert.AreEqual(1, withStage.Solutions(0).Schedule.Single(Function(l) l.ClassName = "5a").Period,
+            "Mit TeacherGaps-Stufe ist deren Optimum 0 fixiert, bevor die Gewichte zum Zug kommen - die Randstunde ist erzwungen.")
+        Assert.AreEqual(0, withStage.Solutions(0).Quality.TeacherGapCount)
+
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, withoutStage.Solutions(0).Schedule).Count)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, withStage.Solutions(0).Schedule).Count)
+    End Sub
+
     ''' <summary>9 classes sharing only 3 teachers (3 classes per teacher -
     ''' real no_overlap(teacher) contention, not the trivially-independent
     ''' per-class-own-teacher shape the old ThreeClassLooseScenario used),
@@ -587,8 +934,8 @@ Public Class SolveTopTests
     ''' /tmp/.../scratchpad/stagtiming/) to reliably produce a genuine
     ''' ~1.4s mid-search stagnation window well clear of the 500ms poll
     ''' granularity used by SolveWithStagnationCutoff.</summary>
-    Private Function CoupledTeacherContentionScenario() As JsonObject
-        Dim classes = Enumerable.Range(0, 9).Select(Function(i) $"C{i}").ToArray()
+    Private Function CoupledTeacherContentionScenario(Optional classCount As Integer = 9) As JsonObject
+        Dim classes = Enumerable.Range(0, classCount).Select(Function(i) $"C{i}").ToArray()
         Dim teachers = {"T1", "T2", "T3"}
         Dim cons As New List(Of JsonObject)
         For i = 0 To classes.Length - 1

@@ -255,14 +255,27 @@ Public Module Solver
         Return kannVars(index).Var
     End Function
 
+    ''' <summary>Code-Review-Umsetzung (R1): exakte Duplikate (gleiches
+    ''' Tripel Klasse/Fach/Lehrer) werden hier zusaetzlich defensiv
+    ''' dedupliziert - vorher ueberschrieb das zweite Duplikat den
+    ''' Lesson-Dictionary-Eintrag des ersten stillschweigend und liess
+    ''' dessen Variablen als unreferenzierte Waisen im Modell zurueck.
+    ''' Validation.ValidateEntities meldet solche Duplikate seit derselben
+    ''' Umsetzung als harten Fehler (Fail-Fast fuer den normalen
+    ''' Solve-Pfad); das Dedupe hier schuetzt Aufrufer, die BuildCoreModel
+    ''' umgehen koennten.</summary>
     Private Function SessionsFromAssignments(data As JsonObject) As List(Of Session)
-        Dim sessions = JsonHelpers.Constraints(data).
-            Where(Function(c) JsonHelpers.GetString(c, "type") = "teacher_subject_assignment").
-            Select(Function(c) New Session(
-                JsonHelpers.GetString(c, "class"),
-                JsonHelpers.GetString(c, "subject"),
-                JsonHelpers.GetString(c, "teacher"))).
-            ToList()
+        Dim seen As New HashSet(Of (String, String, String))
+        Dim sessions As New List(Of Session)
+        For Each c In JsonHelpers.Constraints(data)
+            If JsonHelpers.GetString(c, "type") <> "teacher_subject_assignment" Then Continue For
+            Dim className = JsonHelpers.GetString(c, "class")
+            Dim subject = JsonHelpers.GetString(c, "subject")
+            Dim teacher = JsonHelpers.GetString(c, "teacher")
+            If seen.Add((className, subject, teacher)) Then
+                sessions.Add(New Session(className, subject, teacher))
+            End If
+        Next
         If sessions.Count = 0 Then
             Throw New ArgumentException("Keine teacher_subject_assignment-Constraints gefunden - es gibt nichts zu planen.")
         End If
@@ -473,17 +486,18 @@ Public Module Solver
         Next
     End Sub
 
+    ''' <summary>Code-Review-Umsetzung (R4): reiner Dispatcher - jeder
+    ''' Constraint-Typ lebt jetzt in einer eigenen ApplyXxx-Methode
+    ''' darunter (mechanische Extraktion der frueheren Select-Case-Bloecke,
+    ''' identisches Verhalten und identische Variablen-Erzeugungsreihenfolge;
+    ''' die frueheren sessionsOf*-Lambdas sind als gleichwertige
+    ''' LINQ-Filter in die Einzelmethoden gewandert).</summary>
     Private Sub ApplyConstraints(model As CpModel, data As JsonObject, sessions As List(Of Session),
                                   lesson As Dictionary(Of LessonKey, BoolVar), room As Dictionary(Of RoomKey, BoolVar),
                                   days As List(Of String), periods As List(Of Integer),
                                   kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)),
                                   parallelGroupOf As Dictionary(Of (ClassName As String, Subject As String, Teacher As String), Integer),
                                   parallelVars As Dictionary(Of (GroupIndex As Integer, Day As String, Period As Integer), BoolVar))
-
-        Dim sessionsOfClass = Function(className As String) sessions.Where(Function(s) s.ClassName = className).ToList()
-        Dim sessionsOfTeacher = Function(teacher As String) sessions.Where(Function(s) s.Teacher = teacher).ToList()
-        Dim sessionsOfSubjectClass = Function(subject As String, className As String) _
-            sessions.Where(Function(s) s.Subject = subject AndAlso s.ClassName = className).ToList()
 
         Dim constraintsList = JsonHelpers.Constraints(data)
         For ci = 0 To constraintsList.Count - 1
@@ -492,263 +506,356 @@ Public Module Solver
             Dim priority = JsonHelpers.GetPriority(c)
 
             Select Case constraintType
-
                 Case "teacher_availability"
-                    Dim teacher = JsonHelpers.GetString(c, "teacher")
-                    Dim availDaysList = JsonHelpers.AsStringList(c, "available_days")
-                    Dim availDays As New HashSet(Of String)(If(availDaysList.Any(), availDaysList, days))
-                    Dim blocked As New HashSet(Of (Day As String, Period As Integer))
-                    If c.ContainsKey("unavailable_periods") AndAlso c("unavailable_periods") IsNot Nothing Then
-                        For Each node In c("unavailable_periods").AsArray()
-                            Dim entryObj = node.AsObject()
-                            blocked.Add((JsonHelpers.GetString(entryObj, "day"), JsonHelpers.GetInt(entryObj, "period").Value))
-                        Next
-                    End If
-                    Dim taViolated As BoolVar = Nothing
-                    If priority = JsonHelpers.PriorityShould Then
-                        taViolated = GetOrCreateKannVar(model, kannVars, ci, constraintType, JsonHelpers.GetReason(c))
-                    End If
-                    For Each s In sessionsOfTeacher(teacher)
-                        For Each d In days
-                            For Each p In periods
-                                If Not availDays.Contains(d) OrElse blocked.Contains((d, p)) Then
-                                    Dim con = model.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)) = 0)
-                                    If taViolated IsNot Nothing Then con.OnlyEnforceIf(taViolated.Not())
-                                End If
-                            Next
-                        Next
-                    Next
-
+                    ApplyTeacherAvailability(model, c, ci, priority, sessions, lesson, days, periods, kannVars)
                 Case "weekly_hours"
-                    Dim className = JsonHelpers.GetString(c, "class")
-                    Dim subject = JsonHelpers.GetString(c, "subject")
-                    Dim hoursPerWeek = JsonHelpers.GetInt(c, "hours_per_week").Value
-                    Dim maxPerDay = JsonHelpers.GetInt(c, "max_per_day")
-                    ' priority only ever governs the max_per_day cap below -
-                    ' hours_per_week's exact-count stays always-must
-                    ' (Validation.vb rejects "should" without max_per_day).
-                    Dim whViolated As BoolVar = Nothing
-                    If priority = JsonHelpers.PriorityShould Then
-                        whViolated = GetOrCreateKannVar(model, kannVars, ci, constraintType, JsonHelpers.GetReason(c))
-                    End If
-                    For Each s In sessionsOfSubjectClass(subject, className)
-                        Dim terms As New List(Of BoolVar)
-                        For Each d In days
-                            For Each p In periods
-                                terms.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)))
-                            Next
-                        Next
-                        model.Add(LinearExpr.Sum(terms) = hoursPerWeek)
-
-                        If maxPerDay.HasValue AndAlso maxPerDay.Value <> 0 Then
-                            For Each d In days
-                                Dim dayTerms = periods.
-                                    Select(Function(p) lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p))).
-                                    ToList()
-                                Dim con = model.Add(LinearExpr.Sum(dayTerms) <= maxPerDay.Value)
-                                If whViolated IsNot Nothing Then con.OnlyEnforceIf(whViolated.Not())
-                            Next
-                        End If
-                    Next
-
+                    ApplyWeeklyHours(model, c, ci, priority, sessions, lesson, days, periods, kannVars)
                 Case "no_overlap"
-                    Dim resource = JsonHelpers.GetString(c, "resource")
-                    Dim entityVal = JsonHelpers.GetString(c, "entity")
-                    Dim relevantSessions As List(Of Session)
-                    Select Case resource
-                        Case "class"
-                            relevantSessions = sessionsOfClass(entityVal)
-                        Case "teacher"
-                            relevantSessions = sessionsOfTeacher(entityVal)
-                        Case "room"
-                            relevantSessions = sessions
-                        Case Else
-                            relevantSessions = New List(Of Session)
-                    End Select
-
-                    For Each d In days
-                        For Each p In periods
-                            Dim terms As New List(Of BoolVar)
-                            If resource = "room" Then
-                                For Each s In relevantSessions
-                                    Dim key As New RoomKey(s.ClassName, s.Subject, s.Teacher, d, p, entityVal)
-                                    If room.ContainsKey(key) Then terms.Add(room(key))
-                                Next
-                            Else
-                                ' Phase 2.20: Sessions belonging to the same
-                                ' Parallelgruppe must contribute only ONE
-                                ' shared term (the group's own parallelVar
-                                ' for this slot) instead of one term per
-                                ' member - their Lesson vars were already
-                                ' forced equal in the pre-pass, so summing
-                                ' each individually would count the same
-                                ' value multiple times and force the group
-                                ' permanently to 0 (the exact degeneracy the
-                                ' Plan-Agent review flagged).
-                                Dim countedGroups As New HashSet(Of Integer)
-                                For Each s In relevantSessions
-                                    Dim gi As Integer
-                                    If parallelGroupOf.TryGetValue((s.ClassName, s.Subject, s.Teacher), gi) Then
-                                        If countedGroups.Add(gi) Then terms.Add(parallelVars((gi, d, p)))
-                                    Else
-                                        terms.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)))
-                                    End If
-                                Next
-                            End If
-                            If terms.Count > 0 Then
-                                model.Add(LinearExpr.Sum(terms) <= 1)
-                            End If
-                        Next
-                    Next
-
+                    ApplyNoOverlap(model, c, sessions, lesson, room, days, periods, parallelGroupOf, parallelVars)
                 Case "shared_resource_conflict"
-                    Dim classesInvolved = JsonHelpers.AsStringList(c, "classes")
-                    Dim sharedSubject = JsonHelpers.GetString(c, "subject")
-                    Dim sharedTeacher = JsonHelpers.GetString(c, "teacher")
-                    Dim relevantSessions = classesInvolved.
-                        SelectMany(Function(cls) sessionsOfSubjectClass(sharedSubject, cls)).
-                        Where(Function(s) s.Teacher = sharedTeacher).
-                        ToList()
-                    For Each d In days
-                        For Each p In periods
-                            Dim terms = relevantSessions.
-                                Select(Function(s) lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p))).
-                                ToList()
-                            If terms.Count > 0 Then
-                                model.Add(LinearExpr.Sum(terms) <= 1)
-                            End If
-                        Next
-                    Next
-
+                    ApplySharedResourceConflict(model, c, sessions, lesson, days, periods)
                 Case "forbidden_slot"
-                    Dim scope = JsonHelpers.GetString(c, "scope")
-                    Dim entityVal = JsonHelpers.GetString(c, "entity")
-                    Dim day = JsonHelpers.GetString(c, "day")
-                    Dim period = JsonHelpers.GetInt(c, "period").Value
-
-                    Dim relevantSessions As List(Of Session)
-                    Select Case scope
-                        Case "class"
-                            relevantSessions = sessionsOfClass(entityVal)
-                        Case "teacher"
-                            relevantSessions = sessionsOfTeacher(entityVal)
-                        Case "room"
-                            relevantSessions = sessions
-                        Case Else
-                            relevantSessions = New List(Of Session)
-                    End Select
-
-                    Dim fsViolated As BoolVar = Nothing
-                    If priority = JsonHelpers.PriorityShould Then
-                        fsViolated = GetOrCreateKannVar(model, kannVars, ci, constraintType, JsonHelpers.GetReason(c))
-                    End If
-
-                    If scope = "room" Then
-                        For Each s In relevantSessions
-                            Dim key As New RoomKey(s.ClassName, s.Subject, s.Teacher, day, period, entityVal)
-                            If room.ContainsKey(key) Then
-                                Dim con = model.Add(room(key) = 0)
-                                If fsViolated IsNot Nothing Then con.OnlyEnforceIf(fsViolated.Not())
-                            End If
-                        Next
-                    Else
-                        For Each s In relevantSessions
-                            Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, day, period)
-                            If lesson.ContainsKey(key) Then
-                                Dim con = model.Add(lesson(key) = 0)
-                                If fsViolated IsNot Nothing Then con.OnlyEnforceIf(fsViolated.Not())
-                            End If
-                        Next
-                    End If
-
+                    ApplyForbiddenSlot(model, c, ci, priority, sessions, lesson, room, kannVars)
                 Case "required_slot"
-                    ' Phase 2.23: positives Gegenstueck zu forbidden_slot -
-                    ' erzwingt (statt verbietet) eine (Klasse,Fach)-Session
-                    ' auf einem exakten (Tag,Periode)-Slot. Kombiniert mit
-                    ' dem bestehenden parallel_group-Pre-Pass reicht es, NUR
-                    ' EIN Mitglied einer synchronisierten Gruppe zu pinnen -
-                    ' die per Gleichheit gekoppelten uebrigen Mitglieder
-                    ' wandern automatisch mit.
-                    Dim reqClassName = JsonHelpers.GetString(c, "class")
-                    Dim reqSubject = JsonHelpers.GetString(c, "subject")
-                    Dim reqDay = JsonHelpers.GetString(c, "day")
-                    Dim reqPeriod = JsonHelpers.GetInt(c, "period").Value
-
-                    Dim rsViolated As BoolVar = Nothing
-                    If priority = JsonHelpers.PriorityShould Then
-                        rsViolated = GetOrCreateKannVar(model, kannVars, ci, constraintType, JsonHelpers.GetReason(c))
-                    End If
-
-                    For Each s In sessionsOfSubjectClass(reqSubject, reqClassName)
-                        Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, reqDay, reqPeriod)
-                        If lesson.ContainsKey(key) Then
-                            Dim con = model.Add(lesson(key) = 1)
-                            If rsViolated IsNot Nothing Then con.OnlyEnforceIf(rsViolated.Not())
-                        End If
-                    Next
-
+                    ApplyRequiredSlot(model, c, ci, priority, sessions, lesson, kannVars)
                 Case "occupied_slot"
-                    ' Subject-agnostic sibling of required_slot: "this class/
-                    ' teacher should have SOME lesson (any subject) at this
-                    ' exact (day,period)" - a scheduling-DENSITY preference
-                    ' (e.g. "class 1a should be busy every period 2-4, every
-                    ' day"), not a specific subject placement. required_slot
-                    ' can't express this: it forces ONE named session's own
-                    ' Lesson-BoolVar to exactly 1, whereas this needs "at
-                    ' least one of possibly several sessions is active" - an
-                    ' OR over the class'/teacher's own sessions at that slot,
-                    ' mirroring forbidden_slot's scope/entity fields (its
-                    ' exact negation: forbidden_slot forces the SUM to 0,
-                    ' this forces it to >= 1).
-                    Dim occScope = JsonHelpers.GetString(c, "scope")
-                    Dim occEntity = JsonHelpers.GetString(c, "entity")
-                    Dim occDay = JsonHelpers.GetString(c, "day")
-                    Dim occPeriod = JsonHelpers.GetInt(c, "period").Value
-
-                    Dim occRelevantSessions As List(Of Session)
-                    Select Case occScope
-                        Case "class"
-                            occRelevantSessions = sessionsOfClass(occEntity)
-                        Case "teacher"
-                            occRelevantSessions = sessionsOfTeacher(occEntity)
-                        Case Else
-                            occRelevantSessions = New List(Of Session)
-                    End Select
-
-                    Dim occViolated As BoolVar = Nothing
-                    If priority = JsonHelpers.PriorityShould Then
-                        occViolated = GetOrCreateKannVar(model, kannVars, ci, constraintType, JsonHelpers.GetReason(c))
-                    End If
-
-                    Dim occVars As New List(Of BoolVar)
-                    For Each s In occRelevantSessions
-                        Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, occDay, occPeriod)
-                        If lesson.ContainsKey(key) Then occVars.Add(lesson(key))
-                    Next
-                    If occVars.Count > 0 Then
-                        Dim con = model.Add(LinearExpr.Sum(occVars) >= 1L)
-                        If occViolated IsNot Nothing Then con.OnlyEnforceIf(occViolated.Not())
-                    End If
-
+                    ApplyOccupiedSlot(model, c, ci, priority, sessions, lesson, kannVars)
+                Case "occupied_window"
+                    ApplyOccupiedWindow(model, c, priority, sessions, lesson, days)
                 Case "consecutive_required"
-                    Dim className = JsonHelpers.GetString(c, "class")
-                    Dim subject = JsonHelpers.GetString(c, "subject")
-                    Dim blockLen = JsonHelpers.GetInt(c, "block_length").Value
-                    Dim crViolated As BoolVar = Nothing
-                    If priority = JsonHelpers.PriorityShould Then
-                        crViolated = GetOrCreateKannVar(model, kannVars, ci, constraintType, JsonHelpers.GetReason(c))
-                    End If
-                    For Each s In sessionsOfSubjectClass(subject, className)
-                        AddBlockConstraint(model, lesson, s, days, periods, blockLen, crViolated)
-                    Next
-
+                    ApplyConsecutiveRequired(model, c, ci, priority, sessions, lesson, days, periods, kannVars)
                 Case "teacher_subject_assignment", "room_requirement", "parallel_group"
                     ' Already consumed above (session/room-choice construction / Phase-2.20 Parallelgruppe-Pre-Pass); no direct constraint here.
-
                 Case Else
                     Throw New ArgumentException($"Unbekannter Constraint-Typ: '{constraintType}'")
-
             End Select
+        Next
+    End Sub
+
+    Private Sub ApplyTeacherAvailability(model As CpModel, c As JsonObject, ci As Integer, priority As String,
+                                          sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                          days As List(Of String), periods As List(Of Integer),
+                                          kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)))
+        Dim teacher = JsonHelpers.GetString(c, "teacher")
+        Dim availDaysList = JsonHelpers.AsStringList(c, "available_days")
+        Dim availDays As New HashSet(Of String)(If(availDaysList.Any(), availDaysList, days))
+        Dim blocked As New HashSet(Of (Day As String, Period As Integer))
+        If c.ContainsKey("unavailable_periods") AndAlso c("unavailable_periods") IsNot Nothing Then
+            For Each node In c("unavailable_periods").AsArray()
+                Dim entryObj = node.AsObject()
+                blocked.Add((JsonHelpers.GetString(entryObj, "day"), JsonHelpers.GetInt(entryObj, "period").Value))
+            Next
+        End If
+        Dim taViolated As BoolVar = Nothing
+        If priority = JsonHelpers.PriorityShould Then
+            taViolated = GetOrCreateKannVar(model, kannVars, ci, "teacher_availability", JsonHelpers.GetReason(c))
+        End If
+        For Each s In sessions.Where(Function(x) x.Teacher = teacher)
+            For Each d In days
+                For Each p In periods
+                    If Not availDays.Contains(d) OrElse blocked.Contains((d, p)) Then
+                        Dim con = model.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)) = 0)
+                        If taViolated IsNot Nothing Then con.OnlyEnforceIf(taViolated.Not())
+                    End If
+                Next
+            Next
+        Next
+    End Sub
+
+    Private Sub ApplyWeeklyHours(model As CpModel, c As JsonObject, ci As Integer, priority As String,
+                                  sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                  days As List(Of String), periods As List(Of Integer),
+                                  kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)))
+        Dim className = JsonHelpers.GetString(c, "class")
+        Dim subject = JsonHelpers.GetString(c, "subject")
+        Dim hoursPerWeek = JsonHelpers.GetInt(c, "hours_per_week").Value
+        Dim maxPerDay = JsonHelpers.GetInt(c, "max_per_day")
+        ' priority only ever governs the max_per_day cap below -
+        ' hours_per_week's exact-count stays always-must
+        ' (Validation.vb rejects "should" without max_per_day).
+        Dim whViolated As BoolVar = Nothing
+        If priority = JsonHelpers.PriorityShould Then
+            whViolated = GetOrCreateKannVar(model, kannVars, ci, "weekly_hours", JsonHelpers.GetReason(c))
+        End If
+        For Each s In sessions.Where(Function(x) x.Subject = subject AndAlso x.ClassName = className)
+            Dim terms As New List(Of BoolVar)
+            For Each d In days
+                For Each p In periods
+                    terms.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)))
+                Next
+            Next
+            model.Add(LinearExpr.Sum(terms) = hoursPerWeek)
+
+            If maxPerDay.HasValue AndAlso maxPerDay.Value <> 0 Then
+                For Each d In days
+                    Dim dayTerms = periods.
+                        Select(Function(p) lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p))).
+                        ToList()
+                    Dim con = model.Add(LinearExpr.Sum(dayTerms) <= maxPerDay.Value)
+                    If whViolated IsNot Nothing Then con.OnlyEnforceIf(whViolated.Not())
+                Next
+            End If
+        Next
+    End Sub
+
+    Private Sub ApplyNoOverlap(model As CpModel, c As JsonObject, sessions As List(Of Session),
+                                lesson As Dictionary(Of LessonKey, BoolVar), room As Dictionary(Of RoomKey, BoolVar),
+                                days As List(Of String), periods As List(Of Integer),
+                                parallelGroupOf As Dictionary(Of (ClassName As String, Subject As String, Teacher As String), Integer),
+                                parallelVars As Dictionary(Of (GroupIndex As Integer, Day As String, Period As Integer), BoolVar))
+        Dim resource = JsonHelpers.GetString(c, "resource")
+        Dim entityVal = JsonHelpers.GetString(c, "entity")
+        Dim relevantSessions As List(Of Session)
+        Select Case resource
+            Case "class"
+                relevantSessions = sessions.Where(Function(s) s.ClassName = entityVal).ToList()
+            Case "teacher"
+                relevantSessions = sessions.Where(Function(s) s.Teacher = entityVal).ToList()
+            Case "room"
+                relevantSessions = sessions
+            Case Else
+                relevantSessions = New List(Of Session)
+        End Select
+
+        For Each d In days
+            For Each p In periods
+                Dim terms As New List(Of BoolVar)
+                If resource = "room" Then
+                    For Each s In relevantSessions
+                        Dim key As New RoomKey(s.ClassName, s.Subject, s.Teacher, d, p, entityVal)
+                        If room.ContainsKey(key) Then terms.Add(room(key))
+                    Next
+                Else
+                    ' Phase 2.20: Sessions belonging to the same
+                    ' Parallelgruppe must contribute only ONE
+                    ' shared term (the group's own parallelVar
+                    ' for this slot) instead of one term per
+                    ' member - their Lesson vars were already
+                    ' forced equal in the pre-pass, so summing
+                    ' each individually would count the same
+                    ' value multiple times and force the group
+                    ' permanently to 0 (the exact degeneracy the
+                    ' Plan-Agent review flagged).
+                    Dim countedGroups As New HashSet(Of Integer)
+                    For Each s In relevantSessions
+                        Dim gi As Integer
+                        If parallelGroupOf.TryGetValue((s.ClassName, s.Subject, s.Teacher), gi) Then
+                            If countedGroups.Add(gi) Then terms.Add(parallelVars((gi, d, p)))
+                        Else
+                            terms.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)))
+                        End If
+                    Next
+                End If
+                If terms.Count > 0 Then
+                    model.Add(LinearExpr.Sum(terms) <= 1)
+                End If
+            Next
+        Next
+    End Sub
+
+    Private Sub ApplySharedResourceConflict(model As CpModel, c As JsonObject, sessions As List(Of Session),
+                                             lesson As Dictionary(Of LessonKey, BoolVar),
+                                             days As List(Of String), periods As List(Of Integer))
+        Dim classesInvolved = JsonHelpers.AsStringList(c, "classes")
+        Dim sharedSubject = JsonHelpers.GetString(c, "subject")
+        Dim sharedTeacher = JsonHelpers.GetString(c, "teacher")
+        Dim relevantSessions = classesInvolved.
+            SelectMany(Function(cls) sessions.Where(Function(s) s.Subject = sharedSubject AndAlso s.ClassName = cls)).
+            Where(Function(s) s.Teacher = sharedTeacher).
+            ToList()
+        For Each d In days
+            For Each p In periods
+                Dim terms = relevantSessions.
+                    Select(Function(s) lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p))).
+                    ToList()
+                If terms.Count > 0 Then
+                    model.Add(LinearExpr.Sum(terms) <= 1)
+                End If
+            Next
+        Next
+    End Sub
+
+    Private Sub ApplyForbiddenSlot(model As CpModel, c As JsonObject, ci As Integer, priority As String,
+                                    sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                    room As Dictionary(Of RoomKey, BoolVar),
+                                    kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)))
+        Dim scope = JsonHelpers.GetString(c, "scope")
+        Dim entityVal = JsonHelpers.GetString(c, "entity")
+        Dim day = JsonHelpers.GetString(c, "day")
+        Dim period = JsonHelpers.GetInt(c, "period").Value
+
+        Dim relevantSessions As List(Of Session)
+        Select Case scope
+            Case "class"
+                relevantSessions = sessions.Where(Function(s) s.ClassName = entityVal).ToList()
+            Case "teacher"
+                relevantSessions = sessions.Where(Function(s) s.Teacher = entityVal).ToList()
+            Case "room"
+                relevantSessions = sessions
+            Case Else
+                relevantSessions = New List(Of Session)
+        End Select
+
+        Dim fsViolated As BoolVar = Nothing
+        If priority = JsonHelpers.PriorityShould Then
+            fsViolated = GetOrCreateKannVar(model, kannVars, ci, "forbidden_slot", JsonHelpers.GetReason(c))
+        End If
+
+        If scope = "room" Then
+            For Each s In relevantSessions
+                Dim key As New RoomKey(s.ClassName, s.Subject, s.Teacher, day, period, entityVal)
+                If room.ContainsKey(key) Then
+                    Dim con = model.Add(room(key) = 0)
+                    If fsViolated IsNot Nothing Then con.OnlyEnforceIf(fsViolated.Not())
+                End If
+            Next
+        Else
+            For Each s In relevantSessions
+                Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, day, period)
+                If lesson.ContainsKey(key) Then
+                    Dim con = model.Add(lesson(key) = 0)
+                    If fsViolated IsNot Nothing Then con.OnlyEnforceIf(fsViolated.Not())
+                End If
+            Next
+        End If
+    End Sub
+
+    ''' <summary>Phase 2.23: positives Gegenstueck zu forbidden_slot -
+    ''' erzwingt (statt verbietet) eine (Klasse,Fach)-Session auf einem
+    ''' exakten (Tag,Periode)-Slot. Kombiniert mit dem bestehenden
+    ''' parallel_group-Pre-Pass reicht es, NUR EIN Mitglied einer
+    ''' synchronisierten Gruppe zu pinnen - die per Gleichheit gekoppelten
+    ''' uebrigen Mitglieder wandern automatisch mit.</summary>
+    Private Sub ApplyRequiredSlot(model As CpModel, c As JsonObject, ci As Integer, priority As String,
+                                   sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                   kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)))
+        Dim reqClassName = JsonHelpers.GetString(c, "class")
+        Dim reqSubject = JsonHelpers.GetString(c, "subject")
+        Dim reqDay = JsonHelpers.GetString(c, "day")
+        Dim reqPeriod = JsonHelpers.GetInt(c, "period").Value
+
+        Dim rsViolated As BoolVar = Nothing
+        If priority = JsonHelpers.PriorityShould Then
+            rsViolated = GetOrCreateKannVar(model, kannVars, ci, "required_slot", JsonHelpers.GetReason(c))
+        End If
+
+        For Each s In sessions.Where(Function(x) x.Subject = reqSubject AndAlso x.ClassName = reqClassName)
+            Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, reqDay, reqPeriod)
+            If lesson.ContainsKey(key) Then
+                Dim con = model.Add(lesson(key) = 1)
+                If rsViolated IsNot Nothing Then con.OnlyEnforceIf(rsViolated.Not())
+            End If
+        Next
+    End Sub
+
+    ''' <summary>Subject-agnostic sibling of required_slot: "this class/
+    ''' teacher should have SOME lesson (any subject) at this exact
+    ''' (day,period)" - a scheduling-DENSITY preference, not a specific
+    ''' subject placement (an OR over the class'/teacher's own sessions at
+    ''' that slot, forbidden_slot's exact negation: that forces the SUM to
+    ''' 0, this forces it to &gt;= 1). Eine leere Treffermenge ist seit der
+    ''' Review-Umsetzung (R2) ein Validation-Fehler statt eines stillen
+    ''' No-Ops hier.</summary>
+    Private Sub ApplyOccupiedSlot(model As CpModel, c As JsonObject, ci As Integer, priority As String,
+                                   sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                   kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)))
+        Dim occScope = JsonHelpers.GetString(c, "scope")
+        Dim occEntity = JsonHelpers.GetString(c, "entity")
+        Dim occDay = JsonHelpers.GetString(c, "day")
+        Dim occPeriod = JsonHelpers.GetInt(c, "period").Value
+
+        Dim occRelevantSessions As List(Of Session)
+        Select Case occScope
+            Case "class"
+                occRelevantSessions = sessions.Where(Function(s) s.ClassName = occEntity).ToList()
+            Case "teacher"
+                occRelevantSessions = sessions.Where(Function(s) s.Teacher = occEntity).ToList()
+            Case Else
+                occRelevantSessions = New List(Of Session)
+        End Select
+
+        Dim occViolated As BoolVar = Nothing
+        If priority = JsonHelpers.PriorityShould Then
+            occViolated = GetOrCreateKannVar(model, kannVars, ci, "occupied_slot", JsonHelpers.GetReason(c))
+        End If
+
+        Dim occVars As New List(Of BoolVar)
+        For Each s In occRelevantSessions
+            Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, occDay, occPeriod)
+            If lesson.ContainsKey(key) Then occVars.Add(lesson(key))
+        Next
+        If occVars.Count > 0 Then
+            Dim con = model.Add(LinearExpr.Sum(occVars) >= 1L)
+            If occViolated IsNot Nothing Then con.OnlyEnforceIf(occViolated.Not())
+        End If
+    End Sub
+
+    ''' <summary>Code-Review-Umsetzung (P1): kompaktes Gegenstueck zur
+    ''' occupied_slot-BATTERIE - EIN Constraint-Objekt beschreibt ein
+    ''' ganzes (Tage x from_period..to_period)-Belegungsfenster einer
+    ''' Klasse/Lehrkraft statt einer Regel pro Slot. `must` erzwingt hier
+    ''' jeden Fenster-Slot hart (Sum >= 1, wie eine must-occupied_slot-
+    ''' Batterie, nur als ein Objekt). `should` erzeugt BEWUSST KEINE
+    ''' Kann-BoolVars: das Dichte-Defizit fliesst stattdessen als reine
+    ''' Linearsumme ueber das occupied-Scaffolding in SolveTops
+    ''' Zielfunktion ein (SolveTopObjective.BuildQualityTerms,
+    ''' QualityWeights.OccupiedDensity) - der P1-Befund war ja gerade,
+    ''' dass hunderte reifizierte Kann-Terme mit Gewicht 100 CP-SATs
+    ''' Bound-Beweis strukturell verhindern. Konsequenz: ein
+    ''' should-occupied_window hat im reinen Solve()/BuildModel-Pfad
+    ''' (Kann-only-Objective) keine Wirkung - es ist ein
+    ''' SolveTop-Qualitaetskriterium. occupied_slot bleibt als Typ
+    ''' vollstaendig erhalten (per-Slot-Kann-Semantik, wo genau EIN
+    ''' einzelner Slot gemeint ist).</summary>
+    Private Sub ApplyOccupiedWindow(model As CpModel, c As JsonObject, priority As String,
+                                     sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                     days As List(Of String))
+        If priority = JsonHelpers.PriorityShould Then Return
+
+        Dim scope = JsonHelpers.GetString(c, "scope")
+        Dim entity = JsonHelpers.GetString(c, "entity")
+        Dim fromPeriod = JsonHelpers.GetInt(c, "from_period").Value
+        Dim toPeriod = JsonHelpers.GetInt(c, "to_period").Value
+        Dim windowDaysList = JsonHelpers.AsStringList(c, "days")
+        Dim windowDays = If(windowDaysList.Any(), windowDaysList, days)
+
+        Dim relevantSessions As List(Of Session)
+        Select Case scope
+            Case "class"
+                relevantSessions = sessions.Where(Function(s) s.ClassName = entity).ToList()
+            Case "teacher"
+                relevantSessions = sessions.Where(Function(s) s.Teacher = entity).ToList()
+            Case Else
+                relevantSessions = New List(Of Session)
+        End Select
+
+        For Each d In windowDays
+            For p = fromPeriod To toPeriod
+                Dim slotVars As New List(Of BoolVar)
+                For Each s In relevantSessions
+                    Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)
+                    If lesson.ContainsKey(key) Then slotVars.Add(lesson(key))
+                Next
+                If slotVars.Count > 0 Then
+                    model.Add(LinearExpr.Sum(slotVars) >= 1L)
+                End If
+            Next
+        Next
+    End Sub
+
+    Private Sub ApplyConsecutiveRequired(model As CpModel, c As JsonObject, ci As Integer, priority As String,
+                                          sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                          days As List(Of String), periods As List(Of Integer),
+                                          kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)))
+        Dim className = JsonHelpers.GetString(c, "class")
+        Dim subject = JsonHelpers.GetString(c, "subject")
+        Dim blockLen = JsonHelpers.GetInt(c, "block_length").Value
+        Dim crViolated As BoolVar = Nothing
+        If priority = JsonHelpers.PriorityShould Then
+            crViolated = GetOrCreateKannVar(model, kannVars, ci, "consecutive_required", JsonHelpers.GetReason(c))
+        End If
+        For Each s In sessions.Where(Function(x) x.Subject = subject AndAlso x.ClassName = className)
+            AddBlockConstraint(model, lesson, s, days, periods, blockLen, crViolated)
         Next
     End Sub
 
@@ -757,20 +864,39 @@ Public Module Solver
     ''' of its multi-solution loop without duplicating it.</summary>
     Private Function ExtractSchedule(built As BuiltModel, solver As CpSolver, status As CpSolverStatus) As List(Of ScheduleEntry)
         If status <> CpSolverStatus.Optimal AndAlso status <> CpSolverStatus.Feasible Then Return Nothing
+
+        ' Code-Review-Umsetzung (P5): das Room-Dictionary EINMAL nach dem
+        ' Lesson-Schluessel gruppieren statt es fuer jede wahre Lesson-Var
+        ' komplett linear zu durchsuchen - die Extraktion faellt damit von
+        ' O(Lessons x Rooms) auf O(Lessons + Rooms), spuerbar bei
+        ' Szenarien mit room_requirement und vielen max_solutions-
+        ' Iterationen (die Extraktion laeuft einmal pro Iteration).
+        Dim roomsByLesson As New Dictionary(Of LessonKey, List(Of (Room As String, Var As BoolVar)))
+        For Each rkvp In built.Room
+            Dim rk = rkvp.Key
+            Dim lessonKey As New LessonKey(rk.ClassName, rk.Subject, rk.Teacher, rk.Day, rk.Period)
+            Dim candidates As List(Of (Room As String, Var As BoolVar)) = Nothing
+            If Not roomsByLesson.TryGetValue(lessonKey, candidates) Then
+                candidates = New List(Of (Room As String, Var As BoolVar))
+                roomsByLesson(lessonKey) = candidates
+            End If
+            candidates.Add((rk.Room, rkvp.Value))
+        Next
+
         Dim schedule As New List(Of ScheduleEntry)
         For Each kvp In built.Lesson
             If solver.BooleanValue(kvp.Value) Then
                 Dim key = kvp.Key
                 Dim assignedRoom As String = Nothing
-                For Each rkvp In built.Room
-                    Dim rk = rkvp.Key
-                    If rk.ClassName = key.ClassName AndAlso rk.Subject = key.Subject AndAlso
-                       rk.Teacher = key.Teacher AndAlso rk.Day = key.Day AndAlso rk.Period = key.Period AndAlso
-                       solver.BooleanValue(rkvp.Value) Then
-                        assignedRoom = rk.Room
-                        Exit For
-                    End If
-                Next
+                Dim candidates As List(Of (Room As String, Var As BoolVar)) = Nothing
+                If roomsByLesson.TryGetValue(key, candidates) Then
+                    For Each candidate In candidates
+                        If solver.BooleanValue(candidate.Var) Then
+                            assignedRoom = candidate.Room
+                            Exit For
+                        End If
+                    Next
+                End If
                 schedule.Add(New ScheduleEntry With {
                     .ClassName = key.ClassName, .Subject = key.Subject, .Teacher = key.Teacher,
                     .Day = key.Day, .Period = key.Period, .Room = assignedRoom
@@ -819,16 +945,35 @@ Public Module Solver
     ''' implements ILiteral directly (no cast needed) and this exact
     ''' true-Not()/false-as-is split enumerates a small model's full
     ''' distinct-assignment space with zero duplicates/omissions.</summary>
-    Private Sub BlockSolution(model As CpModel, lesson As Dictionary(Of LessonKey, BoolVar), solver As CpSolver)
+    ''' <summary>Code-Review-Umsetzung (P3): `minDiversity >= 1` ergaenzt
+    ''' den exakten No-Good um einen echten Distanz-Cut - mindestens
+    ''' `minDiversity` der soeben WAHREN Lesson-Vars muessen in jeder
+    ''' spaeteren Loesung aus sein (`Sum(wahre Vars) <= Anzahl - d`). Da
+    ''' `weekly_hours` die Gesamtzahl wahrer Lesson-Vars fixiert, erzwingt
+    ''' das effektiv eine Mindest-Hamming-Distanz von 2*minDiversity zur
+    ''' blockierten Loesung, statt (wie der No-Good allein) triviale
+    ''' Ein-Slot-Nachbarn als "verschieden" zuzulassen. Der No-Good bleibt
+    ''' zusaetzlich immer gesetzt (bei minDiversity=0 unveraendert das
+    ''' einzige, exakt heutige Verhalten). Ein minDiversity groesser als
+    ''' die Anzahl wahrer Vars verlangt vollstaendige Disjunktheit - das
+    ''' darf (gewollt) zu SearchSpaceExhausted fuehren, wenn es keine so
+    ''' verschiedene Loesung gibt.</summary>
+    Private Sub BlockSolution(model As CpModel, lesson As Dictionary(Of LessonKey, BoolVar), solver As CpSolver,
+                               Optional minDiversity As Integer = 0)
         Dim literals As New List(Of ILiteral)
+        Dim trueVars As New List(Of BoolVar)
         For Each kvp In lesson
             If solver.BooleanValue(kvp.Value) Then
                 literals.Add(kvp.Value.Not())
+                trueVars.Add(kvp.Value)
             Else
                 literals.Add(kvp.Value)
             End If
         Next
         model.AddBoolOr(literals)
+        If minDiversity >= 1 AndAlso trueVars.Count > 0 Then
+            model.Add(LinearExpr.Sum(trueVars) <= CLng(trueVars.Count) - CLng(minDiversity))
+        End If
     End Sub
 
     ''' <summary>Phase 2.25: runs `solver.Solve(model, callback)` on a
@@ -933,7 +1078,24 @@ Public Module Solver
     ''' portfolio threading isn't already providing that). `relativeGapLimit`
     ''' stays opt-in (default Nothing) - unlike the above, it changes WHEN
     ''' CP-SAT accepts a solution as proven-final, a stronger behavioral
-    ''' change this phase deliberately does not force on every caller.</summary>
+    ''' change this phase deliberately does not force on every caller.
+    '''
+    ''' Code-Review-Umsetzung (P2/P3): `lexicographic` (Default True seit
+    ''' der expliziten Nutzerentscheidung dieser Review-Runde - eine
+    ''' bewusste Ausnahme von der "Default = altes Verhalten"-Konvention,
+    ''' wie zuvor schon stagnationTimeoutS) optimiert Kann -> ClassGaps
+    ''' als einzeln beweisbare Stufen und fixiert jedes Stufenoptimum als
+    ''' Constraint (`lexTolerance` weitet das Band pro Stufe);
+    ''' `lexTeacherGapsStage` (opt-in, Default False) haengt TeacherGaps
+    ''' als dritte Stufe an - ohne sie bleibt TeacherGaps gewichtet in der
+    ''' Rest-Zielfunktion. `lexicographic:=False` liefert den frueheren
+    ''' gewichteten Summenmodus unveraendert. `minDiversity` (Default 0 =
+    ''' heutiges Verhalten)
+    ''' erzwingt pro bereits gefundener Loesung einen echten Distanz-Cut
+    ''' statt nur des exakten No-Goods (siehe BlockSolution).
+    ''' `rehintFoundSolutions` (Default True = heutiges Verhalten) steuert,
+    ''' ob jede Iteration auf die soeben gefundene Loesung gehintet wird -
+    ''' fuer Diversitaets-Laeufe auf False setzen.</summary>
     Public Function SolveTop(data As JsonObject,
                               Optional maxSolutions As Integer = 10,
                               Optional totalTimeLimitS As Double = 120.0,
@@ -946,27 +1108,111 @@ Public Module Solver
                               Optional stagnationTimeoutS As Double? = 45.0,
                               Optional diversifySeed As Boolean = True,
                               Optional randomizeSearch As Boolean = True,
-                              Optional relativeGapLimit As Double? = Nothing) As MultiSolveResult
+                              Optional relativeGapLimit As Double? = Nothing,
+                              Optional lexicographic As Boolean = True,
+                              Optional lexTolerance As Integer = 0,
+                              Optional lexTeacherGapsStage As Boolean = False,
+                              Optional lexOccupiedDensityStage As Boolean = False,
+                              Optional minDiversity As Integer = 0,
+                              Optional rehintFoundSolutions As Boolean = True,
+                              Optional laterIterationsGapLimit As Double? = Nothing) As MultiSolveResult
         Dim weights = If(qualityWeights, New QualityWeights())
         Dim built = BuildCoreModel(data)
         Dim sw = Stopwatch.StartNew()
 
-        If useStagedHints Then
-            Dim stage1Limit = Math.Min(stage1TimeLimitS, Math.Max(totalTimeLimitS - sw.Elapsed.TotalSeconds, 0.0))
-            If stage1Limit > 0 Then
-                If built.KannVars.Count > 0 Then
-                    built.Model.Minimize(KannOnlyObjectiveExpr(built.KannVars))
-                End If
-                Dim stage1Solver As New CpSolver()
-                stage1Solver.StringParameters = $"max_time_in_seconds:{stage1Limit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
-                Dim stage1Status = stage1Solver.Solve(built.Model)
-                If stage1Status = CpSolverStatus.Optimal OrElse stage1Status = CpSolverStatus.Feasible Then
-                    ApplyLessonHints(built.Model, built.Lesson, stage1Solver)
+        If lexicographic Then
+            ' Code-Review-Umsetzung (P2): lexikografische Stufen statt einer
+            ' einzigen grossen gewichteten Summe. Motiviert durch die
+            ' Phase-2.25-Livemessungen (Kann-only beweist Optimal in 0,2s,
+            ' das 7-Kriterien-Summenmodell blieb bei 97-99% Restluecke):
+            ' Kann -> ClassGaps -> TeacherGaps werden nacheinander einzeln
+            ' minimiert und ihr jeweils gefundenes Optimum als Constraint
+            ' fixiert (`<= opt + lexTolerance`), dann laeuft die normale
+            ' Iterationsschleife mit der gewichteten Rest-Zielfunktion
+            ' (EdgePeriod/AfternoonDayCount/LoadVariance, soweit aktiv)
+            ' innerhalb dieses Toleranzbands. Re-Minimize auf demselben
+            ' CpModel ersetzt die Zielfunktion nachweislich (dieselbe
+            ' Zwei-Minimize-Sequenz nutzte SolveTop schon vor diesem Umbau,
+            ' Stage 1 -> ApplyQualityObjective; das dokumentierte Fehlen
+            ' von ClearObjective() auf der installierten DLL ist deshalb
+            ' kein Hindernis). Die Stufenreihenfolge ist FIX (Kann vor
+            ' ClassGaps, optional gefolgt von TeacherGaps) - die
+            ' konfigurierten Gewichte steuern in diesem Modus nur noch die
+            ' Rest-Zielfunktion und das nachgelagerte Quality-Ranking,
+            ' nicht mehr die relative Prioritaet der Stufen. Seit der
+            ' expliziten Nutzerentscheidung dieser Review-Runde ist dieser
+            ' Modus DEFAULT (lexicographic:=True) - der gewichtete Modus
+            ' bleibt per lexicographic:=False fuer Aufrufer erreichbar, die
+            ' ihre Prioritaeten frei ueber Gewichte tauschen wollen (siehe
+            ' SolveTopQualityWeightsInfluenceChosenSchedule-Test, der
+            ' genau deshalb explizit False setzt). Die TeacherGaps-Stufe
+            ' ist dabei OPT-IN (lexTeacherGapsStage, Default False -
+            ' ebenfalls Nutzerentscheidung): ohne sie wird TeacherGaps
+            ' nicht hart auf sein Optimum fixiert, sondern wandert mit
+            ' seinem konfigurierten Gewicht in die Rest-Zielfunktion -
+            ' Lehrer-Springstunden bleiben so gegen die uebrigen
+            ' Restkriterien abwaegbar, statt Klassenplaene dem
+            ' Lehrerplan-Optimum unterzuordnen.
+            Dim terms = SolveTopObjective.BuildQualityTerms(built, data, weights)
+            Dim stageExprs As New List(Of LinearExpr)
+            If terms.KannSum IsNot Nothing Then stageExprs.Add(terms.KannSum)
+            ' Dichte-Stufe (opt-in, Antwort auf den P1-Langvergleich): die
+            ' occupied_slot-Batterie dominierte die Fensterabdeckung, weil
+            ' ihre Kann-Stufe der Dichte ein DEDIZIERTES Budget gab und das
+            ' Ergebnis als hartes Band fixierte - diese Stufe gibt dem
+            ' kompakten occupied_window-Kriterium exakt denselben Vorteil,
+            ' ohne zur Batterie zurueckzukehren. Position VOR ClassGaps:
+            ' das entspricht der Batterie-Reihenfolge (Dichte sass dort in
+            ' Stufe 1, ClassGaps folgte) und damit dem Verhalten, gegen das
+            ' der Vergleich gemessen wurde.
+            If lexOccupiedDensityStage AndAlso terms.OccupiedDensitySum IsNot Nothing Then stageExprs.Add(terms.OccupiedDensitySum)
+            If terms.ClassGapsSum IsNot Nothing Then stageExprs.Add(terms.ClassGapsSum)
+            If lexTeacherGapsStage AndAlso terms.TeacherGapsSum IsNot Nothing Then stageExprs.Add(terms.TeacherGapsSum)
+
+            For Each stageExpr In stageExprs
+                Dim stageLimit = Math.Min(stage1TimeLimitS, Math.Max(totalTimeLimitS - sw.Elapsed.TotalSeconds, 0.0))
+                If stageLimit <= 0 Then Exit For
+                built.Model.Minimize(stageExpr)
+                Dim stageSolver As New CpSolver()
+                stageSolver.StringParameters = $"max_time_in_seconds:{stageLimit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
+                Dim stageStatus = stageSolver.Solve(built.Model)
+                If stageStatus <> CpSolverStatus.Optimal AndAlso stageStatus <> CpSolverStatus.Feasible Then Exit For
+                ' Auch ein nur-Feasible-Stufenwert ist eine ERREICHTE obere
+                ' Schranke - sie zu fixieren schneidet keine Loesung ab,
+                ' die besser waere als das bereits Gefundene.
+                Dim stageBound = CLng(Math.Round(stageSolver.ObjectiveValue)) + CLng(Math.Max(lexTolerance, 0))
+                built.Model.Add(stageExpr <= stageBound)
+                If useStagedHints Then ApplyLessonHints(built.Model, built.Lesson, stageSolver)
+            Next
+
+            ' Rest-Zielfunktion fuer die Iterationsschleife: die nicht
+            ' gestuften Kriterien; existiert keines, die (jetzt eng
+            ' eingeschraenkte, daher schnell beweisbare) gewichtete
+            ' Gesamtsumme - so behaelt jede Iteration eine wohldefinierte
+            ' ObjectiveValue/Bound-Semantik.
+            Dim finalObjective = SolveTopObjective.WeightedResidual(terms, weights,
+                teacherGapsInResidual:=Not lexTeacherGapsStage,
+                occupiedDensityInResidual:=Not lexOccupiedDensityStage)
+            If finalObjective Is Nothing Then finalObjective = SolveTopObjective.WeightedTotal(terms, weights)
+            If finalObjective IsNot Nothing Then built.Model.Minimize(finalObjective)
+        Else
+            If useStagedHints Then
+                Dim stage1Limit = Math.Min(stage1TimeLimitS, Math.Max(totalTimeLimitS - sw.Elapsed.TotalSeconds, 0.0))
+                If stage1Limit > 0 Then
+                    If built.KannVars.Count > 0 Then
+                        built.Model.Minimize(KannOnlyObjectiveExpr(built.KannVars))
+                    End If
+                    Dim stage1Solver As New CpSolver()
+                    stage1Solver.StringParameters = $"max_time_in_seconds:{stage1Limit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
+                    Dim stage1Status = stage1Solver.Solve(built.Model)
+                    If stage1Status = CpSolverStatus.Optimal OrElse stage1Status = CpSolverStatus.Feasible Then
+                        ApplyLessonHints(built.Model, built.Lesson, stage1Solver)
+                    End If
                 End If
             End If
-        End If
 
-        SolveTopObjective.ApplyQualityObjective(built, data, weights)
+            SolveTopObjective.ApplyQualityObjective(built, data, weights)
+        End If
         Dim solutions As New List(Of ScoredSolution)
         Dim iterations = 0
         Dim stagnationTriggeredCount = 0
@@ -987,7 +1233,15 @@ Public Module Solver
             Dim effectiveSeed = If(diversifySeed, seed + iterations, seed)
             Dim paramsStr = $"max_time_in_seconds:{thisLimit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{effectiveSeed},num_search_workers:{numWorkers}"
             If randomizeSearch Then paramsStr &= ",randomize_search:true"
-            If relativeGapLimit.HasValue Then paramsStr &= $",relative_gap_limit:{relativeGapLimit.Value.ToString(Globalization.CultureInfo.InvariantCulture)}"
+            ' P6: laterIterationsGapLimit gilt ab der ZWEITEN Iteration und
+            ' ueberstimmt dort ein gesetztes relativeGapLimit - die erste
+            ' Iteration darf weiterhin sorgfaeltig beweisen, waehrend
+            ' Folge-Iterationen (deren Zweck ALTERNATIVEN sind, kein
+            ' besseres Optimum) eine Loesung innerhalb dieser relativen
+            ' Luecke frueher akzeptieren und so mehr Kandidaten ins selbe
+            ' Gesamtbudget passen. Nothing = unveraendertes Verhalten.
+            Dim effectiveGapLimit = If(iterations >= 1 AndAlso laterIterationsGapLimit.HasValue, laterIterationsGapLimit, relativeGapLimit)
+            If effectiveGapLimit.HasValue Then paramsStr &= $",relative_gap_limit:{effectiveGapLimit.Value.ToString(Globalization.CultureInfo.InvariantCulture)}"
 
             Dim solver As New CpSolver()
             solver.StringParameters = paramsStr
@@ -1020,8 +1274,15 @@ Public Module Solver
                 .ObjectiveValue = solver.ObjectiveValue, .BestObjectiveBound = solver.BestObjectiveBound,
                 .Convergence = convergenceCb.Points})
 
-            BlockSolution(built.Model, built.Lesson, solver)
-            If useStagedHints Then ApplyLessonHints(built.Model, built.Lesson, solver)
+            BlockSolution(built.Model, built.Lesson, solver, minDiversity)
+            ' P3: das Re-Hinting auf die soeben blockierte Loesung ist eine
+            ' AEHNLICHKEITS-Heuristik (beschleunigt Feasibility, zieht die
+            ' naechste Iteration aber aktiv zum naechstgelegenen Nachbarn) -
+            ' fuer Laeufe, deren Ziel DIVERSE Alternativen sind, per
+            ' rehintFoundSolutions:=False abschaltbar; der Stage-1-/Stufen-
+            ' Warm-Start-Hint vor der ersten Iteration bleibt davon
+            ' unberuehrt.
+            If useStagedHints AndAlso rehintFoundSolutions Then ApplyLessonHints(built.Model, built.Lesson, solver)
         Loop
 
         Return New MultiSolveResult With {

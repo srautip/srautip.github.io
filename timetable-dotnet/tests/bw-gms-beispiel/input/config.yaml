@@ -5,11 +5,11 @@
 # FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
 # "CP-SAT-Status"-Feld in output/stundenplan.md.
 #
-# Kurzauftrag: laengerer Lauf mit 60-Min-Gesamtbudget (vorher 5 Min) -
-# der letzte 5-Min-Testlauf erreichte nur Feasible mit 28 Kann-
-# Verstoessen (occupied_slot-Luecken), mehr Zeit soll pruefen, ob das
-# verbessert werden kann.
-solve_time_limit_s: 3600.0
+# Kurzauftrag (P1-Langvergleich): 20-Min-Budget fuer den erneuten
+# Performancevergleich "occupied_slot-Batterie (720 Kann-Regeln) vs.
+# occupied_window (24 Regeln)" - Messwerte beider Budgets (300s und
+# 1200s) im Kommentar bei quality_weights unten.
+solve_time_limit_s: 1200.0
 
 # Deutlich groesser/komplexer als das vorherige generische Beispiel (24
 # statt 12 Klassen, 114 Gruppen fuer Niveau-/WPF-/Profil-/Religions-
@@ -24,38 +24,148 @@ lehrereinsatz_time_limit_s: 180.0
 num_workers: 4
 
 # Begrenzt (getrennt von solve_time_limit_s) jede EINZELNE Solve-
-# Iteration in Solver.SolveTop - bewusst deutlich unter dem 5-Min-
-# Gesamtbudget, damit innerhalb der 300s mehrere Iterationen (= mehrere
-# verschiedene Loesungen) Platz haben, statt dass die erste Iteration
-# allein das komplette Budget verbraucht.
-per_solve_time_limit_s: 60.0
+# Iteration in Solver.SolveTop. Nutzervorgabe fuer den 20-Min-Vergleich:
+# 120s statt 60s - der Langvergleich zeigte, dass die erste Iteration
+# der occupied_window-Variante im 60s-Fenster teils gar keine Loesung
+# fand (TimeLimitReached ohne Kandidaten, 2 von 4 Laeufen); das
+# groessere Fenster gibt der ersten Feasibility-Suche Luft, waehrend
+# die Stagnationserkennung (unten) bereits konvergierte Iterationen
+# weiterhin frueh beendet.
+per_solve_time_limit_s: 120.0
+
+# Budget je lexikografischer Stufe (Kann/ClassGaps) - gleiche
+# Begruendung wie per_solve_time_limit_s: eine Stufe, die in 60s keine
+# Loesung findet, hinterlaesst den Folge-Iterationen keinen
+# Warm-Start-Hint (kalter Start = der beobachtete Fehlermodus).
+stage1_time_limit_s: 120.0
 
 # Phase 2.25: bricht eine einzelne Solve-Iteration vorzeitig ab, sobald so
 # lange keine neue Verbesserung mehr gefunden wurde - die gesparte Zeit
-# steht der naechsten Iteration zur Verfuegung (Nutzervorgabe: 20s statt
-# des Defaults 45.0s, damit eine feststeckende Iteration frueher abbricht
-# und die eingesparte Zeit weiteren Versuchen zugutekommt).
+# steht der naechsten Iteration zur Verfuegung (20s: eine feststeckende
+# Iteration bricht frueh ab, die eingesparte Zeit kommt weiteren
+# Versuchen zugute; greift erst, sobald mindestens eine Loesung der
+# Iteration existiert - die erste Feasibility-Suche bekommt also die
+# vollen 120s).
 stagnation_timeout_s: 20.0
 
 # Phase 2.21: wie viele vergleichbare Loesungs-Alternativen sollen in
 # output/stundenplan.json + output/stundentafel.html exportiert werden?
-# Das Gesamt-Zeitbudget bleibt unabhaengig davon durch solve_time_limit_s
-# gedeckelt (Solver.SolveTop prueft das verbleibende Budget vor jeder
-# weiteren Iteration) - ein hoeherer Wert verlangsamt den Lauf also nicht
-# ueber das obige Zeitbudget hinaus.
-max_solutions: 5
+# Nutzervorgabe fuer den 20-Min-Vergleich: hoch genug, dass das
+# ZEITBUDGET (nicht dieses Feld) die begrenzende Groesse ist - der
+# erste 20-Min-Batterie-Lauf erreichte max_solutions=5 bereits nach
+# 432s und liess den Rest des Budgets ungenutzt.
+max_solutions: 40
 
 # Phase 2.24/2.25-Nachtrag-2: die vier Sekundaerkriterien Randstunden/
 # Nachmittags-Tage/Klassen-/Lehrer-Tagesausgewogenheit sind fuer dieses
 # Beispiel STRUKTURELL abgeschaltet (keine Hilfsvariablen im CP-SAT-
 # Modell, nicht nur Gewicht 0) - reduziert die Modellgroesse fuer dieses
 # ohnehin schon deutlich groessere Szenario (24 Klassen, 114 Gruppen).
-# Nur Kann/ClassGaps/TeacherGaps fliessen noch in die Suche ein.
-# ScheduleQuality.Score zeigt die echten Werte dieser vier Kriterien in
-# stundenplan.md/stundenplan.json trotzdem weiterhin an (nur die SUCHE
-# ist dafuer blind, nicht die Anzeige).
+# In die Suche fliessen damit Kann (lexikografische Stufe 1 - seit der
+# P1-Umstellung nur noch die 15 room_requirement-Wuensche statt
+# zusaetzlich 720 occupied_slot-Regeln), ClassGaps (Stufe 2) sowie
+# TeacherGaps und die occupied_window-Dichte (beide Rest-Zielfunktion)
+# ein. ScheduleQuality.Score zeigt die echten Werte aller Kriterien in
+# stundenplan.md/stundenplan.json weiterhin an (nur die SUCHE ist fuer
+# die abgeschalteten blind, nicht die Anzeige).
 quality_weights:
+  # P1-Performancevergleich (je exakt 300s SolveTop-Budget, identischer
+  # Seed/Config, dieselbe Maschine direkt nacheinander; Lehrereinsatz-
+  # Stufe jeweils identisch Optimal):
+  # - Variante A (720 occupied_slot-Kann-Regeln, alter Stand): 5
+  #   Loesungen, 8 unbelegte Fenster-Slots (beste), Bound 0 / 100%
+  #   Luecke. Wichtig fuer die Einordnung: die Batterie bekam als
+  #   Kann-Kriterium eine EIGENE lexikografische Stufe mit dediziertem
+  #   60s-Budget, deren Ergebnis (8) danach als hartes Band fixiert war.
+  # - Variante B, occupied_density 100: 5 Loesungen, 26-35 unbelegte
+  #   Fenster-Slots, dafuer ~25% weniger Lehrer-Springstunden - ohne
+  #   eigene Stufe konkurriert die Dichte nur gleichgewichtet in der
+  #   Rest-Zielfunktion jeder (per Stagnation-Cutoff frueh gekappten)
+  #   Iteration. Bound ebenfalls 0 / 100%.
+  # - Variante B, occupied_density 500 (dieser Stand): 5 Loesungen,
+  #   13-19 unbelegte Fenster-Slots, dafuer wieder mehr
+  #   Lehrer-Springstunden - das Gewicht verschiebt den Trade-off,
+  #   ersetzt aber kein dediziertes Stufen-Budget. Bound 0 / 100%.
+  # Zwei ehrliche Befunde: (1) der Modell-/Datengewinn ist real (720
+  # Kann-BoolVars + 720 reifizierte Constraints entfallen,
+  # constraints.yaml 5492 -> 622 Zeilen, Laufzeit je Runde ~30-60s
+  # kuerzer), (2) die Bound-Schwaeche dieses Szenarios lag bei diesem
+  # Budget NICHT an der Batterie-Kodierung - sie bleibt auch ohne sie
+  # bestehen (grosse gewichtete Rest-Zielfunktion ueber TeacherGaps +
+  # Dichte bei 24 Klassen) - und die Batterie profitierte von ihrer
+  # eigenen Kann-Stufe. Naheliegender Folgeschritt (offen): eine
+  # opt-in-Dichte-Stufe analog lex_teacher_gaps_stage, die der Dichte
+  # wieder ein dediziertes Budget + hartes Band gibt; dazu ein langer
+  # Lauf (>= 30 Min) mit der neuen Kodierung.
+  #
+  # Nachtrag (P4-P6-Umsetzung, erneuter 300s-Lauf): die Rest-Zielfunktion
+  # rechnet jetzt GCD-normalisiert (Koeffizienten 100/500 -> 1/5,
+  # objective_value entsprechend ~Faktor 100 kleiner; Quality.Total
+  # bleibt auf der vollen Gewichtsskala). Die Bound blieb bei diesem
+  # Budget trotzdem 0. Bei num_workers=4 sind Laeufe trotz fixem Seed
+  # NICHT deterministisch (CP-SAT-Portfolio-Threading).
+  #
+  # 20-MIN-LANGVERGLEICH (je exakt 1200s SolveTop-Budget, max_solutions
+  # 40, per_solve/stage 120s, Stagnation 20s, direkt nacheinander):
+  # - Variante A (720 occupied_slot-Kann-Regeln): 33 Loesungen,
+  #   Fenster-Defizit KONSTANT 8 ueber alle Loesungen (die Kann-Stufe
+  #   fixiert ihr Optimum als hartes Band), TeacherGaps 50-60,
+  #   ClassGaps ueberall 0, beste Quality.Total 9062.
+  # - Variante B (24 occupied_window, dieser Stand): 22 Loesungen,
+  #   Fenster-Defizit 12-22 (bestes 12), TeacherGaps 50-68, ClassGaps
+  #   ueberall 0. Ein frueherer B-Lauf mit per_solve 60s scheiterte
+  #   komplett (erste Iteration ohne Feasibility) - die 120s-Fenster
+  #   beheben das.
+  # Ehrliches Fazit nach 20 Min: auf der Zielmetrik Fensterabdeckung
+  # DOMINIERT die Batterie-Variante (8 ueberall vs. bestenfalls 12)
+  # bei gleichem besten TeacherGaps-Wert (50) - ihr struktureller
+  # Vorteil ist die dedizierte Kann-Stufe (eigenes Budget + hartes
+  # Band), nicht die Kodierung selbst; die Bound blieb in BEIDEN
+  # Varianten 0. Der Kompaktheitsgewinn von occupied_window (keine 720
+  # Kann-BoolVars, constraints.yaml 5492 -> 622 Zeilen) steht damit
+  # weiterhin gegen einen realen Qualitaetsrueckstand auf der
+  # Dichte-Metrik. Vorgesehene Abhilfe (offen): opt-in-Dichte-STUFE
+  # analog lex_teacher_gaps_stage - sie gaebe dem kompakten Kriterium
+  # exakt den Stufen-Vorteil der Batterie zurueck. Bis dahin bleibt
+  # fuer diese Schule auch die Rueckkehr zur Batterie eine legitime
+  # Option (occupied_slot ist als Typ vollstaendig erhalten).
+  occupied_density: 500.0
   include_edge_period: false
   include_afternoon_day_count: false
   include_class_load_variance: false
   include_teacher_load_variance: false
+
+# Dichte-STUFE (Antwort auf den 20-Min-Langvergleich oben): die
+# occupied_window-Dichte bekommt als eigene lexikografische Stufe
+# zwischen Kann und ClassGaps ein dediziertes Budget (stage1_time_limit_s)
+# und ihr Optimum wird als hartes Band fixiert - exakt der strukturelle
+# Vorteil, mit dem die Batterie den Vergleich gewann. Das
+# occupied_density-Gewicht steuert damit nur noch das nachgelagerte
+# Quality-Ranking, nicht mehr die Suche.
+#
+# Testlauf mit dieser Stufe (1200s, identische Config wie der
+# 20-Min-Vergleich): 32 Loesungen, Fenster-Defizit KONSTANT 11 (das
+# Band wirkt wie bei der Batterie - vorher ohne Stufe 12-22 streuend),
+# TeacherGaps 44-53 (BESSER als beide Vergleichsvarianten: Batterie
+# 50-60, Fenster ohne Stufe 50-68), ClassGaps ueberall 0. Ehrliche
+# Einordnung: die Batterie-8 wird nicht ganz erreicht (ihr
+# Stufen-Ergebnis ist wie unseres NICHT bewiesen, nur das beste im
+# 120s-Stufenfenster gefundene - der Rest-Abstand 8 vs. 11 kann
+# Stufen-Zufall bei num_workers=4 sein oder an der vorgelagerten
+# Kann-Fixierung der 15 Raumwuensche liegen); dafuer sind die
+# Lehrerplaene durchweg besser. Weder dominiert die Batterie noch die
+# Stufe - die Stufe schliesst den Dichte-Rueckstand weitgehend und
+# gewinnt die Lehrerseite. Moegliche weitere Hebel: stage1_time_limit_s
+# fuer die Dichte-Stufe erhoehen oder lex_tolerance nutzen.
+#
+# Nachtrag (Regenerationslauf fuer den Viewer-Ausbau, gleiche Config):
+# in diesem Lauf fand die Dichte-Stufe ihr Band bei 8 - Fenster-Defizit
+# KONSTANT 8 ueber alle 28 Loesungen, exakt das Batterie-Niveau. Die
+# Stufen-Ergebnisse streuen bei num_workers=4 also lauf-zu-lauf (11 im
+# ersten Lauf, 8 hier), erreichen die Batterie aber nachweislich.
+# Hinweis zur Metrik: seit dem Viewer-Ausbau exportiert stundenplan.json
+# den ECHTEN TeacherGapCount aus ScheduleQuality (dieser Lauf: best 3) -
+# die 44-68 in den Vergleichs-Kommentaren oben stammen aus einer
+# groeberen, Grid-abgeleiteten Naeherung und sind nur untereinander
+# vergleichbar, nicht mit den neuen exportierten Werten.
+lex_occupied_density_stage: true

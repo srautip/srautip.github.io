@@ -147,7 +147,16 @@ Public Module Formatting
     ''' throughout, matching the only JSON-naming convention already
     ''' established in this codebase (Stammdaten.vb's SnakeCaseLower,
     ''' ToJsonPerClass's hand-built lowercase keys).</summary>
-    Public Function ToStundentafelJson(bestand As Stammdatenbestand, data As JsonObject, multiResult As MultiSolveResult) As JsonObject
+    ''' <summary>Viewer-Ausbau Schritt 1 (siehe docs/viewer-ausbau-plan.md):
+    ''' exportiert seither pro Loesung den VOLLEN Qualitaetsvektor (nicht
+    ''' nur quality_total) und top-level die effektiven quality_weights
+    ''' inkl. Include*-Flags - Grundlage fuer Vergleichstabelle,
+    ''' Gewichts-Regler und Pareto-Filter im Stundentafel-Viewer.
+    ''' `weights` = Nothing faellt auf `New QualityWeights()` (die
+    ''' Default-Konstanten) zurueck.</summary>
+    Public Function ToStundentafelJson(bestand As Stammdatenbestand, data As JsonObject, multiResult As MultiSolveResult,
+                                        Optional weights As QualityWeights = Nothing) As JsonObject
+        Dim w = If(weights, New QualityWeights())
         Dim klassenstufenSorted = bestand.Klassenstufen.OrderBy(Function(ks) ks.Nummer).ToList()
         Dim klassenByKlassenstufe = bestand.Klassen.GroupBy(Function(k) k.Klassenstufe).
             ToDictionary(Function(g) g.Key, Function(g) g.ToList())
@@ -204,6 +213,13 @@ Public Module Formatting
                 {"kann_violation_count", sol.Quality.KannViolationCount},
                 {"muss_violation_count", Verifier.VerifySchedule(data, sol.Schedule).Count},
                 {"quality_total", sol.Quality.Total},
+                {"occupied_density_count", sol.Quality.OccupiedDensityCount},
+                {"class_gap_count", sol.Quality.ClassGapCount},
+                {"teacher_gap_count", sol.Quality.TeacherGapCount},
+                {"edge_period_count", sol.Quality.EdgePeriodCount},
+                {"afternoon_day_count", sol.Quality.AfternoonDayCount},
+                {"class_load_variance", sol.Quality.ClassLoadVariance},
+                {"teacher_load_variance", sol.Quality.TeacherLoadVariance},
                 {"objective_value", sol.ObjectiveValue},
                 {"best_objective_bound", sol.BestObjectiveBound},
                 {"gap_percent", gapPercent},
@@ -219,6 +235,23 @@ Public Module Formatting
             {"max_parallel_klassen", maxParallelKlassen},
             {"klassenstufen", klassenstufenJson},
             {"stop_reason", multiResult.StopReason.ToString()},
+            {"quality_weights", New JsonObject From {
+                {"kann", w.Kann},
+                {"class_gaps", w.ClassGaps},
+                {"teacher_gaps", w.TeacherGaps},
+                {"edge_period", w.EdgePeriod},
+                {"afternoon_day_count", w.AfternoonDayCount},
+                {"class_load_variance", w.ClassLoadVariance},
+                {"teacher_load_variance", w.TeacherLoadVariance},
+                {"occupied_density", w.OccupiedDensity},
+                {"include_class_gaps", w.IncludeClassGaps},
+                {"include_teacher_gaps", w.IncludeTeacherGaps},
+                {"include_edge_period", w.IncludeEdgePeriod},
+                {"include_afternoon_day_count", w.IncludeAfternoonDayCount},
+                {"include_class_load_variance", w.IncludeClassLoadVariance},
+                {"include_teacher_load_variance", w.IncludeTeacherLoadVariance},
+                {"include_occupied_density", w.IncludeOccupiedDensity}
+            }},
             {"solutions", solutionsJson}
         }
     End Function

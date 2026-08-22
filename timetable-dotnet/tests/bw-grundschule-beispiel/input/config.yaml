@@ -5,12 +5,11 @@
 # FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
 # "CP-SAT-Status"-Feld in output/stundenplan.md.
 #
-# Kurzauftrag: Testlauf mit 2 Min Gesamtbudget (vorher 10 Min) - Test des
-# neu ins Template uebernommenen Stundentafel-Viewers (Lehrerstundenplan
-# + kaskadierender Klassenstufen/Lehrer-Filter) - siehe
-# per_solve_time_limit_s/stagnation_timeout_s unten fuer die Abstimmung
-# auf "moeglichst viele optimale UND unterschiedliche Loesungen".
-solve_time_limit_s: 120.0
+# Kurzauftrag (Code-Review-Umsetzung P1): 3-Min-Gesamtbudget fuer den
+# Performancevergleich "occupied_slot-Batterie (140 Kann-Regeln) vs.
+# kompaktes occupied_window-Dichte-Kriterium (8 Regeln)" - Messwerte
+# beider Varianten im Kommentar bei quality_weights unten.
+solve_time_limit_s: 180.0
 
 # Anzahl paralleler CP-SAT-Suchpfade (Portfolio-Threading). Hoeher kann
 # helfen, ueberhaupt schneller eine erste Loesung zu finden, geht aber zu
@@ -52,6 +51,29 @@ stagnation_timeout_s: 4.0
 # Feld (sondern das Zeitbudget) die begrenzende Groesse ist.
 max_solutions: 30
 
+# Code-Review-Umsetzung P2: der lexikografische Modus (Kann und
+# ClassGaps als einzeln beweisbare Stufen, Optimum je Stufe als
+# Constraint fixiert, danach Enumeration ueber die gewichtete
+# Rest-Zielfunktion) ist inzwischen PROJEKTWEITER DEFAULT
+# (Nutzerentscheidung) - hier nur noch explizit gesetzt, damit die
+# Kalibrierung dieses Referenzbeispiels selbsterklaerend bleibt.
+# TeacherGaps ist per Default KEINE eigene Stufe
+# (lex_teacher_gaps_stage: false), sondern wirkt mit seinem
+# quality_weights-Gewicht (50) in der Rest-Zielfunktion - abwaegbar
+# gegen Randstunden/Nachmittage/Ausgewogenheit.
+# lex_tolerance 0 = jede exportierte Alternative ist exakt stufen-optimal.
+lexicographic: true
+lex_tolerance: 0
+lex_teacher_gaps_stage: false
+
+# Code-Review-Umsetzung P3: jede weitere Loesung muss mindestens 8 der
+# bisher belegten Slots anders belegen (~5% der Gesamt-Wochenstunden) -
+# echte Alternativen statt Ein-Slot-Nachbarn. Dazu passend das
+# Re-Hinting auf die jeweils letzte Loesung aus (das ist eine
+# Aehnlichkeits-, keine Diversitaetsheuristik).
+min_diversity: 8
+rehint_found_solutions: false
+
 # Phase 2.24/2.25-Nachtrag-2: Springstunden (Luecken zwischen belegten
 # Stunden an einem Tag) fuer Klassen deutlich staerker gewichtet als fuer
 # Lehrkraefte - Nutzerentscheidung fuer dieses Beispiel, ClassGaps auf das
@@ -61,17 +83,59 @@ max_solutions: 30
 # einzelne Luecken-Variable berechnet wird, nicht wie die beiden Summen
 # gewichtet in die Zielfunktion einfliessen).
 #
-# Nutzerentscheidung: die vier verbleibenden Sekundaerkriterien
-# (Randstunden, Nachmittags-Tage, Klassen-/Lehrer-Tagesausgewogenheit)
-# sind fuer dieses Beispiel STRUKTURELL abgeschaltet (keine Hilfsvariablen
-# im CP-SAT-Modell, nicht nur Gewicht 0) - nur Kann/ClassGaps/TeacherGaps
-# fliessen noch in die Suche ein. ScheduleQuality.Score zeigt die echten
-# Werte dieser vier Kriterien in stundenplan.md/stundenplan.json trotzdem
-# weiterhin an (nur die SUCHE ist dafuer blind, nicht die Anzeige).
+# Code-Review-Umsetzung P2: die vier Sekundaerkriterien (Randstunden,
+# Nachmittags-Tage, Klassen-/Lehrer-Tagesausgewogenheit) sind im
+# lexikografischen Modus wieder AKTIV - sie bilden dort die
+# REST-Zielfunktion, die innerhalb des fixierten Stufen-Optimums
+# (Kann=0/ClassGaps=0/TeacherGaps=0) jede Iteration steuert. Unter dem
+# frueheren Summenmodell waren sie strukturell abgeschaltet, weil sie
+# die Bound-Beweise verwaesserten.
+#
+# Live gemessen (je volles 2-Min-Budget, ehrlicher Vergleich):
+# - Vorher (Summenmodell, committeter Stand): Feasible mit 71-74%
+#   Luecke, 1-2 Loesungen, beste Quality.Total 167-187.
+# - Lexikografisch, Restkriterien AUS: alle 3 Stufen bewiesen optimal
+#   (Objective=Bound=0), 30 disjunkt-diverse Loesungen - aber
+#   Quality.Total 312-345, komplett getrieben von den vier dann voellig
+#   ungesteuerten Kriterien.
+# - Lexikografisch, Restkriterien AN, TeacherGaps als Stufe: Stufen
+#   fixiert auf 0/0/0, 15 diverse Loesungen, beste Quality.Total 183.6,
+#   Streuung bis 210.8.
+# - Lexikografisch, Restkriterien AN, TeacherGaps in der
+#   Rest-Zielfunktion (dieser Stand, jetzt projektweiter Default):
+#   Kann/ClassGaps fixiert auf 0/0, 16 diverse Loesungen, beste
+#   Quality.Total ebenfalls 183.6 bei deutlich ENGERER Streuung
+#   (183.6-185.5) - die Rest-Zielfunktion (inkl. TeacherGaps, Gewicht 50)
+#   bleibt pro Iteration Feasible (ihr eigenes Optimum im Band ist im
+#   4s-Stagnation-Fenster nicht beweisbar), was aber nur noch die
+#   Restkriterien betrifft, nie mehr Kann/ClassGaps.
 quality_weights:
   class_gaps: 1000.0
   teacher_gaps: 50.0
-  include_edge_period: false
-  include_afternoon_day_count: false
-  include_class_load_variance: false
-  include_teacher_load_variance: false
+  # P1: Gewicht pro unbelegtem occupied_window-Slot - 100 entspricht dem
+  # frueheren Kann-Gewicht der abgeloesten occupied_slot-Batterie (dort
+  # zaehlte jede verletzte Regel = jeder unbelegte Slot ebenfalls 100).
+  #
+  # Performancevergleich (je exakt 180s Gesamtbudget, identischer Seed
+  # und identische uebrige Config, dieselbe Maschine direkt
+  # nacheinander):
+  # - Variante A (140 occupied_slot-Kann-Regeln, alter Stand):
+  #   21 Loesungen, beste Quality.Total 186.0, alle Fenster in ALLEN
+  #   Loesungen belegt (die Kann-Stufe fixiert die Batterie hart auf 0),
+  #   Totals eng geclustert (186.0-197.4), Residual-Luecke 68.7%.
+  # - Variante B (8 occupied_window-Regeln, dieser Stand):
+  #   21 Loesungen, beste Quality.Total 187.2 (praktisch gleich), 140
+  #   Kann-BoolVars + 140 reifizierte Constraints + die komplette
+  #   Kann-Stufe entfallen (constraints.yaml: 1581 -> 663 Zeilen);
+  #   Dichte ist jetzt ABWAEGBAR statt hart fixiert - 20/21 Loesungen
+  #   voll belegt, 1 spaete (vom 4s-Stagnation-Cutoff frueh gekappte)
+  #   Iteration mit 6 unbelegten Fenster-Slots + 19 Lehrer-Springstunden
+  #   landet als ehrlicher Ausreisser am Listenende (Rang 21/21;
+  #   die ClassGaps-Stufe hielt auch dort: 0 Klassen-Springstunden).
+  # Fazit fuer diese Schulgroesse: gleichwertige Ergebnisqualitaet bei
+  # deutlich kleinerem Modell/Datenbestand; der eigentliche
+  # Bound-Beweis-Gewinn von P1 wird bei der ~5x groesseren
+  # occupied_slot-Batterie des bw-gms-beispiels erwartet. Wer die alte
+  # harte Fenster-Garantie zurueckwill: priority auf must setzen (haerter
+  # als vorher) oder occupied_density weiter anheben.
+  occupied_density: 100.0

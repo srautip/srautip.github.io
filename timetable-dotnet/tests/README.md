@@ -336,6 +336,14 @@ stagnation_timeout_s: 45.0   # Optional, Default 45.0 - Phase 2.25, siehe unten
 diversify_seed: true   # Optional, Default true - Phase 2.25
 randomize_search: true   # Optional, Default true - Phase 2.25
 relative_gap_limit: null   # Optional, Default nicht gesetzt - Phase 2.25, siehe unten
+lexicographic: true   # Optional, Default TRUE (Nutzerentscheidung) - Code-Review-Umsetzung P2, siehe unten
+lex_tolerance: 0   # Optional, Default 0 - nur wirksam mit lexicographic: true
+lex_teacher_gaps_stage: false   # Optional, Default false - TeacherGaps-Stufe ist opt-in, siehe unten
+lex_occupied_density_stage: false   # Optional, Default false - Dichte-Stufe fuer occupied_window, siehe unten
+min_diversity: 0   # Optional, Default 0 - Code-Review-Umsetzung P3, siehe unten
+rehint_found_solutions: true   # Optional, Default true - Code-Review-Umsetzung P3, siehe unten
+later_iterations_gap_limit: null   # Optional, Default nicht gesetzt - Code-Review-Umsetzung P6, siehe unten
+stage1_time_limit_s: 60.0   # Optional, Default 60.0 - Budget je lexikografischer Stufe bzw. Kann-Warm-Start; bei grossen Szenarien erhoehen, wenn eine Stufe in 60s keine Loesung findet (Folge-Iterationen starten sonst ohne Warm-Start-Hint kalt)
 quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe unten
   kann: 100.0
   class_gaps: 100.0
@@ -344,6 +352,9 @@ quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe un
   afternoon_day_count: 5.0
   class_load_variance: 3.0
   teacher_load_variance: 3.0
+  occupied_density: 5.0   # Optional, Default 5.0 - Code-Review-Umsetzung P1: Gewicht pro unbelegtem occupied_window-Slot
+  include_class_gaps: true   # Optional, Default true - Code-Review-Umsetzung R3
+  include_occupied_density: true   # Optional, Default true - P1, strukturelles An/Aus des Dichte-Terms
   include_teacher_gaps: true   # Optional, Default true - Phase 2.25-Nachtrag-2, siehe unten
   include_edge_period: true   # Optional, Default true - siehe unten
   include_afternoon_day_count: true   # Optional, Default true - siehe unten
@@ -412,6 +423,95 @@ Felder oben ändert es, WANN CP-SAT eine Lösung als bewiesen optimal
 akzeptiert (eine Lücke bis zu diesem Prozentsatz wird toleriert statt
 weiter nach Beweis gesucht), eine stärkere Verhaltensänderung, die diese
 Phase nicht für jede Schule ungefragt erzwingt.
+
+**`lexicographic`/`lex_tolerance`/`lex_teacher_gaps_stage`**
+(Code-Review-Umsetzung P2, siehe `docs/code-review-cpsat-performance.md`):
+der lexikografische Modus ersetzt die eine große gewichtete Zielfunktion
+durch nacheinander einzeln optimierte Stufen - Kann-Verstöße, dann
+Klassen-Springstunden (ClassGaps). Das Optimum jeder Stufe wird als
+Constraint fixiert (`<= Optimum + lex_tolerance`), erst danach laufen
+die normalen Iterationen über die gewichtete REST-Zielfunktion
+(Lehrer-Springstunden, Randstunden, Nachmittags-Tage, Ausgewogenheit -
+soweit per `include_*` aktiv). Vorteil: jede Stufe ist klein genug, dass
+CP-SAT ihr Optimum in der Regel BEWEISEN kann (die Phase-2.25-Messungen
+zeigten 0,2s für Kann-only gegen 97-99% Restlücke beim Summenmodell) -
+alle gefundenen Alternativen sind dann garantiert stufen-optimal statt
+"irgendwo im Band einer nie geschlossenen Lücke".
+
+Dieser Modus ist seit der Review-Runde **standardmäßig aktiv**
+(explizite Nutzerentscheidung - wie bei `stagnation_timeout_s` eine
+bewusste Ausnahme vom "fehlt das Feld, bleibt das Verhalten
+unverändert"-Prinzip). Zu beachten: die STUFENREIHENFOLGE legt die
+Priorität Kann > ClassGaps fest - die `quality_weights` der gestuften
+Kriterien steuern nur noch das nachgelagerte Ranking, nicht mehr die
+Suche. Wer die Priorität frei über Gewichte tauschen will (z.B.
+Randstunden wichtiger als Springstunden), setzt `lexicographic: false`
+und erhält den früheren gewichteten Summenmodus unverändert.
+
+**`lex_teacher_gaps_stage`** (Default `false`, ebenfalls
+Nutzerentscheidung): Lehrer-Springstunden (TeacherGaps) sind
+standardmäßig KEINE eigene Stufe, sondern bleiben mit ihrem
+`quality_weights`-Gewicht Teil der Rest-Zielfunktion - so bleiben sie
+gegen Randstunden/Nachmittage/Ausgewogenheit abwägbar, statt die
+Klassenpläne dem hart fixierten Lehrerplan-Optimum unterzuordnen.
+`true` hängt TeacherGaps als dritte Stufe an (Kann > ClassGaps >
+TeacherGaps): sein Optimum wird dann VOR jeder Gewichtsabwägung
+fixiert - sinnvoll, wenn lückenlose Lehrerpläne für die Schule
+Vorrang vor allen Restkriterien haben. `lex_tolerance` (Default 0)
+weitet das Band je Stufe, z.B. `1` = "eine Springstunde mehr als das
+Optimum ist für zusätzliche Alternativen akzeptabel".
+
+**`lex_occupied_density_stage`** (Default `false`): macht die
+`occupied_window`-Dichte zur eigenen lexikografischen Stufe ZWISCHEN
+Kann und ClassGaps - sie bekommt ein dediziertes Budget
+(`stage1_time_limit_s`) und ihr Optimum wird als hartes Band fixiert.
+Hintergrund: der P1-Langvergleich am `bw-gms-beispiel` zeigte, dass die
+frühere `occupied_slot`-Batterie die Fensterabdeckung genau wegen
+dieses Stufen-Vorteils dominierte (ihre Kann-Stufe optimierte die
+Dichte mit eigenem Budget), nicht wegen ihrer Kodierung - diese Option
+gibt dem kompakten `occupied_window`-Kriterium denselben Vorteil. Mit
+aktiver Stufe steuert `occupied_density` nur noch das nachgelagerte
+Ranking, nicht mehr die Suche; ohne sie bleibt die Dichte gewichtet in
+der Rest-Zielfunktion abwägbar.
+
+**`min_diversity`/`rehint_found_solutions`** (Code-Review-Umsetzung P3):
+Werkzeuge für "möglichst VERSCHIEDENE Alternativen statt
+Ein-Slot-Nachbarn". `min_diversity` (Default 0 = bisheriges Verhalten)
+verlangt, dass jede weitere Lösung mindestens so viele der bisher
+belegten (Klasse,Fach,Lehrer,Tag,Stunde)-Slots ANDERS belegt - ein
+echter Distanz-Cut gegen jede bereits gefundene Lösung, statt nur deren
+exakte Wiederholung zu verbieten. Sinnvolle Werte: grob 5-10% der
+Gesamt-Wochenstunden aller Klassen; zu hohe Werte erschöpfen den
+Suchraum bewusst früher (`SearchSpaceExhausted` = "keine ausreichend
+verschiedene Lösung existiert mehr"). `rehint_found_solutions: false`
+schaltet zusätzlich ab, dass jede Iteration auf die soeben gefundene
+Lösung "gehintet" wird - dieses Re-Hinting beschleunigt das Finden
+IRGENDEINER nächsten Lösung, zieht die Suche aber systematisch zum
+nächstgelegenen Nachbarn der Vorlösung; für Diversitäts-Läufe gehören
+beide Hebel zusammen (`min_diversity` > 0 und `rehint_found_solutions:
+false`).
+
+**`later_iterations_gap_limit`** (Code-Review-Umsetzung P6): setzt
+CP-SATs `relative_gap_limit` erst AB DER ZWEITEN Solve-Iteration - die
+erste Iteration darf weiterhin sorgfältig ein Optimum beweisen, während
+Folge-Iterationen (deren Zweck zusätzliche ALTERNATIVEN sind, nie ein
+besseres Optimum) eine Lösung innerhalb dieser relativen Lücke früher
+als final akzeptieren; so passen mehr Kandidaten ins selbe
+Gesamtbudget. Sinnvolle Werte ~0.05-0.2. Überstimmt ab Iteration 2 ein
+gesetztes `relative_gap_limit`; Default nicht gesetzt = unverändertes
+Verhalten.
+
+**Hinweis zur Objective-Skala (P6):** die gewichteten Zielfunktionen
+(Gesamtsumme bzw. Rest-Zielfunktion im lexikografischen Modus) werden
+intern GCD-normalisiert - haben z.B. alle aktiven Gewichte den
+gemeinsamen Teiler 100, rechnet der Solver mit den Koeffizienten /100.
+Das ändert weder Optimum noch Ranking, entlastet aber CP-SATs
+Optimalitätsbeweis bei großen Gewichten. Sichtbare Folge: die in
+`stundenplan.md`/`stundenplan.json` ausgewiesenen `objective_value`/
+`best_objective_bound` liegen dann auf der kleineren Skala, während
+`Quality.Total` unverändert die volle Gewichtsskala nutzt - die
+Optimalitäts-LÜCKE in Prozent ist von der Skalierung unabhängig und
+bleibt über Läufe vergleichbar.
 
 **`quality_weights`** (Phase 2.24, komplett optional - fehlt der Block
 oder ein einzelnes Unterfeld darin, gilt unverändert der jeweils oben

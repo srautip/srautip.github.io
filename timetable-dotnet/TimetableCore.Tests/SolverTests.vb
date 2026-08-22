@@ -877,6 +877,132 @@ Public Class SolverTests
         Return arr
     End Function
 
+    ''' <summary>Code-Review-Umsetzung (R1): ein exakt doppeltes
+    ''' teacher_subject_assignment-Tripel muss die Validierung hart
+    ''' ablehnen - vorher ueberschrieb das zweite Duplikat die
+    ''' Lesson-Variablen des ersten stillschweigend im Modellbau.</summary>
+    <TestMethod>
+    Public Sub ValidationRejectsDuplicateTeacherSubjectAssignment()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim errors = Validation.ValidateEntities(data)
+        Assert.AreEqual(1, errors.Count, String.Join(vbLf, errors))
+        StringAssert.Contains(errors(0), "doppelte Zuweisung")
+    End Sub
+
+    ''' <summary>Code-Review-Umsetzung (R2): eine occupied_slot-Regel, deren
+    ''' Entity zwar existiert, aber keine einzige Session hat, waere im
+    ''' Solver ein stiller No-Op (selbst mit priority=must) - jetzt ein
+    ''' harter Validierungsfehler. "5b" ist eine bekannte Klasse, hat aber
+    ''' keine teacher_subject_assignment.</summary>
+    <TestMethod>
+    Public Sub ValidationRejectsOccupiedSlotWithoutAnySession()
+        Dim data = Scenario(Mini({"5a", "5b"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "occupied_slot"}, {"scope", "class"}, {"entity", "5b"}, {"day", "Mo"}, {"period", 1}}
+        })
+        Dim errors = Validation.ValidateEntities(data)
+        Assert.AreEqual(1, errors.Count, String.Join(vbLf, errors))
+        StringAssert.Contains(errors(0), "keine einzige teacher_subject_assignment-Session")
+    End Sub
+
+    ''' <summary>R2: required_slot auf ein (Klasse,Fach)-Paar ohne
+    ''' zugehoerige teacher_subject_assignment - vorher ein stiller No-Op
+    ''' im Solver (lesson.ContainsKey-Guard), jetzt ein Fehler. Deutsch
+    ''' existiert als Fach, wird fuer 5a aber nicht unterrichtet.</summary>
+    <TestMethod>
+    Public Sub ValidationRejectsRequiredSlotWithoutMatchingAssignment()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe", "Deutsch"}, {}, {"Mo"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "required_slot"}, {"class", "5a"}, {"subject", "Deutsch"}, {"day", "Mo"}, {"period", 1}}
+        })
+        Dim errors = Validation.ValidateEntities(data)
+        Assert.AreEqual(1, errors.Count, String.Join(vbLf, errors))
+        StringAssert.Contains(errors(0), "ohne zugehoerige teacher_subject_assignment")
+    End Sub
+
+    ''' <summary>R2: ein Slot ausserhalb des timeslots-Rasters (unbekannter
+    ''' Tag bzw. Periode ausserhalb 1..periods_per_day) existiert als
+    ''' Lesson-Variable nicht - required_slot/occupied_slot darauf waren
+    ''' stille No-Ops, jetzt Fehler.</summary>
+    <TestMethod>
+    Public Sub ValidationRejectsSlotOutsideTimeslotGrid()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 2), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "required_slot"}, {"class", "5a"}, {"subject", "Mathe"}, {"day", "Di"}, {"period", 1}},
+            New JsonObject From {{"type", "occupied_slot"}, {"scope", "class"}, {"entity", "5a"}, {"day", "Mo"}, {"period", 9}}
+        })
+        Dim errors = Validation.ValidateEntities(data)
+        Assert.AreEqual(2, errors.Count, String.Join(vbLf, errors))
+        StringAssert.Contains(errors(0), "kein Tag aus entities.timeslots.days")
+        StringAssert.Contains(errors(1), "ausserhalb von 1..2")
+    End Sub
+
+    ''' <summary>Code-Review-Umsetzung (P1): occupied_window/must erzwingt
+    ''' JEDEN Slot des Fensters hart - ein Objekt statt einer
+    ''' occupied_slot-Batterie. 4 Perioden, 2 Wochenstunden, Fenster 3..4
+    ''' -&gt; die beiden Stunden MUESSEN auf 3 und 4 liegen.</summary>
+    <TestMethod>
+    Public Sub OccupiedWindowMustForcesWindowOccupancy()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "occupied_window"}, {"scope", "class"}, {"entity", "5a"}, {"from_period", 3}, {"to_period", 4}}
+        })
+        Dim result = Solver.Solve(data)
+        Assert.IsTrue(IsFeasibleOrOptimal(result.Status))
+        Dim periods = result.Schedule.Select(Function(l) l.Period).OrderBy(Function(p) p).ToList()
+        CollectionAssert.AreEqual(New List(Of Integer) From {3, 4}, periods)
+        Assert.AreEqual(0, Verifier.VerifySchedule(data, result.Schedule).Count)
+    End Sub
+
+    ''' <summary>P1: der Verifier prueft occupied_window/must unabhaengig
+    ''' nach - ein Plan, der ohne die Regel geloest wurde, muss beim
+    ''' Nachpruefen gegen ein nachtraeglich ergaenztes 1..4-Fenster genau
+    ''' die 2 unbelegten Fenster-Slots als Verstoesse melden (2 Stunden
+    ''' belegt, 4 gefordert - unabhaengig davon, WO die 2 liegen).</summary>
+    <TestMethod>
+    Public Sub VerifierDetectsOccupiedWindowViolationIndependently()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 2}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}}
+        })
+        Dim result = Solver.Solve(data)
+        Assert.IsTrue(IsFeasibleOrOptimal(result.Status))
+
+        Dim withWindow = data.DeepClone().AsObject()
+        withWindow("constraints").AsArray().Add(New JsonObject From {
+            {"type", "occupied_window"}, {"scope", "class"}, {"entity", "5a"}, {"from_period", 1}, {"to_period", 4}})
+        Dim violations = Verifier.VerifySchedule(withWindow, result.Schedule)
+        Assert.AreEqual(2, violations.Count, String.Join(vbLf, violations))
+        For Each v In violations
+            StringAssert.Contains(v, "Fenster-Slot")
+        Next
+    End Sub
+
+    ''' <summary>P1: Validierung eines inkonsistenten Fensters -
+    ''' from &gt; to und Fenster ausserhalb des Periodenrasters sind harte
+    ''' Fehler (sonst stiller Teil-No-Op im Solver/Objective).</summary>
+    <TestMethod>
+    Public Sub ValidationRejectsInconsistentOccupiedWindow()
+        Dim data = Scenario(Mini({"5a"}, {"T1"}, {"Mathe"}, {}, {"Mo"}, 4), {
+            New JsonObject From {{"type", "weekly_hours"}, {"class", "5a"}, {"subject", "Mathe"}, {"hours_per_week", 1}},
+            New JsonObject From {{"type", "teacher_subject_assignment"}, {"teacher", "T1"}, {"class", "5a"}, {"subject", "Mathe"}},
+            New JsonObject From {{"type", "occupied_window"}, {"scope", "class"}, {"entity", "5a"}, {"from_period", 3}, {"to_period", 2}},
+            New JsonObject From {{"type", "occupied_window"}, {"scope", "class"}, {"entity", "5a"}, {"from_period", 2}, {"to_period", 9}}
+        })
+        Dim errors = Validation.ValidateEntities(data)
+        Assert.AreEqual(2, errors.Count, String.Join(vbLf, errors))
+        StringAssert.Contains(errors(0), "from_period=3 > to_period=2")
+        StringAssert.Contains(errors(1), "liegt nicht vollstaendig in 1..4")
+    End Sub
+
     ' --- shared helpers ---
 
     Private Shared Function IsFeasibleOrOptimal(status As CpSolverStatus) As Boolean
