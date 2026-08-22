@@ -160,6 +160,14 @@ quality_weights:
   # subject_period_window-Regeln in constraints.yaml). Startwert 100 =
   # gleicher Tier wie occupied_density - eine spuerbare, aber gegen
   # ClassGaps (1000) klar untergeordnete Praeferenz.
+  # BELEG-LAUF (180s-Budget, direkt nach Einfuehrung der Regeln): alle
+  # 30 Loesungen Optimal, subject_window_count ueberall 0 - saemtliche
+  # 98 Kernfach-Stunden je Loesung liegen im Vormittagsblock 1-4
+  # (unabhaengig aus den Grids nachgerechnet). Vorher (identische
+  # Config OHNE die 16 Regeln): 22-36 Kernfach-Stunden ausserhalb je
+  # Loesung. Kosten: keine - ClassGaps 0, TeacherGaps 0,
+  # Fenster-Defizit 0 wie zuvor; beste Quality.Total 220.8 (vorher
+  # 226.8; Skalen wegen des neuen Kriteriums nur bedingt vergleichbar).
   subject_window: 100.0
   include_edge_period: false
   include_afternoon_day_count: false
