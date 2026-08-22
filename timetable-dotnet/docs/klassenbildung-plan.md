@@ -284,3 +284,7 @@ dritter. K6 einzeln auf Zuruf.
   bw-grundschule-beispiel; Beleg-Lauf: 3 Varianten, alle Optimal
   (Zielwert 1001 = vorhergesagter Sozialverhalten-Ueberlauf 1000 +
   Nordstadt-Split 1), Konsens-Kern 33/100, Diffs 11/59 Kinder.
+- **Separate Regressionssuite:** die Klassenbildungs-Tests leben im
+  eigenen Testprojekt `Klassenbildung.Tests` (13 Tests, < 1 s) - bei
+  reinen Klassenbildungs-Aenderungen muss die teure Stundenplan-Suite
+  (`TimetableCore.Tests`, ~6 Min) nicht mitlaufen; Regel in CLAUDE.md.
