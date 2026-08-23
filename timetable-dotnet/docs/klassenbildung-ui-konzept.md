@@ -267,4 +267,7 @@ Highlight-Mengen, Pin-Export-Inhalt, Live-Bewertung == Bewerte).
   Python-Nachrechnung - Live-Bewertung == Bewerte fuer alle 3
   Varianten (Chips + Verletzungen zeichengleich), Ampel nach
   Verschiebung exakt wie vorhergesagt, Warnbanner/Kapazitaets-Rot/
-  Haertungs-Export/Pin-Ruecknahme geprueft. Offen: U5 (Re-Solve-Loop).
+  Haertungs-Export/Pin-Ruecknahme geprueft. Offen: U5 (Re-Solve-Loop) -
+  der Kanal dafuer ist inzwischen konkretisiert: die geplante WPF-GUI
+  hostet das Board in WebView2 und ersetzt den Export+CLI-Umweg durch
+  eine "Neu rechnen"-Bridge (docs/gui-ui-konzept.md Abschnitt 4).

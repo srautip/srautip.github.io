@@ -417,6 +417,19 @@ außerhalb des Kerns, arc42 §5.1). Für die GUI:
   Export = Gegenrichtung in einen `input/`-Ordner nach
   `tests/<schule>/`-Layout. Damit bleibt der komplette CLI-Weg
   (`run`/`klassen`/`render`) als zweiter, skriptbarer Kanal erhalten.
+- **Migrations-Importe** (unterjährige Einführung, GUI-Konzept
+  Abschnitt 9): Schülerlisten, Lehrer-Zuteilungen und Bestandspläne
+  kommen zusätzlich per CSV bzw. aus Excel kopiertem
+  Zwischenablage-Bereich mit Spalten-Zuordnungs-Dialog herein - bewusst
+  KEIN xlsx-Parser in V1 (neue Abhängigkeit gegen den
+  BCL-only-Grundsatz; CSV-Export/Copy-Paste decken die Fälle ab).
+  Datenhaltungs-Konsequenzen: anonyme **Platzhalter-Schüler** aus dem
+  Generator erhalten keinen `mapping.json`-Eintrag (kein Personenbezug
+  im Projekt, solange nur Platzhalter existieren); ein importierter
+  **Bestandsplan** wird als regulärer Stand unter `ergebnisse/`
+  gespeichert (Label "Bestand", gegen automatisches Verdrängen
+  geschützt wie der Freigabe-Stand) und beim Import durch
+  `Verifier.VerifySchedule` gegen die erfassten Stammdaten geprüft.
 
 ### 8.3 Was sich am Bestand NICHT ändert
 
@@ -462,3 +475,6 @@ unverschlüsselt (synthetische Daten, kein Personenbezug).
    ein eigenes Querschnittskonzept in §8.
 5. **Muster-Eintrag fürs Verzeichnis von Verarbeitungstätigkeiten** der
    Schule als Handbuch-Anhang (Hilfestellung, keine Rechtsberatung).
+
+Die Bedienschicht über dieser Datenhaltung (Fensteraufbau, Menüs,
+Dashboards, Eingabemasken) beschreibt `docs/gui-ui-konzept.md`.
