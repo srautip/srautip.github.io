@@ -268,7 +268,7 @@ qualifizierte Lehrkraft" wird hier präventiv sichtbar).
   geprüft (alle Gruppen eines Verbunds: Fach paarweise verschieden,
   gleiche Stufe, gleiches `wochenstunden_soll`/`block_length`) - mit
   Klartext-Fehlern statt späterem Infeasible.
-- GMS-Komfort (Ausbaustufe, 10): "Sektionen bilden" teilt eine zu große
+- GMS-Komfort (Ausbaustufe, 11): "Sektionen bilden" teilt eine zu große
   Fachgruppe automatisch in nummerierte Sektionen nach dem Muster des
   GMS-Beispiels.
 
@@ -475,13 +475,75 @@ Analog auf der Klassenbildungs-Seite: eine importierte Einteilung
 übernommen werden - Umverteilung einzelner Kinder läuft dann über den
 normalen Board-Workflow (Pins lösen, verschieben, neu rechnen).
 
-## 10. Ausbaustufen
+## 10. Ausfall und Vertretung ("Lehrer krank" / "Schüler krank")
+
+Zwei Anwendungsfälle des laufenden Betriebs, bewusst getrennt nach
+Zeithorizont - sie sind strukturell verschiedene Probleme:
+
+### 10.1 Längerfristiger Ausfall (Wochen: Langzeiterkrankung, Elternzeit)
+
+Hier wird tatsächlich ein neuer **Dauerplan** gebraucht - und der
+Mechanismus dafür existiert bereits (9.3): aktuellen Plan als Stand
+sichern und einfrieren, nur die Stunden der ausfallenden Lehrkraft
+lockern, neu rechnen; die Diff-Ansicht zeigt exakt, was sich für wen
+ändert. Ergänzend kann der Lehrereinsatz (Stufe 1) mit einer um die
+Lehrkraft reduzierten Liste neu gerechnet werden, wenn die Vertretung
+dauerhaft übernommen wird - `springer_reserve_stunden` ist die schon
+vorhandene Kapazitätsvorsorge dafür. Kein neuer Baustein nötig; die
+GUI verpackt den Ablauf als geführte Aktion "Lehrkraft fällt länger
+aus…" (Planung-Menü), die diese Schritte in der richtigen Reihenfolge
+anbietet. Nutzbar ab V2 (setzt Bestandsplan-Einfrieren voraus).
+
+### 10.2 Kurzfristige Vertretung (Tage: "Frau X ist Mo/Di krank")
+
+Ein strukturell ANDERES Problem als Planung: gesucht ist kein neuer
+Plan, sondern die **minimal störende Überbrückung** konkreter Tage -
+und dafür fehlt dem gesamten System heute die Datums-Dimension
+(geplant wird ein Wochenraster, kein Kalender). Der Vertretungs-Modus
+ist deshalb eine echte neue Ausbaustufe (V3):
+
+- **Datum als flüchtige Ebene ÜBER dem Wochenplan**, kein Umbau des
+  Kernrasters: ein Vertretungsplan referenziert Datum → Wochentag →
+  betroffene Slots des gültigen Dauerplans.
+- **Ablauf**: Planung → "Vertretung planen…" → Datum(e) und
+  ausfallende Lehrkraft(en)/Räume wählen → je betroffener Stunde eine
+  Vorschlagsliste mit den üblichen Optionen: qualifizierte Lehrkraft
+  mit Freistunde (Springer zuerst), fachfremde Aufsicht, Raumtausch,
+  Klassen zusammenlegen, Verlegung, ersatzlos entfallen (Randstunden
+  zuerst) - der Nutzer entscheidet je Stunde, Vorschläge sind
+  Angebote.
+- **Eigenes kleines Teilmodell** nach dem etablierten Projektmuster
+  (eigenständiges Modul, Kern unverändert, unabhängige Nachprüfung):
+  Zielfunktion "minimale Störung" (wenige Betroffene, keine
+  Mehrfachbelastung, Springer vor Mehrarbeit) statt Planqualität;
+  angesichts der Größe (eine Handvoll Stunden) genügt ggf. sogar eine
+  regelbasierte Vorschlagsliste ohne Solver - die Entscheidung fällt
+  in der Umsetzung.
+- **Ergebnis**: tagesbezogener Vertretungsplan als eigenes, flüchtiges
+  Artefakt ("Vertretungsplan Mo 12.01.") - druckbar/exportierbar,
+  gespeichert als Stand unter `ergebnisse/` (Muster Datenhaltung 5.2)
+  mit Audit-Log-Zeile; der Dauerplan bleibt unberührt.
+
+### 10.3 "Schüler krank": ehrliche Einordnung
+
+Im klassenbasierten Modell ist ein erkranktes Kind **planungsneutral**:
+Stunden- und Vertretungsplan hängen an Klassen/Gruppen, nicht an
+Einzelschülern. Relevant ist der Fall nur an zwei Rändern: in der
+**Klassenbildung** (Kind fällt vor der Einschulung langfristig aus →
+Fixierung lösen, ggf. Nachrücker, neu rechnen - das deckt der
+bestehende Board-Workflow bereits ab, kein neuer Baustein) und
+perspektivisch in der **Kursstufe** (dort zählen Wahlprofile, aber
+ebenfalls keine Einzel-Absenzen). Eine Absenzen-/Fehlzeiten-Verwaltung
+wäre ein neues Fachgebiet außerhalb der Planungs-Domäne dieses
+Projekts und wird bewusst NICHT eingeplant.
+
+## 11. Ausbaustufen
 
 | Stufe | Inhalt |
 |---|---|
 | **V1** | Projekt-Assistent inkl. anonymer Schüler-/Gruppen-Generator (6.1/6.8), Stammdaten-Dialoge (6.2-6.9), Regel-Masken + Expertenmodus (6.10), Klassenbildungs-Eingaben (6.11), Solver-Einstellungen einfach/Experten, Lauf-Monitor, beide Dashboards mit Bridge **inklusive U5-Re-Solve** aus dem Board, Stände-Historie, YAML-Ex-/Import, CSV-/Zwischenablage-Import für Schülerlisten und feste Zuordnungen (9.1/9.2), Startseite |
-| **V2** | Chat-Regeln (Freitext → `LlmExtraction` → Vorschlagsliste mit Prüfen/Übernehmen je Regel - nie Direktübernahme), Bestandsplan-Übernahme mit Einfrieren/Lockern (9.3), Klarnamen-Druckexporte, Konfliktkern-Dialog (setzt Klassenbildungs-Plan K6 voraus), Bericht-Generator (Art.-15-Bericht je Kind aus der gefilterten Sicht) |
-| **V3** | Kursstufen-/Schienenmodell-Sichten (Kurse, Schienen, Wahlprofile), GMS-Assistent für Sektionen/Parallelverbünde, kombinierte Schule |
+| **V2** | Chat-Regeln (Freitext → `LlmExtraction` → Vorschlagsliste mit Prüfen/Übernehmen je Regel - nie Direktübernahme), Bestandsplan-Übernahme mit Einfrieren/Lockern (9.3), geführte Aktion "Lehrkraft fällt länger aus" (10.1), Klarnamen-Druckexporte, Konfliktkern-Dialog (setzt Klassenbildungs-Plan K6 voraus), Bericht-Generator (Art.-15-Bericht je Kind aus der gefilterten Sicht) |
+| **V3** | Vertretungs-Modus für kurzfristige Ausfälle (10.2), Kursstufen-/Schienenmodell-Sichten (Kurse, Schienen, Wahlprofile), GMS-Assistent für Sektionen/Parallelverbünde, kombinierte Schule |
 
 Abhängigkeiten und Datenfluss (Projektdatei, Bridge, WebView2-Hygiene,
 Audit-Log) sind im Datenhaltungskonzept festgelegt; dieses Dokument
