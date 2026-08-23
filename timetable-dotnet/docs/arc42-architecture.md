@@ -193,6 +193,8 @@ timetable-dotnet/
 │                             seit dem GUI-Unterbau nur noch CLI-Hülle
 │                             (Argument-Parsing + Datei-/Konsolenschicht;
 │                             6.7 und docs/schooltestrunner-benutzerhandbuch.md)
+├── TimetableViewer.Tests/    Playwright-Tests der Viewer-Vorlagen und der
+│                             Bruecke - headless, ohne Desktop (8.14)
 └── TimetableGui.Tests/       ViewModel- und Auslieferungstests, headless
                               (kein Fenster, kein Browser - siehe 8.13)
 ```
@@ -746,7 +748,7 @@ Grundschul-Fixture braucht 180s Solve-Budget und gehört deshalb in die
 `run`-Beispielläufe, nicht in eine Unit-Suite) und `TimetableProjekt.Tests`
 (Container, Krypto und Modellzusagen, ~2s - die PBKDF2-Iterationszahl ist
 dort bewusst klein, der Produktionswert wird separat festgenagelt). "Volle Suite" heißt
-seither ALLE FÜNF Testprojekte, am einfachsten über
+seither ALLE SIEBEN Testprojekte, am einfachsten über
 `dotnet test TimetableCore.sln`.
 
 ### 8.10 Self-contained-HTML-Viewer und ihre Verifikation
@@ -964,6 +966,64 @@ die Auslieferung in einer Klasse, die WebView2 gar nicht kennt.
 Browser. Was dadurch **nicht** abgedeckt ist und ehrlich offen bleibt: das
 tatsächliche Rendern in WebView2 und das Verhalten der XAML-Bindungen zur
 Laufzeit. Beides ist nur am laufenden Fenster zu sehen.
+
+### 8.14 Die Brücke: ein Kanal, zwei Betriebsarten
+
+Der Klassenbildungs-Viewer läuft in **zwei** Betriebsarten, und beide
+müssen funktionieren:
+
+- **Doppelklick** — keine Brücke, Pins im `localStorage`, Rückweg ist der
+  `fixierungen:`-YAML-Block zum Kopieren. Das ist eine dokumentierte
+  Zusage (8.10), kein Nebenweg.
+- **WebView2** — der Host injiziert den Zustand vor dem Laden, bekommt
+  jede Änderung zurück und ersetzt den Export-Block durch „Neu rechnen".
+
+Deshalb ist die Erweiterung **additiv und feature-erkannt**: alles hängt
+an `window.chrome.webview.postMessage`, das WebView2 selbst stellt. Der
+alte Pfad wurde nicht ersetzt, sondern nur umgangen, wenn ein Host da ist.
+
+**Nachrichtenformat.** Weder das UI- noch das Datenhaltungskonzept legt
+eines fest — sie nennen nur Transportmittel und fachliche Nutzlasten. Es
+entsteht daher hier, mit einem **versionierten Umschlag**:
+
+```json
+{"v": 1, "typ": "zustand" | "neu-rechnen", "nutzlast": { … }}
+```
+
+Die Versionierung ist nicht vorsorglich: die Vorlagen sind Embedded
+Resources, ein Host läuft also immer mit *seiner* Version — aber eine als
+Claude-Artifact veröffentlichte Seite (CLAUDE.md) kann älter oder neuer
+sein. Der Host ignoriert deshalb unbekannte Typen und neuere Versionen
+**still**, statt zu werfen.
+
+**Richtung Host → Seite** gibt es genau zwei Variablen, per
+`AddScriptToExecuteOnDocumentCreated` vor dem Laden gesetzt:
+`window.__gastZustand` (Pins, Härtungen, Herkunft — ersetzt die
+`localStorage`-Rolle durch `gui-state.json` der Projektdatei) und
+`window.__anzeigeNamen`. Letztere ist der **einzige** Weg, auf dem
+Klarnamen in die Seite gelangen; sie werden dort ausschließlich in den
+DOM gerendert, während das eingebettete JSON und jeder Export pseudonym
+bleiben (Datenhaltung 6.1/6.2). Ein Test prüft genau diese Grenze.
+
+**U5 ist damit geschlossen.** „Neu rechnen" schickt die Fixierungen
+strukturiert an den Host — mit denselben Feldnamen wie das YAML
+(`kind`/`klasse`/`nicht_klasse`), sodass die Übernahme eine reine
+Umformung ohne Namenszuordnung ist. Der Host ersetzt die Fixierungsliste
+(nicht anhängen: die YAML-Bestandsfixierungen sind in der Board-Liste
+bereits als `herkunft: bestehend` enthalten, Anhängen würde sie
+verdoppeln), setzt die gehärteten Regeln auf `modus: hard`, schreibt eine
+Audit-Zeile und startet den Lauf. Der Weg „YAML-Block kopieren → CLI
+aufrufen" entfällt — und **nur** der; Board, Bewertung und Trichter
+bleiben unverändert (gui-ui-konzept.md 4).
+
+**Verifikation ohne Browser-Einbettung.** Die Feature-Erkennung hängt an
+einer JS-Eigenschaft, also lässt sich der Host durch ein Init-Skript
+nachstellen, das `postMessage` in ein Array schreibt. `TimetableViewer.Tests`
+(Playwright, headless, ohne Desktop-Sitzung) prüft damit beide
+Betriebsarten und das Protokoll an der echten Vorlage;
+`TimetableGui.Tests` prüft die Gegenseite an derselben Zeichenkette. Was
+weiterhin **nicht** abgedeckt ist: dass WebView2 die Nachricht auch
+tatsächlich zustellt — das hängt am laufenden Fenster (8.13).
 
 ## 9. Architekturentscheidungen
 

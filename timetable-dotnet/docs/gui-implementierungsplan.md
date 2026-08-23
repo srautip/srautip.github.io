@@ -8,7 +8,7 @@
 | B | YAML-Schreiber, Klassenbildungs-JSON öffentlich, Pipeline als Dienst | **erledigt** |
 | C | Projektablage `.splanx` | **erledigt** |
 | D | GUI-Durchstich (Klassenbildung) | **erledigt** |
-| E | Bridge und U5-Re-Solve | offen |
+| E | Bridge und U5-Re-Solve | **erledigt** (Klassenbildung; Stundentafel-Bridge in G) |
 | F | Eingabemasken | offen |
 | G | Stundenplan-Dashboard, Im-/Export, Startseite, Freigabe | offen |
 

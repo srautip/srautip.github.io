@@ -24,11 +24,18 @@ Public NotInheritable Class ViewerHost
 
     Private ReadOnly _sicht As WebView2
     Private ReadOnly _auslieferung As ViewerAuslieferung
+    Private ReadOnly _aufNachricht As Action(Of String)
+    Private ReadOnly _startSkript As Func(Of String)
     Private _bereit As Boolean
+    Private _skriptId As String
 
-    Public Sub New(sicht As WebView2, auslieferung As ViewerAuslieferung)
+    Public Sub New(sicht As WebView2, auslieferung As ViewerAuslieferung,
+                    Optional aufNachricht As Action(Of String) = Nothing,
+                    Optional startSkript As Func(Of String) = Nothing)
         _sicht = sicht
         _auslieferung = auslieferung
+        _aufNachricht = aufNachricht
+        _startSkript = startSkript
     End Sub
 
     Public Async Function VorbereitenAsync() As Task
@@ -61,7 +68,42 @@ Public NotInheritable Class ViewerHost
                 End If
             End Sub
 
+        ' Die Bruecke (U5): Nachrichten der Seite entgegennehmen. Der
+        ' Handler laeuft auf dem UI-Thread, weil WebView2 seine Ereignisse
+        ' dorthin zustellt.
+        If _aufNachricht IsNot Nothing Then
+            AddHandler kern.WebMessageReceived,
+                Sub(s, e)
+                    ' TryGetWebMessageAsString wirft, wenn die Seite ein
+                    ' Objekt statt einer Zeichenkette gepostet hat -
+                    ' unsere Vorlage tut das nicht, aber der Host darf an
+                    ' einer fremden Nachricht nicht sterben.
+                    Try
+                        _aufNachricht(e.TryGetWebMessageAsString())
+                    Catch ex As ArgumentException
+                        ' Nachricht in unerwartetem Format - ignorieren.
+                    End Try
+                End Sub
+        End If
+
         _bereit = True
+    End Function
+
+    ''' <summary>Hinterlegt das Startskript (Board-Zustand und
+    ''' Anzeige-Map) fuer die NAECHSTE Navigation. Muss vor dem Laden
+    ''' geschehen, weil die Vorlage den Zustand beim Initialisieren liest;
+    ''' ein spaeteres ExecuteScript kaeme zu spaet.</summary>
+    Public Async Function ZustandVorbereitenAsync() As Task
+        If _startSkript Is Nothing Then Return
+        Await VorbereitenAsync()
+        ' Das vorige Skript entfernen - sonst stapeln sich mit jedem Lauf
+        ' veraltete Zustaende. (Entfernen ist synchron, anders als das
+        ' Hinzufuegen - an der installierten DLL 1.0.2903.40 nachgesehen,
+        ' nicht angenommen.)
+        If _skriptId IsNot Nothing Then
+            _sicht.CoreWebView2.RemoveScriptToExecuteOnDocumentCreated(_skriptId)
+        End If
+        _skriptId = Await _sicht.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(_startSkript())
     End Function
 
     Private Sub AufAnfrage(sender As Object, e As CoreWebView2WebResourceRequestedEventArgs)
@@ -77,6 +119,7 @@ Public NotInheritable Class ViewerHost
     ''' Lauf waere unsichtbar.</summary>
     Public Async Function AnzeigenAsync() As Task
         Await VorbereitenAsync()
+        Await ZustandVorbereitenAsync()
         Dim ziel = _auslieferung.SeitenUrl
         If String.Equals(_sicht.Source?.ToString(), ziel, StringComparison.OrdinalIgnoreCase) Then
             _sicht.CoreWebView2.Reload()

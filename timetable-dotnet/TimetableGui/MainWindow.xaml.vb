@@ -17,7 +17,9 @@ Class MainWindow
         ' selbsttaetig zurueck (arc42 8.11).
         _modell = New HauptViewModel(New WpfDialoge(Me))
         DataContext = _modell
-        _host = New ViewerHost(Dashboard, _modell.Auslieferung)
+        _host = New ViewerHost(Dashboard, _modell.Auslieferung,
+                               AddressOf _modell.VerarbeiteBrueckenNachricht,
+                               AddressOf _modell.BrueckenStartSkript)
 
         AddHandler _modell.PropertyChanged, AddressOf AufModellAenderung
 

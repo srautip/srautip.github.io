@@ -447,21 +447,62 @@
         if (f.klasse !== null && f.klasse !== undefined) bestandVon[f.kind] = f.klasse;
       });
 
+      // ---- Bruecke zum GUI-Host (U5) ------------------------------
+      // Die Seite laeuft in ZWEI Betriebsarten, und beide muessen
+      // funktionieren:
+      //   * Doppelklick: keine Bruecke, Pins liegen im localStorage,
+      //     Rueckweg ist der YAML-Export-Block. Das ist eine
+      //     dokumentierte Zusage (arc42 8.10) und wird per Test
+      //     abgesichert - deshalb ist alles hier ADDITIV und haengt an
+      //     der Feature-Erkennung, statt den alten Pfad zu ersetzen.
+      //   * WebView2: der Host injiziert den Zustand vor dem Laden,
+      //     bekommt jede Aenderung per postMessage zurueck und ersetzt
+      //     den Export-Block durch "Neu rechnen".
+      var brueckeAktiv = !!(window.chrome && window.chrome.webview &&
+                            typeof window.chrome.webview.postMessage === 'function');
+      // Anzeige-Map (id -> "Mia M."), vom Host injiziert. Sie wird NUR
+      // in den DOM gerendert; das eingebettete JSON und jeder Export
+      // bleiben pseudonym (Datenhaltung 6.1/6.2).
+      var anzeigeNamen = (brueckeAktiv && window.__anzeigeNamen) || {};
+      function anzeigeVon(id) {
+        return anzeigeNamen[id] ? anzeigeNamen[id] + ' (' + id + ')' : id;
+      }
+      function sende(typ, nutzlast) {
+        if (!brueckeAktiv) return;
+        try {
+          window.chrome.webview.postMessage(JSON.stringify({ v: 1, typ: typ, nutzlast: nutzlast }));
+        } catch (e) { /* Host weg - das Board bleibt trotzdem bedienbar */ }
+      }
+      function zustand() {
+        return { pins: pins, notPins: notPins, herkunft: pinHerkunft, haertungen: haertungen };
+      }
+
       // localStorage-Komfort (file:// ist unzuverlaessig - massgeblich
-      // ist immer der YAML-Export).
+      // ist immer der YAML-Export). Im GUI-Betrieb uebernimmt
+      // gui-state.json in der Projektdatei diese Rolle (Datenhaltung
+      // 7.6), deshalb bleibt localStorage dort unberuehrt.
       var storeKey = 'klassenbildung-pins:' + data.schule;
       function ladePins() {
-        try {
-          var raw = localStorage.getItem(storeKey);
-          if (!raw) return;
-          var st = JSON.parse(raw);
-          pins = st.pins || {};
-          notPins = st.notPins || {};
-          pinHerkunft = st.herkunft || {};
-          haertungen = st.haertungen || { gruppen: {}, wuensche: {} };
-        } catch (e) { /* ohne Persistenz weiterarbeiten */ }
+        var st = null;
+        if (brueckeAktiv) {
+          st = window.__gastZustand || null;
+        } else {
+          try {
+            var raw = localStorage.getItem(storeKey);
+            if (raw) st = JSON.parse(raw);
+          } catch (e) { /* ohne Persistenz weiterarbeiten */ }
+        }
+        if (!st) return;
+        pins = st.pins || {};
+        notPins = st.notPins || {};
+        pinHerkunft = st.herkunft || {};
+        haertungen = st.haertungen || { gruppen: {}, wuensche: {} };
       }
       function speicherePins() {
+        if (brueckeAktiv) {
+          sende('zustand', zustand());
+          return;
+        }
         try {
           localStorage.setItem(storeKey, JSON.stringify({
             pins: pins, notPins: notPins, herkunft: pinHerkunft, haertungen: haertungen }));
@@ -1373,7 +1414,11 @@
         }
         var kindId = document.createElement('span');
         kindId.className = 'kind-id';
-        kindId.textContent = id;
+        // anzeigeVon() haengt die vom Host injizierte Anzeige-Map davor,
+        // wenn es eine gibt. Sie landet NUR hier im DOM - das
+        // eingebettete JSON, der YAML-Block und jeder Export bleiben
+        // pseudonym (Datenhaltung 6.1/6.2).
+        kindId.textContent = anzeigeVon(id);
         kindId.title = 'Details und Fixier-Aktionen';
         kindId.addEventListener('click', function (e) {
           e.stopPropagation();
@@ -1444,6 +1489,32 @@
       }
 
       // ---- Fixierungen-Panel mit YAML-Export (U3) ------------------
+
+      // Dieselben Fixierungen, die der YAML-Block als Text ausgibt - nur
+      // strukturiert, fuer den Weg ueber die Bruecke (U5). Feldnamen
+      // bewusst wie im YAML (kind/klasse/nicht_klasse), damit der Host
+      // sie ohne Uebersetzungstabelle in KlassenbildungFixierung
+      // uebernehmen kann.
+      function fixierungsListe() {
+        var liste = [];
+        bestandsFixierungen.forEach(function (f) {
+          if (f.klasse !== null && f.klasse !== undefined) {
+            liste.push({ kind: f.kind, klasse: f.klasse, herkunft: 'bestehend' });
+          } else {
+            liste.push({ kind: f.kind, nicht_klasse: f.nicht_klasse, herkunft: 'bestehend' });
+          }
+        });
+        Object.keys(pins).sort().forEach(function (id) {
+          liste.push({ kind: id, klasse: pins[id], herkunft: pinHerkunft[id] || 'manuell' });
+        });
+        Object.keys(notPins).sort().forEach(function (id) {
+          Object.keys(notPins[id]).forEach(function (klasse) {
+            liste.push({ kind: id, nicht_klasse: parseInt(klasse, 10), herkunft: 'manuell' });
+          });
+        });
+        return liste;
+      }
+
       function renderFixierungen() {
         var c = document.getElementById('fixierungen');
         c.innerHTML = '';
@@ -1460,10 +1531,41 @@
         c.appendChild(kopf);
         var hinweis = document.createElement('div');
         hinweis.className = 'hinweis';
-        hinweis.textContent = 'Den Block unten als fixierungen: in input/klassenbildung.yaml uebernehmen und neu rechnen - ' +
-          'der Viewer bewertet Verschiebungen live, optimiert aber nicht (Re-Solve: Ausbaustufe U5). ' +
-          'Pins ueberleben Reloads nur als Browser-Komfort.';
+        hinweis.textContent = brueckeAktiv
+          ? 'Die Fixierungen werden beim Neurechnen direkt uebernommen - kein Kopieren noetig. ' +
+            'Der Viewer bewertet Verschiebungen live; optimiert wird erst beim Neurechnen.'
+          : 'Den Block unten als fixierungen: in input/klassenbildung.yaml uebernehmen und neu rechnen - ' +
+            'der Viewer bewertet Verschiebungen live, optimiert aber nicht (Re-Solve: Ausbaustufe U5). ' +
+            'Pins ueberleben Reloads nur als Browser-Komfort.';
         c.appendChild(hinweis);
+
+        // U5 im GUI-Betrieb: der Export-Umweg entfaellt. Bewusst NUR
+        // dieser Teil - Board, Bewertung und Trichter bleiben unveraendert
+        // (gui-ui-konzept.md 4: "ersetzt NUR den Export-Teil").
+        if (brueckeAktiv) {
+          var zus = document.createElement('div');
+          zus.className = 'hinweis';
+          zus.textContent = (bestandsFixierungen.length + pinListe.length + notListe.length) +
+            ' Fixierungen' + (nHart > 0 ? ', ' + nHart + ' Haertung' + (nHart > 1 ? 'en' : '') : '') +
+            ' -> neu rechnen';
+          c.appendChild(zus);
+
+          var rechnen = document.createElement('button');
+          rechnen.id = 'neu-rechnen';
+          rechnen.className = 'primaer';
+          rechnen.textContent = 'Neu rechnen';
+          rechnen.addEventListener('click', function () {
+            sende('neu-rechnen', { fixierungen: fixierungsListe(), haertungen: haertungen });
+          });
+          c.appendChild(rechnen);
+
+          var reset2 = document.createElement('button');
+          reset2.style.marginLeft = '0.6rem';
+          reset2.textContent = 'Alle Pins loesen';
+          reset2.addEventListener('click', allePinsLoesen);
+          c.appendChild(reset2);
+          return;
+        }
 
         var zeilen = ['fixierungen:'];
         bestandsFixierungen.forEach(function (f) {
@@ -1525,7 +1627,12 @@
         warnungen: function () { return warnungen; },
         haertungen: function () { return haertungen; },
         loesePin: function (id) { loesePin(id); render(); },
-        liveFaehig: liveFaehig
+        liveFaehig: liveFaehig,
+        // U5: Betriebsart und die strukturierte Fixierungsliste, damit
+        // der Test beide Betriebsarten und das Nachrichtenformat pruefen
+        // kann, ohne den DOM zu interpretieren.
+        brueckeAktiv: brueckeAktiv,
+        fixierungen: fixierungsListe
       };
     })();
   </script>

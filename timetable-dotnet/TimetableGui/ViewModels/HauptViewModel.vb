@@ -5,6 +5,7 @@
 ' nichts pruefbar, weil jeder Test ein Fenster braeuchte - und ein
 ' Durchstich, dessen Ablauf man nur von Hand nachvollziehen kann, ist
 ' auf einem Server ohne Desktop-Sitzung gar nicht nachvollziehbar.
+Imports System.Text.Json.Nodes
 Imports System.Threading
 Imports System.Threading.Tasks
 Imports TimetableCore
@@ -312,6 +313,74 @@ Public NotInheritable Class HauptViewModel
         Meldung = $"{e.Geloeste.Count} Variante(n), Konsens-Kern {e.Top.KonsensKern.Count}/{e.Eingabe.Schueler.Count} Kinder" &
                   If(e.Abgebrochen, " (abgebrochen)", "")
     End Sub
+
+    ' ---------------------------------------------------------------
+    ' Bruecke zum Board (U5)
+    ' ---------------------------------------------------------------
+
+    ''' <summary>Das Skript, das vor dem Laden der Seite injiziert wird:
+    ''' gesicherter Board-Zustand plus Anzeige-Map. Die Map ist der
+    ''' einzige Weg, auf dem Klarnamen in die Seite gelangen - dort
+    ''' werden sie ausschliesslich in den DOM gerendert.</summary>
+    Public Function BrueckenStartSkript() As String
+        Dim namen As New Dictionary(Of String, String)
+        If ProjektOffen Then
+            For Each m In _projekt.Mapping
+                Dim anzeige = $"{m.Vorname} {m.Nachname}".Trim()
+                If anzeige.Length > 0 Then namen(m.Id) = anzeige
+            Next
+        End If
+        Return Bruecke.StartSkript(If(ProjektOffen, _projekt.GuiState, Nothing), namen)
+    End Function
+
+    ''' <summary>Nimmt eine Nachricht des Boards entgegen. Unbekannte
+    ''' Typen und neuere Versionen werden bewusst STILL ignoriert statt
+    ''' zu werfen: eine aeltere, als Artifact veroeffentlichte Seite
+    ''' (CLAUDE.md) darf den Host nicht abschiessen.</summary>
+    Friend Sub VerarbeiteBrueckenNachricht(json As String)
+        Dim n = BrueckenNachricht.Lesen(json)
+        If n Is Nothing OrElse Not ProjektOffen Then Return
+        If n.Version > BrueckenNachricht.AktuelleVersion Then Return
+
+        Select Case n.Typ
+            Case "zustand"
+                ' Ersetzt die localStorage-Rolle der Vorlage: der Zustand
+                ' wandert nach gui-state.json in der Projektdatei
+                ' (Datenhaltung 7.6).
+                _projekt.GuiState = n.Nutzlast
+                Geaendert = True
+
+            Case "neu-rechnen"
+                NeuRechnenAsync(n.Nutzlast)
+        End Select
+    End Sub
+
+    ''' <summary>U5, der geschlossene Loop: Pins und Haertungen aus dem
+    ''' Board in den Projektbestand schreiben und neu rechnen. Damit
+    ''' entfaellt der Weg "YAML-Block kopieren -> CLI aufrufen" - und zwar
+    ''' NUR der; Board, Bewertung und Trichter bleiben unveraendert
+    ''' (gui-ui-konzept.md 4).
+    '''
+    ''' Die Fixierungsliste ERSETZT die bisherige vollstaendig: sie
+    ''' enthaelt die YAML-Bestandsfixierungen bereits mit (das Board
+    ''' fuehrt sie als `herkunft: bestehend`), und ein Anhaengen wuerde
+    ''' sie verdoppeln.</summary>
+    Friend Async Function NeuRechnenAsync(nutzlast As JsonObject) As Task
+        If Not ProjektOffen OrElse Monitor.Laeuft Then Return
+
+        Dim fixierungen = Bruecke.LiesFixierungen(nutzlast)
+        _projekt.Klassenbildung.Fixierungen.Clear()
+        _projekt.Klassenbildung.Fixierungen.AddRange(fixierungen)
+        Dim gehaertet = Bruecke.WendeHaertungenAn(nutzlast, _projekt.Klassenbildung)
+        Geaendert = True
+
+        _projekt.Protokolliere(Umgebung.Benutzer, "fixierung",
+            $"Aus dem Board uebernommen: {fixierungen.Count} Fixierung(en)" &
+            If(gehaertet > 0, $", {gehaertet} Regel(n) auf hart gesetzt", "") &
+            " - Neuberechnung gestartet", _jetzt())
+
+        Await KlassenbildungRechnenAsync()
+    End Function
 
 End Class
 

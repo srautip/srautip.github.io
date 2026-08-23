@@ -38,7 +38,11 @@ pauschal die volle Suite zu fahren:
   2. `dotnet run --project SchoolTestRunner -- render <schule>` gegen
      beide Beispiel-Schulen (baut stundentafel.html aus vorhandener
      stundenplan.json neu - KEIN teurer Solver-Lauf noetig),
-  3. Headless-Browser-Smoke gegen die generierten Seiten. Unter Windows:
+  3. Bei Aenderungen an den Vorlagen selbst: `dotnet test
+     TimetableViewer.Tests` (Playwright gegen Edge, headless, ~1min) -
+     prueft VERHALTEN (Drag & Drop, Pins, beide Betriebsarten der
+     Bruecke), nicht nur "laeuft das JS".
+  4. Headless-Browser-Smoke gegen die generierten Seiten. Unter Windows:
      `powershell -File tools\viewer-smoke.ps1` (nutzt Edge, prueft alle
      Viewer-Seiten unter `tests/`). Unter Linux liegt Chromium unter
      `/opt/pw-browsers/`; in beiden Faellen fuehrt `--headless --dump-dom
@@ -52,7 +56,7 @@ pauschal die volle Suite zu fahren:
   Testlauf noetig; Config-Aenderungen werden per `run <schule>`-Lauf
   live belegt und die Outputs mitcommittet (bestehende Konvention).
 
-"Volle Suite" heisst seit dem GUI-Unterbau ALLE SECHS Testprojekte, am
+"Volle Suite" heisst seit dem GUI-Unterbau ALLE SIEBEN Testprojekte, am
 einfachsten ueber `dotnet test TimetableCore.sln`.
 
 Hintergrund: Die Regel entstand, nachdem fuer einen reinen
