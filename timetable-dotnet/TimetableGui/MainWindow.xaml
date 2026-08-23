@@ -4,7 +4,18 @@
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         xmlns:app="clr-namespace:TimetableGui"
         Title="{Binding Titel}" Height="800" Width="1280"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource farbe-flaeche}"
+        Foreground="{StaticResource farbe-text}"
+        FontFamily="{StaticResource schrift-stapel}"
+        FontSize="{StaticResource grad-basis}">
+
+    <!-- Schrift und Grundfarben stehen HIER am Fenster, nicht als
+         impliziter Style TargetType="Window": implizite Styles greifen
+         auf den konkreten Typ, und MainWindow ist eine Ableitung -
+         ein Window-Style wuerde sie stillschweigend verfehlen. Beide
+         Eigenschaften vererben von hier nach unten und sind damit der
+         billigste globale Hebel. -->
 
     <!-- Fensteraufbau nach gui-ui-konzept.md 2: EIN Hauptfenster,
          schmale Seitenleiste, der Rest gehoert dem Vollflaechen-Dashboard.
@@ -43,10 +54,14 @@
             <StatusBarItem HorizontalAlignment="Right">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="{Binding Monitor.StatusZeile}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <ProgressBar Width="120" Height="12" Minimum="0" Maximum="100"
+                    <ProgressBar Width="140" Height="6" Minimum="0" Maximum="100"
+                                 VerticalAlignment="Center"
+                                 Background="{StaticResource farbe-linie}"
+                                 Foreground="{StaticResource farbe-akzent}"
+                                 BorderThickness="0"
                                  Value="{Binding Monitor.FortschrittProzent, Mode=OneWay}"
                                  Visibility="{Binding Monitor.Laeuft, Converter={StaticResource BoolNachSichtbar}}" />
-                    <Button Content="Abbrechen" Margin="8,0,0,0" Padding="8,0"
+                    <Button Content="Abbrechen" Margin="8,0,0,0" MinHeight="22" MinWidth="0" Padding="8,2"
                             Command="{Binding Monitor.AbbrechenBefehl}"
                             Visibility="{Binding Monitor.Laeuft, Converter={StaticResource BoolNachSichtbar}}" />
                 </StackPanel>
@@ -55,54 +70,65 @@
 
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="72" />
+                <!-- Auto: die Breite steht am Rahmen, weil ColumnDefinition.Width
+                     ein GridLength ist und das Token ein Double. -->
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="0" Background="#F0F0F0">
-                <RadioButton Style="{StaticResource BereichsSchalter}" IsChecked="True"
-                             Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Start}">
-                    <StackPanel>
-                        <TextBlock Text="⌂" Style="{StaticResource BereichsIcon}" />
-                        <TextBlock Text="Start" Style="{StaticResource BereichsLabel}" />
-                    </StackPanel>
-                </RadioButton>
-                <RadioButton Style="{StaticResource BereichsSchalter}"
-                             Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Klassenbildung}">
-                    <StackPanel>
-                        <TextBlock Text="🧩" Style="{StaticResource BereichsIcon}" />
-                        <TextBlock Text="Klassen" Style="{StaticResource BereichsLabel}" />
-                    </StackPanel>
-                </RadioButton>
-                <RadioButton Style="{StaticResource BereichsSchalter}"
-                             Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Stundenplan}">
-                    <StackPanel>
-                        <TextBlock Text="📅" Style="{StaticResource BereichsIcon}" />
-                        <TextBlock Text="Stunden" Style="{StaticResource BereichsLabel}" />
-                    </StackPanel>
-                </RadioButton>
-                <RadioButton Style="{StaticResource BereichsSchalter}"
-                             Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Stammdaten}">
-                    <StackPanel>
-                        <TextBlock Text="👥" Style="{StaticResource BereichsIcon}" />
-                        <TextBlock Text="Stammdaten" Style="{StaticResource BereichsLabel}" />
-                    </StackPanel>
-                </RadioButton>
-                <RadioButton Style="{StaticResource BereichsSchalter}"
-                             Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Regeln}">
-                    <StackPanel>
-                        <TextBlock Text="📏" Style="{StaticResource BereichsIcon}" />
-                        <TextBlock Text="Regeln" Style="{StaticResource BereichsLabel}" />
-                    </StackPanel>
-                </RadioButton>
-                <RadioButton Style="{StaticResource BereichsSchalter}"
-                             Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Laeufe}">
-                    <StackPanel>
-                        <TextBlock Text="▶" Style="{StaticResource BereichsIcon}" />
-                        <TextBlock Text="Läufe" Style="{StaticResource BereichsLabel}" />
-                    </StackPanel>
-                </RadioButton>
-            </StackPanel>
+            <!-- Seitenleiste. Die Zeichen stammen aus Segoe MDL2 Assets;
+                 dass jedes davon in BEIDEN Symbolschriften existiert, ist
+                 gemessen und wird von DesignKanonTests festgehalten -
+                 ein nur in Fluent vorhandenes Zeichen erschiene unter
+                 Windows 10 still als Kaestchen. -->
+            <Border Grid.Column="0" Width="{StaticResource breite-seitenleiste}"
+                    Background="{StaticResource farbe-flaeche-2}"
+                    BorderBrush="{StaticResource farbe-linie}" BorderThickness="0,0,1,0">
+                <StackPanel>
+                    <RadioButton Style="{StaticResource BereichsSchalter}" IsChecked="True"
+                                 Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Start}">
+                        <StackPanel>
+                            <TextBlock Text="&#xE80F;" Style="{StaticResource BereichsIcon}" />
+                            <TextBlock Text="Start" Style="{StaticResource BereichsLabel}" />
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton Style="{StaticResource BereichsSchalter}"
+                                 Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Klassenbildung}">
+                        <StackPanel>
+                            <TextBlock Text="&#xE716;" Style="{StaticResource BereichsIcon}" />
+                            <TextBlock Text="Klassen" Style="{StaticResource BereichsLabel}" />
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton Style="{StaticResource BereichsSchalter}"
+                                 Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Stundenplan}">
+                        <StackPanel>
+                            <TextBlock Text="&#xE787;" Style="{StaticResource BereichsIcon}" />
+                            <TextBlock Text="Stunden" Style="{StaticResource BereichsLabel}" />
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton Style="{StaticResource BereichsSchalter}"
+                                 Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Stammdaten}">
+                        <StackPanel>
+                            <TextBlock Text="&#xE8FD;" Style="{StaticResource BereichsIcon}" />
+                            <TextBlock Text="Stammdaten" Style="{StaticResource BereichsLabel}" />
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton Style="{StaticResource BereichsSchalter}"
+                                 Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Regeln}">
+                        <StackPanel>
+                            <TextBlock Text="&#xE7C1;" Style="{StaticResource BereichsIcon}" />
+                            <TextBlock Text="Regeln" Style="{StaticResource BereichsLabel}" />
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton Style="{StaticResource BereichsSchalter}"
+                                 Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Laeufe}">
+                        <StackPanel>
+                            <TextBlock Text="&#xE768;" Style="{StaticResource BereichsIcon}" />
+                            <TextBlock Text="Läufe" Style="{StaticResource BereichsLabel}" />
+                        </StackPanel>
+                    </RadioButton>
+                </StackPanel>
+            </Border>
 
             <Grid Grid.Column="1">
                 <!-- Das Dashboard: der bestehende Viewer, 1:1 gehostet,
@@ -110,31 +136,72 @@
                      (Konzept 1, "Dashboard-first"). -->
                 <wv2:WebView2 x:Name="Dashboard" Visibility="Collapsed" />
 
-                <!-- Startseite als Schrittleiste (Konzept 8), für den
-                     Durchstich auf die zwei vorhandenen Schritte
-                     reduziert. -->
-                <ScrollViewer x:Name="Startseite">
-                    <StackPanel Margin="24" MaxWidth="720" HorizontalAlignment="Left">
-                        <TextBlock Text="Schulplanung" FontSize="28" Margin="0,0,0,4" />
-                        <TextBlock Text="{Binding Titel}" Opacity="0.6" Margin="0,0,0,24" />
+                <!-- Startseite als Schrittleiste (Konzept 8). Jeder
+                     Schritt zeigt seinen echten Stand aus dem ViewModel -
+                     Zeichen UND Farbe, damit er ohne Farbe lesbar
+                     bleibt. -->
+                <ScrollViewer x:Name="Startseite" Background="{StaticResource farbe-flaeche}">
+                    <StackPanel Margin="{StaticResource pad-platte}" MaxWidth="780" HorizontalAlignment="Left">
 
-                        <TextBlock Text="[1] Projekt" FontSize="16" FontWeight="SemiBold" />
-                        <TextBlock TextWrapping="Wrap" Margin="0,4,0,8"
+                        <TextBlock Text="Schulplanung" Style="{StaticResource Marke}" />
+                        <TextBlock Text="{Binding Titel}" Foreground="{StaticResource farbe-text-3}"
+                                   FontSize="{StaticResource grad-basis}" Margin="0,2,0,24" />
+
+                        <!-- [1] Projekt -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                            <TextBlock Style="{StaticResource SchrittZeichen}" DataContext="{Binding SchrittProjekt}" />
+                            <TextBlock Text="Projekt" Style="{StaticResource SchrittTitel}" />
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource SchrittText}" Margin="26,2,0,8"
                                    Text="Ein neues Projekt anlegen oder einen bestehenden Schulordner im tests/&lt;schule&gt;/-Layout übernehmen." />
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                            <Button Content="Neues Projekt…" Padding="12,4" Command="{Binding NeuBefehl}" />
-                            <Button Content="Bestehende Schule übernehmen…" Padding="12,4" Margin="8,0,0,0" Command="{Binding ImportierenBefehl}" />
-                            <Button Content="Öffnen…" Padding="12,4" Margin="8,0,0,0" Command="{Binding OeffnenBefehl}" />
+                        <StackPanel Orientation="Horizontal" Margin="26,0,0,24">
+                            <Button Content="Neues Projekt…" Style="{StaticResource KnopfPrimaer}" Command="{Binding NeuBefehl}" />
+                            <Button Content="Bestehende Schule übernehmen…" Margin="8,0,0,0" Command="{Binding ImportierenBefehl}" />
+                            <Button Content="Öffnen…" Margin="8,0,0,0" Command="{Binding OeffnenBefehl}" />
                         </StackPanel>
 
-                        <TextBlock Text="[2] Klassenbildung" FontSize="16" FontWeight="SemiBold" />
-                        <TextBlock TextWrapping="Wrap" Margin="0,4,0,8"
-                                   Text="Varianten rechnen und im Board bewerten. Der Lauf läuft im Hintergrund und ist jederzeit abbrechbar – bereits fertige Varianten bleiben erhalten." />
-                        <Button Content="Klassenbildung rechnen" Padding="12,4" HorizontalAlignment="Left"
-                                Command="{Binding KlassenbildungBefehl}" />
+                        <!-- [2] Stammdaten -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                            <TextBlock Style="{StaticResource SchrittZeichen}" DataContext="{Binding SchrittStammdaten}" />
+                            <TextBlock Text="Stammdaten" Style="{StaticResource SchrittTitel}" />
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource SchrittText}" Margin="26,2,0,24"
+                                   Text="{Binding SchrittStammdatenText}" />
 
-                        <TextBlock Text="Noch nicht umgesetzt: Stammdaten- und Regel-Masken, Stundenplan-Dashboard, Freigabe."
-                                   Opacity="0.6" TextWrapping="Wrap" Margin="0,28,0,0" />
+                        <!-- [3] Rechnen -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                            <TextBlock Style="{StaticResource SchrittZeichen}" DataContext="{Binding SchrittRechnen}" />
+                            <TextBlock Text="Klassenbildung rechnen" Style="{StaticResource SchrittTitel}" />
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource SchrittText}" Margin="26,2,0,8"
+                                   Text="Varianten rechnen und im Board bewerten. Der Lauf läuft im Hintergrund und ist jederzeit abbrechbar – bereits fertige Varianten bleiben erhalten." />
+                        <StackPanel Orientation="Horizontal" Margin="26,0,0,24">
+                            <Button Content="Klassenbildung rechnen" Style="{StaticResource KnopfPrimaer}"
+                                    Command="{Binding KlassenbildungBefehl}" />
+                        </StackPanel>
+
+                        <!-- Noch nicht umgesetzt: ehrlich als eigene
+                             Schritte gezeigt statt als Fussnote, damit
+                             die Leiste den ganzen Weg abbildet. -->
+                        <Border BorderBrush="{StaticResource farbe-linie}" BorderThickness="0,1,0,0" Padding="0,16,0,0">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                    <TextBlock Style="{StaticResource SchrittZeichen}" />
+                                    <TextBlock Text="Entscheiden" Style="{StaticResource SchrittTitel}"
+                                               Foreground="{StaticResource farbe-text-3}" />
+                                </StackPanel>
+                                <TextBlock Style="{StaticResource SchrittText}" Margin="26,2,0,12"
+                                           Text="Stundenplan-Dashboard, Stammdaten- und Regel-Masken – noch nicht umgesetzt (Stufe F/G)." />
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                    <TextBlock Style="{StaticResource SchrittZeichen}" />
+                                    <TextBlock Text="Freigabe &amp; Export" Style="{StaticResource SchrittTitel}"
+                                               Foreground="{StaticResource farbe-text-3}" />
+                                </StackPanel>
+                                <TextBlock Style="{StaticResource SchrittText}" Margin="26,2,0,0"
+                                           Text="Bestätigung mit Substanz, geschützter Freigabe-Stand, Klarnamen-Export – noch nicht umgesetzt (Stufe G)." />
+                            </StackPanel>
+                        </Border>
+
                     </StackPanel>
                 </ScrollViewer>
             </Grid>

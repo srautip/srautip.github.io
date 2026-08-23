@@ -24,6 +24,19 @@ Public Enum Bereich
     Laeufe
 End Enum
 
+''' <summary>Zustand eines Schritts auf der Startseite (gui-ui-konzept.md 8).
+''' Bewusst SEMANTISCH und nicht als Zeichen: welches Symbol dafuer
+''' steht, ist eine Frage der Ansicht und gehoert nicht ins ViewModel.
+''' Die Stufen folgen der Statussprache des Projekts - erledigt, offen,
+''' und "Warnung" fuer den Fall, den das Konzept als "!" fuehrt: da ist
+''' etwas, aber es haelt noch nicht.</summary>
+Public Enum SchrittStand
+    Offen
+    Bereit
+    Erledigt
+    Warnung
+End Enum
+
 ''' <summary>Alles, wofuer die Oberflaeche den Nutzer fragen muss. Die
 ''' WPF-Umsetzung liegt im View, Tests setzen eine eigene ein.</summary>
 Public Interface IDialoge
@@ -86,6 +99,7 @@ Public NotInheritable Class HauptViewModel
                 Melde(NameOf(ProjektOffen))
                 Melde(NameOf(Titel))
                 Melde(NameOf(KannKlassenbildungRechnen))
+                MeldeSchritte()
                 Befehl.MeldeAenderung()
             End If
         End Set
@@ -202,6 +216,62 @@ Public NotInheritable Class HauptViewModel
             Return ProjektOffen AndAlso StammdatenPruefen().Count = 0
         End Get
     End Property
+
+    ' ---------------------------------------------------------------
+    ' Startseite als Schrittleiste (gui-ui-konzept.md 8)
+    ' ---------------------------------------------------------------
+
+    Public ReadOnly Property SchrittProjekt As SchrittStand
+        Get
+            Return If(ProjektOffen, SchrittStand.Erledigt, SchrittStand.Bereit)
+        End Get
+    End Property
+
+    Public ReadOnly Property SchrittStammdaten As SchrittStand
+        Get
+            If Not ProjektOffen Then Return SchrittStand.Offen
+            Return If(PruefungGruen, SchrittStand.Erledigt, SchrittStand.Warnung)
+        End Get
+    End Property
+
+    ''' <summary>"Erledigt" heisst hier: es liegt ein anzeigbares
+    ''' Ergebnis vor. Genau daran haengt auch die Anzeige selbst, also
+    ''' ist es dieselbe Wahrheit und keine zweite.</summary>
+    Public ReadOnly Property SchrittRechnen As SchrittStand
+        Get
+            If Not ProjektOffen Then Return SchrittStand.Offen
+            If Auslieferung.SeitenGroesse > 0 Then Return SchrittStand.Erledigt
+            Return If(KannKlassenbildungRechnen, SchrittStand.Bereit, SchrittStand.Offen)
+        End Get
+    End Property
+
+    ''' <summary>Die Zusammenfassung, die das Konzept in seiner Skizze
+    ''' zeigt ("8 Klassen, 12 Lehrkraefte, Pruefung gruen"). Nennt im
+    ''' Fehlerfall den ERSTEN Befund im Klartext - eine blosse Zahl
+    ''' zwaenge zum Weiterklicken, um ueberhaupt zu erfahren, worum es
+    ''' geht.</summary>
+    Public ReadOnly Property SchrittStammdatenText As String
+        Get
+            If Not ProjektOffen Then Return "Erst ein Projekt anlegen oder oeffnen."
+            Dim b = _projekt.Bestand
+            Dim basis = $"{b.Klassen.Count} Klassen, {b.Lehrkraefte.Count} Lehrkraefte, {b.Faecher.Count} Faecher"
+            Dim fehler = StammdatenPruefen()
+            If fehler.Count = 0 Then Return basis & " - Pruefung gruen."
+            Return $"{basis} - {fehler.Count} offen: {fehler(0)}"
+        End Get
+    End Property
+
+    ''' <summary>Sammelmeldung nach jedem Vorgang, der einen Schritt
+    ''' weiterbewegt haben kann. Bewusst an EINER Stelle: sonst
+    ''' vergisst der naechste Aufrufer eine der Eigenschaften, und die
+    ''' Leiste zeigt stillschweigend einen alten Stand.</summary>
+    Private Sub MeldeSchritte()
+        Melde(NameOf(SchrittProjekt))
+        Melde(NameOf(SchrittStammdaten))
+        Melde(NameOf(SchrittRechnen))
+        Melde(NameOf(SchrittStammdatenText))
+        Melde(NameOf(PruefungGruen))
+    End Sub
 
     ' ---------------------------------------------------------------
     ' Projekt
@@ -361,6 +431,7 @@ Public NotInheritable Class HauptViewModel
 
         Meldung = $"{e.Geloeste.Count} Variante(n), Konsens-Kern {e.Top.KonsensKern.Count}/{e.Eingabe.Schueler.Count} Kinder" &
                   If(e.Abgebrochen, " (abgebrochen)", "")
+        MeldeSchritte()
     End Sub
 
     ' ---------------------------------------------------------------

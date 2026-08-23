@@ -26,6 +26,13 @@
   <ItemGroup>
     <EmbeddedResource Include="Templates\stundentafel.html" />
     <EmbeddedResource Include="Templates\klassenbildung.html" />
+    <!-- Die Designsystem-Quelle. Eingebettet, damit die Waechtertests
+         sie ohne Pfadwissen lesen koennen; der logische Name lautet
+         nach derselben Regel wie oben "TimetableWorkflow.design-tokens.css".
+         Sie wird NICHT zur Laufzeit injiziert - die Vorlagen tragen
+         eine zeichengleiche Kopie (siehe Kopf der CSS-Datei). -->
+    <EmbeddedResource Include="Templates\design-tokens.css" />
+    <EmbeddedResource Include="Templates\design-basis.css" />
   </ItemGroup>
 
 </Project>

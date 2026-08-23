@@ -822,7 +822,19 @@ sein.
 Details, Nutzerentscheidungen und Live-Verifikationsergebnisse siehe
 `docs/phase2-21-stundentafel-visualisierung.md`.
 
-## Veröffentlichung als GitHub Page (`main`-Branch)
+## Veröffentlichung (frühere GitHub Page)
+
+> **Nicht mehr gepflegt (Nutzerentscheidung 23.08.2026).** Die
+> Kopien unter `stundentafel/*.html` werden nach einem Lauf nicht mehr
+> nachgezogen und zeigen einen eingefrorenen Altstand - insbesondere
+> das Erscheinungsbild VOR dem Designsystem-Umbau (arc42 8.16).
+> Vorschau-Kanal sind die Claude-Artifacts, siehe `CLAUDE.md`.
+> Die Dateien zu entfernen oder die Seite abzuschalten wäre ein
+> eigener, nach außen wirkender Schritt und steht dem Betreiber zu.
+>
+> Der folgende Abschnitt beschreibt den damaligen Weg und bleibt als
+> Anleitung stehen, falls die Seite wieder aufgenommen werden soll.
+
 
 Da `stundentafel.html` (siehe oben) komplett eigenständig ist (JSON-Daten
 inline eingebettet, kein `fetch()`, kein Build-Schritt), lässt sie sich

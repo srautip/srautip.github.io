@@ -1,0 +1,174 @@
+/* ============================================================
+   DESIGNSYSTEM - GETEILTE GRUNDREGELN
+   ============================================================
+
+   Gegenstueck zu design-tokens.css: nicht Werte, sondern die Regeln,
+   die BEIDE Viewer-Vorlagen brauchen. Auch dieser Block liegt als
+   zeichengleiche Kopie in jeder Vorlage; DesignTokenTests haelt ihn
+   fest.
+
+   AUFNAHMEKRITERIUM, streng: hier steht nur, was vor diesem Schritt
+   BEREITS in beiden Dateien stand. Alles andere waere kein
+   Deduplizieren, sondern ein unbemerktes Redesign.
+
+   Das schliesst `button` ausdruecklich aus: klassenbildung.html hat
+   eine generische Knopf-Regel, stundentafel.html nicht. Ein geteilter
+   Elementselektor haette dort `.weights-reset` sichtbar veraendert -
+   und zwar, ohne dass jemand es beabsichtigt haette.
+
+   REIHENFOLGE: Dieser Block gehoert unmittelbar hinter die
+   Token-Region und VOR die vorlageneigenen Regeln. Umgekehrt wuerden
+   diese Grundregeln die spezifischeren Ueberschreibungen still
+   clobbern - `#meta` und `#controls` sind ID-Selektoren, da entscheidet
+   allein die Reihenfolge.
+
+   VIER ENTSCHIEDENE ABWEICHUNGEN. Die Regeln waren dupliziert und
+   bereits auseinandergelaufen; hier steht die getroffene Wahl:
+
+     h2 margin       mass-5 (statt mass-4 in klassenbildung) - eine
+                     Abschnittsueberschrift braucht Luft nach oben.
+     h2 color        gesetzt (fehlte in klassenbildung) - explizit
+                     statt von der Vererbung abhaengig.
+     #meta margin    mass-4 (statt mass-3) - gleicher Abstand wie
+                     #controls, damit der Seitenkopf ein Raster hat.
+     #controls gap   mass-3 (statt mass-2) - Bedienelemente brauchen
+                     mehr Trennung als 8 px, sonst lesen sie sich als
+                     eine Gruppe.
+     #controls size  t-klein (fehlte in stundentafel).
+     #compare-info   text-2 (statt text) - es ist Begleitinformation,
+                     keine Aussage.
+   ============================================================ */
+
+/* == DESIGN-BASIS: erzeugt aus Templates/design-basis.css.
+      NICHT VON HAND AENDERN - DesignTokenTests haelt die Kopien
+      zeichengleich zur Quelle. == */
+  body {
+    font-family: var(--schrift-stapel);
+    margin: var(--mass-6);
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
+    font-size: var(--t-basis);
+    line-height: var(--lh-basis);
+  }
+  h1 {
+    font-size: var(--t-titel);
+    line-height: var(--lh-eng);
+    margin-bottom: var(--mass-1);
+    color: var(--farbe-text);
+  }
+  h2 {
+    font-size: var(--t-kopf);
+    line-height: var(--lh-eng);
+    margin: var(--mass-5) 0 var(--mass-2);
+    color: var(--farbe-text);
+  }
+  #meta {
+    color: var(--farbe-text-2);
+    margin-bottom: var(--mass-4);
+    font-size: var(--t-basis);
+  }
+  #controls {
+    margin-bottom: var(--mass-4);
+    display: flex;
+    align-items: center;
+    gap: var(--mass-3);
+    flex-wrap: wrap;
+    font-size: var(--t-klein);
+  }
+  #compare-info {
+    margin: 0 0 var(--mass-2);
+    font-size: var(--t-klein);
+    color: var(--farbe-text-2);
+  }
+
+  /* Sichtbarer Fokus fuer Tastaturbedienung. `:focus-visible` statt
+     `:focus`, damit Mausnutzer keinen Ring sehen. Es gab bisher in
+     KEINER Vorlage eine Fokusregel, obwohl
+     klassenbildung-ui-konzept.md:203 Tastaturbedienung ausdruecklich
+     zusagt ("Pin = Enter auf fokussierter Karte").
+
+     `[tabindex]` deckt alles ab, was in Stufe 5 fokussierbar gemacht
+     wird - Karten, Badges, Panelzeilen, Loesungszeilen. Deshalb steht
+     hier eine Regel und nicht eine Liste, die dann mitwachsen muesste.
+     Selektoren, die in einer Vorlage nichts treffen, sind harmlos. */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [tabindex]:focus-visible {
+    outline: var(--fokus-ring);
+    outline-offset: 1px;
+  }
+
+  /* Symbole aus dem Inline-Sprite (siehe direkt nach <body>).
+     Monochrom, erben currentColor, skalieren mit der Schriftgroesse -
+     und vor allem: keine Datei, keine Schrift, kein CDN. Damit passen
+     sie unter die Self-contained-Leitplanke, die den Doppelklick-
+     Betrieb sichert (viewer-ausbau-plan.md "Leitplanken").
+
+     Vorher standen dort Emoji. Die rendern in FARBE und je nach
+     Betriebssystem verschieden, ignorieren die Textfarbe, sind in der
+     Groesse nicht steuerbar und drucken schlecht - auf einer Flaeche,
+     deren gesamte Bedeutungslehre auf kontrollierter Farbe beruht, ist
+     ein unkontrolliert farbiges Zeichen ein Fremdkoerper.
+
+     KEIN uebernommenes Duplikat, sondern eine neue geteilte Regel des
+     Designsystems: die Stundentafel nutzt den Satz heute noch nicht,
+     eine Klasse ohne Verwendung ist dort aber folgenlos. */
+  .ico {
+    width: 1em;
+    height: 1em;
+    flex: none;
+    vertical-align: -0.125em;
+  }
+  .ico use, .ico path, .ico rect, .ico circle {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .ico.voll path, .ico.voll rect { fill: currentColor; }
+  .ico-punkte circle { fill: currentColor; stroke: none; }
+
+  /* ---- Druck ----------------------------------------------------
+     Es gab bisher kein Druckbild, obwohl Stundenplan und Klassenliste
+     die typischen Druckartefakte sind - und obwohl das Konzept den
+     Druck ausdruecklich als Grund fuer die Gruppen-Kuerzel nennt
+     (klassenbildung-ui-konzept.md:41).
+
+     Selektoren, die in einer der beiden Vorlagen nichts treffen, sind
+     folgenlos; deshalb steht der Block geteilt statt zweimal. */
+  @media print {
+    /* OHNE das hier faerbt kein Browser die Flaechen - und damit
+       verschwaende genau die Kodierung, um die es geht: Ampelrand,
+       Gruppenfarbe, belegte Zelle. */
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    body { margin: 0; background: #fff; }
+
+    /* Bedienelemente drucken nicht mit - sie sind auf Papier weder
+       bedienbar noch informativ. */
+    #controls, #prozess, #varianten, #warnung, #fixierungen,
+    #pareto-label, #compare-info, .dropdown, #weights-menu,
+    button, .karte .pin, .gruppe-zeile .fixieren { display: none; }
+
+    /* Zusammengehoeriges nicht ueber die Seitengrenze reissen. */
+    .karte, .stapel, .klasse-spalte, .gruppe-zeile, tr { break-inside: avoid; }
+    h1, h2 { break-after: avoid; }
+
+    /* Auf Papier gibt es keinen Scrollbereich - alles muss stehen. */
+    #panel, #table-container, #lehrer-table-container, #solutions-overview {
+      max-height: none;
+      overflow: visible;
+    }
+    /* Schwebende Flaechen und Hover-Zustaende sind auf Papier sinnlos. */
+    #popover { display: none; }
+    .karte, .klasse-spalte, #panel, .variante-kachel { box-shadow: none; }
+
+    /* Kopfzeilen wiederholen sich auf jeder Seite - ein Raster ohne
+       Tages- und Stundenspalte ist auf Seite zwei nicht mehr lesbar. */
+    thead { display: table-header-group; }
+  }
+/* == ENDE DESIGN-BASIS == */
