@@ -20,18 +20,16 @@ pauschal die volle Suite zu fahren:
   Stundenplan-Tests exerzieren sie nicht und umgekehrt). Bei
   querschneidenden Aenderungen (z.B. gemeinsame Helfer) beide Suiten
   fahren.
-- **Aenderungen an `TimetableYaml/` oder `TimetableWorkflow/`** (seit dem
+- **Aenderungen an `TimetableYaml/`, `TimetableWorkflow/` oder `TimetableProjekt/`** (seit dem
   GUI-Unterbau, siehe `docs/gui-implementierungsplan.md`): die eigenen
   Suiten `dotnet test TimetableYaml.Tests` (<1s) und
-  `dotnet test TimetableWorkflow.Tests` (~3s). Beruehrt die Aenderung die
+  `dotnet test TimetableWorkflow.Tests` (~3s) bzw. `dotnet test TimetableProjekt.Tests` (~2s). Beruehrt die Aenderung die
   Pipeline-Orchestrierung oder die Berichts-Zeichenketten, zusaetzlich
   `dotnet run --project SchoolTestRunner -- run --all` - nur der echte
   Lauf belegt, dass die committeten Beispiel-Outputs unveraendert bleiben.
 
-"Volle Suite" heisst seit dem GUI-Unterbau ALLE VIER Testprojekte, am
-einfachsten ueber `dotnet test TimetableCore.sln`.
 - **Aenderungen nur an `SchoolTestRunner/`-CLI oder
-  `SchoolTestRunner/Templates/stundentafel.html`** (Viewer): die Suite
+  `TimetableWorkflow/Templates/*.html`** (Viewer): die Suite
   deckt beides NICHT ab - stattdessen gezielt pruefen:
   1. `dotnet build TimetableCore.sln` (Compile inkl. Embedded-Resource),
   2. `dotnet run --project SchoolTestRunner -- render <schule>` gegen
@@ -48,6 +46,9 @@ einfachsten ueber `dotnet test TimetableCore.sln`.
 - **Aenderungen nur an `tests/<schule>/input/*.yaml` oder Doku**: kein
   Testlauf noetig; Config-Aenderungen werden per `run <schule>`-Lauf
   live belegt und die Outputs mitcommittet (bestehende Konvention).
+
+"Volle Suite" heisst seit dem GUI-Unterbau ALLE FUENF Testprojekte, am
+einfachsten ueber `dotnet test TimetableCore.sln`.
 
 Hintergrund: Die Regel entstand, nachdem fuer einen reinen
 Viewer-Commit die volle 5-Minuten-Suite lief, obwohl sie den

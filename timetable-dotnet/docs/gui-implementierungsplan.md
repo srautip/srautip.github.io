@@ -6,7 +6,7 @@
 |---|---|---|
 | A | Unterbau-Umbau (`TimetableYaml`, `TimetableWorkflow`) | **erledigt** |
 | B | YAML-Schreiber, Klassenbildungs-JSON öffentlich, Pipeline als Dienst | **erledigt** |
-| C | Projektablage `.splanx` | offen |
+| C | Projektablage `.splanx` | **erledigt** |
 | D | GUI-Durchstich (Klassenbildung) | offen |
 | E | Bridge und U5-Re-Solve | offen |
 | F | Eingabemasken | offen |

@@ -180,6 +180,11 @@ timetable-dotnet/
 │                             Build*Html + Templates/*.html als Embedded
 │                             Resources, siehe 8.10), Curriculum-Vorlagen
 │                             und Scaffold für `new`
+├── TimetableProjekt/         Klassenbibliothek: die verschlüsselte
+│                             Ein-Datei-Projektablage (.splanx), Klarnamen-
+│                             Mapping, Audit-Log, Ergebnis-Stände sowie
+│                             Im-/Export in das tests/<schule>/-Layout
+│                             (Konzept: docs/gui-datenhaltung-konzept.md)
 ├── RobustnessRunner/         Konsolenprogramm: LLM-Wiederholungsstudien
 ├── SchoolTestRunner/         Konsolenprogramm: code-freie YAML-Testfälle -
 │                             seit dem GUI-Unterbau nur noch CLI-Hülle
@@ -562,8 +567,8 @@ Varianten liegen aber stets im ε-Band).
 
 | Umgebung | Inhalt | Status |
 |---|---|---|
-| Linux-Sandbox (aktuelle Entwicklungsumgebung) | `TimetableCore`, `TimetableYaml`, `TimetableWorkflow`, die vier Testprojekte (`TimetableCore.Tests`, `Klassenbildung.Tests`, `TimetableYaml.Tests`, `TimetableWorkflow.Tests`), `RobustnessRunner`, `SchoolTestRunner`, lokaler Ollama-Server | Aktiv, vollständig lauffähig (`dotnet test`, `dotnet run --project RobustnessRunner`, `dotnet run --project SchoolTestRunner`) - `SchoolTestRunner` braucht KEINEN Ollama-Server (rein YAML-basiert, keine LLM-Extraktion) |
-| Windows-Zielumgebung (nachgelagert) | `TimetableGui` (WPF + WebView2) + `TimetableCore` (per `ProjectReference`) + lokaler Ollama-Server; Nutzdaten als verschlüsselte Ein-Datei-Projektablage (`.splanx`-Arbeitstitel, `docs/gui-datenhaltung-konzept.md`); WebView2 nutzt die auf aktuellen Windows-10/11-Systemen vorhandene Evergreen-Runtime (sonst Bootstrapper) | Noch nicht begonnen (Phase 3); Datenhaltungskonzept liegt vor |
+| Linux-Sandbox (aktuelle Entwicklungsumgebung) | `TimetableCore`, `TimetableYaml`, `TimetableWorkflow`, `TimetableProjekt`, die fünf Testprojekte (`TimetableCore.Tests`, `Klassenbildung.Tests`, `TimetableYaml.Tests`, `TimetableWorkflow.Tests`, `TimetableProjekt.Tests`), `RobustnessRunner`, `SchoolTestRunner`, lokaler Ollama-Server | Aktiv, vollständig lauffähig (`dotnet test`, `dotnet run --project RobustnessRunner`, `dotnet run --project SchoolTestRunner`) - `SchoolTestRunner` braucht KEINEN Ollama-Server (rein YAML-basiert, keine LLM-Extraktion) |
+| Windows-Zielumgebung (nachgelagert) | `TimetableGui` (WPF + WebView2) + `TimetableCore` (per `ProjectReference`) + lokaler Ollama-Server; Nutzdaten als verschlüsselte Ein-Datei-Projektablage (`.splanx`-Arbeitstitel, `docs/gui-datenhaltung-konzept.md`); WebView2 nutzt die auf aktuellen Windows-10/11-Systemen vorhandene Evergreen-Runtime (sonst Bootstrapper) | Oberfläche noch nicht begonnen (Phase 3); der Unterbau steht: Projektablage in `TimetableProjekt` umgesetzt (8.12), Pipeline als Dienst in `TimetableWorkflow` |
 
 `Google.OrTools` läuft nativ unter beiden Plattformen (`Google.OrTools.runtime.linux-x64`
 bzw. `...win-x64` als transitive NuGet-Abhängigkeit) - derselbe
@@ -731,14 +736,16 @@ Regel dazu (welcher Änderungsbereich welchen Prüfumfang verlangt, inkl.
 des Sonderfalls "reine Viewer-Änderung → Build + `render` +
 Chromium-Smoke statt Suite") steht in `timetable-dotnet/CLAUDE.md`.
 
-Mit dem GUI-Unterbau sind zwei weitere Suiten dazugekommen, beide nach
+Mit dem GUI-Unterbau sind drei weitere Suiten dazugekommen, alle nach
 demselben Kosten-Prinzip schnell gehalten: `TimetableYaml.Tests`
 (Round-Trips gegen die echten Beispieldateien, <1s) und
 `TimetableWorkflow.Tests` (die Pipeline als Dienst, ~3s gegen eine per
 `Scaffold` erzeugte einzügige Testschule - die echte
 Grundschul-Fixture braucht 180s Solve-Budget und gehört deshalb in die
-`run`-Beispielläufe, nicht in eine Unit-Suite). "Volle Suite" heißt
-seither ALLE VIER Testprojekte, am einfachsten über
+`run`-Beispielläufe, nicht in eine Unit-Suite) und `TimetableProjekt.Tests`
+(Container, Krypto und Modellzusagen, ~2s - die PBKDF2-Iterationszahl ist
+dort bewusst klein, der Produktionswert wird separat festgenagelt). "Volle Suite" heißt
+seither ALLE FÜNF Testprojekte, am einfachsten über
 `dotnet test TimetableCore.sln`.
 
 ### 8.10 Self-contained-HTML-Viewer und ihre Verifikation
@@ -854,6 +861,62 @@ garantiert einmal meldet, unabhängig von der Solve-Dauer. Zu jedem
 Abbruchtest gehört eine Gegenprobe, die belegt, dass dasselbe Szenario
 ohne Token tatsächlich lösbar ist.
 
+### 8.12 Projektablage: ein verschlüsselter Container
+
+`TimetableProjekt` setzt `docs/gui-datenhaltung-konzept.md` um. Eine
+Schule plus ein Schuljahr sind **eine Datei** (`.splanx`): ein
+ZIP-Container mit JSON-Einträgen, als Ganzes mit AES-256-GCM
+verschlüsselt.
+
+Aufbau der Datei — der Kopf liegt bewusst **unverschlüsselt**:
+
+```
+Bytes 0..7    Magic "SPLANX01"
+Bytes 8..11   Länge des Klartext-Kopfes (Int32 LE)
+danach        Kopf-JSON: KDF, Iterationszahl, Salt, Nonce
+danach        16 Byte GCM-Tag
+Rest          Chiffrat = ZIP mit manifest/stammdaten/constraints/
+              klassenbildung/config/mapping/audit-log/gui-state/ergebnisse
+```
+
+Die Iterationszahl muss lesbar sein, *bevor* der Schlüssel abgeleitet
+werden kann, und soll später erhöhbar sein, ohne alte Dateien unlesbar zu
+machen. Salt und Nonce sind per Definition öffentlich; ein Geheimnis
+steht nicht im Kopf. Schlüsselableitung ist PBKDF2-SHA256 mit ≥ 600.000
+Runden, die Nonce ist pro Speichervorgang frisch.
+
+**Alles BCL** — `System.IO.Compression`, `AesGcm`,
+`Rfc2898DeriveBytes.Pbkdf2`, `System.Text.Json`. Keine neue Abhängigkeit,
+kein zweiter Native-Stack neben `Google.OrTools`. Bewusst *nicht* hier:
+das optionale „Passwort merken" per Windows-DPAPI — es bräuchte ein
+Windows-only-Paket und gehört deshalb in `TimetableGui`
+(`net8.0-windows`), nicht in eine plattformneutrale Bibliothek.
+
+**Atomar speichern** (Anforderung A9): serialisieren → ZIP im Speicher →
+verschlüsseln → Temp-Datei **im selben Ordner** → `File.Replace`. Der
+Umweg über `%TEMP%` scheidet doppelt aus: `File.Replace` wäre über
+Datenträgergrenzen hinweg kein Rename mehr, und Klartext hätte in einem
+fremden Verzeichnis nichts verloren. Ein Absturz mitten im Speichern
+hinterlässt damit die alte, intakte Datei.
+
+**Kein Recovery-Pfad.** Passwort vergessen heißt Daten verloren; das ist
+die Kehrseite echter Verschlüsselung und die getroffene Entscheidung
+(schließt offenen Punkt 1 des Datenhaltungskonzepts). Abgemildert wird
+sie organisatorisch, nicht technisch.
+
+Drei Zusagen liegen im Modell, nicht im Container, und sind einzeln
+getestet: eine **einmal vergebene Schüler-ID bleibt verbrannt** (der
+Zähler im Manifest zählt nur aufwärts, damit alte Audit-Einträge nie auf
+ein anderes Kind zeigen); **Freigabe- und Bestands-Stände** sind gegen
+Verdrängen *und* Löschen geschützt, und wenn nur noch geschützte Stände
+übrig sind, tritt die Obergrenze zurück statt eine Freigabe wegzuwerfen;
+das **Audit-Log überlebt das Löschen eines Standes** — die Ergebnisdaten
+verschwinden, die Zeile bleibt.
+
+`AesGcm` ist authentifiziert: ein falsches Passwort und eine manipulierte
+Datei scheitern beide an derselben Prüfung. Der Kern kann sie nicht
+unterscheiden, und die Fehlermeldung behauptet es deshalb auch nicht.
+
 ## 9. Architekturentscheidungen
 
 Ausgewählte, besonders folgenreiche Entscheidungen (ausführliche
@@ -924,7 +987,8 @@ Qualität
 | **Klassenbildung: Konfliktkern-Analyse (Plan K6) und Re-Solve aus dem Viewer (UI-Konzept U5) offen.** Bei kollidierenden harten Regeln/Fixierungen meldet der Lauf nur Infeasible ohne Benennung des minimalen Konfliktkerns; der Viewer-Loop läuft über YAML-Export + erneuten CLI-Lauf. | Offen, in `docs/klassenbildung-plan.md` bzw. `docs/klassenbildung-ui-konzept.md` als nächste Ausbaustufen beschrieben; das UI ist so geschnitten, dass U5 nur den Export-Teil ersetzt. |
 | **`klassen`-Läufe sind trotz festem Seed nicht run-zu-run-stabil** (Wandzeit-Limits beeinflussen, welche Varianten im ε-Band gefunden werden - beobachtet: Konsens-Kern 27 vs. 54 von 100 bei identischem Input). | Bekannt und in 6.9 dokumentiert; die Zielwerte akzeptierter Varianten liegen stets im ε-Band, der Konsens-Kern ist als Arbeitshilfe (Bulk-Fixierung), nicht als stabile Kennzahl zu lesen. |
 | **Ein abgebrochenes `SolveTop` kann ein LEERES `Solutions` liefern** (Abbruch während der lexikographischen Vorphase, bevor die erste Lösung existiert) - ununterscheidbar von "nichts gefunden", wenn ein Aufrufer nur die Listenlänge prüft. | Bewusste Semantik, in 8.11 und am Enum-Wert `MultiSolveStopReason.Cancelled` dokumentiert: `StopReason` unterscheidet den Fall eindeutig von `SearchSpaceExhausted`. Die GUI muss den Leerfall behandeln. |
-| **GUI (Phase 3) noch nicht begonnen.** | Geplant, nachgelagert unter Windows als WPF + WebView2 (siehe 2, 7); das Datenhaltungskonzept inkl. DSGVO-Betrachtung liegt vor (`docs/gui-datenhaltung-konzept.md`). Der Kern ist GUI-unabhängig entworfen (siehe 4, 7) und seit 8.11 zusätzlich abbrechbar und beobachtbar - die technische Voraussetzung für eine bedienbare Oberfläche steht damit. |
+| **Passwort einer Projektdatei vergessen = Daten unwiederbringlich verloren.** Es gibt bewusst keinen Recovery-Schlüssel und keine Hintertür (8.12). | Entschieden und akzeptiert - die Kehrseite echter Verschlüsselung; ein zweiter Schlüsselweg wäre selbst wieder eine Angriffsfläche. Abmilderung ist organisatorisch (Handbuch: Passwort in den Schultresor, "Sicherungskopie erstellen" prominent). Schließt offenen Punkt 1 des Datenhaltungskonzepts. |
+| **GUI (Phase 3) noch nicht begonnen.** | Geplant, nachgelagert unter Windows als WPF + WebView2 (siehe 2, 7); das Datenhaltungskonzept inkl. DSGVO-Betrachtung liegt vor (`docs/gui-datenhaltung-konzept.md`). Der Kern ist GUI-unabhängig entworfen (siehe 4, 7) und seit 8.11 zusätzlich abbrechbar und beobachtbar - abbrechbar und beobachtbar. Der Unterbau der Stufen A-C ist umgesetzt (`docs/gui-implementierungsplan.md`): YAML in beide Richtungen, Pipeline als I/O-freier Dienst, verschlüsselte Projektablage. Offen ist die Oberfläche selbst. |
 
 ## 12. Glossar
 
