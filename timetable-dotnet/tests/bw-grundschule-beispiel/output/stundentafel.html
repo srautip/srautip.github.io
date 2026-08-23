@@ -4,123 +4,372 @@
 <meta charset="utf-8">
 <title>Stundentafel</title>
 <style>
-  :root {
-    color-scheme: light;
-  }
+/* == DESIGN-TOKENS: erzeugt aus Templates/design-tokens.css.
+      NICHT VON HAND AENDERN - DesignTokenTests haelt die Kopien
+      zeichengleich zur Quelle. == */
+:root {
+  color-scheme: light;
+
+  /* --- Neutrale, als ROLLEN statt als Rampe. Leichter Kaltstich in
+         Richtung des Akzents: reines Grau neben blauem Akzent liest
+         sich schmutzig. Acht Rollen ersetzen die rund zwanzig
+         Einzelwerte des Bestands - #ccc, #bbb, #ddd, #999 und #eee
+         heissen dort alle "ein Rahmen".
+         Die zugrundeliegende Zehnerrampe ist bewusst NICHT als Token
+         abgelegt: sie ist die Herleitung, nicht die Schnittstelle.
+         Als Token waere sie eine zweite Wahrheit neben den Rollen
+         (jeder Wert stuende zweimal da) und haette tote Stufen. --- */
+  --farbe-flaeche:#ffffff;
+  --farbe-flaeche-2:#fafbfc;
+  --farbe-flaeche-3:#f2f4f7;
+  --farbe-linie:#e6e9ee;
+  --farbe-linie-stark:#d5dae1;
+  --farbe-text:#1a1f26;
+  --farbe-text-2:#626b76;
+  --farbe-text-3:#8a929d;
+
+  /* --- Status: gesaettigt, kleinflaechig, IMMER mit Symbol.
+         Ein Triplett je Zustand macht die heutigen zwei Gelbtoene
+         (#a16207 fuer den Text, #ca8a04 fuer Balken und Kartenkante)
+         und die zwei Neutralgraus (#94a3b8/#9ca3af) strukturell
+         unmoeglich. Die Symbole bleiben Text - die Doppelkodierung
+         ist laut klassenbildung-konzept.md:419 Pflicht. --- */
+  --farbe-ok-text:#0f7938;    --farbe-ok-rand:#86c9a4;    --farbe-ok-flaeche:#e9f6ef;
+  --farbe-warn-text:#8a5a00;  --farbe-warn-rand:#ddb45f;  --farbe-warn-flaeche:#fdf3e4;
+  --farbe-krit-text:#b3261e;  --farbe-krit-rand:#eaa6a1;  --farbe-krit-flaeche:#fcecea;
+  /* "frei" hat bewusst KEINE eigene Flaeche: sie waere wertgleich mit
+     --farbe-flaeche-3 und damit eine zweite Wahrheit fuer denselben Ton. */
+  --farbe-frei-text:#626b76;  --farbe-frei-rand:#d5dae1;
+
+  --farbe-akzent:#0f6cbd;
+  --farbe-akzent-hover:#115ea3;
+  --farbe-akzent-flaeche:#eff6fc;
+  --farbe-diff:#a8480b;
+  /* Vergleichsauswahl ist NICHT dasselbe wie aktive Auswahl - beide
+     koennen gleichzeitig sichtbar sein (eine Loesung gewaehlt, eine
+     zum Vergleich). Deshalb eine eigene Rolle statt eines Farbtons
+     der Akzentfamilie. */
+  --farbe-vergleich-flaeche:#fdf1e3;
+
+  /* --- Kategoriale Palette: 16 Gruppenfarben.
+         Basis hsl(H 38% 46%) in gleichmaessigen 22,5-Grad-Schritten,
+         danach 10 % eines Ockers hsl(35 38% 46%) beigemischt. Der
+         Anker hat DIESELBE Saettigung und Helligkeit - die Mischung
+         verschiebt deshalb nur den Ton und daempft die kalten Toene,
+         ohne die Helligkeit anzutasten.
+
+         Die feste, niedrige Saettigung ist die tragende Zusage:
+         eine GESAETTIGTE Farbe im Bild ist immer Status, nie
+         Identitaet (klassenbildung-ui-konzept.md:35 nennt die
+         Trennung "strikt" und fordert entsaettigte Toene). Eine
+         reine Ton-Trennung waere bei 16 Kategorien unmoeglich - die
+         drei Ampelbaender belegen ein Sechstel des Kreises; die
+         Trennung MUSS auf Saettigung plus Pflicht-Kuerzel ruhen.
+
+         Reihenfolge handsortiert: benachbarte Indizes liegen
+         mindestens 45 Grad auseinander, denn genau die treffen im
+         Board aufeinander. Rot steht bewusst auf Platz 16.
+
+         Heute verletzt der Bestand die eigene Regel: #15803d ist
+         gleichzeitig Ampel-Gruen und Gruppenfarbe 11, #c2410c
+         gleichzeitig Diff-Marker und Gruppenfarbe 16. --- */
+  --kat-1:#528099;  --kat-2:#529e7b;  --kat-3:#984e99;  --kat-4:#a28b49;
+  --kat-5:#529e99;  --kat-6:#a24e85;  --kat-7:#7a9e49;  --kat-8:#5c4e99;
+  --kat-9:#a26c49;  --kat-10:#529e5d; --kat-11:#7a4e99; --kat-12:#989e49;
+  --kat-13:#526299; --kat-14:#a24e67; --kat-15:#5c9e49; --kat-16:#a24e49;
+
+  /* --- Typografie: fuenf Rollen statt vierzehn gewachsener Werte.
+         Keine Webschrift - die Viewer laufen per Doppelklick ohne
+         Netz, ein CDN scheidet aus (viewer-ausbau-plan.md
+         "Leitplanken"). Hierarchie kommt aus Groesse, Gewicht und
+         Flaeche. Zeilenhoehen sind heute NIRGENDS deklariert. --- */
+  --schrift-stapel:-apple-system,"Segoe UI",Roboto,sans-serif;
+  --schrift-mono:ui-monospace,Consolas,monospace;
+  --t-titel:1.25rem;
+  --t-kopf:0.9375rem;
+  --t-basis:0.8125rem;
+  --t-klein:0.75rem;
+  --t-mikro:0.6875rem;
+  --lh-eng:1.2;
+  --lh-basis:1.4;
+
+  /* --- Mass: 4-px-Raster. Heute liegen die Werte auf jedem
+         0,05-rem-Schritt zwischen 0,1 und 0,6 - kein Raster. --- */
+  --mass-05:2px; --mass-1:4px; --mass-2:8px; --mass-3:12px;
+  --mass-4:16px; --mass-5:20px; --mass-6:24px;
+
+  /* --- Radius nach Rolle: Marke, Steuerelement, Flaeche. --- */
+  --radius-s:2px; --radius-m:4px; --radius-l:8px;
+
+  /* --- Elevation: EIN Rezept fuer schwebende Flaechen. Popover und
+         Aufklappmenue teilen sich heute die Rolle, aber nicht das
+         Rezept - zwei Raender, zwei Radien, zwei Schatten. --- */
+  --schatten-1:0 2px 8px rgba(16,24,40,.10), 0 0 1px rgba(16,24,40,.16);
+
+  /* --- Zustand. Der Fokusring ist neu: es gibt heute keine einzige
+         :focus-Regel, obwohl klassenbildung-ui-konzept.md:203
+         Tastaturbedienung ausdruecklich zusagt. --- */
+  --zustand-hover:rgba(16,24,40,.045);
+  --fokus-ring:2px solid var(--farbe-akzent);
+  --uebergang:120ms ease;
+
+  /* --- Dichte. --dichte-zeile meint die GESAMTHOEHE der Zeile, nicht
+         ihre Inhaltshoehe - die Zeilenelemente setzen dafuer
+         box-sizing:border-box. Ohne das kaemen Polsterung und Rahmen
+         obendrauf, und "22 px" ergaeben 28 (live gemessen).
+         Stufe "kompakt" entspricht der heutigen Kartenhoehe von 24 px. Kompakt kostet also nichts; komfortabel ist der
+         Zugewinn fuer kleinere Anzeigen. --- */
+  --dichte-zeile:24px;
+  --dichte-pad-y:2px;
+  --dichte-pad-x:6px;
+  --dichte-gap:4px;
+}
+
+:root[data-dichte="komfortabel"] {
+  --dichte-zeile:32px;
+  --dichte-pad-y:5px;
+  --dichte-pad-x:9px;
+  --dichte-gap:6px;
+}
+
+/* Bewegung abschalten, wenn das System es verlangt. Bewusst ueber den
+   Token und nicht ueber `* { transition: none !important }`: jeder
+   Uebergang liest --uebergang, also genuegt EINE Zuweisung - kein
+   Spezifitaetskampf, kein !important. Das ist der Nutzen des
+   Token-Satzes an einer Stelle, an der man ihn sofort sieht. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --uebergang:0s; }
+}
+/* == ENDE DESIGN-TOKENS == */
+
+/* == DESIGN-BASIS: erzeugt aus Templates/design-basis.css.
+      NICHT VON HAND AENDERN - DesignTokenTests haelt die Kopien
+      zeichengleich zur Quelle. == */
   body {
-    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-    margin: 1.5rem;
-    background: #fff;
-    color: #000;
+    font-family: var(--schrift-stapel);
+    margin: var(--mass-6);
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
+    font-size: var(--t-basis);
+    line-height: var(--lh-basis);
   }
   h1 {
-    font-size: 1.3rem;
-    margin-bottom: 0.2rem;
-    color: #000;
-  }
-  #meta {
-    color: #333;
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
-  }
-  #controls {
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-  }
-  #solution-summary {
-    font-size: 0.9rem;
-    color: #000;
-  }
-  #solution-summary a {
-    color: #1d4ed8;
+    font-size: var(--t-titel);
+    line-height: var(--lh-eng);
+    margin-bottom: var(--mass-1);
+    color: var(--farbe-text);
   }
   h2 {
-    font-size: 1.05rem;
-    margin: 1.2rem 0 0.4rem;
-    color: #000;
+    font-size: var(--t-kopf);
+    line-height: var(--lh-eng);
+    margin: var(--mass-5) 0 var(--mass-2);
+    color: var(--farbe-text);
   }
-  #lehrer-controls {
-    margin-bottom: 0.6rem;
+  #meta {
+    color: var(--farbe-text-2);
+    margin-bottom: var(--mass-4);
+    font-size: var(--t-basis);
+  }
+  #controls {
+    margin-bottom: var(--mass-4);
     display: flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: var(--mass-3);
+    flex-wrap: wrap;
+    font-size: var(--t-klein);
+  }
+  #compare-info {
+    margin: 0 0 var(--mass-2);
+    font-size: var(--t-klein);
+    color: var(--farbe-text-2);
+  }
+
+  /* Sichtbarer Fokus fuer Tastaturbedienung. `:focus-visible` statt
+     `:focus`, damit Mausnutzer keinen Ring sehen. Es gab bisher in
+     KEINER Vorlage eine Fokusregel, obwohl
+     klassenbildung-ui-konzept.md:203 Tastaturbedienung ausdruecklich
+     zusagt ("Pin = Enter auf fokussierter Karte").
+
+     `[tabindex]` deckt alles ab, was in Stufe 5 fokussierbar gemacht
+     wird - Karten, Badges, Panelzeilen, Loesungszeilen. Deshalb steht
+     hier eine Regel und nicht eine Liste, die dann mitwachsen muesste.
+     Selektoren, die in einer Vorlage nichts treffen, sind harmlos. */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [tabindex]:focus-visible {
+    outline: var(--fokus-ring);
+    outline-offset: 1px;
+  }
+
+  /* Symbole aus dem Inline-Sprite (siehe direkt nach <body>).
+     Monochrom, erben currentColor, skalieren mit der Schriftgroesse -
+     und vor allem: keine Datei, keine Schrift, kein CDN. Damit passen
+     sie unter die Self-contained-Leitplanke, die den Doppelklick-
+     Betrieb sichert (viewer-ausbau-plan.md "Leitplanken").
+
+     Vorher standen dort Emoji. Die rendern in FARBE und je nach
+     Betriebssystem verschieden, ignorieren die Textfarbe, sind in der
+     Groesse nicht steuerbar und drucken schlecht - auf einer Flaeche,
+     deren gesamte Bedeutungslehre auf kontrollierter Farbe beruht, ist
+     ein unkontrolliert farbiges Zeichen ein Fremdkoerper.
+
+     KEIN uebernommenes Duplikat, sondern eine neue geteilte Regel des
+     Designsystems: die Stundentafel nutzt den Satz heute noch nicht,
+     eine Klasse ohne Verwendung ist dort aber folgenlos. */
+  .ico {
+    width: 1em;
+    height: 1em;
+    flex: none;
+    vertical-align: -0.125em;
+  }
+  .ico use, .ico path, .ico rect, .ico circle {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .ico.voll path, .ico.voll rect { fill: currentColor; }
+  .ico-punkte circle { fill: currentColor; stroke: none; }
+
+  /* ---- Druck ----------------------------------------------------
+     Es gab bisher kein Druckbild, obwohl Stundenplan und Klassenliste
+     die typischen Druckartefakte sind - und obwohl das Konzept den
+     Druck ausdruecklich als Grund fuer die Gruppen-Kuerzel nennt
+     (klassenbildung-ui-konzept.md:41).
+
+     Selektoren, die in einer der beiden Vorlagen nichts treffen, sind
+     folgenlos; deshalb steht der Block geteilt statt zweimal. */
+  @media print {
+    /* OHNE das hier faerbt kein Browser die Flaechen - und damit
+       verschwaende genau die Kodierung, um die es geht: Ampelrand,
+       Gruppenfarbe, belegte Zelle. */
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    body { margin: 0; background: #fff; }
+
+    /* Bedienelemente drucken nicht mit - sie sind auf Papier weder
+       bedienbar noch informativ. */
+    #controls, #prozess, #varianten, #warnung, #fixierungen,
+    #pareto-label, #compare-info, .dropdown, #weights-menu,
+    button, .karte .pin, .gruppe-zeile .fixieren { display: none; }
+
+    /* Zusammengehoeriges nicht ueber die Seitengrenze reissen. */
+    .karte, .stapel, .klasse-spalte, .gruppe-zeile, tr { break-inside: avoid; }
+    h1, h2 { break-after: avoid; }
+
+    /* Auf Papier gibt es keinen Scrollbereich - alles muss stehen. */
+    #panel, #table-container, #lehrer-table-container, #solutions-overview {
+      max-height: none;
+      overflow: visible;
+    }
+    /* Schwebende Flaechen und Hover-Zustaende sind auf Papier sinnlos. */
+    #popover { display: none; }
+    .karte, .klasse-spalte, #panel, .variante-kachel { box-shadow: none; }
+
+    /* Kopfzeilen wiederholen sich auf jeder Seite - ein Raster ohne
+       Tages- und Stundenspalte ist auf Seite zwei nicht mehr lesbar. */
+    thead { display: table-header-group; }
+  }
+/* == ENDE DESIGN-BASIS == */
+
+  #solution-summary {
+    font-size: var(--t-basis);
+    color: var(--farbe-text);
+  }
+  #solution-summary a {
+    color: var(--farbe-akzent);
+  }  #lehrer-controls {
+    margin-bottom: var(--mass-2);
+    display: flex;
+    align-items: center;
+    gap: var(--mass-2);
   }
   #table-container, #lehrer-table-container {
-    overflow: hidden;
-    border: 1px solid #ccc;
+    /* Frueher overflow:hidden - dadurch waren die vorhandenen
+       position:sticky-Kopfzeilen wirkungslos. Die horizontale Achse
+       schaltet fitOneTable je nach Bedarf. */
+    overflow: auto;
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-m);
   }
   #table-container table, #lehrer-table-container table {
     transform-origin: top left;
   }
   table {
     border-collapse: collapse;
-    font-size: 0.78rem;
+    font-size: var(--t-klein);
     min-width: 100%;
   }
   th, td {
-    border: 1px solid #ccc;
-    padding: 2px 4px;
+    border: 1px solid var(--farbe-linie);
+    padding: var(--dichte-pad-y) var(--dichte-pad-x);
     text-align: center;
     vertical-align: middle;
     min-width: 4.2rem;
-    color: #000;
+    color: var(--farbe-text);
   }
   thead th {
     position: sticky;
     top: 0;
-    background: #fff;
-    color: #000;
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
     z-index: 2;
   }
   tbody th {
     position: sticky;
     left: 0;
-    background: #fff;
-    color: #000;
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
     z-index: 1;
   }
   td.leer {
-    background: #e2e2e2;
+    background: var(--farbe-flaeche-3);
   }
   .klasse-badge {
     display: block;
-    font-weight: bold;
-    font-size: 0.68rem;
-    color: #000;
+    font-weight: 700;
+    font-size: var(--t-mikro);
+    color: var(--farbe-text-2);
   }
   .subject {
     font-weight: 600;
-    color: #000;
+    color: var(--farbe-text);
   }
   .teacher {
-    font-size: 0.72rem;
-    color: #000;
+    font-size: var(--t-mikro);
+    color: var(--farbe-text-2);
   }
   .dropdown {
     position: relative;
   }
   .dropdown-btn {
     font: inherit;
-    padding: 0.3rem 0.6rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background: #fff;
-    color: #000;
+    font-size: var(--t-klein);
+    padding: var(--mass-1) var(--mass-3);
+    border: 1px solid var(--farbe-linie-stark);
+    border-radius: var(--radius-m);
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
     cursor: pointer;
+    transition: background var(--uebergang);
+  }
+  .dropdown-btn:hover {
+    background: var(--zustand-hover);
   }
   .dropdown-menu {
     position: absolute;
     top: 100%;
     left: 0;
-    margin-top: 0.2rem;
-    background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    padding: 0.4rem 0.7rem;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    margin-top: var(--mass-1);
+    background: var(--farbe-flaeche);
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-l);
+    padding: var(--mass-2) var(--mass-3);
+    box-shadow: var(--schatten-1);
     z-index: 10;
     min-width: 10rem;
   }
@@ -130,11 +379,11 @@
   .dropdown-menu label {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.2rem 0;
+    gap: var(--mass-2);
+    padding: var(--mass-05) 0;
     white-space: nowrap;
     cursor: pointer;
-    color: #000;
+    color: var(--farbe-text);
   }
   /* Viewer-Ausbau Schritt 2 (docs/viewer-ausbau-plan.md): sortierbare
      Loesungsuebersicht - eine Zeile pro Loesung, Spalten = voller
@@ -142,20 +391,21 @@
      table/th/td-Regeln oben (min-width, sticky) werden hier gezielt
      zurueckgesetzt. */
   #solutions-overview {
-    margin-bottom: 1rem;
+    margin-bottom: var(--mass-4);
     overflow-x: auto;
-    border: 1px solid #ccc;
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-m);
     max-height: 22rem;
     overflow-y: auto;
   }
   #solutions-overview table {
     font-variant-numeric: tabular-nums;
-    font-size: 0.8rem;
+    font-size: var(--t-klein);
     width: 100%;
   }
   #solutions-overview th, #solutions-overview td {
     min-width: 0;
-    padding: 3px 8px;
+    padding: var(--mass-1) var(--mass-2);
     text-align: right;
     white-space: nowrap;
   }
@@ -168,20 +418,21 @@
   }
   #solutions-overview tbody tr {
     cursor: pointer;
+    transition: background var(--uebergang);
   }
   #solutions-overview tbody tr:hover {
-    background: #f2f2f2;
+    background: var(--zustand-hover);
   }
   #solutions-overview tbody tr.active {
-    background: #dcebff;
+    background: var(--farbe-akzent-flaeche);
   }
   #solutions-overview .muted-col {
-    color: #999;
+    color: var(--farbe-text-3);
   }
   #solutions-overview .overview-note {
-    font-size: 0.75rem;
-    color: #555;
-    padding: 3px 8px;
+    font-size: var(--t-mikro);
+    color: var(--farbe-text-2);
+    padding: var(--mass-1) var(--mass-2);
   }
   /* Viewer-Ausbau Schritt 4: dominierte Loesungen werden abgedunkelt
      statt entfernt (Transparenz: sichtbar bleibt, WAS aussortiert
@@ -198,91 +449,102 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.6rem;
-    padding: 0.15rem 0;
+    gap: var(--mass-2);
+    padding: var(--mass-05) 0;
   }
   #weights-menu .weight-row input {
     width: 5.5rem;
     font: inherit;
+    font-size: var(--t-klein);
     text-align: right;
+    border: 1px solid var(--farbe-linie-stark);
+    border-radius: var(--radius-m);
+    padding: var(--mass-05) var(--mass-1);
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
   }
   #weights-menu .weight-row.muted-crit span {
-    color: #999;
+    color: var(--farbe-text-3);
   }
   #weights-menu .weights-note {
-    font-size: 0.72rem;
-    color: #555;
+    font-size: var(--t-mikro);
+    color: var(--farbe-text-2);
     max-width: 18rem;
-    margin-top: 0.3rem;
+    margin-top: var(--mass-2);
   }
+  /* War bisher ein ungestylter Browser-Standardknopf direkt neben
+     gestylten Nachbarn - jetzt dieselbe Grundform wie .dropdown-btn. */
   #weights-menu .weights-reset {
-    margin-top: 0.4rem;
+    margin-top: var(--mass-2);
     font: inherit;
-    padding: 0.15rem 0.5rem;
+    font-size: var(--t-klein);
+    padding: var(--mass-1) var(--mass-2);
+    border: 1px solid var(--farbe-linie-stark);
+    border-radius: var(--radius-m);
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
     cursor: pointer;
+    transition: background var(--uebergang);
+  }
+  #weights-menu .weights-reset:hover {
+    background: var(--zustand-hover);
   }
   #pareto-label {
     display: flex;
     align-items: center;
-    gap: 0.3rem;
-    font-size: 0.85rem;
+    gap: var(--mass-1);
+    font-size: var(--t-klein);
     cursor: pointer;
   }
   #pareto-count {
-    font-size: 0.8rem;
-    color: #555;
+    font-size: var(--t-klein);
+    color: var(--farbe-text-2);
   }
   /* Viewer-Ausbau Schritt 5: Loesungs-Diff - Zellen, die sich zwischen
      der gewaehlten und der Vergleichsloesung unterscheiden, bekommen
      einen deutlichen Rahmen (Inhalt bleibt der der gewaehlten Loesung;
      der Tooltip zeigt die Belegung der Vergleichsloesung). */
   td.diff-cell {
-    outline: 3px solid #c2410c;
+    outline: 3px solid var(--farbe-diff);
     outline-offset: -3px;
-  }
-  #compare-info {
-    margin: 0 0 0.6rem;
-    font-size: 0.85rem;
-    color: #000;
-  }
-  #compare-info .compare-hint {
-    color: #555;
-    font-size: 0.78rem;
+  }  #compare-info .compare-hint {
+    color: var(--farbe-text-2);
+    font-size: var(--t-klein);
   }
   #solutions-overview tbody tr.compare {
-    background: #fdf0e5;
+    background: var(--farbe-vergleich-flaeche);
   }
   #solutions-overview tbody tr.compare.active {
-    background: #dcebff;
+    background: var(--farbe-akzent-flaeche);
   }
   /* Aequivalenz-Anzeige: Lehrkraefte, die per identischem
      Pipeline-Profil direkt tauschbar sind. */
   #tausch-legende {
-    margin: 0 0 0.6rem;
-    font-size: 0.8rem;
-    color: #555;
+    margin: 0 0 var(--mass-2);
+    font-size: var(--t-klein);
+    color: var(--farbe-text-2);
   }
   #lehrer-table-container th.tauschbar {
-    color: #1d4ed8;
+    color: var(--farbe-akzent);
   }
   #convergence-panel {
-    margin-bottom: 1rem;
-    font-size: 0.85rem;
-    color: #000;
+    margin-bottom: var(--mass-4);
+    font-size: var(--t-klein);
+    color: var(--farbe-text);
   }
   #convergence-panel .gap-line {
-    margin-bottom: 0.3rem;
+    margin-bottom: var(--mass-1);
   }
   #convergence-panel .conv-note {
-    color: #333;
-    font-size: 0.78rem;
-    margin-bottom: 0.2rem;
+    color: var(--farbe-text-2);
+    font-size: var(--t-klein);
+    margin-bottom: var(--mass-1);
   }
   #convergence-panel svg {
     display: block;
-    background: #f7f7f7;
-    border: 1px solid #ccc;
-    border-radius: 3px;
+    background: var(--farbe-flaeche-2);
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-s);
   }
 </style>
 </head>
@@ -329,16 +591,67 @@
       document.getElementById('meta').textContent =
         data.tage.join(', ') + ' | ' + data.periods_per_day + ' Stunden/Tag | Stop-Grund: ' + data.stop_reason;
 
+      // Die Klassenstufen-Farben stammen aus der kategorialen Palette der
+      // Design-Tokens (--kat-1..16). Frueher rechnete diese Datei sich
+      // eigene, gleichverteilte Toene mit 65 % Saettigung aus - ein
+      // zweites, unverbundenes Farbsystem neben dem des
+      // Klassenbildungs-Viewers, und gesaettigt genug, um mit der
+      // Ampel-Semantik zu kollidieren, die das Konzept exklusiv fuer den
+      // Status reserviert (klassenbildung-ui-konzept.md:35).
+      // Macht ein Element per Tastatur bedienbar. Enter und
+      // Leertaste loesen denselben Klick aus, den die Maus ausloesen
+      // wuerde - dadurch KANN die Tastaturbedienung nicht von der
+      // Maus abweichen. Es gab bisher keinen Tastaturweg zu
+      // Sortierung und Loesungsauswahl, obwohl beides nur per Klick
+      // auf ein <th> bzw. <tr> erreichbar war.
+      function bedienbar(el, rolle, beschriftung) {
+        el.tabIndex = 0;
+        el.setAttribute('role', rolle);
+        if (beschriftung) el.setAttribute('aria-label', beschriftung);
+        el.addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+          e.preventDefault();
+          el.click();
+        });
+      }
+
+      var katPalette = (function () {
+        var wurzel = getComputedStyle(document.documentElement), p = [];
+        for (var i = 1; i <= 16; i++) {
+          var wert = wurzel.getPropertyValue('--kat-' + i).trim();
+          if (wert) p.push(wert);
+        }
+        return p;
+      })();
+
+      function alsRgb(hex) {
+        var h = hex.replace('#', '');
+        if (h.length === 3) {
+          h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+        }
+        return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)];
+      }
+
       // Parallelklassen (gleiche Klassenstufe, unterschiedliche Zeilen-
-      // Position rowIndex) bekommen denselben Farbton (hue), aber
-      // abgestufte Helligkeit (-10 Prozentpunkte je weiterer
-      // Parallelklasse) - so bleiben sie auf einen Blick unterscheidbar,
-      // ohne die Klassenstufen-Zuordnung (hue) zu verlieren.
+      // Position rowIndex) behalten die Identitaetsfarbe ihrer
+      // Klassenstufe und werden nur stufenweise aufgehellt - so bleiben
+      // sie auf einen Blick unterscheidbar, ohne die Zuordnung zu
+      // verlieren. Das war schon die Absicht der alten Rechnung.
+      //
+      // NEU ist die UNTERGRENZE des Weissanteils: die alte Formel ging
+      // bis Helligkeit 40 % herunter, wo der schwarze Zelltext kaum noch
+      // lesbar war. Eine Schule mit vielen Parallelklassen traf das als
+      // erste.
       function stufeColor(stufeIndex, rowIndex) {
-        var hue = Math.round((360 * stufeIndex) / Math.max(data.klassenstufen.length, 1));
-        var lightness = 87 - rowIndex * 10;
-        if (lightness < 40) lightness = 40;
-        return 'hsl(' + hue + ', 65%, ' + lightness + '%)';
+        if (!katPalette.length) return '#ffffff';
+        var basis = alsRgb(katPalette[stufeIndex % katPalette.length]);
+        var weiss = 0.84 - rowIndex * 0.11;
+        if (weiss < 0.46) weiss = 0.46;
+        var c = [];
+        for (var k = 0; k < 3; k++) {
+          c.push(Math.round(basis[k] * (1 - weiss) + 255 * weiss));
+        }
+        return 'rgb(' + c.join(', ') + ')';
       }
 
       var lastTable = null;
@@ -350,6 +663,15 @@
       // kein Verzerren) - reicht die Bildschirmhoehe nicht, scrollt die
       // Seite normal statt die Schrift weiter zu schrumpfen. Wird sowohl
       // fuer den Klassen- als auch den Lehrerstundenplan verwendet.
+      // Untergrenze der Verkleinerung. Ohne sie schrumpfte die Tabelle
+      // unbegrenzt weiter: eine breite Schule mit vielen Klassen und
+      // Perioden landete bei einem Bruchteil der Schriftgroesse, und der
+      // Plan war schlicht nicht mehr lesbar. Unterhalb dieser Grenze
+      // wird deshalb gescrollt statt weiter geschrumpft - eine Tabelle,
+      // die man verschieben muss, ist besser als eine, die man nicht
+      // entziffern kann.
+      var SKALA_MIN = 0.72;
+
       function fitOneTable(table, container) {
         if (!table) return;
         table.style.transform = 'none';
@@ -358,8 +680,15 @@
         var availW = container.clientWidth;
         var scale = availW / natW;
         if (!isFinite(scale) || scale <= 0) scale = 1;
+        if (scale > 1) scale = 1;
+        if (scale < SKALA_MIN) scale = SKALA_MIN;
         table.style.transform = 'scale(' + scale + ')';
         container.style.height = (natH * scale) + 'px';
+        // Passt die Tabelle auch bei Mindestgroesse nicht, uebernimmt
+        // der Behaelter das Scrollen. Die sticky-Kopfzeilen greifen
+        // dann endlich - im frueheren overflow:hidden waren sie
+        // wirkungslos.
+        container.style.overflowX = (natW * scale > availW + 1) ? 'auto' : 'hidden';
       }
       function fitTable() {
         fitOneTable(lastTable, document.getElementById('table-container'));
@@ -644,6 +973,7 @@
             th.className = (th.className ? th.className + ' ' : '') + 'muted-col';
             th.title = mutedTitle;
           }
+          bedienbar(th, 'columnheader', 'Nach ' + col.label + ' sortieren');
           th.addEventListener('click', function () {
             if (overviewSort.key === col.key) {
               overviewSort.dir = -overviewSort.dir;
@@ -676,6 +1006,7 @@
             }
             tr.appendChild(td);
           });
+          bedienbar(tr, 'button', 'Loesung ' + sol.__nr + ' waehlen');
           tr.addEventListener('click', function () {
             render(sol.__nr - 1);
           });
@@ -1271,6 +1602,48 @@
         document.getElementById('lehrer-table-container').textContent = 'Keine Loesungen vorhanden.';
       }
     })();
-  </script>
+  
+      // ---- Dichteschalter ------------------------------------------
+      // Kompakt oder komfortabel. Bewusst im localStorage und NICHT im
+      // Projekt: die Dichte ist eine Eigenschaft des Bildschirms, an dem
+      // jemand sitzt, nicht des Plans. Sie folgt deshalb dem Rechner und
+      // nicht der Datei - und funktioniert dadurch in beiden
+      // Betriebsarten gleich, denn auch der WebView2-Host liefert unter
+      // einer echten Herkunft aus, wo localStorage nutzbar ist.
+      //
+      // "kompakt" entspricht exakt der bisherigen Dichte; komfortabel
+      // ist der Zugewinn fuer kleinere Anzeigen, nicht der Normalfall.
+      (function () {
+        var SCHLUESSEL = 'stundenplan-dichte';
+        var wurzel = document.documentElement;
+
+        function anwenden(wert) {
+          if (wert === 'komfortabel') wurzel.setAttribute('data-dichte', wert);
+          else wurzel.removeAttribute('data-dichte');
+        }
+
+        var start = 'kompakt';
+        try {
+          if (localStorage.getItem(SCHLUESSEL) === 'komfortabel') start = 'komfortabel';
+        } catch (e) { /* file:// ist unzuverlaessig - dann eben Standard */ }
+        anwenden(start);
+
+        var leiste = document.getElementById('controls');
+        if (!leiste) return;
+        var l = document.createElement('label');
+        l.title = 'Kompakt zeigt mehr auf einmal; komfortabel ist auf kleinen Anzeigen leichter zu treffen.';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = (start === 'komfortabel');
+        cb.addEventListener('change', function () {
+          var wert = cb.checked ? 'komfortabel' : 'kompakt';
+          anwenden(wert);
+          try { localStorage.setItem(SCHLUESSEL, wert); } catch (e) { }
+        });
+        l.appendChild(cb);
+        l.appendChild(document.createTextNode(' komfortable Dichte'));
+        leiste.appendChild(l);
+      })();
+</script>
 </body>
 </html>

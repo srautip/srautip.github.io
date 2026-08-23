@@ -105,8 +105,9 @@ Dropdown kann bleiben, die Tabelle wird der primaere Auswahlweg):
   aendert zusaetzlich das JSON-Schema. Beide Beispiele neu laufen
   lassen (Grundschule ~3 Min; GMS mit reduziertem Kurzbudget fuer die
   Regeneration, die 20-Min-Referenzlaeufe muessen nicht wiederholt
-  werden) und die GitHub-Pages-Kopien (`stundentafel/*.html`)
-  nachziehen.
+  werden). Die GitHub-Pages-Kopien (`stundentafel/*.html`) werden seit
+  dem 23.08.2026 NICHT mehr nachgezogen - Vorschau-Kanal sind die
+  Claude-Artifacts (siehe CLAUDE.md).
 - **Abwaertskompatibilitaet:** der Viewer liest fehlende neue
   JSON-Felder defensiv (aeltere stundenplan.json bleiben oeffenbar,
   Spalten zeigen dann "-").

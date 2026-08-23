@@ -4,161 +4,422 @@
 <meta charset="utf-8">
 <title>Klassenbildung</title>
 <style>
-  :root {
-    color-scheme: light;
-  }
+/* == DESIGN-TOKENS: erzeugt aus Templates/design-tokens.css.
+      NICHT VON HAND AENDERN - DesignTokenTests haelt die Kopien
+      zeichengleich zur Quelle. == */
+:root {
+  color-scheme: light;
+
+  /* --- Neutrale, als ROLLEN statt als Rampe. Leichter Kaltstich in
+         Richtung des Akzents: reines Grau neben blauem Akzent liest
+         sich schmutzig. Acht Rollen ersetzen die rund zwanzig
+         Einzelwerte des Bestands - #ccc, #bbb, #ddd, #999 und #eee
+         heissen dort alle "ein Rahmen".
+         Die zugrundeliegende Zehnerrampe ist bewusst NICHT als Token
+         abgelegt: sie ist die Herleitung, nicht die Schnittstelle.
+         Als Token waere sie eine zweite Wahrheit neben den Rollen
+         (jeder Wert stuende zweimal da) und haette tote Stufen. --- */
+  --farbe-flaeche:#ffffff;
+  --farbe-flaeche-2:#fafbfc;
+  --farbe-flaeche-3:#f2f4f7;
+  --farbe-linie:#e6e9ee;
+  --farbe-linie-stark:#d5dae1;
+  --farbe-text:#1a1f26;
+  --farbe-text-2:#626b76;
+  --farbe-text-3:#8a929d;
+
+  /* --- Status: gesaettigt, kleinflaechig, IMMER mit Symbol.
+         Ein Triplett je Zustand macht die heutigen zwei Gelbtoene
+         (#a16207 fuer den Text, #ca8a04 fuer Balken und Kartenkante)
+         und die zwei Neutralgraus (#94a3b8/#9ca3af) strukturell
+         unmoeglich. Die Symbole bleiben Text - die Doppelkodierung
+         ist laut klassenbildung-konzept.md:419 Pflicht. --- */
+  --farbe-ok-text:#0f7938;    --farbe-ok-rand:#86c9a4;    --farbe-ok-flaeche:#e9f6ef;
+  --farbe-warn-text:#8a5a00;  --farbe-warn-rand:#ddb45f;  --farbe-warn-flaeche:#fdf3e4;
+  --farbe-krit-text:#b3261e;  --farbe-krit-rand:#eaa6a1;  --farbe-krit-flaeche:#fcecea;
+  /* "frei" hat bewusst KEINE eigene Flaeche: sie waere wertgleich mit
+     --farbe-flaeche-3 und damit eine zweite Wahrheit fuer denselben Ton. */
+  --farbe-frei-text:#626b76;  --farbe-frei-rand:#d5dae1;
+
+  --farbe-akzent:#0f6cbd;
+  --farbe-akzent-hover:#115ea3;
+  --farbe-akzent-flaeche:#eff6fc;
+  --farbe-diff:#a8480b;
+  /* Vergleichsauswahl ist NICHT dasselbe wie aktive Auswahl - beide
+     koennen gleichzeitig sichtbar sein (eine Loesung gewaehlt, eine
+     zum Vergleich). Deshalb eine eigene Rolle statt eines Farbtons
+     der Akzentfamilie. */
+  --farbe-vergleich-flaeche:#fdf1e3;
+
+  /* --- Kategoriale Palette: 16 Gruppenfarben.
+         Basis hsl(H 38% 46%) in gleichmaessigen 22,5-Grad-Schritten,
+         danach 10 % eines Ockers hsl(35 38% 46%) beigemischt. Der
+         Anker hat DIESELBE Saettigung und Helligkeit - die Mischung
+         verschiebt deshalb nur den Ton und daempft die kalten Toene,
+         ohne die Helligkeit anzutasten.
+
+         Die feste, niedrige Saettigung ist die tragende Zusage:
+         eine GESAETTIGTE Farbe im Bild ist immer Status, nie
+         Identitaet (klassenbildung-ui-konzept.md:35 nennt die
+         Trennung "strikt" und fordert entsaettigte Toene). Eine
+         reine Ton-Trennung waere bei 16 Kategorien unmoeglich - die
+         drei Ampelbaender belegen ein Sechstel des Kreises; die
+         Trennung MUSS auf Saettigung plus Pflicht-Kuerzel ruhen.
+
+         Reihenfolge handsortiert: benachbarte Indizes liegen
+         mindestens 45 Grad auseinander, denn genau die treffen im
+         Board aufeinander. Rot steht bewusst auf Platz 16.
+
+         Heute verletzt der Bestand die eigene Regel: #15803d ist
+         gleichzeitig Ampel-Gruen und Gruppenfarbe 11, #c2410c
+         gleichzeitig Diff-Marker und Gruppenfarbe 16. --- */
+  --kat-1:#528099;  --kat-2:#529e7b;  --kat-3:#984e99;  --kat-4:#a28b49;
+  --kat-5:#529e99;  --kat-6:#a24e85;  --kat-7:#7a9e49;  --kat-8:#5c4e99;
+  --kat-9:#a26c49;  --kat-10:#529e5d; --kat-11:#7a4e99; --kat-12:#989e49;
+  --kat-13:#526299; --kat-14:#a24e67; --kat-15:#5c9e49; --kat-16:#a24e49;
+
+  /* --- Typografie: fuenf Rollen statt vierzehn gewachsener Werte.
+         Keine Webschrift - die Viewer laufen per Doppelklick ohne
+         Netz, ein CDN scheidet aus (viewer-ausbau-plan.md
+         "Leitplanken"). Hierarchie kommt aus Groesse, Gewicht und
+         Flaeche. Zeilenhoehen sind heute NIRGENDS deklariert. --- */
+  --schrift-stapel:-apple-system,"Segoe UI",Roboto,sans-serif;
+  --schrift-mono:ui-monospace,Consolas,monospace;
+  --t-titel:1.25rem;
+  --t-kopf:0.9375rem;
+  --t-basis:0.8125rem;
+  --t-klein:0.75rem;
+  --t-mikro:0.6875rem;
+  --lh-eng:1.2;
+  --lh-basis:1.4;
+
+  /* --- Mass: 4-px-Raster. Heute liegen die Werte auf jedem
+         0,05-rem-Schritt zwischen 0,1 und 0,6 - kein Raster. --- */
+  --mass-05:2px; --mass-1:4px; --mass-2:8px; --mass-3:12px;
+  --mass-4:16px; --mass-5:20px; --mass-6:24px;
+
+  /* --- Radius nach Rolle: Marke, Steuerelement, Flaeche. --- */
+  --radius-s:2px; --radius-m:4px; --radius-l:8px;
+
+  /* --- Elevation: EIN Rezept fuer schwebende Flaechen. Popover und
+         Aufklappmenue teilen sich heute die Rolle, aber nicht das
+         Rezept - zwei Raender, zwei Radien, zwei Schatten. --- */
+  --schatten-1:0 2px 8px rgba(16,24,40,.10), 0 0 1px rgba(16,24,40,.16);
+
+  /* --- Zustand. Der Fokusring ist neu: es gibt heute keine einzige
+         :focus-Regel, obwohl klassenbildung-ui-konzept.md:203
+         Tastaturbedienung ausdruecklich zusagt. --- */
+  --zustand-hover:rgba(16,24,40,.045);
+  --fokus-ring:2px solid var(--farbe-akzent);
+  --uebergang:120ms ease;
+
+  /* --- Dichte. --dichte-zeile meint die GESAMTHOEHE der Zeile, nicht
+         ihre Inhaltshoehe - die Zeilenelemente setzen dafuer
+         box-sizing:border-box. Ohne das kaemen Polsterung und Rahmen
+         obendrauf, und "22 px" ergaeben 28 (live gemessen).
+         Stufe "kompakt" entspricht der heutigen Kartenhoehe von 24 px. Kompakt kostet also nichts; komfortabel ist der
+         Zugewinn fuer kleinere Anzeigen. --- */
+  --dichte-zeile:24px;
+  --dichte-pad-y:2px;
+  --dichte-pad-x:6px;
+  --dichte-gap:4px;
+}
+
+:root[data-dichte="komfortabel"] {
+  --dichte-zeile:32px;
+  --dichte-pad-y:5px;
+  --dichte-pad-x:9px;
+  --dichte-gap:6px;
+}
+
+/* Bewegung abschalten, wenn das System es verlangt. Bewusst ueber den
+   Token und nicht ueber `* { transition: none !important }`: jeder
+   Uebergang liest --uebergang, also genuegt EINE Zuweisung - kein
+   Spezifitaetskampf, kein !important. Das ist der Nutzen des
+   Token-Satzes an einer Stelle, an der man ihn sofort sieht. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --uebergang:0s; }
+}
+/* == ENDE DESIGN-TOKENS == */
+
+/* == DESIGN-BASIS: erzeugt aus Templates/design-basis.css.
+      NICHT VON HAND AENDERN - DesignTokenTests haelt die Kopien
+      zeichengleich zur Quelle. == */
   body {
-    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-    margin: 1.5rem;
-    background: #fff;
-    color: #000;
+    font-family: var(--schrift-stapel);
+    margin: var(--mass-6);
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
+    font-size: var(--t-basis);
+    line-height: var(--lh-basis);
   }
   h1 {
-    font-size: 1.3rem;
-    margin-bottom: 0.2rem;
-    color: #000;
+    font-size: var(--t-titel);
+    line-height: var(--lh-eng);
+    margin-bottom: var(--mass-1);
+    color: var(--farbe-text);
   }
   h2 {
-    font-size: 1rem;
-    margin: 1rem 0 0.4rem;
+    font-size: var(--t-kopf);
+    line-height: var(--lh-eng);
+    margin: var(--mass-5) 0 var(--mass-2);
+    color: var(--farbe-text);
   }
   #meta {
-    color: #333;
-    margin-bottom: 0.8rem;
-    font-size: 0.88rem;
+    color: var(--farbe-text-2);
+    margin-bottom: var(--mass-4);
+    font-size: var(--t-basis);
   }
+  #controls {
+    margin-bottom: var(--mass-4);
+    display: flex;
+    align-items: center;
+    gap: var(--mass-3);
+    flex-wrap: wrap;
+    font-size: var(--t-klein);
+  }
+  #compare-info {
+    margin: 0 0 var(--mass-2);
+    font-size: var(--t-klein);
+    color: var(--farbe-text-2);
+  }
+
+  /* Sichtbarer Fokus fuer Tastaturbedienung. `:focus-visible` statt
+     `:focus`, damit Mausnutzer keinen Ring sehen. Es gab bisher in
+     KEINER Vorlage eine Fokusregel, obwohl
+     klassenbildung-ui-konzept.md:203 Tastaturbedienung ausdruecklich
+     zusagt ("Pin = Enter auf fokussierter Karte").
+
+     `[tabindex]` deckt alles ab, was in Stufe 5 fokussierbar gemacht
+     wird - Karten, Badges, Panelzeilen, Loesungszeilen. Deshalb steht
+     hier eine Regel und nicht eine Liste, die dann mitwachsen muesste.
+     Selektoren, die in einer Vorlage nichts treffen, sind harmlos. */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [tabindex]:focus-visible {
+    outline: var(--fokus-ring);
+    outline-offset: 1px;
+  }
+
+  /* Symbole aus dem Inline-Sprite (siehe direkt nach <body>).
+     Monochrom, erben currentColor, skalieren mit der Schriftgroesse -
+     und vor allem: keine Datei, keine Schrift, kein CDN. Damit passen
+     sie unter die Self-contained-Leitplanke, die den Doppelklick-
+     Betrieb sichert (viewer-ausbau-plan.md "Leitplanken").
+
+     Vorher standen dort Emoji. Die rendern in FARBE und je nach
+     Betriebssystem verschieden, ignorieren die Textfarbe, sind in der
+     Groesse nicht steuerbar und drucken schlecht - auf einer Flaeche,
+     deren gesamte Bedeutungslehre auf kontrollierter Farbe beruht, ist
+     ein unkontrolliert farbiges Zeichen ein Fremdkoerper.
+
+     KEIN uebernommenes Duplikat, sondern eine neue geteilte Regel des
+     Designsystems: die Stundentafel nutzt den Satz heute noch nicht,
+     eine Klasse ohne Verwendung ist dort aber folgenlos. */
+  .ico {
+    width: 1em;
+    height: 1em;
+    flex: none;
+    vertical-align: -0.125em;
+  }
+  .ico use, .ico path, .ico rect, .ico circle {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .ico.voll path, .ico.voll rect { fill: currentColor; }
+  .ico-punkte circle { fill: currentColor; stroke: none; }
+
+  /* ---- Druck ----------------------------------------------------
+     Es gab bisher kein Druckbild, obwohl Stundenplan und Klassenliste
+     die typischen Druckartefakte sind - und obwohl das Konzept den
+     Druck ausdruecklich als Grund fuer die Gruppen-Kuerzel nennt
+     (klassenbildung-ui-konzept.md:41).
+
+     Selektoren, die in einer der beiden Vorlagen nichts treffen, sind
+     folgenlos; deshalb steht der Block geteilt statt zweimal. */
+  @media print {
+    /* OHNE das hier faerbt kein Browser die Flaechen - und damit
+       verschwaende genau die Kodierung, um die es geht: Ampelrand,
+       Gruppenfarbe, belegte Zelle. */
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    body { margin: 0; background: #fff; }
+
+    /* Bedienelemente drucken nicht mit - sie sind auf Papier weder
+       bedienbar noch informativ. */
+    #controls, #prozess, #varianten, #warnung, #fixierungen,
+    #pareto-label, #compare-info, .dropdown, #weights-menu,
+    button, .karte .pin, .gruppe-zeile .fixieren { display: none; }
+
+    /* Zusammengehoeriges nicht ueber die Seitengrenze reissen. */
+    .karte, .stapel, .klasse-spalte, .gruppe-zeile, tr { break-inside: avoid; }
+    h1, h2 { break-after: avoid; }
+
+    /* Auf Papier gibt es keinen Scrollbereich - alles muss stehen. */
+    #panel, #table-container, #lehrer-table-container, #solutions-overview {
+      max-height: none;
+      overflow: visible;
+    }
+    /* Schwebende Flaechen und Hover-Zustaende sind auf Papier sinnlos. */
+    #popover { display: none; }
+    .karte, .klasse-spalte, #panel, .variante-kachel { box-shadow: none; }
+
+    /* Kopfzeilen wiederholen sich auf jeder Seite - ein Raster ohne
+       Tages- und Stundenspalte ist auf Seite zwei nicht mehr lesbar. */
+    thead { display: table-header-group; }
+  }
+/* == ENDE DESIGN-BASIS == */
+
   button {
     font: inherit;
-    font-size: 0.8rem;
-    padding: 0.2rem 0.55rem;
-    border: 1px solid #bbb;
-    border-radius: 4px;
-    background: #fff;
-    color: #000;
+    font-size: var(--t-klein);
+    padding: var(--mass-1) var(--mass-3);
+    border: 1px solid var(--farbe-linie-stark);
+    border-radius: var(--radius-m);
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
     cursor: pointer;
+    transition: background var(--uebergang), border-color var(--uebergang);
   }
-  button:hover { background: #f2f2f2; }
-  button.primaer { border-color: #1d4ed8; color: #1d4ed8; }
+  button:hover { background: var(--zustand-hover); }
+  button.primaer {
+    border-color: var(--farbe-akzent);
+    background: var(--farbe-akzent);
+    color: var(--farbe-flaeche);
+  }
+  button.primaer:hover {
+    border-color: var(--farbe-akzent-hover);
+    background: var(--farbe-akzent-hover);
+  }
 
   /* ---- Fortschrittsleiste (U3): der Trichter als sichtbarer Prozess */
   #prozess {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: var(--mass-2);
     flex-wrap: wrap;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    padding: 0.5rem 0.7rem;
-    margin-bottom: 0.9rem;
-    font-size: 0.82rem;
-    background: #fafafa;
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-l);
+    padding: var(--mass-2) var(--mass-3);
+    margin-bottom: var(--mass-3);
+    font-size: var(--t-klein);
+    background: var(--farbe-flaeche-2);
   }
   #prozess .schritt {
-    color: #555;
+    color: var(--farbe-text-2);
     white-space: nowrap;
   }
-  #prozess .schritt b { color: #000; }
+  #prozess .schritt b { color: var(--farbe-text); }
   #prozess .zaehler {
     margin-left: auto;
     font-weight: 600;
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
   }
 
   /* ---- Varianten-Kacheln (U2) ---- */
   #varianten {
     display: flex;
-    gap: 0.6rem;
+    gap: var(--mass-2);
     flex-wrap: wrap;
-    margin-bottom: 0.7rem;
+    margin-bottom: var(--mass-3);
   }
   .variante-kachel {
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    padding: 0.4rem 0.7rem;
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-l);
+    padding: var(--mass-2) var(--mass-3);
     cursor: pointer;
-    font-size: 0.82rem;
+    font-size: var(--t-klein);
     min-width: 11rem;
-    background: #fff;
+    background: var(--farbe-flaeche);
+    transition: background var(--uebergang), border-color var(--uebergang);
   }
-  .variante-kachel:hover { background: #f2f2f2; }
+  .variante-kachel:hover { background: var(--zustand-hover); }
   .variante-kachel.active {
-    border-color: #1d4ed8;
-    background: #dcebff;
+    border-color: var(--farbe-akzent);
+    background: var(--farbe-akzent-flaeche);
   }
-  .variante-kachel.compare { background: #fdf0e5; }
+  /* Auswahl und Vergleich waren bisher unterschiedlich stark markiert
+     (Auswahl mit Rahmen UND Flaeche, Vergleich nur mit Flaeche) -
+     jetzt beide gleich stark, nur in ihrer eigenen Rolle. */
+  .variante-kachel.compare {
+    border-color: var(--farbe-diff);
+    background: var(--farbe-vergleich-flaeche);
+  }
   .variante-kachel .kopf { font-weight: 600; }
-  .variante-kachel .zeile { color: #444; font-variant-numeric: tabular-nums; }
-
-  #controls {
-    margin-bottom: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 0.9rem;
-    flex-wrap: wrap;
-    font-size: 0.85rem;
-  }
+  .variante-kachel .zeile { color: var(--farbe-text-2); font-variant-numeric: tabular-nums; }
   #controls label {
     display: flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: var(--mass-1);
     cursor: pointer;
   }
-  #compare-info { color: #555; font-size: 0.82rem; }
-
   /* ---- Hauptbereich: Panel-Seitenleiste + Board (U1) ---- */
   #haupt {
     display: flex;
-    gap: 0.9rem;
+    gap: var(--mass-3);
     align-items: flex-start;
   }
   #panel {
     flex: 0 0 21rem;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    font-size: 0.8rem;
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-l);
+    font-size: var(--t-basis);
     max-height: 75vh;
     overflow-y: auto;
-    background: #fff;
+    background: var(--farbe-flaeche);
   }
   #panel .sektion {
-    padding: 0.35rem 0.55rem 0.1rem;
+    padding: var(--mass-2) var(--mass-3) var(--mass-05);
     font-weight: 700;
-    font-size: 0.72rem;
-    letter-spacing: 0.04em;
-    color: #555;
-    border-top: 1px solid #eee;
+    font-size: var(--t-mikro);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--farbe-text-3);
+    background: var(--farbe-flaeche-2);
+    border-top: 1px solid var(--farbe-linie);
   }
   #panel .sektion:first-child { border-top: none; }
   .gruppe-zeile {
     display: flex;
+    line-height: var(--lh-eng);
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.25rem 0.55rem;
+    gap: var(--mass-2);
+    padding: var(--dichte-pad-y) var(--mass-3);
+    min-height: var(--dichte-zeile);
+    box-sizing: border-box;
     cursor: pointer;
+    transition: background var(--uebergang);
   }
-  .gruppe-zeile:hover { background: #f2f2f2; }
-  .gruppe-zeile.aktiv { background: #eef4ff; }
+  .gruppe-zeile:hover { background: var(--zustand-hover); }
+  .gruppe-zeile.aktiv { background: var(--farbe-akzent-flaeche); }
   .gruppe-zeile .kuerzel {
     flex: 0 0 auto;
     min-width: 2.4rem;
     text-align: center;
-    border-radius: 3px;
+    border-radius: var(--radius-s);
     font-weight: 700;
-    font-size: 0.7rem;
-    padding: 1px 3px;
-    color: #fff;
+    font-size: var(--t-mikro);
+    padding: 1px var(--mass-1);
+    color: var(--farbe-flaeche);
   }
-  .gruppe-zeile .typ { color: #555; flex: 0 0 auto; }
-  .gruppe-zeile .status { flex: 0 0 auto; font-size: 0.75rem; }
-  .status.s-verletzt { color: #b91c1c; font-weight: 600; }
-  .status.s-knapp { color: #a16207; font-weight: 600; }
-  .status.s-ok { color: #15803d; }
+  .gruppe-zeile .typ { color: var(--farbe-text-2); flex: 0 0 auto; }
+  .gruppe-zeile .status { flex: 0 0 auto; font-size: var(--t-klein); }
+  .status.s-verletzt { color: var(--farbe-krit-text); font-weight: 600; }
+  .status.s-knapp { color: var(--farbe-warn-text); font-weight: 600; }
+  .status.s-ok { color: var(--farbe-ok-text); }
   .gruppe-zeile .name {
     flex: 1 1 auto;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #333;
+    color: var(--farbe-text);
   }
   /* Mini-Balken: Ist-Verteilung ueber die Klassen. */
   .mini-balken {
@@ -171,223 +432,267 @@
   .mini-balken i {
     display: block;
     width: 5px;
-    background: #94a3b8;
+    background: var(--farbe-frei-text);
     border-radius: 1px 1px 0 0;
   }
-  .mini-balken i.ueber { background: #b91c1c; }
-  .mini-balken i.voll { background: #ca8a04; }
-  .gruppe-zeile .fixieren { flex: 0 0 auto; padding: 0 0.35rem; }
+  .mini-balken i.ueber { background: var(--farbe-krit-text); }
+  .mini-balken i.voll { background: var(--farbe-warn-text); }
+  .gruppe-zeile .fixieren { flex: 0 0 auto; padding: 0 var(--mass-1); }
   #panel .block {
-    padding: 0.25rem 0.55rem 0.45rem;
-    color: #333;
+    padding: var(--mass-1) var(--mass-3) var(--mass-2);
+    color: var(--farbe-text-2);
   }
-  #panel .block .zeile { padding: 0.1rem 0; display: flex; gap: 0.4rem; align-items: center; }
+  #panel .block .zeile { padding: var(--mass-05) 0; display: flex; gap: var(--mass-2); align-items: center; }
 
   /* ---- Board (U1/U2) ---- */
   #board {
     flex: 1 1 auto;
     display: flex;
-    gap: 0.8rem;
+    gap: var(--mass-2);
     align-items: flex-start;
     overflow-x: auto;
   }
   .klasse-spalte {
     flex: 1 1 0;
     min-width: 14rem;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    background: #fafafa;
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-l);
+    background: var(--farbe-flaeche-2);
   }
   .klasse-kopf {
-    padding: 0.45rem 0.6rem;
-    border-bottom: 1px solid #ccc;
-    background: #fff;
-    border-radius: 6px 6px 0 0;
+    padding: var(--mass-2) var(--mass-3);
+    border-bottom: 1px solid var(--farbe-linie);
+    background: var(--farbe-flaeche);
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
   }
   .klasse-kopf .name-zeile {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: var(--mass-2);
   }
   .klasse-kopf .name { font-weight: 600; flex: 1 1 auto; }
   /* Kapazitaetsbalken: Fuellstand relativ zu max_groesse. */
   .kapazitaet {
     height: 6px;
-    background: #e5e7eb;
-    border-radius: 3px;
-    margin: 0.3rem 0 0.2rem;
+    background: var(--farbe-linie);
+    border-radius: var(--radius-s);
+    margin: var(--mass-1) 0 var(--mass-05);
     position: relative;
     overflow: hidden;
   }
   .kapazitaet i {
     position: absolute;
     left: 0; top: 0; bottom: 0;
-    background: #60a5fa;
+    background: var(--farbe-akzent);
   }
-  .kapazitaet.ausserhalb i { background: #b91c1c; }
+  .kapazitaet.ausserhalb i { background: var(--farbe-krit-text); }
   .klasse-kopf .kennzahl {
-    font-size: 0.72rem;
-    color: #555;
+    font-size: var(--t-mikro);
+    color: var(--farbe-text-2);
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: var(--mass-1);
   }
-  .klasse-kopf .kennzahl.verletzt { color: #b91c1c; font-weight: 600; }
+  .klasse-kopf .kennzahl.verletzt { color: var(--farbe-krit-text); font-weight: 600; }
   .karten {
-    padding: 0.5rem;
+    padding: var(--mass-2);
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: var(--dichte-gap);
   }
   /* Buendelungs-Stapel (U2): Karten derselben Gruppe im Gruppenrahmen. */
   .stapel {
     border: 2px solid;
-    border-radius: 6px;
-    padding: 0.25rem;
+    border-radius: var(--radius-m);
+    padding: var(--mass-1);
   }
   .stapel .stapel-kopf {
-    font-size: 0.7rem;
+    font-size: var(--t-mikro);
     font-weight: 700;
-    padding: 0 0.2rem 0.2rem;
+    padding: 0 var(--mass-05) var(--mass-05);
   }
-  .stapel .stapel-kopf .zerrissen { color: #b91c1c; }
+  .stapel .stapel-kopf .zerrissen { color: var(--farbe-krit-text); }
   .stapel .karten-innen {
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: var(--dichte-gap);
   }
+  /* Enge Zeilenhoehe: die Karte ist eine Datenzeile, keine Textzeile.
+     Mit --lh-basis (1,4) wuchs sie von 24 auf 28 px - der Umbau haette
+     jedem, der heute kompakt arbeitet, Flaeche weggenommen. */
+  /* box-sizing: --dichte-zeile ist die Gesamthoehe (siehe Token). */
   .karte {
-    background: #fff;
-    border: 1px solid #ddd;
-    border-left: 4px solid #9ca3af;
-    border-radius: 4px;
-    padding: 0.22rem 0.4rem;
+    background: var(--farbe-flaeche);
+    border: 1px solid var(--farbe-linie);
+    border-left: 4px solid var(--farbe-frei-rand);
+    border-radius: var(--radius-m);
+    padding: var(--dichte-pad-y) var(--dichte-pad-x);
+    min-height: var(--dichte-zeile);
+    box-sizing: border-box;
     display: flex;
     align-items: center;
-    gap: 0.35rem;
-    font-size: 0.8rem;
+    gap: var(--mass-1);
+    font-size: var(--t-basis);
+    line-height: var(--lh-eng);
     position: relative;
+    transition: background var(--uebergang), box-shadow var(--uebergang);
   }
-  .karte.agg-gruen { border-left-color: #15803d; }
-  .karte.agg-gelb  { border-left-color: #ca8a04; }
-  .karte.agg-rot   { border-left-color: #b91c1c; }
-  .karte.diff { outline: 3px solid #c2410c; outline-offset: -3px; }
-  .karte.hl { box-shadow: 0 0 0 2px var(--hl, #1d4ed8); }
-  .karte.gepinnt { background: #f4f6fa; }
+  /* Die Karte ist das Hauptobjekt des Boards und reagierte bisher
+     ueberhaupt nicht auf den Zeiger. */
+  .karte:hover { background: var(--zustand-hover); }
+  .karte.agg-gruen { border-left-color: var(--farbe-ok-text); }
+  .karte.agg-gelb  { border-left-color: var(--farbe-warn-text); }
+  .karte.agg-rot   { border-left-color: var(--farbe-krit-text); }
+  .karte.diff { outline: 3px solid var(--farbe-diff); outline-offset: -3px; }
+  .karte.hl { box-shadow: 0 0 0 2px var(--hl, var(--farbe-akzent)); }
+  .karte.gepinnt { background: var(--farbe-akzent-flaeche); }
   .karte .kind-id {
     font-variant-numeric: tabular-nums;
     min-width: 3rem;
     cursor: pointer;
   }
-  .karte .konsens { color: #1d4ed8; font-size: 0.7rem; }
+  .karte .konsens { color: var(--farbe-akzent); font-size: var(--t-mikro); }
   .karte .pin {
     margin-left: auto;
     cursor: pointer;
-    font-size: 0.75rem;
-    color: #bbb;
+    font-size: var(--t-klein);
+    color: var(--farbe-text-3);
   }
-  .karte .pin.an { color: #1d4ed8; }
-  .badges { display: flex; gap: 0.2rem; flex-wrap: wrap; }
+  .karte .pin.an { color: var(--farbe-akzent); }
+  .badges { display: flex; gap: var(--mass-05); flex-wrap: wrap; }
   /* Gruppen-Badge (U1): Grundfarbe = GRUPPE, Statuszeichen = Ampel. */
   .badge {
     display: inline-flex;
     align-items: center;
     gap: 2px;
-    border-radius: 3px;
-    font-size: 0.66rem;
+    border-radius: var(--radius-s);
+    font-size: var(--t-mikro);
     font-weight: 700;
-    padding: 0 3px;
-    color: #fff;
+    padding: 0 var(--mass-1);
+    color: var(--farbe-flaeche);
     cursor: pointer;
+    line-height: 1.45;
   }
   .badge .st { font-weight: 400; }
-  .badge .st.gruen { color: #bbf7d0; }
-  .badge .st.gelb  { color: #fde047; }
-  .badge .st.rot   { color: #fecaca; }
-  .badge.wunsch { background: #64748b; }
+  .badge .st.gruen { color: var(--farbe-ok-rand); }
+  .badge .st.gelb  { color: var(--farbe-warn-rand); }
+  .badge .st.rot   { color: var(--farbe-krit-rand); }
+  .badge.wunsch { background: var(--farbe-frei-text); }
 
   /* ---- Karten-Popover (U3: F1/F2) ---- */
   #popover {
     position: absolute;
     z-index: 20;
-    background: #fff;
-    border: 1px solid #999;
-    border-radius: 6px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.25);
-    padding: 0.5rem 0.6rem;
-    font-size: 0.78rem;
+    background: var(--farbe-flaeche);
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-l);
+    box-shadow: var(--schatten-1);
+    padding: var(--mass-3);
+    font-size: var(--t-klein);
     max-width: 20rem;
   }
-  #popover .kopf { font-weight: 700; margin-bottom: 0.25rem; }
-  #popover ul { margin: 0.2rem 0 0.4rem 1rem; padding: 0; }
-  #popover .aktionen { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  #popover .kopf { font-weight: 700; margin-bottom: var(--mass-1); }
+  #popover ul { margin: var(--mass-05) 0 var(--mass-2) 1rem; padding: 0; }
+  #popover .aktionen { display: flex; gap: var(--mass-2); flex-wrap: wrap; }
 
   /* ---- Fixierungen-Panel (U3) ---- */
   #fixierungen {
-    margin-top: 1rem;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    padding: 0.6rem 0.8rem;
-    font-size: 0.82rem;
+    margin-top: var(--mass-4);
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-l);
+    padding: var(--mass-3) var(--mass-4);
+    font-size: var(--t-klein);
   }
   #fixierungen textarea {
     width: 100%;
     box-sizing: border-box;
-    font-family: ui-monospace, Consolas, monospace;
-    font-size: 0.75rem;
+    font-family: var(--schrift-mono);
+    font-size: var(--t-mikro);
     min-height: 8rem;
-    margin-top: 0.4rem;
+    margin-top: var(--mass-2);
+    border: 1px solid var(--farbe-linie-stark);
+    border-radius: var(--radius-m);
+    padding: var(--mass-2);
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
   }
   #fixierungen .cli {
-    font-family: ui-monospace, Consolas, monospace;
-    font-size: 0.75rem;
-    background: #f4f4f4;
-    padding: 0.25rem 0.4rem;
-    border-radius: 4px;
+    font-family: var(--schrift-mono);
+    font-size: var(--t-mikro);
+    background: var(--farbe-flaeche-3);
+    padding: var(--mass-1) var(--mass-2);
+    border-radius: var(--radius-m);
     display: inline-block;
-    margin-top: 0.3rem;
+    margin-top: var(--mass-1);
   }
-  .hinweis { color: #555; font-size: 0.75rem; }
+  .hinweis { color: var(--farbe-text-2); font-size: var(--t-mikro); }
 
   /* ---- U4: Drag & Drop + Warnbanner ---- */
   .karte[draggable="true"] { cursor: grab; }
+  .karte[draggable="true"]:active { cursor: grabbing; }
   .karte.verschoben {
     border-style: dashed;
-    border-color: #1d4ed8;
-    background: #eef4ff;
+    border-color: var(--farbe-akzent);
+    background: var(--farbe-akzent-flaeche);
   }
   .klasse-spalte.dropziel {
-    border-color: #1d4ed8;
-    box-shadow: 0 0 0 2px #93c5fd inset;
+    border-color: var(--farbe-akzent);
+    box-shadow: 0 0 0 2px var(--farbe-akzent-flaeche) inset;
   }
-  #warnung { margin-bottom: 0.9rem; }
+  #warnung { margin-bottom: var(--mass-3); }
   #warnung .banner {
-    border: 1px solid #fca5a5;
-    background: #fef2f2;
-    color: #7f1d1d;
-    border-radius: 6px;
-    padding: 0.45rem 0.7rem;
-    font-size: 0.82rem;
+    border: 1px solid var(--farbe-krit-rand);
+    background: var(--farbe-krit-flaeche);
+    color: var(--farbe-krit-text);
+    border-radius: var(--radius-l);
+    padding: var(--mass-2) var(--mass-3);
+    font-size: var(--t-klein);
   }
   #warnung .banner.ok {
-    border-color: #86efac;
-    background: #f0fdf4;
-    color: #14532d;
+    border-color: var(--farbe-ok-rand);
+    background: var(--farbe-ok-flaeche);
+    color: var(--farbe-ok-text);
   }
   #warnung .banner .titel { font-weight: 700; }
-  #warnung .banner ul { margin: 0.2rem 0 0 1.1rem; padding: 0; }
+  #warnung .banner ul { margin: var(--mass-05) 0 0 1.1rem; padding: 0; }
   #warnung .banner .zu {
     float: right;
     cursor: pointer;
     border: none;
     background: none;
-    font-size: 0.9rem;
+    font-size: var(--t-basis);
     color: inherit;
-    padding: 0 0.2rem;
+    padding: 0 var(--mass-05);
+    min-height: 0;
   }
 </style>
 </head>
 <body>
+
+<!-- Symbol-Sprite. Nur die Zeichen, die diese Seite wirklich benutzt -
+     ein Vorrat "fuer spaeter" waere derselbe Friedhof, den die
+     Token-Waechter verhindern. Gleichdokument-Referenzen (<use href="#...">)
+     funktionieren auch unter file://, der Doppelklick-Betrieb bleibt
+     also unberuehrt (arc42 8.14).
+
+     Der Pin traegt seinen Zustand DOPPELT: schraeg und offen heisst
+     "noch nicht fixiert", senkrecht und gefuellt heisst "fixiert". Es
+     ist dieselbe Kontur, nur gedreht. Winkel allein waere im
+     Graustufendruck knapp, Fuellung allein bei 13 px ebenso - zusammen
+     ist es eindeutig. Dieselbe Doppelkodierung, die das Konzept fuer
+     die Ampel als Pflicht formuliert (klassenbildung-konzept.md:419). -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-pin" viewBox="0 0 16 16"><path d="M6 2h4v2.2l1.6 3.3H4.4L6 4.2V2z"/><path d="M8 7.5v5.5"/></symbol>
+  <symbol id="i-pin-schraeg" viewBox="0 0 16 16"><g transform="rotate(-32 8 8)"><path d="M6 2h4v2.2l1.6 3.3H4.4L6 4.2V2z"/><path d="M8 7.5v5.5"/></g></symbol>
+  <symbol id="i-schloss-zu" viewBox="0 0 16 16"><rect x="3.2" y="7" width="9.6" height="6.5" rx="1.2"/><path d="M5.5 7V4.8a2.5 2.5 0 0 1 5 0V7"/></symbol>
+  <!-- Der Buegel schwingt bis rund 40 Grad ueber die Waagerechte auf -
+       der Spalt zum Korpus ist damit auf einen Blick da statt nur
+       angedeutet. -->
+  <symbol id="i-schloss-auf" viewBox="0 0 16 16"><rect x="3.2" y="7" width="9.6" height="6.5" rx="1.2"/><path d="M5.5 7V4.8a2.5 2.5 0 0 1 4.4-1.6"/></symbol>
+  <symbol id="i-buendel" viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="8" height="8" rx="1.5"/><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/></symbol>
+  <symbol id="i-verteil" viewBox="0 0 16 16"><path d="M2.5 6h10M10 3.5L12.5 6 10 8.5M13.5 10h-10M6 7.5L3.5 10 6 12.5"/></symbol>
+</svg>
+
   <h1 id="titel">Klassenbildung</h1>
   <div id="meta"></div>
 
@@ -511,9 +816,58 @@
       ladePins();
 
       // ---- Gruppen-Identitaet (U1): Farbe + Kuerzel ----------------
-      var palette = ['#2563eb', '#0d9488', '#7c3aed', '#db2777', '#ea580c', '#65a30d',
-                     '#0891b2', '#9333ea', '#b45309', '#4f46e5', '#15803d', '#be123c',
-                     '#0369a1', '#a21caf', '#4d7c0f', '#c2410c'];
+      // Macht ein Element per Tastatur bedienbar. Ohne `aktion` loest
+      // Enter/Leertaste denselben Klick aus, den die Maus ausloesen
+      // wuerde - dadurch KANN die Tastaturbedienung gar nicht von der
+      // Maus abweichen, statt beides parallel pflegen zu muessen.
+      //
+      // Loest die Zusage aus klassenbildung-ui-konzept.md:203 ein
+      // ("Fokus-Reihenfolge Panel -> Board, Pin = Enter auf fokussierter
+      // Karte"). Die Reihenfolge ergibt sich aus dem DOM und laeuft
+      // damit von selbst Panel -> Board.
+      //
+      // Badges bleiben bewusst mausgebunden: sie sitzen zu Dutzenden in
+      // jeder Karte und wuerden die Tab-Kette unbrauchbar machen. Ihre
+      // Funktion - eine Gruppe hervorheben - ist ueber die Panel-Zeile
+      // erreichbar, und die IST fokussierbar.
+      function bedienbar(el, beschriftung, aktion) {
+        el.tabIndex = 0;
+        el.setAttribute('role', 'button');
+        if (beschriftung) el.setAttribute('aria-label', beschriftung);
+        el.addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+          e.preventDefault();
+          if (aktion) aktion(); else el.click();
+        });
+      }
+
+      // Symbol aus dem Sprite oben. `voll` fuellt die Kontur - beim Pin
+      // bedeutet das "fixiert", waehrend die schraege, offene Variante
+      // "noch nicht fixiert" heisst.
+      function ikone(id, voll) {
+        return '<svg class="ico' + (voll ? ' voll' : '') + '" aria-hidden="true"><use href="#' + id + '"/></svg>';
+      }
+
+      // Die Gruppenpalette kommt aus den Design-Tokens (--kat-1..16) und
+      // nicht mehr aus einer eigenen Liste hier: sonst haetten Viewer und
+      // WPF-Huelle zwei Wahrheiten, und der Kanon-Waechter koennte die
+      // hiesige nicht sehen.
+      //
+      // Die alte Liste war ausserdem GESAETTIGT und verletzte damit die
+      // eigene Konzeptregel: #15803d war zeichengleich mit dem Ampel-
+      // Gruen, #c2410c mit dem Diff-Marker, obwohl
+      // klassenbildung-ui-konzept.md:35 die Trennung "strikt" nennt und
+      // entsaettigte Toene fordert.
+      var palette = (function () {
+        var wurzel = getComputedStyle(document.documentElement), p = [];
+        for (var i = 1; i <= 16; i++) {
+          var wert = wurzel.getPropertyValue('--kat-' + i).trim();
+          if (wert) p.push(wert);
+        }
+        // Rueckfall, falls die Token-Region fehlt: lieber eine Farbe als
+        // gar keine Gruppenidentitaet.
+        return p.length ? p : ['#528099'];
+      })();
       var farbeVon = {};
       var kuerzelVon = {};
       var gruppeVon = {};             // id -> gruppe
@@ -899,6 +1253,7 @@
             '<div class="zeile">Zielwert ' + v.objective + ' | Diff zu V1: ' + v.diff_zu_v1 + '</div>' +
             '<div class="zeile">' + z.rot + ' rot / ' + z.gelb + ' gelb / ' + z.gruen + ' gruen / ' + z.frei + ' frei</div>';
           k.title = 'Als Arbeitsstand uebernehmen';
+          bedienbar(k, 'Variante ' + v.index + ' uebernehmen');
           k.addEventListener('click', function () {
             aktuelleVariante = i;
             render();
@@ -1020,7 +1375,7 @@
             if (w.modus === 'soft') {
               var haertW = document.createElement('button');
               haertW.className = 'fixieren';
-              haertW.textContent = haertungen.wuensche[w.index] ? '🔒' : '🔓';
+              haertW.innerHTML = ikone(haertungen.wuensche[w.index] ? 'i-schloss-zu' : 'i-schloss-auf');
               haertW.title = haertungen.wuensche[w.index]
                 ? 'Haertung zuruecknehmen (F3)'
                 : 'F3: Wunsch hart stellen (modus: hard) - erscheint als Diff-Hinweis im Export';
@@ -1048,7 +1403,8 @@
         zeile.appendChild(kuerzel);
         var typ = document.createElement('span');
         typ.className = 'typ';
-        typ.textContent = (g.typ === 'buendelung' ? '⧉' : '⇌') + (g.modus === 'hard' ? '🔒' : '');
+        typ.innerHTML = ikone(g.typ === 'buendelung' ? 'i-buendel' : 'i-verteil') +
+          (g.modus === 'hard' ? ikone('i-schloss-zu') : '');
         typ.title = g.typ + (g.modus === 'hard' ? ' (hart)' : '') +
           (g.max_pro_klasse ? ', max ' + g.max_pro_klasse + '/Klasse' : '');
         zeile.appendChild(typ);
@@ -1072,7 +1428,7 @@
         }, function (count, idx) { return labelVon(idx + 1) + ': ' + count; }));
         var fixBtn = document.createElement('button');
         fixBtn.className = 'fixieren';
-        fixBtn.textContent = '📌';
+        fixBtn.innerHTML = ikone('i-pin-schraeg');
         fixBtn.title = 'Alle Mitglieder auf ihre aktuelle Klasse fixieren (F4)';
         fixBtn.addEventListener('click', function (e) {
           e.stopPropagation();
@@ -1085,7 +1441,7 @@
         if (g.modus === 'soft') {
           var haert = document.createElement('button');
           haert.className = 'fixieren';
-          haert.textContent = haertungen.gruppen[g.id] ? '🔒' : '🔓';
+          haert.innerHTML = ikone(haertungen.gruppen[g.id] ? 'i-schloss-zu' : 'i-schloss-auf');
           haert.title = haertungen.gruppen[g.id]
             ? 'Haertung zuruecknehmen (F5)'
             : 'F5: Gruppe hart stellen (modus: hard) - erscheint als Diff-Hinweis im Export';
@@ -1103,6 +1459,11 @@
           else highlights[g.id] = true;
           render();
         });
+        bedienbar(zeile, 'Gruppe ' + (g.kuerzel || g.id) + ' hervorheben');
+        // Fokus verhaelt sich wie Hover: wer per Tastatur durch das
+        // Panel geht, sieht dieselbe fluechtige Hervorhebung.
+        zeile.addEventListener('focus', function () { hoverGruppe(g.id, true); });
+        zeile.addEventListener('blur', function () { hoverGruppe(g.id, false); });
         zeile.addEventListener('mouseenter', function () { hoverGruppe(g.id, true); });
         zeile.addEventListener('mouseleave', function () { hoverGruppe(g.id, false); });
         return zeile;
@@ -1219,8 +1580,9 @@
           if (w.modus !== 'soft') return;
           var partner = w.kinder[0] === id ? w.kinder[1] : w.kinder[0];
           var b = document.createElement('button');
-          b.textContent = (haertungen.wuensche[w.index] ? '🔒 ' : '🔓 ') +
-            (w.typ === 'zusammen' ? 'zusammen mit ' : 'getrennt von ') + partner + ' hart';
+          b.innerHTML = ikone(haertungen.wuensche[w.index] ? 'i-schloss-zu' : 'i-schloss-auf') + ' ';
+          b.appendChild(document.createTextNode(
+            (w.typ === 'zusammen' ? 'zusammen mit ' : 'getrennt von ') + partner + ' hart'));
           b.title = haertungen.wuensche[w.index]
             ? 'Haertung zuruecknehmen (F3)'
             : 'F3: Wunsch hart stellen (modus: hard) - erscheint als Diff-Hinweis im Export';
@@ -1310,7 +1672,7 @@
         name.textContent = labelVon(klasse) + ' - ' + mitglieder.length + ' Kinder';
         nameZeile.appendChild(name);
         var freeze = document.createElement('button');
-        freeze.textContent = '🔒';
+        freeze.innerHTML = ikone('i-schloss-zu');
         freeze.title = labelVon(klasse) + ' einfrieren: alle aktuellen Kinder fixieren (F6)';
         freeze.addEventListener('click', function () { klasseEinfrieren(klasse); });
         nameZeile.appendChild(freeze);
@@ -1409,7 +1771,7 @@
         }
         if (liveFaehig && pins.hasOwnProperty(id) && pins[id] !== basisKlasse) {
           karte.classList.add('verschoben');
-          karte.title = 'Verschoben aus ' + labelVon(basisKlasse) + ' (F1-Pin - 📌 loest und legt zurueck)';
+          karte.title = 'Verschoben aus ' + labelVon(basisKlasse) + ' (F1-Pin - ueber das Pin-Symbol loesen und zuruecklegen)';
         }
         if (cmp && cmp.zuordnung[id] !== klasse) {
           karte.classList.add('diff');
@@ -1472,7 +1834,7 @@
         // Pin (F1): Toggle auf die aktuelle Klasse.
         var pin = document.createElement('span');
         pin.className = 'pin' + (istFixiert(id) ? ' an' : '');
-        pin.textContent = '📌';
+        pin.innerHTML = istFixiert(id) ? ikone('i-pin', true) : ikone('i-pin-schraeg');
         if (bestandVon[id]) {
           pin.title = 'Per YAML fixiert (' + labelVon(bestandVon[id]) + ') - im Viewer nicht loesbar';
         } else if (pins.hasOwnProperty(id)) {
@@ -1488,6 +1850,9 @@
           render();
         });
         karte.appendChild(pin);
+        // Enter/Leertaste auf der Karte pinnt bzw. loest - dieselbe
+        // Aktion wie ein Klick auf das Pin-Symbol.
+        bedienbar(karte, 'Kind ' + id + ': fixieren oder loesen', function () { pin.click(); });
         return karte;
       }
 
@@ -1646,6 +2011,48 @@
         fixierungen: fixierungsListe
       };
     })();
-  </script>
+  
+      // ---- Dichteschalter ------------------------------------------
+      // Kompakt oder komfortabel. Bewusst im localStorage und NICHT im
+      // Projekt: die Dichte ist eine Eigenschaft des Bildschirms, an dem
+      // jemand sitzt, nicht des Plans. Sie folgt deshalb dem Rechner und
+      // nicht der Datei - und funktioniert dadurch in beiden
+      // Betriebsarten gleich, denn auch der WebView2-Host liefert unter
+      // einer echten Herkunft aus, wo localStorage nutzbar ist.
+      //
+      // "kompakt" entspricht exakt der bisherigen Dichte; komfortabel
+      // ist der Zugewinn fuer kleinere Anzeigen, nicht der Normalfall.
+      (function () {
+        var SCHLUESSEL = 'stundenplan-dichte';
+        var wurzel = document.documentElement;
+
+        function anwenden(wert) {
+          if (wert === 'komfortabel') wurzel.setAttribute('data-dichte', wert);
+          else wurzel.removeAttribute('data-dichte');
+        }
+
+        var start = 'kompakt';
+        try {
+          if (localStorage.getItem(SCHLUESSEL) === 'komfortabel') start = 'komfortabel';
+        } catch (e) { /* file:// ist unzuverlaessig - dann eben Standard */ }
+        anwenden(start);
+
+        var leiste = document.getElementById('controls');
+        if (!leiste) return;
+        var l = document.createElement('label');
+        l.title = 'Kompakt zeigt mehr auf einmal; komfortabel ist auf kleinen Anzeigen leichter zu treffen.';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = (start === 'komfortabel');
+        cb.addEventListener('change', function () {
+          var wert = cb.checked ? 'komfortabel' : 'kompakt';
+          anwenden(wert);
+          try { localStorage.setItem(SCHLUESSEL, wert); } catch (e) { }
+        });
+        l.appendChild(cb);
+        l.appendChild(document.createTextNode(' komfortable Dichte'));
+        leiste.appendChild(l);
+      })();
+</script>
 </body>
 </html>

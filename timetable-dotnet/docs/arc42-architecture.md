@@ -580,12 +580,15 @@ läuft in beiden Umgebungen als separater, lokal zu installierender
 Prozess (`http://127.0.0.1:11434`), keine Cloud-Abhängigkeit.
 
 Die generierten Self-contained-HTML-Viewer (siehe 8.10) brauchen
-keinerlei Laufzeitumgebung außer einem Browser und werden auf zwei
-Wegen bereitgestellt: als committete Kopien für GitHub Pages
-(`stundentafel/*.html`, ausgeliefert wird nur der `main`-Branch) und
-als Claude-Artifacts (stabil verlinkte private Vorschau-Seiten für
-Zwischenstände ohne main-Merge; URLs und Aktualisierungs-Prozedur in
-`timetable-dotnet/CLAUDE.md`).
+keinerlei Laufzeitumgebung außer einem Browser. Bereitgestellt werden
+sie als **Claude-Artifacts** - stabil verlinkte private Vorschau-Seiten
+für Zwischenstände, ohne Merge nach `main`; URLs und
+Aktualisierungs-Prozedur in `timetable-dotnet/CLAUDE.md`.
+
+Die früheren GitHub-Pages-Kopien unter `stundentafel/*.html` werden
+**nicht mehr gepflegt** (Nutzerentscheidung 23.08.2026). Sie liegen als
+eingefrorener Altstand im Repository; sie zu entfernen oder die Seite
+abzuschalten wäre ein eigener, nach außen wirkender Schritt.
 
 ## 8. Querschnittliche Konzepte
 
@@ -776,8 +779,7 @@ Python-Nachrechnung derselben Rohdaten prüft die Browser-Ergebnisse
 (z.B. "Live-Bewertung == Bewerte" zeichengleich für alle Varianten,
 Ampel-Zähler nach einer simulierten Verschiebung exakt wie
 vorhergesagt). Verteilungs-Detail siehe 7: die generierten Seiten
-werden als GitHub-Pages-Kopien (main-Stand) und als Claude-Artifacts
-(Zwischenstände) bereitgestellt; die geplante WPF-GUI hostet dieselben
+werden als Claude-Artifacts bereitgestellt; die WPF-GUI hostet dieselben
 Viewer als dritten Kanal in WebView2 (siehe 2 und
 `docs/gui-datenhaltung-konzept.md`), statt sie in XAML nachzubauen.
 
@@ -1075,6 +1077,113 @@ Kern: ein leeres Stammdatenmodell ist widerspruchsfrei und fällt durch
 jede Konsistenzprüfung durch; der Kern scheitert erst spät und technisch
 („Keine `teacher_subject_assignment`-Constraints gefunden"), die
 Oberfläche soll früh und in Klartext sagen, was fehlt.
+
+### 8.16 Designsystem: eine Quelle, drei Kopien
+
+Die Oberfläche besteht aus **zwei Technologien** — der WPF-Hülle und den
+beiden HTML-Viewern, die in WebView2 den größten Teil der Fläche
+einnehmen (8.13). Sie sahen bis August 2026 auch so aus: der Bestand
+hatte **kein einziges Design-Token**, ~20 Grautöne für vier Rollen, 14
+Schriftgrößen zwischen 0,66 und 1,3 rem, vier Eckenradien für dieselbe
+Elementklasse, drei unabhängige Knopf-Definitionen, zwei Schattenrezepte
+für dieselbe Rolle, **null** `:focus`-Regeln und nirgends eine deklarierte
+Zeilenhöhe. Die zwischen beiden Vorlagen wörtlich duplizierten Regeln
+(`body`, `h1`, `h2`, `#meta`, `#controls`, `#compare-info`) waren bereits
+auseinandergelaufen.
+
+Zwei Befunde waren keine Schönheitsfehler, sondern Verstöße gegen die
+eigenen Konzepte: es gab **keine Tastaturbedienung**, obwohl
+`klassenbildung-ui-konzept.md:203` sie zusagt ("Pin = Enter auf
+fokussierter Karte"), und die kategoriale Palette **kollidierte mit der
+Ampel-Semantik** — `#15803d` war zeichengleich mit dem Ampel-Grün,
+`#c2410c` mit dem Diff-Marker, obwohl dieselbe Konzeptzeile die Trennung
+"strikt" nennt und entsättigte Töne fordert.
+
+#### Kopie statt Injektion
+
+Quelle sind `TimetableWorkflow/Templates/design-tokens.css` (Werte) und
+`design-basis.css` (geteilte Regeln). Beide Viewer-Vorlagen tragen eine
+**zeichengleiche Kopie** zwischen Markern, `TimetableGui/Design/Tokens.xaml`
+spiegelt den Kanon.
+
+Eine Injektion zur Generierungszeit wäre naheliegender gewesen und wurde
+verworfen: sie hätte die Rohvorlage unstyled gelassen (ein realer
+Debug-Weg bei 1900 Zeilen), über `String.Replace` einen still
+scheiternden Platzhalter eingeführt — und der dann nötige Fallback-`:root`
+wäre selbst wieder eine Drift-Quelle gewesen, womit die Injektion
+überflüssig wird. Es ist dasselbe Muster wie bei den JS-Formelkopien des
+VB-Kerns (8.2): bewusste, maschinell geprüft zeichengleiche Duplikation.
+
+**Kanon** ist, was in beiden Welten sichtbar ist: die Präfixe `--farbe-`,
+`--kat-`, `--radius-`. Gefiltert wird über eine Regel, nicht über eine
+Liste — eine Liste wäre selbst ein Objekt, das driften kann. Schriftstapel
+gehören ausdrücklich NICHT dazu: der Web-Stapel enthält `-apple-system`
+und `sans-serif`, die es in WPF nicht gibt; eine Gleichheitsprüfung darauf
+wäre ein Wächter, der Unsinn assertiert. Geprüft wird XAML → CSS, nicht
+umgekehrt — WPF muss nicht jede Farbe der Viewer kennen.
+
+#### Was die Wächter fangen
+
+| Test | Fehlerklasse |
+|---|---|
+| `DesignTokenTests.JedeRegionIstZeichengleichZurQuelle` | Kopie driftet von der Quelle |
+| `.JedeVariableHatEineDeklaration` | Tippfehler in `var(--…)` — in CSS **kein** Fehler, die Deklaration fällt still auf `inherit` zurück |
+| `.KeineFarbliteraleAusserhalbDerRegion` | Rückfall auf Literale |
+| `.DieBasisStehtVorDenEigenenRegeln` | Reihenfolge — `#meta`/`#controls` sind ID-Selektoren, eine nachgestellte Basis clobbert jede Überschreibung still |
+| `DesignKanonTests.JedeVerwendeteRessourceIstDefiniert` | fehlender `StaticResource`-Schlüssel — wirft erst beim Fensteraufbau |
+| `.SymbolzeichenGibtEsInBeidenSchriften` | ein nur in *Segoe Fluent Icons* vorhandenes Zeichen erscheint auf Windows 10 still als Kästchen |
+| `TokenVerbrauchTests.KeinTokenBleibtUngenutzt` | die Quelle wird zum Friedhof |
+| `TastaturTests` (5) | die Zusage aus dem Konzept bleibt wieder unerfüllt |
+
+Jeder dieser Wächter wurde beim Einbau mit echter Drift **rot gemacht und
+wieder zurückgenommen** — ein Test, der nie rot war, ist keine Zusage.
+
+#### Belege des Umbaus
+
+Der Byte-Vergleich der ganzen Datei scheidet aus, weil sich der
+`<style>`-Block absichtlich ändert. Getragen hat stattdessen:
+
+- **`tools/css-umbau-pruefen.ps1`** — alles AUSSERHALB von `<style>` muss
+  byteweise unverändert bleiben. Bei der GMS-Seite sind das 1,85 MB
+  Markup und JS gegen 15 KB CSS, also 99,7 % der Datei. Der Wächter fing
+  bei seinem ersten Einsatz einen echten Fehler: `sed -i` schreibt die
+  CRLF-Vorlagen still auf LF um — 1.269 stille Byte-Änderungen.
+- **Berechnete Stile vorher/nachher**, je Selektor und Eigenschaft (49
+  bzw. 69 Selektoren × 26 Eigenschaften). Jede der 437 bzw. 648
+  Abweichungen ließ sich einem Token zuordnen; keine fiel auf
+  `transparent`, `none` oder leer — genau so sähe eine nicht auflösende
+  `var()` aus.
+
+#### Zwei Korrekturen am eigenen Vorgehen
+
+**Eine streng wertbewahrende Tokenisierung ist unmöglich.** Der Bestand
+hatte drei Grautöne für "Sekundärtext", drei für "Rahmen" und zwei
+Gelbtöne für denselben Zustand — genau diese Zusammenlegung *ist* der
+Zweck. Wertbewahrend zu tokenisieren hieße, zwanzig Grautöne als zwanzig
+Token zu behalten. Deshalb wurde der Nachweis feinkörniger gemacht statt
+die Sache: pro Eigenschaft statt pro Stufengrenze.
+
+**`--dichte-zeile` meint die Gesamthöhe, nicht die Inhaltshöhe.** Ohne
+`box-sizing: border-box` kamen Polsterung und Rahmen obendrauf, und die
+kompakte Karte wuchs von 24 auf 28 px — der Umbau hätte jedem, der heute
+kompakt arbeitet, Fläche weggenommen. Aufgefallen ist das nur, weil ein
+Test die Dichte in Pixeln misst statt sie zu behaupten.
+
+#### Bewusst nicht
+
+**Dunkelmodus.** Er verlangt eine zweite Kalibrierung von Ampel *und*
+kategorialer Palette und kollidiert mit dem Druckbild; `color-scheme:
+light` bleibt gesetzt. Die Tokens machen ihn später zu einer Änderung an
+einem Block — dann mit ordentlicher Kalibrierung statt nebenbei.
+
+**Badges sind nicht fokussierbar.** Sie sitzen zu Dutzenden je Karte und
+würden die Tab-Kette unbrauchbar machen; ihre Funktion — eine Gruppe
+hervorheben — ist über die Panel-Zeile erreichbar, und die ist es.
+
+**Die Dichte liegt im `localStorage`, nicht im Projekt.** Sie ist eine
+Eigenschaft des Bildschirms, an dem jemand sitzt, nicht des Plans — und
+funktioniert dadurch in beiden Betriebsarten gleich, denn auch der
+WebView2-Host liefert unter einer echten Herkunft aus.
 
 ## 9. Architekturentscheidungen
 

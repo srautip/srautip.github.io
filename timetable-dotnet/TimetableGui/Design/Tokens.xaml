@@ -1,0 +1,81 @@
+<!-- Spiegel des Designsystem-Kanons fuer WPF.
+     Quelle ist TimetableWorkflow/Templates/design-tokens.css;
+     TimetableGui.Tests/DesignKanonTests.vb prueft jeden Eintrag hier
+     gegen den dortigen Wert.
+
+     BEWUSST NUR PRIMITIVE - keine Style-Elemente, keine
+     StaticResource-Verweise. Eine referenzfreie Datei laesst sich
+     bedenkenlos mergen; sobald hier ein StaticResource staende, waere
+     die Reihenfolge der MergedDictionaries plotzlich bedeutsam.
+
+     NICHT ALLES AUS DER QUELLE STEHT HIER, und das ist Absicht: die
+     Pruefung laeuft XAML -> CSS. Jeder Eintrag hier muss drueben mit
+     gleichem Wert existieren; umgekehrt muss WPF nicht jede Farbe
+     kennen. Vollstaendigkeit in dieser Richtung waere keine
+     Korrektheitseigenschaft, sondern nur eine Liste, die selbst
+     driften kann.
+
+     Nicht im Kanon: die Schriftstapel (der Web-Stapel enthaelt
+     "-apple-system" und "sans-serif", die es in WPF nicht gibt - eine
+     Gleichheitspruefung darauf waere sinnlos), ausserdem Masse in
+     rem, Schriftgrade, Schatten und Dichte.
+     (XML-Notiz: CSS-Variablennamen sind hier ohne ihr fuehrendes
+     doppeltes Minus geschrieben - XML-Kommentare duerfen es nicht
+     enthalten.) -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <!-- ===== Kanon: Flaechen, Linien, Text ===== -->
+    <SolidColorBrush x:Key="farbe-flaeche" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="farbe-flaeche-2" Color="#FAFBFC" />
+    <SolidColorBrush x:Key="farbe-flaeche-3" Color="#F2F4F7" />
+    <SolidColorBrush x:Key="farbe-linie" Color="#E6E9EE" />
+    <SolidColorBrush x:Key="farbe-linie-stark" Color="#D5DAE1" />
+    <SolidColorBrush x:Key="farbe-text" Color="#1A1F26" />
+    <SolidColorBrush x:Key="farbe-text-2" Color="#626B76" />
+    <SolidColorBrush x:Key="farbe-text-3" Color="#8A929D" />
+
+    <!-- ===== Kanon: Status ===== -->
+    <SolidColorBrush x:Key="farbe-ok-text" Color="#0F7938" />
+    <SolidColorBrush x:Key="farbe-warn-text" Color="#8A5A00" />
+    <SolidColorBrush x:Key="farbe-warn-rand" Color="#DDB45F" />
+    <SolidColorBrush x:Key="farbe-warn-flaeche" Color="#FDF3E4" />
+    <SolidColorBrush x:Key="farbe-krit-text" Color="#B3261E" />
+    <SolidColorBrush x:Key="farbe-frei-text" Color="#626B76" />
+
+    <!-- ===== Kanon: Akzent ===== -->
+    <SolidColorBrush x:Key="farbe-akzent" Color="#0F6CBD" />
+    <SolidColorBrush x:Key="farbe-akzent-hover" Color="#115EA3" />
+    <SolidColorBrush x:Key="farbe-akzent-flaeche" Color="#EFF6FC" />
+
+    <!-- ===== Kanon: Radien ===== -->
+    <CornerRadius x:Key="radius-s">2</CornerRadius>
+    <CornerRadius x:Key="radius-m">4</CornerRadius>
+    <CornerRadius x:Key="radius-l">8</CornerRadius>
+
+    <!-- ===== Nur WPF ===== -->
+
+    <!-- Symbolschrift. Beides sind Systemschriften - keine neue
+         Abhaengigkeit. WPF waehlt pro Glyphe die erste Familie, die
+         sie liefern kann; deshalb reicht die Kommaliste als
+         Rueckfall fuer Windows 10, wo "Segoe Fluent Icons" fehlt.
+         VERWENDET WERDEN NUR Zeichen aus dem MDL2-Kernbereich - ein
+         reines Fluent-Zeichen erschiene dort still als Kaestchen. -->
+    <FontFamily x:Key="schrift-symbole">Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol</FontFamily>
+    <FontFamily x:Key="schrift-stapel">Segoe UI, Tahoma, sans-serif</FontFamily>
+
+    <sys:Double x:Key="grad-titel">20</sys:Double>
+    <sys:Double x:Key="grad-kopf">15</sys:Double>
+    <sys:Double x:Key="grad-basis">13</sys:Double>
+    <sys:Double x:Key="grad-klein">12</sys:Double>
+    <sys:Double x:Key="grad-mikro">11</sys:Double>
+    <sys:Double x:Key="grad-symbol">16</sys:Double>
+
+    <sys:Double x:Key="breite-seitenleiste">76</sys:Double>
+
+    <Thickness x:Key="pad-knopf">12,5</Thickness>
+    <Thickness x:Key="pad-feld">8,4</Thickness>
+    <Thickness x:Key="pad-platte">20</Thickness>
+
+</ResourceDictionary>

@@ -31,6 +31,36 @@ pauschal die volle Suite zu fahren:
   `dotnet run --project SchoolTestRunner -- run --all` - nur der echte
   Lauf belegt, dass die committeten Beispiel-Outputs unveraendert bleiben.
 
+- **Aenderungen an `TimetableWorkflow/Templates/design-tokens.css` oder
+  `design-basis.css`** (Designsystem-Quellen, arc42 8.16): beide Dateien
+  werden NICHT zur Laufzeit injiziert - die zwei Viewer-Vorlagen und
+  `TimetableGui/Design/Tokens.xaml` tragen zeichengleiche Kopien.
+  Die Waechter ziehen eine Aenderung NICHT selbst nach, sondern melden
+  die Abweichung und drucken den kopierbaren Soll-Block.
+  Zu fahren: `dotnet test TimetableWorkflow.Tests` (Regionen, Lints) und
+  `dotnet test TimetableGui.Tests` (Kanon CSS <-> XAML, Symbolzeichen,
+  tote Token). Beruehrt die Aenderung das Aussehen, zusaetzlich
+  `dotnet test TimetableViewer.Tests` (Tastatur, Dichte, Lesbarkeits-
+  grenze). Begruendung fuer "Kopie statt Injektion" im Kopf der
+  CSS-Datei.
+
+  Die Kopien setzt `perl tools/design-einsetzen.pl <vorlage.html>
+  <eigen.css> <tokens.css> <basis.css>` - es baut den `<style>`-Inhalt
+  aus Token-Region, Basis-Region und vorlageneigenem CSS in genau dieser
+  Reihenfolge und schreibt CRLF.
+
+- **NIEMALS `sed -i` auf `Templates/*.html` oder `tests/*/output/*.html`.**
+  Diese Dateien sind CRLF; `sed -i` schreibt sie still auf LF um und
+  erzeugt damit einen Diff ueber die ganze Datei (live erlebt: 1.269
+  stille Byte-Aenderungen). `perl -0pi` mit `:raw` oder das Edit-Werkzeug
+  erhalten die Zeilenenden; `Write` dagegen schreibt LF.
+
+- **Reine CSS-Umbauten** an den Vorlagen zusaetzlich mit
+  `powershell -File tools\css-umbau-pruefen.ps1 -Referenz <ordner>`
+  belegen: alles AUSSERHALB von `<style>` muss byteweise unveraendert
+  bleiben - das sind ueber 99 % der Datei. Vor dem Umbau einmal mit
+  `-Anlegen` die Referenz erzeugen.
+
 - **Aenderungen nur an `SchoolTestRunner/`-CLI oder
   `TimetableWorkflow/Templates/*.html`** (Viewer): die Suite
   deckt beides NICHT ab - stattdessen gezielt pruefen:
@@ -67,10 +97,17 @@ waren dort die tatsaechlich tragende Validierung.
 ## Weitere Konventionen (Kurzreferenz)
 
 - Beispiel-Outputs (`tests/*/output/`) sind generiert und werden nach
-  jedem Lauf mitcommittet; die GitHub-Pages-Kopien unter
-  `../stundentafel/*.html` nachziehen (`cp` aus `output/`). GitHub
-  Pages liefert NUR den `main`-Branch aus - Merge nach `main` nur auf
-  explizite Nutzeranweisung.
+  jedem Lauf mitcommittet.
+- **GitHub Pages wird nicht mehr gepflegt** (Nutzerentscheidung
+  23.08.2026). Die Kopien unter `../stundentafel/*.html` sind damit ein
+  eingefrorener Altstand und werden nach einem Lauf NICHT mehr
+  nachgezogen. Der Vorschau-Kanal sind die Claude-Artifacts unten.
+  Sollen die Seiten spaeter wieder aktuell sein, ist das ein bewusster
+  Schritt - nicht die Nebenwirkung eines Laufs.
+- Merge nach `main` weiterhin nur auf explizite Nutzeranweisung. Der
+  Grund ist jetzt ein anderer: `main` ist der Standardzweig eines
+  oeffentlichen Repositorys, nicht mehr die Quelle einer
+  ausgelieferten Seite.
 - Messlaeufe ehrlich dokumentieren (inkl. negativer Befunde) als
   Kommentar in der jeweiligen `config.yaml` bzw. in `docs/`; bei
   `num_workers > 1` sind Laeufe trotz fixem Seed nicht deterministisch -
@@ -78,17 +115,22 @@ waren dort die tatsaechlich tragende Validierung.
 - Lange Laeufe (>10 Min) nicht direkt im Tool-Aufruf starten, sondern
   als `setsid nohup`-Skript entkoppeln und per Log ueberwachen.
 
-## Viewer-Artifacts (schneller Vorschau-Kanal ohne main-Merge)
+## Viewer-Artifacts (der Vorschau-Kanal)
 
-Neben den GitHub-Pages-Kopien (main-Stand) werden die beiden
-Stundentafel-Viewer als Claude-Artifacts bereitgestellt - private,
-stabil verlinkte Seiten fuer Zwischenstaende direkt nach einem Lauf:
+Seit GitHub Pages nicht mehr gepflegt wird, sind die Claude-Artifacts
+der EINZIGE Vorschau-Kanal: private, stabil verlinkte Seiten fuer
+Zwischenstaende direkt nach einem Lauf - und ohne Merge nach `main`.
 
 - Grundschule: https://claude.ai/code/artifact/d644d791-48e1-4bbd-89fa-02d2cf13fe09
 - GMS: https://claude.ai/code/artifact/ae942861-a1ae-4664-a1f5-51ac9ce702d1
 - Klassenbildung Grundschule: https://claude.ai/code/artifact/d00f8a57-75ca-4809-9690-19613dd071a1
   (Quelle: tests/bw-grundschule-beispiel/output/klassenbildung.html,
   Titel "Klassenbildung Grundschule", Favicon 🧩)
+- Designsystem-Muster: https://claude.ai/code/artifact/44e7835c-6ceb-467e-b7d8-234be0185cdb
+  (Favicon 🎨) - KEIN Generat aus dem Repo, sondern die Entwurfsseite zu
+  arc42 8.16: Palette, Typo-Skala, Komponenten und Symbolsatz mit
+  Umschaltern fuer Dichte und Vorher/Nachher. Wird nur bei einer
+  Aenderung AM DESIGNSYSTEM nachgezogen, nicht nach einem Lauf.
 
 Aktualisierung nach jedem `run`-Lauf: den aeusseren Dokumentrahmen der
 generierten `output/stundentafel.html` strippen (doctype/html/head/
