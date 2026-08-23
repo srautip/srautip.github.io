@@ -115,6 +115,38 @@ waren dort die tatsaechlich tragende Validierung.
 - Lange Laeufe (>10 Min) nicht direkt im Tool-Aufruf starten, sondern
   als `setsid nohup`-Skript entkoppeln und per Log ueberwachen.
 
+## VB-Fallstricke bei der Namensaufloesung (wiederholt aufgetreten)
+
+**VB unterscheidet KEINE Gross-/Kleinschreibung.** `Stunden` und
+`stunden` sind derselbe Bezeichner. Das ist die mit Abstand haeufigste
+Fehlerquelle in diesem Projekt gewesen - fuenfmal in verschiedenen
+Ausfuehrungen.
+
+**Die Regel:** Ein Parameter oder eine lokale Variable bekommt NIE
+denselben Namen wie ein Mitglied, mit dem sie im selben Rumpf zu tun
+hat. Also `anzahlStunden` statt `stunden` neben `Stunden`, `BaueZelle`
+statt `Zelle` neben `zelle`, `LadeSchule` statt `Schule` neben
+`schule`.
+
+**Warum das nicht der Compiler erledigt:** Er faengt nur einen Teil der
+Faelle - und ausgerechnet der gefaehrlichste bleibt still.
+
+| Fall | Was passiert | Compiler |
+|---|---|---|
+| `Public Sub New(stunden As Integer)` mit Eigenschaft `Stunden`; im Rumpf `Stunden = stunden` | **Selbstzuweisung des Parameters.** Die Eigenschaft bleibt auf ihrem Standardwert - hier 0, wodurch KEINE Rasterzelle mehr gueltig war. | **schweigt** |
+| Lokales `Dim zelle = Zelle(...)` neben `Function Zelle` | - | `BC30980: Type of 'zelle' cannot be inferred from an expression containing 'zelle'` |
+| `Region(...)`-Funktion, lokal `Dim region = Region(...)` | - | `BC30980` |
+| Helfer `Schule(name)` neben Parameter `schule`; `Schule(schule)` | indiziert den STRING statt die Funktion zu rufen | `BC30311: Value of type 'Char' cannot be converted to 'Projekt'` |
+| `Melde(SolveProgress)` in einer Klasse mit geerbtem `Melde(name)` | Ueberladung kollidiert mit der Basis | Fehler beim Ueberschreiben |
+
+Die erste Zeile ist der Punkt: **ein Test hat sie gefunden, nicht der
+Compiler.** Wer eine Eigenschaft im Konstruktor setzt, prueft ihren
+Wert danach - oder benennt den Parameter von vornherein anders.
+
+**Verwandt, gleiche Familie:** `List(Of T).Count` ist in VB eine
+EIGENSCHAFT und verschattet die LINQ-Ueberladung `Count(predicate)`.
+Statt `liste.Count(Function(x) ...)` also `liste.Where(...).Count`.
+
 ## Viewer-Artifacts (der Vorschau-Kanal)
 
 Seit GitHub Pages nicht mehr gepflegt wird, sind die Claude-Artifacts

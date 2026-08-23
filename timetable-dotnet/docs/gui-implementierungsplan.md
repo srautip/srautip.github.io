@@ -279,8 +279,17 @@ nicht entstehen können.
 - Regeln §6.10: acht Masken plus **Rasterpicker als gemeinsames Control**
   (Tag × Stunde, gleiche Optik wie die Stundentafel), generierte Regeln
   read-only, validierter YAML-Expertenmodus.
-- Klassenbildungs-Eingaben §6.11, Solver-Einstellungen §6.12 (einfach/Experten
-  gegen die `RunConfig`-Felder aus Stufe A).
+- Klassenbildungs-Eingaben §6.11 **inklusive Zwischenablage-Import**,
+  Solver-Einstellungen §6.12 (einfach/Experten gegen die `RunConfig`-Felder
+  aus Stufe A).
+
+  **Nachtrag (Nutzerentscheidung):** der Zwischenablage-Import war ursprünglich
+  in Stufe G eingeplant. Das war falsch geschnitten: eine Einschulungsliste,
+  die man abtippen muss, wird nicht benutzt – die Maske wäre fertig, aber
+  praktisch unbenutzbar. Der Zwischenablage-Weg (`Name;Klasse` bzw.
+  Einschulungszeilen mit Attributspalten, IDs vergibt die GUI) gehört deshalb
+  hierher. In G bleibt nur der CSV-Dialog mit freier Spalten-Zuordnung
+  (§9.1) – das ist der Komfortweg, nicht der Grundweg.
 - Querschnitt §7: **Umbenennen kaskadiert** über alle Referenzen (Vorschau
   „12 Verweise werden angepasst"), **Löschen** zeigt Konsequenzen-Dialog —
   niemals stilles Verwaisen. „Speichern immer möglich, Rechnen nur bei grüner
@@ -299,8 +308,9 @@ Beispielprojekt.
   „neu rechnen" mit Kurzparametern).
 - YAML-Ex-/Import in `tests/<schule>/`-Layout — der CLI-Kanal bleibt damit
   vollwertig erhalten.
-- CSV-/Zwischenablage-Import mit Spalten-Zuordnung (§9.1/9.2). **Kein
-  xlsx-Parser** — bewusst nicht in V1.
+- CSV-Import mit freier Spalten-Zuordnung (§9.1/9.2). Der
+  Zwischenablage-Weg steht bereits seit Stufe F4. **Kein xlsx-Parser** —
+  bewusst nicht in V1.
 - Startseite als Schrittleiste (§8).
 - **Freigabe:** aktive Bestätigung mit Substanz (Klassenbildungs-Konzept §10),
   Freigabe-Stand gegen Löschen/Verdrängen geschützt, Audit-Zeile.

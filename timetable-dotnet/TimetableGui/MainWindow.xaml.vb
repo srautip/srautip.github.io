@@ -30,6 +30,21 @@ Class MainWindow
     Private Async Sub AufModellAenderung(sender As Object, e As PropertyChangedEventArgs)
         If e.PropertyName <> NameOf(HauptViewModel.Bereich) Then Return
 
+        ' Stammdaten oeffnen als MODALER Dialog ueber der Flaeche - "das
+        ' Dashboard bleibt der Anker" (gui-ui-konzept.md 2). Der Bereich
+        ' springt danach auf Start zurueck, damit die Seitenleiste nicht
+        ' auf einem Eintrag stehenbleibt, hinter dem nichts liegt.
+        If _modell.Bereich = Bereich.Stammdaten Then
+            StammdatenOeffnen()
+            _modell.Bereich = Bereich.Start
+            Return
+        End If
+        If _modell.Bereich = Bereich.Regeln Then
+            KlassenbildungEingabenOeffnen()
+            _modell.Bereich = Bereich.Start
+            Return
+        End If
+
         Dim zeigtDashboard = _modell.Bereich = Bereich.Klassenbildung OrElse _modell.Bereich = Bereich.Stundenplan
         Startseite.Visibility = If(zeigtDashboard, Visibility.Collapsed, Visibility.Visible)
         Dashboard.Visibility = If(zeigtDashboard, Visibility.Visible, Visibility.Collapsed)
@@ -37,6 +52,48 @@ Class MainWindow
         If zeigtDashboard AndAlso _modell.Auslieferung.SeitenGroesse > 0 Then
             Await _host.AnzeigenAsync()
         End If
+    End Sub
+
+    ''' <summary>Oeffnet die Stammdaten-Pflege. Ohne Projekt gibt es
+    ''' nichts zu pflegen - dann der Hinweis statt eines leeren Fensters,
+    ''' in dem jede Aktion ins Nichts liefe.</summary>
+    Private Sub StammdatenOeffnen()
+        If Not _modell.ProjektOffen Then
+            MessageBox.Show(Me, "Erst ein Projekt anlegen, öffnen oder eine Schule übernehmen.",
+                            "Stammdaten", MessageBoxButton.OK, MessageBoxImage.Information)
+            Return
+        End If
+
+        Dim f As New StammdatenFenster(_modell.Projekt, New WpfDialoge(Me)) With {.Owner = Me}
+        ' Jede Aenderung in den Masken macht das Projekt ungespeichert -
+        ' Autosave ist ausdruecklich abgelehnt (Konzept 7), also muss der
+        ' Indikator stimmen.
+        AddHandler f.Geaendert, Sub() _modell.Geaendert = True
+        f.ShowDialog()
+    End Sub
+
+    ''' <summary>Die Eingaben der Klassenbildung (6.11) samt
+    ''' Solver-Einstellungen (6.12). Eigenes Fenster, weil die
+    ''' Einschulungsliste ausdruecklich NICHT die Schuelerliste der
+    ''' Stammdaten ist - "die Klassenbildung laeuft VOR der
+    ''' Klassenzuteilung".</summary>
+    Private Sub KlassenbildungEingabenOeffnen()
+        If Not _modell.ProjektOffen Then
+            MessageBox.Show(Me, "Erst ein Projekt anlegen, öffnen oder eine Schule übernehmen.",
+                            "Klassenbildung", MessageBoxButton.OK, MessageBoxImage.Information)
+            Return
+        End If
+        Dim f As New KlassenbildungFenster(_modell.Projekt, New WpfDialoge(Me)) With {.Owner = Me}
+        AddHandler f.Geaendert, Sub() _modell.Geaendert = True
+        f.ShowDialog()
+    End Sub
+
+    Private Sub AufStammdaten(sender As Object, e As RoutedEventArgs)
+        StammdatenOeffnen()
+    End Sub
+
+    Private Sub AufKlassenbildungEingaben(sender As Object, e As RoutedEventArgs)
+        KlassenbildungEingabenOeffnen()
     End Sub
 
     Private Sub AufBeenden(sender As Object, e As RoutedEventArgs)

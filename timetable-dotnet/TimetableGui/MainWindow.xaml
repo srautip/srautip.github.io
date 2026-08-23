@@ -38,7 +38,10 @@
                 <MenuItem Header="Lauf abbrechen" Command="{Binding Monitor.AbbrechenBefehl}" />
             </MenuItem>
             <MenuItem Header="_Extras">
-                <MenuItem Header="Browserdaten bereinigen" Click="AufBrowserdatenBereinigen" />
+                <MenuItem Header="Stammdaten…" Click="AufStammdaten" />
+                <MenuItem Header="Klassenbildung: Eingaben…" Click="AufKlassenbildungEingaben" />
+            <Separator />
+            <MenuItem Header="Browserdaten bereinigen" Click="AufBrowserdatenBereinigen" />
             </MenuItem>
             <MenuItem Header="_Hilfe">
                 <MenuItem Header="Über" Click="AufUeber" />

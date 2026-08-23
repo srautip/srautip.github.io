@@ -44,8 +44,19 @@ Friend NotInheritable Class TestDialoge
         Hinweise.Add($"{titel}: {text}")
     End Sub
 
+    ''' <summary>Gestellte Fragen im Wortlaut. Der Loeschdialog muss die
+    ''' Folgen NENNEN (Konzept 7, "niemals stilles Verwaisen") - das ist
+    ''' nur pruefbar, wenn die Attrappe den Text aufhebt.</summary>
+    Public ReadOnly Property Fragen As New List(Of String)
+
+    ''' <summary>Steuerbar, damit auch der Nein-Fall pruefbar ist. Eine
+    ''' Attrappe, die immer Ja sagt, kann nicht belegen, dass ein Nein
+    ''' wirklich nichts aendert.</summary>
+    Public Property FrageAntwort As Boolean = True
+
     Public Function Frage(titel As String, text As String) As Boolean Implements IDialoge.Frage
-        Return True
+        Fragen.Add(text)
+        Return FrageAntwort
     End Function
 End Class
 

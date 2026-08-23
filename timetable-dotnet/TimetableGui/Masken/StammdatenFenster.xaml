@@ -1,0 +1,124 @@
+<Window x:Class="StammdatenFenster"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Stammdaten" Height="720" Width="1080"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource farbe-flaeche}"
+        Foreground="{StaticResource farbe-text}"
+        FontFamily="{StaticResource schrift-stapel}"
+        FontSize="{StaticResource grad-basis}">
+
+    <!-- Ein Fenster mit Reitern statt acht einzelner Dialoge.
+         gui-ui-konzept.md 2 nennt "Uebersichtslisten (WPF), aus denen
+         die Detail-Dialoge starten" - die Reiter sind die Umsetzung
+         davon: sie halten den mentalen Anker ("ich pflege die
+         Stammdaten DIESER Schule") und ersparen acht Fensterwechsel
+         waehrend derselben Arbeit.
+
+         Jeder Listen-Reiter folgt dem Grundmuster aus 6: Liste links
+         (filterbar), Detailformular rechts, Aktionen unten. Die
+         Aktionsleiste steht EINMAL am Fensterfuss statt in jedem
+         Reiter - sonst waere sie achtmal zu pflegen. -->
+
+    <Window.Resources>
+        <Style x:Key="Feldbeschriftung" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource farbe-text-2}" />
+            <Setter Property="FontSize" Value="{StaticResource grad-klein}" />
+            <Setter Property="Margin" Value="0,10,0,2" />
+        </Style>
+        <Style TargetType="TabItem">
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="FontSize" Value="{StaticResource grad-basis}" />
+        </Style>
+    </Window.Resources>
+
+    <DockPanel Margin="{StaticResource pad-platte}">
+
+        <!-- Fusszeile: die vier Aktionen des Grundmusters plus die
+             Pruefzeile, die immer sichtbar bleibt. -->
+        <Border DockPanel.Dock="Bottom" Margin="0,16,0,0"
+                BorderBrush="{StaticResource farbe-linie}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="Prüfen" Click="AufPruefen" />
+                    <Button Content="Schließen" Margin="8,0,0,0" IsCancel="True"
+                            Style="{StaticResource KnopfPrimaer}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="NeuKnopf" Content="Neu" Click="AufNeu" />
+                    <Button x:Name="DuplizierenKnopf" Content="Duplizieren" Margin="8,0,0,0" Click="AufDuplizieren" />
+                    <Button x:Name="LoeschenKnopf" Content="Löschen" Margin="8,0,0,0" Click="AufLoeschen" />
+                    <TextBlock x:Name="Statuszeile" VerticalAlignment="Center" Margin="16,0,0,0"
+                               Foreground="{StaticResource farbe-text-2}"
+                               FontSize="{StaticResource grad-klein}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <TabControl x:Name="Reiter" Background="Transparent" BorderThickness="0"
+                    SelectionChanged="AufReiterWechsel">
+
+            <!-- ===== 6.2 Schuldaten (kein Listen-Dialog) ===== -->
+            <TabItem Header="Schuldaten">
+                <ScrollViewer Margin="0,12,0,0">
+                    <StackPanel MaxWidth="560" HorizontalAlignment="Left">
+                        <TextBlock Text="Schulname" Style="{StaticResource Feldbeschriftung}" />
+                        <TextBox x:Name="SchulName" TextChanged="AufSchuldatenAenderung" />
+                        <TextBlock Text="Schulart" Style="{StaticResource Feldbeschriftung}" />
+                        <ComboBox x:Name="Schulart" SelectionChanged="AufSchuldatenAenderung">
+                            <ComboBoxItem Content="Grundschule" />
+                            <ComboBoxItem Content="Gemeinschaftsschule" />
+                        </ComboBox>
+                        <TextBlock Text="Bundesland (informativ)" Style="{StaticResource Feldbeschriftung}" />
+                        <TextBox x:Name="Bundesland" TextChanged="AufSchuldatenAenderung" />
+
+                        <TextBlock Text="Unterrichtstage" Style="{StaticResource Feldbeschriftung}" />
+                        <StackPanel x:Name="TageLeiste" Orientation="Horizontal" />
+
+                        <TextBlock Text="Stunden je Tag" Style="{StaticResource Feldbeschriftung}" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBox x:Name="StundenProTag" Width="70" />
+                            <Button Content="Raster übernehmen" Margin="8,0,0,0" Click="AufRasterUebernehmen" />
+                        </StackPanel>
+                        <!-- Das Raster ist die Grundlage des Rasterpickers (6.10).
+                             Wer es verkleinert, entwertet bestehende Regeln -
+                             deshalb ein eigener Knopf statt stiller Uebernahme. -->
+                        <TextBlock x:Name="Kapazitaetszeile" TextWrapping="Wrap" Margin="0,12,0,0"
+                                   Foreground="{StaticResource farbe-text-2}"
+                                   FontSize="{StaticResource grad-klein}" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ===== Listen-Reiter, alle nach demselben Muster ===== -->
+            <TabItem Header="Klassen">
+                <ContentControl x:Name="KlassenBereich" />
+            </TabItem>
+            <TabItem Header="Fächer">
+                <ContentControl x:Name="FaecherBereich" />
+            </TabItem>
+            <TabItem Header="Räume">
+                <ContentControl x:Name="RaeumeBereich" />
+            </TabItem>
+            <TabItem Header="Lehrkräfte">
+                <ContentControl x:Name="LehrkraefteBereich" />
+            </TabItem>
+            <TabItem Header="Qualifikationen">
+                <ScrollViewer Margin="0,12,0,0" HorizontalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="Klick schaltet weiter: nein → qualifiziert → fachfremd."
+                                   Foreground="{StaticResource farbe-text-2}"
+                                   FontSize="{StaticResource grad-klein}" Margin="0,0,0,8" />
+                        <Grid x:Name="Matrix" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Schüler &amp; Gruppen">
+                <ContentControl x:Name="GruppenBereich" />
+            </TabItem>
+            <TabItem Header="Feste Zuordnungen">
+                <ContentControl x:Name="ZuordnungenBereich" />
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>
