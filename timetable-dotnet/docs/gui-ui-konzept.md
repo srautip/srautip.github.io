@@ -99,7 +99,7 @@ Vorab geklärte Nutzerentscheidungen (Dialograunde zu diesem Konzept):
 
 | Menü | Einträge |
 |---|---|
-| **Datei** | Neues Projekt… (Assistent, 6.1) · Öffnen… · Zuletzt verwendet ▸ · Speichern (Strg+S) · Sicherungskopie erstellen · Importieren ▸ (YAML-Ordner nach `tests/<schule>/`-Layout) · Exportieren ▸ (YAML-Ordner / Viewer-HTML / Berichte md/pdf / **Klassenlisten mit Klarnamen…** [Warndialog + Audit-Eintrag]) · Projekt schließen · Beenden |
+| **Datei** | Neues Projekt… (Assistent, 6.1) · Bestehende Schule übernehmen… (Migrations-Einstieg, 9) · Öffnen… · Zuletzt verwendet ▸ · Speichern (Strg+S) · Sicherungskopie erstellen · Importieren ▸ (YAML-Ordner nach `tests/<schule>/`-Layout · CSV/Zwischenablage mit Spalten-Zuordnung, 9.1) · Exportieren ▸ (YAML-Ordner / Viewer-HTML / Berichte md/pdf / **Klassenlisten mit Klarnamen…** [Warndialog + Audit-Eintrag]) · Projekt schließen · Beenden |
 | **Bearbeiten** | Rückgängig/Wiederholen (formularbezogen) · Suchen… (Strg+F: global über Kinder [Klarname+ID], Lehrkräfte, Fächer, Regeln) · Projekt-Passwort ändern… |
 | **Planung** | Klassenbildung rechnen · Lehrereinsatz + Stundenplan rechnen · Lauf abbrechen · Lauf-Monitor anzeigen · Stand als Freigabe markieren… (aktive Bestätigung mit Substanz, Konzept klassenbildung §10) · Solver-Einstellungen… (6.12) |
 | **Extras** | Regeln aus Freitext… (Chat, **Ausbaustufe 2**; Menüpunkt prüft `LlmExtraction.IsOllamaAvailable` und erklärt bei Fehlen die lokale Ollama-Einrichtung) · Browserdaten bereinigen (WebView2-Profil, Datenhaltung 7.6) · Einstellungen… |
@@ -175,12 +175,18 @@ Nutzt die vorhandene Scaffold-Logik (`new`-Kommando) als Motor:
 |---|---|
 | 1 Schule | Schulname, Schulart (Grundschule/Gemeinschaftsschule), Bundesland (BW; weitere folgen), Schuljahr |
 | 2 Struktur | Klassenstufen (1..4 GS / 1..6 GMS), Züge (Default 2), Anzahl Klassenlehrkräfte |
-| 3 Schutz | Projekt-Passwort (+ Wiederholung, Stärke-Hinweis), Speicherort |
-| 4 Zusammenfassung | erzeugter Startbestand in Zahlen (Klassen, Fächer aus dem Kontingent-Template, automatisch ergänzte Fachlehrkräfte) |
+| 3 Schüler & Gruppen (optional, anonym) | Anzahl Schüler je Klassenstufe + Auswahl typischer Gruppen-Vorlagen (z.B. Religion ev/kath/Ethik) mit Aufteilung - erzeugt Platzhalter-Schüler samt Gruppen (6.8); überspringbar: ohne diesen Schritt rechnet der Plan rein klassenbasiert |
+| 4 Schutz | Projekt-Passwort (+ Wiederholung, Stärke-Hinweis), Speicherort |
+| 5 Zusammenfassung | erzeugter Startbestand in Zahlen (Klassen, Fächer aus dem Kontingent-Template, automatisch ergänzte Fachlehrkräfte, ggf. Platzhalter-Schüler/Gruppen) |
 
 Ergebnis: ein sofort rechenbares Projekt (wie der CLI-Scaffold: plausible
 Stammdaten, leeres Regelwerk) - der Nutzer sieht in Minuten ein erstes
-Ergebnis, exakt der Schnellstart-Pfad des Benutzerhandbuchs.
+Ergebnis, exakt der Schnellstart-Pfad des Benutzerhandbuchs. Der
+Stundenplan braucht dabei grundsätzlich KEINE Einzelschüler
+(`schueler`/`gruppen` sind im Modell optional, Klassen tragen nur eine
+informative `schuelerzahl`) - Schritt 3 ist nur nötig, wenn
+klassenübergreifende Gruppen (Religion, Förderung, Niveaukurse)
+mitgeplant werden sollen, und dafür genügen anonyme Platzhalter.
 
 ### 6.2 Schuldaten (allgemein)
 
@@ -239,14 +245,30 @@ qualifizierte Lehrkraft" wird hier präventiv sichtbar).
 
 - **Schülerliste**: ID (automatisch vergeben, nicht editierbar),
   Klarname (→ mapping.json), Heimatklasse. Import per
-  Einfügen aus Zwischenablage (Name;Klasse - IDs vergibt die GUI).
+  Einfügen aus Zwischenablage (Name;Klasse - IDs vergibt die GUI)
+  oder CSV-Datei mit Spalten-Zuordnung (Abschnitt 9.1).
+- **"Anonyme Schüler erzeugen…"** (Aktion, auch als Assistent-Schritt
+  3 in 6.1): Eingabe der Anzahl je Klassenstufe bzw. je Klasse plus
+  Aufteilung auf **typische Gruppen-Vorlagen** - mitgelieferte
+  Vorlagen z.B. "Religion ev/kath/Ethik" (Aufteilung in Prozent oder
+  absolut, je Klassenstufe), "Förderung (n Kinder, max 1 je Klasse)",
+  "Niveaukurse G/E/A je Fach" (GMS); eigene Vorlagen speicherbar.
+  Erzeugt deterministisch Platzhalter-Schüler (S001…) mit
+  Heimatklasse und den Gruppenzuordnungen - exakt das, was die
+  Beispiel-Fixtures bisher per Wegwerf-Skript erzeugt haben
+  (GMS-Beispiel, Klassenbildungs-Fixture). Platzhalter erhalten
+  KEINEN mapping.json-Eintrag (kein Personenbezug), sind als solche
+  markiert und können später durch eine echte Liste ersetzt werden -
+  dabei bleiben Klassen-/Gruppenstruktur erhalten, die Mitgliedschaften
+  werden aber neu zugeordnet (ehrliche Grenze: eine automatische
+  1:1-Übernahme von Platzhalter- auf echte Kinder gibt es nicht).
 - **Gruppen**: `name`, `typ`, Mitglieder-Picker (Mehrfachauswahl mit
   Klarnamen-Anzeige), und für solver-wirksame Fachgruppen `fach_name`,
   `klassenstufe`, `parallelverbund`. Die harte Verbund-Regel wird live
   geprüft (alle Gruppen eines Verbunds: Fach paarweise verschieden,
   gleiche Stufe, gleiches `wochenstunden_soll`/`block_length`) - mit
   Klartext-Fehlern statt späterem Infeasible.
-- GMS-Komfort (Ausbaustufe, 9): "Sektionen bilden" teilt eine zu große
+- GMS-Komfort (Ausbaustufe, 10): "Sektionen bilden" teilt eine zu große
   Fachgruppe automatisch in nummerierte Sektionen nach dem Muster des
   GMS-Beispiels.
 
@@ -389,12 +411,76 @@ starten bei [1] mit dem Assistenten-Ergebnis. Die Klassenbildung hat
 dieselbe Leiste in ihrer Board-Randleiste (Basis wählen → bulk
 fixieren → Gruppen/Einzelfälle → neu rechnen → Freigabe).
 
-## 9. Ausbaustufen
+## 9. Unterjährige Einführung (Migration aus Bestandssystemen)
+
+Die Software wird realistischerweise mitten im Schuljahr eingeführt -
+Klasseneinteilungen und Stundenpläne existieren dann bereits in anderer
+Software oder in Office-Dateien. Die GUI behandelt das als eigenes
+Einstiegsszenario ("Bestehende Schule übernehmen" als Alternative zum
+leeren Assistenten-Projekt), in drei unabhängig nutzbaren Bausteinen:
+
+### 9.1 Klasseneinteilung übernehmen (CSV/Zwischenablage)
+
+Import-Dialog mit **Spalten-Zuordnung**: eine CSV-Datei oder ein
+eingefügter Tabellenbereich (aus Excel kopiert - der verlässlichste
+Office-Weg ohne neue Abhängigkeit) wird als Vorschau angezeigt, der
+Nutzer ordnet Spalten zu: Name → mapping.json, Klasse → Heimatklasse,
+weitere Spalten wahlweise → Klassenbildungs-Attribut (z.B.
+"Geschlecht") oder → Gruppenmitgliedschaft (z.B. Spalte "Religion" mit
+Werten ev/kath/ethik erzeugt die drei Gruppen und verteilt die Kinder).
+IDs vergibt die GUI; nicht zugeordnete Spalten werden verworfen (mit
+Hinweis - Datenminimierung als Default). Ein direkter xlsx-Parser ist
+bewusst NICHT Teil von V1 (er bräuchte eine neue Abhängigkeit entgegen
+dem BCL-only-Grundsatz der Datenhaltung); CSV-Export bzw.
+Kopieren/Einfügen aus Excel decken die Fälle ab.
+
+### 9.2 Bestehenden Lehrereinsatz übernehmen
+
+Die gelebte Lehrer-Klasse-Fach-Zuteilung wird als `feste_zuordnungen`
+erfasst (Maske 6.9 bzw. derselbe CSV-/Einfüge-Weg mit Spalten
+Lehrkraft/Klasse/Fach) - Stufe 1 reproduziert dann die Realität, statt
+neu zu verteilen, und der Mechanismus ist zugleich die vorhandene
+Antwort auf Lehrerkontinuität (gleiche Namen, `docs/
+phase2-14-lehrerkontinuitaet.md`). Beim nächsten Schuljahr können die
+Zuordnungen schrittweise gelöst werden.
+
+### 9.3 Bestehenden Stundenplan übernehmen
+
+Der Ist-Plan wird über ein Erfassungsraster (Rasterpicker je Klasse:
+Fach+Lehrkraft je Slot) oder per CSV (Klasse, Tag, Stunde, Fach,
+Lehrkraft) eingelesen und zweifach genutzt:
+
+- **Als Referenz-Stand "Bestand"** in der Läufe-Historie (6.13): jeder
+  neue Vorschlag wird in der Stundentafel per vorhandener
+  "Vergleichen mit"-Diff-Ansicht GEGEN den Ist-Zustand gelesen -
+  unterjährig die entscheidende Frage ("was ändert sich für wen?").
+  Beim Import läuft `Verifier.VerifySchedule` über den Bestandsplan:
+  Abweichungen von den erfassten Stammdaten/Regeln (der Altplan
+  verletzt z.B. eine Verfügbarkeit) werden gelistet statt
+  stillschweigend übernommen - oft der erste Datenqualitäts-Gewinn
+  der Einführung.
+- **Als Startpunkt zum Weiterplanen**: die Aktion **"Bestandsplan
+  einfrieren"** erzeugt je erfasster Stunde eine `required_slot`-
+  must-Regel (der Typ existiert; Herkunfts-Badge "Bestand") - der
+  Solver reproduziert den Plan exakt. Anschließend wird gezielt
+  gelockert: Bereichsauswahl im Rasterpicker ("Nachmittage der
+  Stufe 3", "alle Stunden von Frau X") entfernt die betreffenden
+  Bestands-Regeln, und nur dieser Ausschnitt wird neu optimiert,
+  während der Rest fixiert bleibt. Das ist der unterjährige
+  Normalfall (Lehrkraft fällt aus, Raum entfällt) - ohne dass der
+  restliche Plan sich bewegt.
+
+Analog auf der Klassenbildungs-Seite: eine importierte Einteilung
+(9.1 mit Spalte Klasse) kann als `fixierungen:`-Vollbestand ins Board
+übernommen werden - Umverteilung einzelner Kinder läuft dann über den
+normalen Board-Workflow (Pins lösen, verschieben, neu rechnen).
+
+## 10. Ausbaustufen
 
 | Stufe | Inhalt |
 |---|---|
-| **V1** | Projekt-Assistent, Stammdaten-Dialoge (6.2-6.9), Regel-Masken + Expertenmodus (6.10), Klassenbildungs-Eingaben (6.11), Solver-Einstellungen einfach/Experten, Lauf-Monitor, beide Dashboards mit Bridge **inklusive U5-Re-Solve** aus dem Board, Stände-Historie, YAML-Ex-/Import, Startseite |
-| **V2** | Chat-Regeln (Freitext → `LlmExtraction` → Vorschlagsliste mit Prüfen/Übernehmen je Regel - nie Direktübernahme), Klarnamen-Druckexporte, Konfliktkern-Dialog (setzt Klassenbildungs-Plan K6 voraus), Bericht-Generator (Art.-15-Bericht je Kind aus der gefilterten Sicht) |
+| **V1** | Projekt-Assistent inkl. anonymer Schüler-/Gruppen-Generator (6.1/6.8), Stammdaten-Dialoge (6.2-6.9), Regel-Masken + Expertenmodus (6.10), Klassenbildungs-Eingaben (6.11), Solver-Einstellungen einfach/Experten, Lauf-Monitor, beide Dashboards mit Bridge **inklusive U5-Re-Solve** aus dem Board, Stände-Historie, YAML-Ex-/Import, CSV-/Zwischenablage-Import für Schülerlisten und feste Zuordnungen (9.1/9.2), Startseite |
+| **V2** | Chat-Regeln (Freitext → `LlmExtraction` → Vorschlagsliste mit Prüfen/Übernehmen je Regel - nie Direktübernahme), Bestandsplan-Übernahme mit Einfrieren/Lockern (9.3), Klarnamen-Druckexporte, Konfliktkern-Dialog (setzt Klassenbildungs-Plan K6 voraus), Bericht-Generator (Art.-15-Bericht je Kind aus der gefilterten Sicht) |
 | **V3** | Kursstufen-/Schienenmodell-Sichten (Kurse, Schienen, Wahlprofile), GMS-Assistent für Sektionen/Parallelverbünde, kombinierte Schule |
 
 Abhängigkeiten und Datenfluss (Projektdatei, Bridge, WebView2-Hygiene,
