@@ -154,6 +154,55 @@ Public NotInheritable Class HauptViewModel
         Return Klassenbildung.ValidateKlassenbildung(_projekt.Klassenbildung)
     End Function
 
+    ''' <summary>Die globale Pruefung der Startseite (Konzept 7). Fuehrt
+    ''' die BESTEHENDEN Validate-APIs aus - sie sind "die eine Wahrheit"
+    ''' (Konzept 1), eine zweite Pruefung in der Oberflaeche waere eine
+    ''' zweite Meinung.
+    '''
+    ''' Bewusst NUR die Referenz- und Strukturpruefung der Handregeln:
+    ''' Vollstaendigkeitsmeldungen (fehlende teacher_subject_assignment)
+    ''' entstehen erst durch die GENERIERTEN Regeln des Lehrereinsatzes
+    ''' und waeren vor dem Lauf kein Fehler, sondern der Normalzustand.</summary>
+    Public Function StammdatenPruefen() As List(Of String)
+        If Not ProjektOffen Then Return New List(Of String) From {"Kein Projekt geoeffnet."}
+
+        ' Vollstaendigkeit zuerst, und zwar HIER statt im Kern: die
+        ' Validate-APIs pruefen Konsistenz, nicht Vollstaendigkeit - ein
+        ' leeres Stammdatenmodell ist widerspruchsfrei und faellt dort
+        ' durch. Der Kern scheitert erst spaet und technisch ("Keine
+        ' teacher_subject_assignment-Constraints gefunden"); die
+        ' Oberflaeche soll frueh und in Klartext sagen, was fehlt
+        ' (Konzept 7: "Rechnen-Aktionen sind bei Fehlern deaktiviert und
+        ' nennen den Grund").
+        Dim fehlt As New List(Of String)
+        If _projekt.Bestand.Klassen.Count = 0 Then fehlt.Add("Es ist keine Klasse angelegt.")
+        If _projekt.Bestand.Faecher.Count = 0 Then fehlt.Add("Es ist kein Fach angelegt.")
+        If _projekt.Bestand.Lehrkraefte.Count = 0 Then fehlt.Add("Es ist keine Lehrkraft angelegt.")
+        If _projekt.Bestand.FachLehrerZuordnungen.Count = 0 Then fehlt.Add("Keine Lehrkraft ist fuer ein Fach qualifiziert.")
+        If fehlt.Count > 0 Then Return fehlt
+
+        Dim fehler = StammdatenValidation.ValidateStammdaten(_projekt.Bestand)
+        If fehler.Count > 0 Then Return fehler
+
+        If _projekt.Constraints.Count = 0 Then Return fehler
+        Dim data As New JsonObject From {
+            {"entities", Stammdaten.BuildEntitiesFragment(_projekt.Bestand)},
+            {"constraints", New JsonArray(_projekt.Constraints.
+                Select(Function(c) CType(c.DeepClone(), JsonNode)).ToArray())}
+        }
+        Return Validation.ValidateEntities(data).
+            Where(Function(e) e.Contains("keine bekannte Entity") OrElse e.Contains("nicht in ")).ToList()
+    End Function
+
+    ''' <summary>"Speichern ist immer moeglich, Rechnen nur bei gruener
+    ''' Pruefung" (Konzept 1). Ein Projekt DARF unfertig sein - nur
+    ''' rechnen darf man damit nicht.</summary>
+    Public ReadOnly Property PruefungGruen As Boolean
+        Get
+            Return ProjektOffen AndAlso StammdatenPruefen().Count = 0
+        End Get
+    End Property
+
     ' ---------------------------------------------------------------
     ' Projekt
     ' ---------------------------------------------------------------

@@ -1025,6 +1025,57 @@ Betriebsarten und das Protokoll an der echten Vorlage;
 weiterhin **nicht** abgedeckt ist: dass WebView2 die Nachricht auch
 tatsächlich zustellt — das hängt am laufenden Fenster (8.13).
 
+### 8.15 Namen sind Schlüssel — Umbenennen und Löschen
+
+Lehrkraft-, Fach-, Klassen- und Raumnamen referenzieren einander über den
+**Namen** (Wire-Format, 8.7). Für eine Oberfläche, in der man Objekte
+umbenennt und löscht, ist das die riskanteste Eigenschaft des Modells: ein
+vergessener Verweis fällt nicht sofort auf, sondern wird zu einer
+verwaisten Referenz, die erst der nächste Solve-Lauf als „unbekannte
+Entity" meldet — bis dahin sieht alles gut aus.
+
+`Bestandspflege` (`TimetableProjekt`) setzt deshalb die beiden Regeln aus
+gui-ui-konzept.md 7 um: **Umbenennen kaskadiert** über Qualifikationen,
+feste Zuordnungen, Gruppen, Schüler und Regeln — mit Vorschau; **Löschen**
+zeigt vorher alle betroffenen Objekte und räumt sie mit, statt Referenzen
+verwaisen zu lassen.
+
+**Die Regel-Seite fragt, statt nachzubauen.** Welches Constraint-Feld auf
+welche Entity-Art verweist, weiß `Validation` — dort steht die Zuordnung,
+gegen die auch geprüft wird. `Validation.ReferenzenVon` macht sie
+abfragbar. Der knifflige Fall ist `entity`: worauf es zeigt, hängt vom
+Geschwisterfeld ab (`resource` bei `no_overlap`, `scope` bei
+`forbidden_slot` bzw. `occupied_slot`/`-window`), und `occupied_*` erlaubt
+bewusst **kein** `room`. Diese Kenntnis in der Oberfläche zu duplizieren
+hieße, dass beide Seiten auseinanderlaufen können — genau der stille
+Fehler, den die Kaskade verhindern soll.
+
+Zwei Entscheidungen, die im Code begründet stehen:
+
+- **Ein Name, den es schon gibt, wird abgelehnt.** Zwei Lehrkräfte
+  gleichen Namens wären im Wire-Format nicht unterscheidbar; der Solver
+  legte ihre Stunden stillschweigend zusammen.
+- **Bei Listenfeldern** (`allowed_rooms`, `classes`) wird nur der Eintrag
+  entfernt — eine Sport-Regel mit zwei Turnhallen darf nicht
+  verschwinden, weil eine davon gelöscht wird. Erst die leere Liste macht
+  die Regel sinnlos.
+- **Kinder überleben ihre Klasse.** Beim Löschen einer Klasse wird die
+  Heimatklasse geleert, das Kind bleibt — es ist kein Anhängsel.
+
+Der Maßstab der Tests ist nicht „die Kaskade hat etwas geändert", sondern
+`ValidateEntities` findet danach **null** verwaiste Referenzen — gefahren
+gegen beide echten Beispielschulen, weil die GMS-Fixture mit ihren 2204
+Constraint-Zeilen alle Referenzarten enthält.
+
+**Prüfen und Rechnen-Sperre.** „Speichern ist immer möglich, Rechnen nur
+bei grüner Prüfung" (Konzept 1). Die Prüfung führt die bestehenden
+Validate-APIs aus — sie sind die eine Wahrheit. Ergänzt wird nur eine
+**Vollständigkeits**-Vorprüfung, und zwar in der Oberfläche, nicht im
+Kern: ein leeres Stammdatenmodell ist widerspruchsfrei und fällt durch
+jede Konsistenzprüfung durch; der Kern scheitert erst spät und technisch
+(„Keine `teacher_subject_assignment`-Constraints gefunden"), die
+Oberfläche soll früh und in Klartext sagen, was fehlt.
+
 ## 9. Architekturentscheidungen
 
 Ausgewählte, besonders folgenreiche Entscheidungen (ausführliche

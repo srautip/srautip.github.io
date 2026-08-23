@@ -9,7 +9,7 @@
 | C | Projektablage `.splanx` | **erledigt** |
 | D | GUI-Durchstich (Klassenbildung) | **erledigt** |
 | E | Bridge und U5-Re-Solve | **erledigt** (Klassenbildung; Stundentafel-Bridge in G) |
-| F | Eingabemasken | offen |
+| F | Eingabemasken | **teilweise** — Querschnitt (Umbenennen/Löschen/Prüfen) erledigt, Masken offen |
 | G | Stundenplan-Dashboard, Im-/Export, Startseite, Freigabe | offen |
 
 ## Context
