@@ -64,6 +64,98 @@ Public Module Validation
         {"class", "classes"}
     }
 
+    ''' <summary>Eine einzelne Entity-Referenz in einer Regel: welches
+    ''' Feld, welche Entity-Art, welcher Wert - und bei Listenfeldern
+    ''' (`classes`, `allowed_rooms`) die Position darin.</summary>
+    Public Structure EntityReferenz
+        Public Feld As String
+        ''' <summary>"classes" | "teachers" | "subjects" | "rooms" | "kurse"</summary>
+        Public EntityArt As String
+        Public Wert As String
+        ''' <summary>Position im Listenfeld, sonst -1.</summary>
+        Public Position As Integer
+    End Structure
+
+    ''' <summary>Alle Entity-Referenzen einer Regel - dieselbe Zuordnung,
+    ''' gegen die ValidateEntities prueft, nur abfragbar statt nur
+    ''' pruefend.
+    '''
+    ''' Zweck: Namen sind in diesem Wire-Format Schluessel (arc42 8.7).
+    ''' Wer eine Lehrkraft umbenennt, muss JEDE Erwaehnung mitziehen, und
+    ''' wer sie loescht, muss sie zeigen koennen. Diese Kenntnis hier
+    ''' abzufragen statt sie in der Oberflaeche nachzubauen ist kein
+    ''' Komfort, sondern verhindert, dass beide Seiten auseinanderlaufen -
+    ''' eine vergessene Feldzuordnung im Umbenennen ergaebe stumm
+    ''' verwaiste Verweise, die erst der naechste Solve-Lauf als
+    ''' "unbekannte Entity" meldet.
+    '''
+    ''' Der Fall `entity` ist der eigentliche Grund fuer diese Funktion:
+    ''' auf WAS es verweist, haengt vom Geschwisterfeld ab
+    ''' (`resource` bei no_overlap, `scope` bei forbidden_slot bzw.
+    ''' occupied_slot/-window) - und occupied_* erlaubt bewusst KEIN
+    ''' "room" (siehe OccupiedSlotScopeEntityKey).</summary>
+    Public Function ReferenzenVon(c As JsonObject) As List(Of EntityReferenz)
+        Dim treffer As New List(Of EntityReferenz)
+        If c Is Nothing Then Return treffer
+
+        For Each kvp In FieldEntityKey
+            If Not c.ContainsKey(kvp.Key) OrElse c(kvp.Key) Is Nothing Then Continue For
+            Dim werte = JsonHelpers.AsStringList(c(kvp.Key))
+            Dim istListe = TypeOf c(kvp.Key) Is JsonArray
+            For i = 0 To werte.Count - 1
+                treffer.Add(New EntityReferenz With {
+                    .Feld = kvp.Key, .EntityArt = kvp.Value, .Wert = werte(i),
+                    .Position = If(istListe, i, -1)})
+            Next
+        Next
+
+        Dim art = EntityFeldArt(c)
+        If art IsNot Nothing AndAlso c.ContainsKey("entity") AndAlso c("entity") IsNot Nothing Then
+            treffer.Add(New EntityReferenz With {
+                .Feld = "entity", .EntityArt = art,
+                .Wert = JsonHelpers.GetString(c, "entity"), .Position = -1})
+        End If
+
+        Return treffer
+    End Function
+
+    ''' <summary>Worauf `entity` in dieser Regel verweist - Nothing, wenn
+    ''' der Typ kein entity-Feld kennt oder scope/resource ungueltig ist
+    ''' (das meldet ValidateEntities, hier wird es nur uebergangen).</summary>
+    Private Function EntityFeldArt(c As JsonObject) As String
+        Dim typ = JsonHelpers.GetString(c, "type")
+        Select Case typ
+            Case "no_overlap"
+                Dim r = JsonHelpers.GetString(c, "resource")
+                Return If(r IsNot Nothing AndAlso ResourceEntityKey.ContainsKey(r), ResourceEntityKey(r), Nothing)
+            Case "forbidden_slot"
+                Dim s = JsonHelpers.GetString(c, "scope")
+                Return If(s IsNot Nothing AndAlso ResourceEntityKey.ContainsKey(s), ResourceEntityKey(s), Nothing)
+            Case "occupied_slot", "occupied_window"
+                Dim s = JsonHelpers.GetString(c, "scope")
+                Return If(s IsNot Nothing AndAlso OccupiedSlotScopeEntityKey.ContainsKey(s), OccupiedSlotScopeEntityKey(s), Nothing)
+            Case Else
+                Return Nothing
+        End Select
+    End Function
+
+    ''' <summary>Benennt eine Entity in einer Regel um. Liefert die Zahl
+    ''' der geaenderten Stellen - 0 heisst "diese Regel erwaehnt sie
+    ''' nicht".</summary>
+    Public Function BenenneUm(c As JsonObject, entityArt As String, alt As String, neu As String) As Integer
+        Dim geaendert = 0
+        For Each r In ReferenzenVon(c)
+            If r.EntityArt <> entityArt OrElse r.Wert <> alt Then Continue For
+            If r.Position >= 0 Then
+                c(r.Feld).AsArray()(r.Position) = JsonValue.Create(neu)
+            Else
+                c(r.Feld) = JsonValue.Create(neu)
+            End If
+            geaendert += 1
+        Next
+        Return geaendert
+    End Function
+
     ''' <summary>Appends the constraint's "reason" (if any) to an error/
     ''' warning message, so it can be traced back to the rule that produced
     ''' it. Returns the message unchanged when no reason is set.</summary>

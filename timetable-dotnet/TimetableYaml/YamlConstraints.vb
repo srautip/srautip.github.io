@@ -4,12 +4,20 @@
 ' fliessen die Eintraege UNVERAENDERT in die bestehende Validation.vb/
 ' Solver.vb-Pipeline (siehe Run.vb), kein Code dort aendert sich fuer
 ' diese neue Eingabequelle.
+Imports System.Text.Json
 Imports System.Text.Json.Nodes
 Imports YamlDotNet.Serialization
 
 Public Module YamlConstraints
 
     Private ReadOnly Deserializer As IDeserializer = New DeserializerBuilder().Build()
+
+    ''' <summary>Bewusst OHNE NamingConvention - anders als bei den
+    ''' POCO-Modulen sind die Schluessel hier keine .NET-Propertynamen,
+    ''' sondern stehen bereits in ihrer Zielschreibweise im JsonObject
+    ''' (`hours_per_week`, `available_days`). Eine Convention wuerde sie
+    ''' ein zweites Mal umschreiben.</summary>
+    Private ReadOnly Serializer As ISerializer = New SerializerBuilder().Build()
 
     ''' <summary>Liest eine YAML-Datei mit einer Liste von Constraint-
     ''' Objekten (oberste Ebene MUSS eine Sequenz sein - je ein Mapping pro
@@ -39,6 +47,68 @@ Public Module YamlConstraints
             Throw New InvalidOperationException($"{path}: oberste Ebene muss eine YAML-Liste von Constraint-Objekten sein (- type: ...).")
         End If
         Return rawList.Select(Function(item) CType(ToJsonNode(item), JsonObject)).ToList()
+    End Function
+
+    ''' <summary>Gegenstueck zu LoadConstraintsYaml: schreibt die Regeln als
+    ''' YAML-Sequenz zurueck. Die Phase-3-GUI pflegt Handregeln in Masken
+    ''' (gui-ui-konzept.md 6.10) und muss sie in den `tests/&lt;schule&gt;/`-
+    ''' Austauschordner exportieren koennen.
+    '''
+    ''' EINSCHRAENKUNG, geerbt von der Leseseite und dort dokumentiert: ein
+    ''' String, der wie eine Zahl aussieht (`reason: "42"`), kommt beim
+    ''' naechsten Laden als Zahl zurueck - ScalarStringToJsonValue kann
+    ''' quotiert und unquotiert nicht unterscheiden. Der Schreiber macht
+    ''' das nicht schlimmer, kann es aber auch nicht heilen; betroffen sind
+    ''' real nur Freitextfelder, die niemand rein numerisch befuellt.</summary>
+    Public Function SerializeConstraintsYaml(constraints As IEnumerable(Of JsonObject)) As String
+        Dim liste = constraints.Select(Function(c) FromJsonNode(c)).ToList()
+        Return Serializer.Serialize(liste)
+    End Function
+
+    Public Sub SaveConstraintsYaml(constraints As IEnumerable(Of JsonObject), path As String)
+        IO.File.WriteAllText(path, SerializeConstraintsYaml(constraints))
+    End Sub
+
+    ''' <summary>Umkehrung von ToJsonNode: JsonNode-Graph zurueck in den
+    ''' generischen Objektgraphen, den YamlDotNet serialisieren kann.
+    ''' Zahlen werden wie auf der Leseseite Int32 zuerst probiert, damit
+    ''' ein gelesenes `period: 6` auch als `6` und nicht als `6.0`
+    ''' zurueckgeschrieben wird.</summary>
+    Private Function FromJsonNode(node As JsonNode) As Object
+        If node Is Nothing Then Return Nothing
+
+        Dim obj = TryCast(node, JsonObject)
+        If obj IsNot Nothing Then
+            Dim d As New Dictionary(Of String, Object)
+            For Each kvp In obj
+                d(kvp.Key) = FromJsonNode(kvp.Value)
+            Next
+            Return d
+        End If
+
+        Dim arr = TryCast(node, JsonArray)
+        If arr IsNot Nothing Then
+            Dim l As New List(Of Object)
+            For Each item In arr
+                l.Add(FromJsonNode(item))
+            Next
+            Return l
+        End If
+
+        Select Case node.GetValueKind()
+            Case JsonValueKind.True
+                Return True
+            Case JsonValueKind.False
+                Return False
+            Case JsonValueKind.Number
+                Dim asInt As Integer
+                If node.AsValue().TryGetValue(Of Integer)(asInt) Then Return asInt
+                Dim asLong As Long
+                If node.AsValue().TryGetValue(Of Long)(asLong) Then Return asLong
+                Return node.GetValue(Of Double)()
+            Case Else
+                Return node.GetValue(Of String)()
+        End Select
     End Function
 
     ''' <summary>Rekursive Umwandlung des generischen YamlDotNet-Objekt-

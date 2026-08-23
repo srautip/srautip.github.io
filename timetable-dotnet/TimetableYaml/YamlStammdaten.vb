@@ -1,5 +1,5 @@
 ' Phase 2.18c: YAML-Persistenz fuer Stammdatenbestand - bewusst NUR hier
-' im SchoolTestRunner-Projekt, nicht in TimetableCore selbst (haelt dessen
+' im TimetableYaml-Projekt, nicht in TimetableCore selbst (haelt dessen
 ' Abhaengigkeitsoberflaeche minimal, siehe arc42 Abschnitt 8 "kein
 ' GUI-Dependency"-Philosophie, hier sinngemaess auf "kein YAML-Dependency
 ' im Kern" uebertragen). Deserialisiert DIREKT auf die bestehenden

@@ -40,6 +40,11 @@ Public Module KlassenbildungQuality
         Dim verletzungen As New List(Of KlassenbildungVerletzung)
         Dim chips As New List(Of KlassenbildungChip)
         Dim anzahl = input.Klassen.Anzahl
+        ' Klassen werden dem Nutzer IMMER als Label gezeigt (1a, 1b, ...),
+        ' nie als Laufnummer - die Nummer ist ein internes Detail des
+        ' Solvers. Ohne `stufe` faellt KlassenLabels auf "Klasse n"
+        ' zurueck, dann steht dort weiterhin etwas Lesbares.
+        Dim labels = Klassenbildung.KlassenLabels(input)
 
         ' --- Gruppen ---
         For Each g In input.Gruppen
@@ -58,7 +63,7 @@ Public Module KlassenbildungQuality
                         .Status = If(mass > 0, "rot", "gruen"),
                         .Text = If(mass > 0,
                                    $"Buendelung {g.Id}: auf {spread} Klassen verteilt",
-                                   $"Buendelung {g.Id}: alle in Klasse {zuordnung(g.Mitglieder(0))}")})
+                                   $"Buendelung {g.Id}: alle in {labels(zuordnung(g.Mitglieder(0)) - 1)}")})
                 Next
             Else ' verteilung
                 Dim kappe = g.MaxProKlasse.Value
