@@ -222,6 +222,34 @@ Public Module YamlConfig
         Return ConfigDeserializer.Deserialize(Of RunConfig)(yaml)
     End Function
 
+    ''' <summary>OmitNull ist hier nicht Kosmetik, sondern
+    ''' bedeutungserhaltend: fast alle Solve-Parameter sind Nullable, und
+    ''' `Nothing` heisst "nicht gesetzt, nimm den Default aus Run.vb". Wuerde
+    ''' der Serializer sie als `null` ausschreiben, laese sie der naechste
+    ''' LoadConfig zwar wieder als Nothing ein - die Datei behauptete aber
+    ''' faelschlich, jemand haette dort etwas entschieden. Ein exportiertes
+    ''' config.yaml enthaelt deshalb genau die Felder, die wirklich gesetzt
+    ''' sind (plus die nicht-nullable mit ihren Werten).</summary>
+    Private ReadOnly ConfigSerializer As ISerializer = New SerializerBuilder().
+        WithNamingConvention(UnderscoredNamingConvention.Instance).
+        ConfigureDefaultValuesHandling(DefaultValuesHandling.OmitNull).
+        Build()
+
+    ''' <summary>Gegenstueck zu LoadConfig - der Solver-Einstellungsdialog
+    ''' der Phase-3-GUI (gui-ui-konzept.md 6.12) schreibt seine Werte
+    ''' hierueber in den `tests/&lt;schule&gt;/`-Austauschordner zurueck.
+    ''' ACHTUNG: die ausfuehrlichen Messprotokoll-Kommentare der beiden
+    ''' Beispielschulen ueberleben einen Schreibvorgang NICHT - YamlDotNet
+    ''' serialisiert Werte, keine Kommentare. Fuer die committeten
+    ''' Beispiel-Configs bleibt Handpflege der Weg.</summary>
+    Public Function SerializeConfig(cfg As RunConfig) As String
+        Return ConfigSerializer.Serialize(cfg)
+    End Function
+
+    Public Sub SaveConfig(cfg As RunConfig, path As String)
+        IO.File.WriteAllText(path, SerializeConfig(cfg))
+    End Sub
+
     ''' <summary>Phase 2.24: startet bei ScheduleQuality.QualityWeights'
     ''' eigenen Defaults (`New QualityWeights()` - identisch zu den
     ''' hartcodierten Weight*-Konstanten) und ueberschreibt nur die in

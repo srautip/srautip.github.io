@@ -19,7 +19,17 @@ pauschal die volle Suite zu fahren:
   Modul ohne jede Kopplung an Solver/SolveTop, die teuren
   Stundenplan-Tests exerzieren sie nicht und umgekehrt). Bei
   querschneidenden Aenderungen (z.B. gemeinsame Helfer) beide Suiten
-  fahren; "volle Suite" heisst seither BEIDE Testprojekte.
+  fahren.
+- **Aenderungen an `TimetableYaml/` oder `TimetableWorkflow/`** (seit dem
+  GUI-Unterbau, siehe `docs/gui-implementierungsplan.md`): die eigenen
+  Suiten `dotnet test TimetableYaml.Tests` (<1s) und
+  `dotnet test TimetableWorkflow.Tests` (~3s). Beruehrt die Aenderung die
+  Pipeline-Orchestrierung oder die Berichts-Zeichenketten, zusaetzlich
+  `dotnet run --project SchoolTestRunner -- run --all` - nur der echte
+  Lauf belegt, dass die committeten Beispiel-Outputs unveraendert bleiben.
+
+"Volle Suite" heisst seit dem GUI-Unterbau ALLE VIER Testprojekte, am
+einfachsten ueber `dotnet test TimetableCore.sln`.
 - **Aenderungen nur an `SchoolTestRunner/`-CLI oder
   `SchoolTestRunner/Templates/stundentafel.html`** (Viewer): die Suite
   deckt beides NICHT ab - stattdessen gezielt pruefen:

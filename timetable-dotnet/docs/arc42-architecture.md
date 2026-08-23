@@ -173,8 +173,11 @@ timetable-dotnet/
 ├── TimetableYaml/            Klassenbibliothek: YAML-Persistenz (YamlDotNet)
 │                             für Stammdaten, Constraints, Klassenbildung
 │                             und config.yaml (RunConfig + LoadConfig)
-├── TimetableWorkflow/        Klassenbibliothek: Viewer-Erzeugung
-│                             (Build*Html + Templates/*.html als Embedded
+├── TimetableWorkflow/        Klassenbibliothek: die Stundenplan-Pipeline
+│                             als I/O-freier Dienst (StundenplanLauf),
+│                             Berichts- und Viewer-Aufbereitung
+│                             (StundenplanBericht, KlassenbildungBericht,
+│                             Build*Html + Templates/*.html als Embedded
 │                             Resources, siehe 8.10), Curriculum-Vorlagen
 │                             und Scaffold für `new`
 ├── RobustnessRunner/         Konsolenprogramm: LLM-Wiederholungsstudien
@@ -205,9 +208,33 @@ diesseits dieser Grenze. Die Abhängigkeitsrichtung ist
 `SchoolTestRunner`/`TimetableGui` → `TimetableWorkflow` → `TimetableYaml`
 → `TimetableCore`, zyklenfrei.
 
+**Die Pipeline gibt es genau einmal.** `StundenplanLauf.Ausfuehren`
+(`TimetableWorkflow`) führt die Abfolge `StammdatenValidation` →
+`Lehrereinsatzplanung` → `VerifyLehrereinsatz` →
+`BuildEntitiesFragment`/`BuildAssignmentConstraints` → `ValidateEntities`
+→ `SolveTop` je Zuteilung → `VerifySchedule` aus - ohne Dateizugriff und
+ohne Konsolenausgabe, mit durchgereichtem Abbruch- und
+Fortschrittskanal (8.11). `SchoolTestRunner/Run.vb` ist seither nur noch
+die Datei- und Konsolenschicht darum herum und damit der erste Konsument
+dieses Dienstes; die GUI wird der zweite. Der Grund für diesen Zuschnitt
+ist nicht Ästhetik: die vier Stellen mit echten Entscheidungen
+(Auflösung der Nullable-Config-Felder auf `SolveTop`s eigene Defaults,
+Aufteilung von Zeitbudget und `max_solutions` auf mehrere Zuteilungen,
+Auswahl des besten Laufs über `Quality.Total`, `DeepClone` je Zuteilung)
+dürfen nicht in zwei Oberflächen doppelt existieren.
+
 `YamlDotNet` liegt bewusst **nur** in `TimetableYaml`, nicht in
 `TimetableCore` - damit dessen Abhängigkeitsoberfläche minimal bleibt
-(siehe 8.7). Dasselbe gilt für die Embedded-Resource-Vorlagen: ihr
+(siehe 8.7). Dort liegt seit Stufe B auch der Rückschreibweg: bis dahin
+existierten Schreib-APIs nur für Stammdaten, `constraints.yaml`,
+`klassenbildung.yaml` und `config.yaml` konnten ausschließlich gelesen
+werden. Eine Einschränkung bleibt und ist von der Leseseite geerbt: ein
+String, der wie eine Zahl aussieht, kommt beim nächsten Laden als Zahl
+zurück (`ScalarStringToJsonValue` kann quotiert und unquotiert nicht
+unterscheiden). Ebenfalls dokumentiert: die ausführlichen
+Messprotokoll-Kommentare der Beispiel-`config.yaml` überleben einen
+programmatischen Schreibvorgang nicht - YamlDotNet serialisiert Werte,
+keine Kommentare. Dasselbe gilt für die Embedded-Resource-Vorlagen: ihr
 logischer Ressourcenname trägt den Assemblynamen als Präfix
 (`TimetableWorkflow.stundentafel.html`) und wird über
 `GetExecutingAssembly()` aufgelöst - beim Verschieben zwischen Projekten
@@ -535,7 +562,7 @@ Varianten liegen aber stets im ε-Band).
 
 | Umgebung | Inhalt | Status |
 |---|---|---|
-| Linux-Sandbox (aktuelle Entwicklungsumgebung) | `TimetableCore`, `TimetableYaml`, `TimetableWorkflow`, `TimetableCore.Tests`, `Klassenbildung.Tests`, `RobustnessRunner`, `SchoolTestRunner`, lokaler Ollama-Server | Aktiv, vollständig lauffähig (`dotnet test`, `dotnet run --project RobustnessRunner`, `dotnet run --project SchoolTestRunner`) - `SchoolTestRunner` braucht KEINEN Ollama-Server (rein YAML-basiert, keine LLM-Extraktion) |
+| Linux-Sandbox (aktuelle Entwicklungsumgebung) | `TimetableCore`, `TimetableYaml`, `TimetableWorkflow`, die vier Testprojekte (`TimetableCore.Tests`, `Klassenbildung.Tests`, `TimetableYaml.Tests`, `TimetableWorkflow.Tests`), `RobustnessRunner`, `SchoolTestRunner`, lokaler Ollama-Server | Aktiv, vollständig lauffähig (`dotnet test`, `dotnet run --project RobustnessRunner`, `dotnet run --project SchoolTestRunner`) - `SchoolTestRunner` braucht KEINEN Ollama-Server (rein YAML-basiert, keine LLM-Extraktion) |
 | Windows-Zielumgebung (nachgelagert) | `TimetableGui` (WPF + WebView2) + `TimetableCore` (per `ProjectReference`) + lokaler Ollama-Server; Nutzdaten als verschlüsselte Ein-Datei-Projektablage (`.splanx`-Arbeitstitel, `docs/gui-datenhaltung-konzept.md`); WebView2 nutzt die auf aktuellen Windows-10/11-Systemen vorhandene Evergreen-Runtime (sonst Bootstrapper) | Noch nicht begonnen (Phase 3); Datenhaltungskonzept liegt vor |
 
 `Google.OrTools` läuft nativ unter beiden Plattformen (`Google.OrTools.runtime.linux-x64`
@@ -702,8 +729,17 @@ Kosten-Entscheidung: die Stundenplan-Suite exerziert die Klassenbildung
 nicht (und umgekehrt), läuft aber Minuten statt Sekunden. Die feste
 Regel dazu (welcher Änderungsbereich welchen Prüfumfang verlangt, inkl.
 des Sonderfalls "reine Viewer-Änderung → Build + `render` +
-Chromium-Smoke statt Suite") steht in `timetable-dotnet/CLAUDE.md`;
-"volle Suite" bedeutet seither BEIDE Testprojekte.
+Chromium-Smoke statt Suite") steht in `timetable-dotnet/CLAUDE.md`.
+
+Mit dem GUI-Unterbau sind zwei weitere Suiten dazugekommen, beide nach
+demselben Kosten-Prinzip schnell gehalten: `TimetableYaml.Tests`
+(Round-Trips gegen die echten Beispieldateien, <1s) und
+`TimetableWorkflow.Tests` (die Pipeline als Dienst, ~3s gegen eine per
+`Scaffold` erzeugte einzügige Testschule - die echte
+Grundschul-Fixture braucht 180s Solve-Budget und gehört deshalb in die
+`run`-Beispielläufe, nicht in eine Unit-Suite). "Volle Suite" heißt
+seither ALLE VIER Testprojekte, am einfachsten über
+`dotnet test TimetableCore.sln`.
 
 ### 8.10 Self-contained-HTML-Viewer und ihre Verifikation
 

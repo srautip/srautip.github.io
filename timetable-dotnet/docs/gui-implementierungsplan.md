@@ -1,5 +1,17 @@
 # TimetableGui: Implementierungsplan für die Phase-3-GUI (WPF + WebView2)
 
+## Stand
+
+| Stufe | Inhalt | Stand |
+|---|---|---|
+| A | Unterbau-Umbau (`TimetableYaml`, `TimetableWorkflow`) | **erledigt** |
+| B | YAML-Schreiber, Klassenbildungs-JSON öffentlich, Pipeline als Dienst | **erledigt** |
+| C | Projektablage `.splanx` | offen |
+| D | GUI-Durchstich (Klassenbildung) | offen |
+| E | Bridge und U5-Re-Solve | offen |
+| F | Eingabemasken | offen |
+| G | Stundenplan-Dashboard, Im-/Export, Startseite, Freigabe | offen |
+
 ## Context
 
 `docs/gui-ui-konzept.md` (553 Zeilen) und `docs/gui-datenhaltung-konzept.md` (481 Zeilen)

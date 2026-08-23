@@ -17,6 +17,10 @@ Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "TimetableYaml", "TimetableY
 EndProject
 Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "TimetableWorkflow", "TimetableWorkflow\TimetableWorkflow.vbproj", "{2C8562AD-0278-435B-AEA1-9434F26962D1}"
 EndProject
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "TimetableYaml.Tests", "TimetableYaml.Tests\TimetableYaml.Tests.vbproj", "{AB1F3D81-E191-46E3-B515-1568B61B0393}"
+EndProject
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "TimetableWorkflow.Tests", "TimetableWorkflow.Tests\TimetableWorkflow.Tests.vbproj", "{58D57B25-86FF-440F-8043-DB7D3F2AEA34}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -54,5 +58,13 @@ Global
 		{2C8562AD-0278-435B-AEA1-9434F26962D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2C8562AD-0278-435B-AEA1-9434F26962D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2C8562AD-0278-435B-AEA1-9434F26962D1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AB1F3D81-E191-46E3-B515-1568B61B0393}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AB1F3D81-E191-46E3-B515-1568B61B0393}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AB1F3D81-E191-46E3-B515-1568B61B0393}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AB1F3D81-E191-46E3-B515-1568B61B0393}.Release|Any CPU.Build.0 = Release|Any CPU
+		{58D57B25-86FF-440F-8043-DB7D3F2AEA34}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{58D57B25-86FF-440F-8043-DB7D3F2AEA34}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{58D57B25-86FF-440F-8043-DB7D3F2AEA34}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{58D57B25-86FF-440F-8043-DB7D3F2AEA34}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
