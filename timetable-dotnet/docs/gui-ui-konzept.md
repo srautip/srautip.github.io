@@ -101,7 +101,7 @@ Vorab geklärte Nutzerentscheidungen (Dialograunde zu diesem Konzept):
 |---|---|
 | **Datei** | Neues Projekt… (Assistent, 6.1) · Bestehende Schule übernehmen… (Migrations-Einstieg, 9) · Öffnen… · Zuletzt verwendet ▸ · Speichern (Strg+S) · Sicherungskopie erstellen · Importieren ▸ (YAML-Ordner nach `tests/<schule>/`-Layout · CSV/Zwischenablage mit Spalten-Zuordnung, 9.1) · Exportieren ▸ (YAML-Ordner / Viewer-HTML / Berichte md/pdf / **Klassenlisten mit Klarnamen…** [Warndialog + Audit-Eintrag]) · Projekt schließen · Beenden |
 | **Bearbeiten** | Rückgängig/Wiederholen (formularbezogen) · Suchen… (Strg+F: global über Kinder [Klarname+ID], Lehrkräfte, Fächer, Regeln) · Projekt-Passwort ändern… |
-| **Planung** | Klassenbildung rechnen · Lehrereinsatz + Stundenplan rechnen · Lauf abbrechen · Lauf-Monitor anzeigen · Stand als Freigabe markieren… (aktive Bestätigung mit Substanz, Konzept klassenbildung §10) · Solver-Einstellungen… (6.12) |
+| **Planung** | Klassenbildung rechnen · Lehrereinsatz + Stundenplan rechnen · Lauf abbrechen · Lauf-Monitor anzeigen · Stand als Freigabe markieren… (aktive Bestätigung mit Substanz, Konzept klassenbildung §10) · Lehrkraft fällt länger aus… (geführte Aktion, 10.1, ab V2) · Vertretung planen… (10.2, V3) · Solver-Einstellungen… (6.12) |
 | **Extras** | Regeln aus Freitext… (Chat, **Ausbaustufe 2**; Menüpunkt prüft `LlmExtraction.IsOllamaAvailable` und erklärt bei Fehlen die lokale Ollama-Einrichtung) · Browserdaten bereinigen (WebView2-Profil, Datenhaltung 7.6) · Einstellungen… |
 | **Hilfe** | Handbuch · Feldreferenz (tests/README-Inhalte) · Über |
 
