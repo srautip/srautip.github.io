@@ -4,7 +4,7 @@
 ' StundentafelHtml (Embedded Resource, JSON-Platzhalter, </script-Escape).
 Public Module KlassenbildungHtml
 
-    Private Const ResourceName As String = "SchoolTestRunner.klassenbildung.html"
+    Private Const ResourceName As String = "TimetableWorkflow.klassenbildung.html"
     Private Const JsonPlaceholder As String = "__KLASSENBILDUNG_JSON__"
 
     Public Function BuildKlassenbildungHtml(jsonText As String) As String

@@ -1,6 +1,6 @@
 ' Klassenbildung (K1, siehe docs/klassenbildung-plan.md): YAML-Persistenz
 ' fuer KlassenbildungInput - wie YamlStammdaten bewusst NUR hier im
-' SchoolTestRunner-Projekt ("kein YAML-Dependency im Kern").
+' TimetableYaml-Projekt ("kein YAML-Dependency im Kern").
 ' UnderscoredNamingConvention matched z.B. "max_pro_klasse" auf
 ' MaxProKlasse und "nicht_klasse" auf NichtKlasse.
 Imports YamlDotNet.Serialization

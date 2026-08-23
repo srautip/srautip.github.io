@@ -25,7 +25,7 @@ Public Module KlassenRun
         IO.Directory.CreateDirectory(outputDir)
 
         Dim input = YamlKlassenbildung.LoadKlassenbildungYaml(inputPath)
-        Dim cfg = Run.LoadConfig(IO.Path.Combine(inputDir, "config.yaml"))
+        Dim cfg = LoadConfig(IO.Path.Combine(inputDir, "config.yaml"))
         Dim kb = If(cfg.Klassenbildung, New KlassenbildungConfig())
 
         Dim errors = Klassenbildung.ValidateKlassenbildung(input)

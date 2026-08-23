@@ -170,11 +170,17 @@ timetable-dotnet/
 ├── TimetableCore.Tests/      MSTest-Suite + Fixtures (Testszenarien)
 ├── Klassenbildung.Tests/     eigene, schnelle MSTest-Suite NUR für die
 │                             Klassenbildung (<1s statt ~6min - siehe 8.9)
+├── TimetableYaml/            Klassenbibliothek: YAML-Persistenz (YamlDotNet)
+│                             für Stammdaten, Constraints, Klassenbildung
+│                             und config.yaml (RunConfig + LoadConfig)
+├── TimetableWorkflow/        Klassenbibliothek: Viewer-Erzeugung
+│                             (Build*Html + Templates/*.html als Embedded
+│                             Resources, siehe 8.10), Curriculum-Vorlagen
+│                             und Scaffold für `new`
 ├── RobustnessRunner/         Konsolenprogramm: LLM-Wiederholungsstudien
-├── SchoolTestRunner/         Konsolenprogramm: code-freie YAML-Testfälle
-│                             + Self-contained-HTML-Viewer als Embedded
-│                             Resources (Templates/stundentafel.html,
-│                             Templates/klassenbildung.html - siehe 8.10;
+├── SchoolTestRunner/         Konsolenprogramm: code-freie YAML-Testfälle -
+│                             seit dem GUI-Unterbau nur noch CLI-Hülle
+│                             (Argument-Parsing + Datei-/Konsolenschicht;
 │                             6.7 und docs/schooltestrunner-benutzerhandbuch.md)
 └── (nachgelagert) TimetableGui/   WPF-GUI mit WebView2-gehosteten Viewern,
                               referenziert TimetableCore direkt; Datenhaltung
@@ -182,17 +188,31 @@ timetable-dotnet/
                               (Konzept: docs/gui-datenhaltung-konzept.md)
 ```
 
-`TimetableCore` hat keine Abhängigkeit auf `TimetableCore.Tests`,
-`Klassenbildung.Tests`, `RobustnessRunner` oder `SchoolTestRunner`.
+`TimetableCore` hat keine Abhängigkeit auf eines der übrigen Projekte.
 `Klassenbildung.Tests` referenziert nur `TimetableCore` (RootNamespace
 bewusst `KlassenbildungTests`, damit der Namespace das Modul
 `Klassenbildung` nicht verschattet). `RobustnessRunner` bindet
 einzelne Testfixtures per `<Compile Include>` ein, um MSTest als
-Abhängigkeit zu vermeiden. `SchoolTestRunner` (Phase 2.18) referenziert
-`TimetableCore` per normaler `ProjectReference` (kein Testprojekt) und
-bringt eine eigene, zusätzliche NuGet-Abhängigkeit mit (`YamlDotNet`) -
-bewusst NUR in diesem Projekt, nicht in `TimetableCore` selbst, damit
-dessen Abhängigkeitsoberfläche minimal bleibt (siehe 8.7).
+Abhängigkeit zu vermeiden.
+
+`TimetableYaml` und `TimetableWorkflow` sind **Bibliotheken**, und zwar
+aus einem einzigen Grund: `SchoolTestRunner` ist ein `Exe`-Projekt mit
+eigener `Main`, das eine GUI nicht sauber referenzieren kann. Alles, was
+die Phase-3-GUI mit der CLI teilen muss - YAML lesen und schreiben,
+Viewer-HTML bauen, Projekte aus einer Vorlage anlegen - liegt deshalb
+seit dem GUI-Unterbau (Stufe A, `docs/gui-implementierungsplan.md`)
+diesseits dieser Grenze. Die Abhängigkeitsrichtung ist
+`SchoolTestRunner`/`TimetableGui` → `TimetableWorkflow` → `TimetableYaml`
+→ `TimetableCore`, zyklenfrei.
+
+`YamlDotNet` liegt bewusst **nur** in `TimetableYaml`, nicht in
+`TimetableCore` - damit dessen Abhängigkeitsoberfläche minimal bleibt
+(siehe 8.7). Dasselbe gilt für die Embedded-Resource-Vorlagen: ihr
+logischer Ressourcenname trägt den Assemblynamen als Präfix
+(`TimetableWorkflow.stundentafel.html`) und wird über
+`GetExecutingAssembly()` aufgelöst - beim Verschieben zwischen Projekten
+müssen `EmbeddedResource`-Item und `ResourceName`-Konstante deshalb immer
+gemeinsam wandern, sonst schlägt der Zugriff erst zur Laufzeit fehl.
 
 ### 5.2 Ebene 2 - Whitebox `TimetableCore`
 
@@ -204,7 +224,7 @@ dessen Abhängigkeitsoberfläche minimal bleibt (siehe 8.7).
 | **Verifier.vb** | Unabhängiger Solution-Checker - teilt bewusst KEINEN Code mit Solver.vb (siehe 8.2). `VerifySchedule`/`VerifyScheduleDetailed` (Muss/Kann getrennt), `VerifyKursblockung` (Stufe-A-Ergebnis unabhängig re-prüfen), `VerifyLehrereinsatz`. Phase 2.20 ergänzt einen unabhängig re-derivierten `parallel_group`-Check plus eine Gruppen-bewusste `VerifyLehrereinsatz`-Erweiterung (alle real umspannten Klassen einer Gruppe müssen vom selben Lehrer unterrichtet werden). | Models.vb |
 | **Formatting.vb** | Rohes `ScheduleEntry`-Ergebnis → Klassen-/Lehrer-/Wahlprofil-Raster (`GridCell`), ASCII-Tabellen, JSON-Export. Reine Präsentationsschicht, keine GUI-Abhängigkeit. Seit Phase 2.20 kollisionsbewusst: mehrere gleichzeitige Sessions derselben Klasse (Parallelgruppe) werden in `ToClassGrids` zu einer kombinierten Zelle zusammengeführt statt einander zu überschreiben. Phase 2.21 ergänzt `ToStundentafelJson` (Klassenstufen-/Parallelklassen-gruppierter Multi-Lösungs-Export für den SchoolTestRunner) - erste Stelle, an der `Formatting.vb` `Verifier.vb` aufruft (pro Lösung ein unabhängiger Muss-Verstoß-Recheck). Phase 2.22: `ToStundentafelJson` exportiert pro Lösung zusätzlich `objective_value`/`best_objective_bound`/`gap_percent` (Optimalitäts-Lücke) und `convergence` (Zeit-vs-Objective-Verlauf). Viewer-Ausbau: der Export trägt den vollen Qualitätsvektor + `quality_weights` je Lösung (Grundlage für Sortierung, Gewichte-Regler und Pareto-Filter im Viewer, siehe 8.10); `ToStundentafelJsonMulti` (Mehr-Zuteilungs-Modus, siehe 6.8) fasst mehrere `AssignmentRun`s (je: Stammdaten-abgeleitetes Szenario + `MultiSolveResult` + Zuteilungs-Index) zu EINEM Export mit global nach Qualität sortierten Lösungen zusammen und exportiert `teacher_equivalence_classes` (nur Klassen mit ≥2 Mitgliedern) für die Tausch-Anzeige. | Models.vb, Verifier.vb |
 | **LlmExtraction.vb** | Freitext → strukturierte Constraints via Ollama/Qwen. Ein Call pro Constraint-Typ mit eigenem JSON-Schema; `period_exception` wird deterministisch zu `forbidden_slot`-Einträgen expandiert (`ExpandPeriodException`); `DropContradictoryConsecutiveRequired` als deterministisches Sicherheitsnetz gegen unmögliche Block-Kombinationen. | Models.vb |
-| **ScheduleQuality.vb** | Post-hoc-Bewertungsschema für Kandidaten-Stundenpläne, 9 Kriterien (Kann-Verstöße, Klassen-/Lehrer-Lücken, Randstunden, Nachmittags-Tage, Klassen-/Lehrer-Tagesausgewogenheit, Dichte-Defizit `OccupiedDensity` für should-`occupied_window`, Fenster-Verstöße `SubjectWindow` für should-`subject_period_window`) - unabhängig von der CP-SAT-Modellierung, dient als "Wahrheit" für `SolveTop`s Endsortierung. `QualityWeights` (Phase 2.24 über `SchoolTestRunner/Run.vb`s `config.yaml` konfigurierbar, siehe `tests/README.md`) gewichtet jedes Kriterium; seit Phase 2.25-Nachtrag-2 sind `ClassGaps`/`TeacherGaps`-Gewicht mit `Kann` vereinheitlicht (früher war `ClassGaps` bewusst 10x höher gewichtet - Live-Experimente zeigten, dass nicht das Gewicht, sondern `TeacherGaps`' CP-SAT-Kodierung die eigentliche Ursache schlecht beweisbarer Lösungsschranken war, siehe `docs/phase2-25-stagnation-heuristik.md` Nachtrag 2). Neues `IncludeTeacherGaps`-Flag (Default `true`) - ein Sicherheitsventil, das den Aufbau der `TeacherGaps`-Hilfskonstrukte im CP-SAT-Modell komplett unterdrücken kann. | Models.vb |
+| **ScheduleQuality.vb** | Post-hoc-Bewertungsschema für Kandidaten-Stundenpläne, 9 Kriterien (Kann-Verstöße, Klassen-/Lehrer-Lücken, Randstunden, Nachmittags-Tage, Klassen-/Lehrer-Tagesausgewogenheit, Dichte-Defizit `OccupiedDensity` für should-`occupied_window`, Fenster-Verstöße `SubjectWindow` für should-`subject_period_window`) - unabhängig von der CP-SAT-Modellierung, dient als "Wahrheit" für `SolveTop`s Endsortierung. `QualityWeights` (Phase 2.24 über `config.yaml` konfigurierbar - Modell und Lader in `TimetableYaml/YamlConfig.vb`, siehe `tests/README.md`) gewichtet jedes Kriterium; seit Phase 2.25-Nachtrag-2 sind `ClassGaps`/`TeacherGaps`-Gewicht mit `Kann` vereinheitlicht (früher war `ClassGaps` bewusst 10x höher gewichtet - Live-Experimente zeigten, dass nicht das Gewicht, sondern `TeacherGaps`' CP-SAT-Kodierung die eigentliche Ursache schlecht beweisbarer Lösungsschranken war, siehe `docs/phase2-25-stagnation-heuristik.md` Nachtrag 2). Neues `IncludeTeacherGaps`-Flag (Default `true`) - ein Sicherheitsventil, das den Aufbau der `TeacherGaps`-Hilfskonstrukte im CP-SAT-Modell komplett unterdrücken kann. | Models.vb |
 | **SolveControl.vb** | Querschnittlicher Abbruch- und Fortschrittskanal (siehe 8.11): die öffentlichen Typen `SolvePhase`/`SolveProgress` und der gemeinsame Ausführungspfad `SolveRunner.RunSolve`, über den seither JEDER Solve-Aufruf des Kerns läuft - Fast-Path ohne Token/Progress unverändert direkt und blockierend, sonst `Task` + 500ms-Polling mit `solver.StopSearch()`. `StageProgressAdapter` etikettiert die Meldungen verketteter Aufrufe (`SolveKursstufe`, `SolveCombinedSchool`) auf die Sicht des Gesamtlaufs um. Keine UI-Abhängigkeit: `CancellationToken` und `IProgress(Of T)` sind BCL-Typen. | Solver.vb (für `ConvergenceCallback`) |
 | **SolveTopObjective.vb** | Baut dieselben Bewertungskriterien zusätzlich direkt ins CP-SAT-Modell (`Friend`, nur von `Solver.SolveTop` genutzt), damit die Suche selbst dorthin gelenkt wird, statt nur die gefundenen Kandidaten hinterher zu sortieren: Randstunden/Nachmittags-Tage/Tagesausgewogenheit über eine CP-SAT-freundliche Näherung (Spannweite statt echter Varianz, teils weiterhin über den Sentinel-Min/Max-Trick, siehe 9). `ClassGaps`/`TeacherGaps` nutzen seit Phase 2.25-Nachtrag-2 `BuildGapFlags` - eine Big-M-freie Kodierung (Präfix/Suffix-OR-Ketten `anyBefore`/`anyAfter` + lineare Reifikation jeder einzelnen Lücken-PERIODE als eigene `BoolVar`), die die vorherige `AddMinEquality`/`AddMaxEquality`-Sentinel-Konstruktion ersetzt, siehe 9. `BuildGapFlags` wird für Lehrkräfte nur aufgerufen, wenn `QualityWeights.IncludeTeacherGaps = True` ist (strukturelles Abschalten, nicht nur Gewicht 0). `BuildQualityTerms` liefert die Stufen-Terme (`KannSum`/`OccupiedDensitySum`/`SubjectWindowSum`/`ClassGapsSum`/`TeacherGapsSum`) einzeln an `SolveTop`s lexikografischen Modus; `OccupiedDensitySum`/`SubjectWindowSum` sind reine Linearsummen über ohnehin existierende Variablen (keine zusätzlichen Verletzungs-BoolVars - der Kern von P1). | Models.vb |
 | **Kursblockung.vb** | Kursstufe Stufe A: Kurs→Schiene-Zuordnung (CP-SAT-Teilmodell, eigenständig, kein Tag/Periode-Bezug). | Models.vb |
@@ -515,7 +535,7 @@ Varianten liegen aber stets im ε-Band).
 
 | Umgebung | Inhalt | Status |
 |---|---|---|
-| Linux-Sandbox (aktuelle Entwicklungsumgebung) | `TimetableCore`, `TimetableCore.Tests`, `RobustnessRunner`, `SchoolTestRunner`, lokaler Ollama-Server | Aktiv, vollständig lauffähig (`dotnet test`, `dotnet run --project RobustnessRunner`, `dotnet run --project SchoolTestRunner`) - `SchoolTestRunner` braucht KEINEN Ollama-Server (rein YAML-basiert, keine LLM-Extraktion) |
+| Linux-Sandbox (aktuelle Entwicklungsumgebung) | `TimetableCore`, `TimetableYaml`, `TimetableWorkflow`, `TimetableCore.Tests`, `Klassenbildung.Tests`, `RobustnessRunner`, `SchoolTestRunner`, lokaler Ollama-Server | Aktiv, vollständig lauffähig (`dotnet test`, `dotnet run --project RobustnessRunner`, `dotnet run --project SchoolTestRunner`) - `SchoolTestRunner` braucht KEINEN Ollama-Server (rein YAML-basiert, keine LLM-Extraktion) |
 | Windows-Zielumgebung (nachgelagert) | `TimetableGui` (WPF + WebView2) + `TimetableCore` (per `ProjectReference`) + lokaler Ollama-Server; Nutzdaten als verschlüsselte Ein-Datei-Projektablage (`.splanx`-Arbeitstitel, `docs/gui-datenhaltung-konzept.md`); WebView2 nutzt die auf aktuellen Windows-10/11-Systemen vorhandene Evergreen-Runtime (sonst Bootstrapper) | Noch nicht begonnen (Phase 3); Datenhaltungskonzept liegt vor |
 
 `Google.OrTools` läuft nativ unter beiden Plattformen (`Google.OrTools.runtime.linux-x64`
@@ -689,7 +709,7 @@ Chromium-Smoke statt Suite") steht in `timetable-dotnet/CLAUDE.md`;
 
 Beide Viewer (`stundentafel.html`, `klassenbildung.html`) folgen
 demselben Muster: ein statisches HTML-Template mit Inline-CSS und
-ES5-Inline-JS liegt als Embedded Resource im `SchoolTestRunner`; beim
+ES5-Inline-JS liegt als Embedded Resource im `TimetableWorkflow`; beim
 Schreiben wird das komplette Ergebnis-JSON in einen
 `<script type="application/json">`-Block eingebettet (`__..._JSON__`-
 Platzhalter, `</script`-Escape). Die erzeugte Datei ist vollständig

@@ -2,7 +2,7 @@
 ' stundentafel.html) aus einer bereits fertig gebauten JSON-Text-
 ' Darstellung von Formatting.ToStundentafelJson. Die Vorlage ist als
 ' Embedded Resource in die Assembly eingebettet (siehe
-' SchoolTestRunner.vbproj), damit sie unabhaengig vom aktuellen
+' TimetableWorkflow.vbproj), damit sie unabhaengig vom aktuellen
 ' Arbeitsverzeichnis lesbar ist - kein CopyToOutputDirectory-Pfadrisiko.
 Public Module StundentafelHtml
 
@@ -12,7 +12,7 @@ Public Module StundentafelHtml
     ' EmbeddedResource-Items den Ordnerpfad nicht in den logischen Namen
     ' aufzunehmen (anders als das C#-Verhalten). Per
     ' Assembly.GetManifestResourceNames() live bestaetigt statt angenommen.
-    Private Const ResourceName As String = "SchoolTestRunner.stundentafel.html"
+    Private Const ResourceName As String = "TimetableWorkflow.stundentafel.html"
     Private Const JsonPlaceholder As String = "__STUNDENTAFEL_JSON__"
 
     ''' <summary>Ersetzt den Platzhalter in der eingebetteten Vorlage durch
