@@ -462,3 +462,6 @@ unverschlüsselt (synthetische Daten, kein Personenbezug).
    ein eigenes Querschnittskonzept in §8.
 5. **Muster-Eintrag fürs Verzeichnis von Verarbeitungstätigkeiten** der
    Schule als Handbuch-Anhang (Hilfestellung, keine Rechtsberatung).
+
+Die Bedienschicht über dieser Datenhaltung (Fensteraufbau, Menüs,
+Dashboards, Eingabemasken) beschreibt `docs/gui-ui-konzept.md`.
