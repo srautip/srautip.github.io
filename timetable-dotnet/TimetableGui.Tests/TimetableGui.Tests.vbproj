@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>TimetableGuiTests</RootNamespace>
+    <!-- Muss dem Zielprojekt folgen; die Tests erzeugen aber KEINE
+         WPF-Steuerelemente, sie laufen headless. -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.0.4" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.0.4" />
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TimetableCore\TimetableCore.vbproj" />
+    <ProjectReference Include="..\TimetableYaml\TimetableYaml.vbproj" />
+    <ProjectReference Include="..\TimetableWorkflow\TimetableWorkflow.vbproj" />
+    <ProjectReference Include="..\TimetableProjekt\TimetableProjekt.vbproj" />
+    <ProjectReference Include="..\TimetableGui\TimetableGui.vbproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Import Include="TimetableCore" />
+    <Import Include="TimetableGui" />
+  </ItemGroup>
+
+</Project>

@@ -25,6 +25,10 @@ Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "TimetableProjekt", "Timetab
 EndProject
 Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "TimetableProjekt.Tests", "TimetableProjekt.Tests\TimetableProjekt.Tests.vbproj", "{AE97075F-4C86-4B71-BF70-718E719D784F}"
 EndProject
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "TimetableGui", "TimetableGui\TimetableGui.vbproj", "{1F16DB59-DD66-4BF5-AD3D-31D838BC9C7E}"
+EndProject
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "TimetableGui.Tests", "TimetableGui.Tests\TimetableGui.Tests.vbproj", "{284C7E28-5AFC-4EB6-8288-EAEC87F128A7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -78,5 +82,13 @@ Global
 		{AE97075F-4C86-4B71-BF70-718E719D784F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AE97075F-4C86-4B71-BF70-718E719D784F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AE97075F-4C86-4B71-BF70-718E719D784F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1F16DB59-DD66-4BF5-AD3D-31D838BC9C7E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F16DB59-DD66-4BF5-AD3D-31D838BC9C7E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F16DB59-DD66-4BF5-AD3D-31D838BC9C7E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F16DB59-DD66-4BF5-AD3D-31D838BC9C7E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{284C7E28-5AFC-4EB6-8288-EAEC87F128A7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{284C7E28-5AFC-4EB6-8288-EAEC87F128A7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{284C7E28-5AFC-4EB6-8288-EAEC87F128A7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{284C7E28-5AFC-4EB6-8288-EAEC87F128A7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

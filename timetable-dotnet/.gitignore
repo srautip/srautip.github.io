@@ -1,3 +1,16 @@
 bin/
 obj/
 TestResults/
+
+# Projektdateien der GUI. Sie enthalten potenziell echte Personendaten
+# (Klarnamen-Mapping, Klassenbildungs-Attribute) und sind verschluesselt -
+# beides Gruende, warum sie nie in ein Repository gehoeren. Die
+# committeten Beispieldaten liegen bewusst als pseudonyme, unverschluesselte
+# YAML unter tests/ (Datenhaltungskonzept 8.3).
+*.splanx
+*.splanx.bak
+*.splanx.tmp-*
+
+# Visual-Studio-Beiwerk
+.vs/
+*.user

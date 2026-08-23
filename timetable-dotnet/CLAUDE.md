@@ -12,18 +12,21 @@ pauschal die volle Suite zu fahren:
   (Definition-of-Done-Konvention aller Phasen-Berichte in `docs/`).
 - **Aenderungen NUR an der Klassenbildung** (`TimetableCore/
   Klassenbildung.vb`, `TimetableCore/KlassenbildungQuality.vb`,
-  `SchoolTestRunner/KlassenRun.vb`, `SchoolTestRunner/
-  YamlKlassenbildung.vb`, `tests/*/input/klassenbildung.yaml`): die
+  `TimetableWorkflow/KlassenbildungLauf.vb`, `TimetableWorkflow/
+  KlassenbildungBericht.vb`, `TimetableYaml/YamlKlassenbildung.vb`,
+  `SchoolTestRunner/KlassenRun.vb`, `tests/*/input/klassenbildung.yaml`): die
   EIGENE Suite genuegt - `dotnet test Klassenbildung.Tests` (laeuft in
   unter einer Sekunde; die Klassenbildung ist ein eigenstaendiges
   Modul ohne jede Kopplung an Solver/SolveTop, die teuren
   Stundenplan-Tests exerzieren sie nicht und umgekehrt). Bei
   querschneidenden Aenderungen (z.B. gemeinsame Helfer) beide Suiten
   fahren.
-- **Aenderungen an `TimetableYaml/`, `TimetableWorkflow/` oder `TimetableProjekt/`** (seit dem
+- **Aenderungen an `TimetableYaml/`, `TimetableWorkflow/`, `TimetableProjekt/` oder `TimetableGui/`** (seit dem
   GUI-Unterbau, siehe `docs/gui-implementierungsplan.md`): die eigenen
   Suiten `dotnet test TimetableYaml.Tests` (<1s) und
-  `dotnet test TimetableWorkflow.Tests` (~3s) bzw. `dotnet test TimetableProjekt.Tests` (~2s). Beruehrt die Aenderung die
+  `dotnet test TimetableWorkflow.Tests` (~3s), `dotnet test TimetableProjekt.Tests`
+  (~2s) bzw. `dotnet test TimetableGui.Tests` (~45s, faehrt echte
+  Klassenbildungs-Laeufe). Beruehrt die Aenderung die
   Pipeline-Orchestrierung oder die Berichts-Zeichenketten, zusaetzlich
   `dotnet run --project SchoolTestRunner -- run --all` - nur der echte
   Lauf belegt, dass die committeten Beispiel-Outputs unveraendert bleiben.
@@ -35,11 +38,13 @@ pauschal die volle Suite zu fahren:
   2. `dotnet run --project SchoolTestRunner -- render <schule>` gegen
      beide Beispiel-Schulen (baut stundentafel.html aus vorhandener
      stundenplan.json neu - KEIN teurer Solver-Lauf noetig),
-  3. Headless-Chromium-Smoke gegen die generierten Seiten (Chromium
-     liegt unter `/opt/pw-browsers/`; `--headless --dump-dom
-     --virtual-time-budget=6000` fuehrt das Inline-JS aus; fuer
-     Interaktionstests ein kleines Skript vor `</body>` injizieren, das
-     Events dispatcht und Ergebnisse in `document.title` schreibt).
+  3. Headless-Browser-Smoke gegen die generierten Seiten. Unter Windows:
+     `powershell -File tools\viewer-smoke.ps1` (nutzt Edge, prueft alle
+     Viewer-Seiten unter `tests/`). Unter Linux liegt Chromium unter
+     `/opt/pw-browsers/`; in beiden Faellen fuehrt `--headless --dump-dom
+     --virtual-time-budget=...` das Inline-JS aus. Fuer Interaktionstests
+     ein kleines Skript vor `</body>` injizieren, das Events dispatcht und
+     Ergebnisse in `document.title` schreibt.
   Aendert sich das JSON-Schema des Exports (`Formatting.
   ToStundentafelJson` liegt in TimetableCore!), gilt wieder die volle
   Suite plus `StundentafelJsonTests`.
@@ -47,7 +52,7 @@ pauschal die volle Suite zu fahren:
   Testlauf noetig; Config-Aenderungen werden per `run <schule>`-Lauf
   live belegt und die Outputs mitcommittet (bestehende Konvention).
 
-"Volle Suite" heisst seit dem GUI-Unterbau ALLE FUENF Testprojekte, am
+"Volle Suite" heisst seit dem GUI-Unterbau ALLE SECHS Testprojekte, am
 einfachsten ueber `dotnet test TimetableCore.sln`.
 
 Hintergrund: Die Regel entstand, nachdem fuer einen reinen

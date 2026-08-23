@@ -1,0 +1,143 @@
+<Window x:Class="MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        xmlns:app="clr-namespace:TimetableGui"
+        Title="{Binding Titel}" Height="800" Width="1280"
+        WindowStartupLocation="CenterScreen">
+
+    <!-- Fensteraufbau nach gui-ui-konzept.md 2: EIN Hauptfenster,
+         schmale Seitenleiste, der Rest gehoert dem Vollflaechen-Dashboard.
+         Stammdaten- und Regel-Pflege laufen spaeter als modale Dialoge
+         DARUEBER (Stufe F) - das Dashboard bleibt der Anker. -->
+    <DockPanel>
+
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_Datei">
+                <MenuItem Header="Neues Projekt…" Command="{Binding NeuBefehl}" />
+                <MenuItem Header="Bestehende Schule übernehmen…" Command="{Binding ImportierenBefehl}" />
+                <MenuItem Header="Öffnen…" Command="{Binding OeffnenBefehl}" />
+                <Separator />
+                <MenuItem Header="Speichern" InputGestureText="Strg+S" Command="{Binding SpeichernBefehl}" />
+                <Separator />
+                <MenuItem Header="Beenden" Click="AufBeenden" />
+            </MenuItem>
+            <MenuItem Header="_Planung">
+                <MenuItem Header="Klassenbildung rechnen" InputGestureText="F5" Command="{Binding KlassenbildungBefehl}" />
+                <MenuItem Header="Lauf abbrechen" Command="{Binding Monitor.AbbrechenBefehl}" />
+            </MenuItem>
+            <MenuItem Header="_Extras">
+                <MenuItem Header="Browserdaten bereinigen" Click="AufBrowserdatenBereinigen" />
+            </MenuItem>
+            <MenuItem Header="_Hilfe">
+                <MenuItem Header="Über" Click="AufUeber" />
+            </MenuItem>
+        </Menu>
+
+        <!-- Statusleiste: Meldung, laufender Lauf mit Kurzfortschritt und
+             Abbrechen (Konzept 2). -->
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock Text="{Binding Meldung}" />
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding Monitor.StatusZeile}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ProgressBar Width="120" Height="12" Minimum="0" Maximum="100"
+                                 Value="{Binding Monitor.FortschrittProzent, Mode=OneWay}"
+                                 Visibility="{Binding Monitor.Laeuft, Converter={StaticResource BoolNachSichtbar}}" />
+                    <Button Content="Abbrechen" Margin="8,0,0,0" Padding="8,0"
+                            Command="{Binding Monitor.AbbrechenBefehl}"
+                            Visibility="{Binding Monitor.Laeuft, Converter={StaticResource BoolNachSichtbar}}" />
+                </StackPanel>
+            </StatusBarItem>
+        </StatusBar>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="72" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Background="#F0F0F0">
+                <RadioButton Style="{StaticResource BereichsSchalter}" IsChecked="True"
+                             Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Start}">
+                    <StackPanel>
+                        <TextBlock Text="⌂" Style="{StaticResource BereichsIcon}" />
+                        <TextBlock Text="Start" Style="{StaticResource BereichsLabel}" />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource BereichsSchalter}"
+                             Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Klassenbildung}">
+                    <StackPanel>
+                        <TextBlock Text="🧩" Style="{StaticResource BereichsIcon}" />
+                        <TextBlock Text="Klassen" Style="{StaticResource BereichsLabel}" />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource BereichsSchalter}"
+                             Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Stundenplan}">
+                    <StackPanel>
+                        <TextBlock Text="📅" Style="{StaticResource BereichsIcon}" />
+                        <TextBlock Text="Stunden" Style="{StaticResource BereichsLabel}" />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource BereichsSchalter}"
+                             Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Stammdaten}">
+                    <StackPanel>
+                        <TextBlock Text="👥" Style="{StaticResource BereichsIcon}" />
+                        <TextBlock Text="Stammdaten" Style="{StaticResource BereichsLabel}" />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource BereichsSchalter}"
+                             Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Regeln}">
+                    <StackPanel>
+                        <TextBlock Text="📏" Style="{StaticResource BereichsIcon}" />
+                        <TextBlock Text="Regeln" Style="{StaticResource BereichsLabel}" />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource BereichsSchalter}"
+                             Command="{Binding WechsleBefehl}" CommandParameter="{x:Static app:Bereich.Laeufe}">
+                    <StackPanel>
+                        <TextBlock Text="▶" Style="{StaticResource BereichsIcon}" />
+                        <TextBlock Text="Läufe" Style="{StaticResource BereichsLabel}" />
+                    </StackPanel>
+                </RadioButton>
+            </StackPanel>
+
+            <Grid Grid.Column="1">
+                <!-- Das Dashboard: der bestehende Viewer, 1:1 gehostet,
+                     randlos und über die volle Fläche
+                     (Konzept 1, "Dashboard-first"). -->
+                <wv2:WebView2 x:Name="Dashboard" Visibility="Collapsed" />
+
+                <!-- Startseite als Schrittleiste (Konzept 8), für den
+                     Durchstich auf die zwei vorhandenen Schritte
+                     reduziert. -->
+                <ScrollViewer x:Name="Startseite">
+                    <StackPanel Margin="24" MaxWidth="720" HorizontalAlignment="Left">
+                        <TextBlock Text="Schulplanung" FontSize="28" Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding Titel}" Opacity="0.6" Margin="0,0,0,24" />
+
+                        <TextBlock Text="[1] Projekt" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock TextWrapping="Wrap" Margin="0,4,0,8"
+                                   Text="Ein neues Projekt anlegen oder einen bestehenden Schulordner im tests/&lt;schule&gt;/-Layout übernehmen." />
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                            <Button Content="Neues Projekt…" Padding="12,4" Command="{Binding NeuBefehl}" />
+                            <Button Content="Bestehende Schule übernehmen…" Padding="12,4" Margin="8,0,0,0" Command="{Binding ImportierenBefehl}" />
+                            <Button Content="Öffnen…" Padding="12,4" Margin="8,0,0,0" Command="{Binding OeffnenBefehl}" />
+                        </StackPanel>
+
+                        <TextBlock Text="[2] Klassenbildung" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock TextWrapping="Wrap" Margin="0,4,0,8"
+                                   Text="Varianten rechnen und im Board bewerten. Der Lauf läuft im Hintergrund und ist jederzeit abbrechbar – bereits fertige Varianten bleiben erhalten." />
+                        <Button Content="Klassenbildung rechnen" Padding="12,4" HorizontalAlignment="Left"
+                                Command="{Binding KlassenbildungBefehl}" />
+
+                        <TextBlock Text="Noch nicht umgesetzt: Stammdaten- und Regel-Masken, Stundenplan-Dashboard, Freigabe."
+                                   Opacity="0.6" TextWrapping="Wrap" Margin="0,28,0,0" />
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</Window>

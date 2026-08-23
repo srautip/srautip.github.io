@@ -7,7 +7,7 @@
 | A | Unterbau-Umbau (`TimetableYaml`, `TimetableWorkflow`) | **erledigt** |
 | B | YAML-Schreiber, Klassenbildungs-JSON öffentlich, Pipeline als Dienst | **erledigt** |
 | C | Projektablage `.splanx` | **erledigt** |
-| D | GUI-Durchstich (Klassenbildung) | offen |
+| D | GUI-Durchstich (Klassenbildung) | **erledigt** |
 | E | Bridge und U5-Re-Solve | offen |
 | F | Eingabemasken | offen |
 | G | Stundenplan-Dashboard, Im-/Export, Startseite, Freigabe | offen |
@@ -213,7 +213,7 @@ Erstes lauffähiges Ergebnis: Projekt öffnen → rechnen → Board sehen.
 
 **Technische Weiche, die das Konzept offen ließ** (§7.6 nennt
 „`NavigateToString` bzw. virtuelles Host-Mapping"): **beides scheidet aus.**
-Die GMS-Stundentafel ist **2,49 MB** — über der dokumentierten ~2-MB-Grenze
+Die Stundentafel-Seite überschreitet die dokumentierte ~2-MB-Grenze
 von `NavigateToString`; Host-Mapping wiederum bräuchte einen Ordner mit
 Klartext-HTML, was §7.6 gerade verbietet. Stattdessen:
 `AddWebResourceRequestedFilter` + `WebResourceRequested`, der die in-memory
@@ -225,7 +225,7 @@ blockierbar. User-Data-Folder explizit auf
 **Verifikation:** Projekt anlegen → Klassenbildung rechnen → Board zeigt
 Varianten; Abbrechen während des Laufs liefert die bereits fertigen Varianten
 (genau das Verhalten, das `KlassenbildungTopResult.Cancelled` zusichert);
-GMS-Stundentafel (2,49 MB) lädt fehlerfrei — der Größen-Regressionstest.
+Eine Seite über 2 MB wird unverändert ausgeliefert — der Größen-Regressionstest (synthetisch, weil die reale Größe lauf- und konfigurationsabhängig ist).
 
 ---
 
@@ -319,7 +319,7 @@ Beispielprojekt.
 | **VB + WPF ist weniger ausgetreten als C# + WPF** (XAML-Designer, MVVM-Tooling) | Templates existieren; MVVM von Hand ohne Framework; Logik in testbaren ViewModels statt Code-Behind |
 | **`SolveLehrereinsatzTop` kann leer sein** (neu seit dem Abbruchkanal) | In Stufe B abfangen; `Run.vb:321` greift heute unbesehen auf Index 0 zu |
 | **Passwort vergessen = Totalverlust** | Bewusst akzeptiert; Handbuch-Hinweis, Warnung im Assistenten, „Sicherungskopie erstellen" prominent |
-| **GMS-Viewer 2,49 MB** | `WebResourceRequested` statt `NavigateToString`; Ladezeit als Regressionstest festhalten |
+|  **Viewer-Seite kann 2 MB überschreiten** (am GMS-Beispiel 2,49 MB bei 28 Lösungen gemessen; derselbe Datensatz ergab bei 20 Lösungen 1,77 MB — der Export enthält ALLE Lösungen, skaliert also mit `max_solutions`) | `WebResourceRequested` statt `NavigateToString`; Ladezeit als Regressionstest festhalten |
 
 ---
 

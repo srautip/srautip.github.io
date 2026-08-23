@@ -1,0 +1,29 @@
+<Window x:Class="PasswortFenster"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Passwort" SizeToContent="Height" Width="420"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize" ShowInTaskbar="False">
+    <StackPanel Margin="16">
+        <TextBlock x:Name="Titelzeile" TextWrapping="Wrap" Margin="0,0,0,12" />
+
+        <TextBlock Text="Passwort" />
+        <PasswordBox x:Name="Feld" Margin="0,4,0,8" />
+
+        <StackPanel x:Name="WiederholungsBlock">
+            <TextBlock Text="Passwort wiederholen" />
+            <PasswordBox x:Name="Wiederholung" Margin="0,4,0,8" />
+            <!-- Beim Anlegen: ohne diesen Hinweis waere die Tragweite
+                 nicht erkennbar - es gibt bewusst keinen Recovery-Weg
+                 (arc42 8.12). -->
+            <TextBlock TextWrapping="Wrap" Opacity="0.75" Margin="0,0,0,8"
+                       Text="Ohne dieses Passwort sind die Daten nicht wiederherstellbar. Es gibt keinen Ersatzschlüssel." />
+        </StackPanel>
+
+        <TextBlock x:Name="Fehler" Foreground="#B00020" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Abbrechen" IsCancel="True" Padding="16,4" />
+            <Button Content="OK" IsDefault="True" Padding="16,4" Margin="8,0,0,0" Click="AufOk" />
+        </StackPanel>
+    </StackPanel>
+</Window>

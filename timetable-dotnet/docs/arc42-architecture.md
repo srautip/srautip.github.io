@@ -185,15 +185,16 @@ timetable-dotnet/
 │                             Mapping, Audit-Log, Ergebnis-Stände sowie
 │                             Im-/Export in das tests/<schule>/-Layout
 │                             (Konzept: docs/gui-datenhaltung-konzept.md)
+├── TimetableGui/             WPF-Anwendung (net8.0-windows): Hauptfenster,
+│                             Lauf-Monitor und die WebView2-gehosteten
+│                             Dashboards (siehe 8.13)
 ├── RobustnessRunner/         Konsolenprogramm: LLM-Wiederholungsstudien
 ├── SchoolTestRunner/         Konsolenprogramm: code-freie YAML-Testfälle -
 │                             seit dem GUI-Unterbau nur noch CLI-Hülle
 │                             (Argument-Parsing + Datei-/Konsolenschicht;
 │                             6.7 und docs/schooltestrunner-benutzerhandbuch.md)
-└── (nachgelagert) TimetableGui/   WPF-GUI mit WebView2-gehosteten Viewern,
-                              referenziert TimetableCore direkt; Datenhaltung
-                              als verschlüsselte Ein-Datei-Projektablage
-                              (Konzept: docs/gui-datenhaltung-konzept.md)
+└── TimetableGui.Tests/       ViewModel- und Auslieferungstests, headless
+                              (kein Fenster, kein Browser - siehe 8.13)
 ```
 
 `TimetableCore` hat keine Abhängigkeit auf eines der übrigen Projekte.
@@ -916,6 +917,53 @@ verschwinden, die Zeile bleibt.
 `AesGcm` ist authentifiziert: ein falsches Passwort und eine manipulierte
 Datei scheitern beide an derselben Prüfung. Der Kern kann sie nicht
 unterscheiden, und die Fehlermeldung behauptet es deshalb auch nicht.
+
+### 8.13 Die Oberfläche: Viewer hosten statt nachbauen
+
+`TimetableGui` ist eine WPF-Anwendung (`net8.0-windows`, `UseWPF`), die
+`TimetableCore`, `-Yaml`, `-Workflow` und `-Projekt` per `ProjectReference`
+nutzt. Ihre einzige zusätzliche Abhängigkeit ist `Microsoft.Web.WebView2`;
+alle vier Bibliotheken bleiben plattformneutrales `net8.0` (5.1).
+
+**Die beiden Dashboards sind die bestehenden HTML-Viewer, 1:1 gehostet.**
+Sie sind fertig, per Interaktionstest verifiziert (8.10) und in XAML
+nachzubauen hieße, ihre Logik ein zweites Mal zu schreiben. WPF liefert
+Rahmen, Navigation und Formulare.
+
+**Wie die Seiten in den Browser kommen.** Das Datenhaltungskonzept ließ
+offen, ob `NavigateToString` oder ein virtuelles Host-Mapping benutzt wird
+(7.6). Beides scheidet aus:
+
+- `NavigateToString` hat eine dokumentierte Grenze von rund 2 MB. Die
+  Stundentafel-Seite überschreitet sie in realistischen Konfigurationen -
+  am GMS-Beispiel wurden 2,49 MB gemessen (28 exportierte Lösungen). Die
+  Größe ist dabei **lauf- und konfigurationsabhängig**: derselbe Datensatz
+  ergab bei einem späteren Lauf mit 20 Lösungen 1,77 MB, weil der Export
+  *alle* gefundenen Lösungen enthält und damit mit `max_solutions` und
+  Schulgröße skaliert. Eine Anzeige, die ab einer bestimmten Lösungszahl
+  kaputtgeht, ist keine Option.
+- Virtuelles Host-Mapping bildet einen *Ordner* ab. Dafür müsste die
+  entschlüsselte HTML als Datei auf der Platte liegen - genau das, was 7.6
+  verbietet.
+
+Stattdessen `AddWebResourceRequestedFilter` plus `WebResourceRequested`:
+eine synthetische Herkunft (`https://viewer.local`, `.local` ist per
+RFC 6762 nie öffentlich auflösbar), deren Antworten vollständig aus dem
+Speicher kommen. Kein Klartext auf Platte, keine Größengrenze; Navigation
+außerhalb dieser Herkunft wird abgebrochen, und `NewWindowRequested` ist
+unterbunden - es ist ein Anzeigerahmen, kein Browser. Der WebView2-
+User-Data-Folder liegt app-eigen unter
+`%LocalAppData%\Schulplanung\WebView2\` (7.6).
+
+**Was ohne Fenster prüfbar ist, liegt außerhalb des Fensters.** Auf dem
+Entwicklungsrechner existiert nur eine getrennte Desktop-Sitzung, das
+laufende Fenster ist also nicht beobachtbar. Deshalb liegen Zustand und
+Ablauf in ViewModels, Datei- und Passwortabfragen hinter `IDialoge`, und
+die Auslieferung in einer Klasse, die WebView2 gar nicht kennt.
+`TimetableGui.Tests` fährt gegen genau diese Teile - ohne Fenster, ohne
+Browser. Was dadurch **nicht** abgedeckt ist und ehrlich offen bleibt: das
+tatsächliche Rendern in WebView2 und das Verhalten der XAML-Bindungen zur
+Laufzeit. Beides ist nur am laufenden Fenster zu sehen.
 
 ## 9. Architekturentscheidungen
 
