@@ -94,9 +94,11 @@ Public Module KlassenbildungBericht
                 z.Add("")
                 For Each b In input.Balance
                     Dim treffer = input.Schueler.Where(Function(s) s.Attribute.ContainsKey(b.Attribut) AndAlso s.Attribute(b.Attribut) = b.Wert).ToList()
+                    ' Mit Label je Zahl statt "12 / 11 / 13 / 12" - sonst
+                    ' muss der Leser mitzaehlen, welche Klasse gemeint ist.
                     Dim counts = Enumerable.Range(1, input.Klassen.Anzahl).
-                        Select(Function(c) treffer.Where(Function(s) v.Zuordnung(s.Id) = c).Count())
-                    z.Add($"- {b.Attribut}={b.Wert}: {String.Join(" / ", counts)} (Ziel ~{Math.Round(treffer.Count / CDbl(input.Klassen.Anzahl))} +/- {b.Toleranz})")
+                        Select(Function(c) $"{labels(c - 1)}: {treffer.Where(Function(s) v.Zuordnung(s.Id) = c).Count()}")
+                    z.Add($"- {b.Attribut}={b.Wert}: {String.Join(", ", counts)} (Ziel ~{Math.Round(treffer.Count / CDbl(input.Klassen.Anzahl))} +/- {b.Toleranz})")
                 Next
                 z.Add("")
             End If

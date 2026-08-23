@@ -621,7 +621,7 @@
                 status: massB > 0 ? 'rot' : 'gruen',
                 text: massB > 0
                   ? 'Buendelung ' + g.id + ': auf ' + spread + ' Klassen verteilt'
-                  : 'Buendelung ' + g.id + ': alle in Klasse ' + zuordnung[g.mitglieder[0]] });
+                  : 'Buendelung ' + g.id + ': alle in ' + labelVon(zuordnung[g.mitglieder[0]]) });
             });
           } else { // verteilung
             var kappe = g.max_pro_klasse;
@@ -827,7 +827,10 @@
       function klasseEinfrieren(klasse) {
         var v = aktuelleSicht();
         alleKinder.forEach(function (id) {
-          if (v.zuordnung[id] === klasse && !istFixiert(id)) setzePin(id, klasse, 'klasse ' + labelVon(klasse));
+          // Herkunft nur "eingefroren", ohne Label: die Anzeige stellt
+          // das Label ohnehin davor ("Fixiert auf 1b (eingefroren)",
+          // "# 1b - eingefroren") - doppelt waere es nur laenger.
+          if (v.zuordnung[id] === klasse && !istFixiert(id)) setzePin(id, klasse, 'eingefroren');
         });
         render();
       }
@@ -1567,19 +1570,27 @@
           return;
         }
 
+        // Der WERT bleibt die Laufnummer - das ist das YAML-Datenformat,
+        // das der Kern liest. Der Kommentar traegt das Label nach, damit
+        // die Zeile beim Einfuegen in input/klassenbildung.yaml auch ohne
+        // Nachschlagen lesbar ist.
         var zeilen = ['fixierungen:'];
         bestandsFixierungen.forEach(function (f) {
           if (f.klasse !== null && f.klasse !== undefined) {
-            zeilen.push('  - {kind: ' + f.kind + ', klasse: ' + f.klasse + '}   # bestehend (YAML)');
+            zeilen.push('  - {kind: ' + f.kind + ', klasse: ' + f.klasse + '}   # ' +
+              labelVon(f.klasse) + ' - bestehend (YAML)');
           } else {
-            zeilen.push('  - {kind: ' + f.kind + ', nicht_klasse: ' + f.nicht_klasse + '}   # bestehend (YAML)');
+            zeilen.push('  - {kind: ' + f.kind + ', nicht_klasse: ' + f.nicht_klasse + '}   # nicht ' +
+              labelVon(f.nicht_klasse) + ' - bestehend (YAML)');
           }
         });
         pinListe.forEach(function (id) {
-          zeilen.push('  - {kind: ' + id + ', klasse: ' + pins[id] + '}   # ' + (pinHerkunft[id] || 'manuell'));
+          zeilen.push('  - {kind: ' + id + ', klasse: ' + pins[id] + '}   # ' +
+            labelVon(pins[id]) + ' - ' + (pinHerkunft[id] || 'manuell'));
         });
         notListe.forEach(function (e) {
-          zeilen.push('  - {kind: ' + e.kind + ', nicht_klasse: ' + e.klasse + '}   # manuell (F2)');
+          zeilen.push('  - {kind: ' + e.kind + ', nicht_klasse: ' + e.klasse + '}   # nicht ' +
+            labelVon(e.klasse) + ' - manuell (F2)');
         });
         // U4: Haertungen (F3/F5) als modus-hard-Diff-Hinweis - kein
         // fixierungen-Eintrag, sondern eine Aenderung an der Regel

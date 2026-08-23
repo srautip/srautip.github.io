@@ -78,6 +78,60 @@ Public Class KlassenbildungBoardTests
                         "die Pin-Herkunft ist nicht als Verschiebung markiert")
     End Function
 
+    ''' <summary>Die zentrale Zusage von arc42 8.10: die Live-Bewertung im
+    ''' Browser ist ein bewusstes, kommentiertes Duplikat von
+    ''' KlassenbildungQuality.Bewerte - und die Chip-Texte muessen
+    ''' ZEICHENGLEICH sein. Bis dieser Test existierte, war das eine
+    ''' Absichtserklaerung; genau so ist beim Umstellen auf Klassenlabels
+    ''' auffliegen koennen, dass VB "alle in 1a" sagt und JS noch "alle in
+    ''' Klasse 2".
+    '''
+    ''' Verglichen wird die JS-Bewertung der Basis-Variante gegen die vom
+    ''' VB-Kern EXPORTIERTEN Chips derselben Variante.</summary>
+    <TestMethod>
+    Public Async Function LiveBewertungIstZeichengleichZumKern() As Task
+        Await SeiteOeffnenAsync(KlassenbildungSeite())
+
+        Dim abweichungen = Await Seite.EvaluateAsync(Of String())("() => {
+            const data = JSON.parse(document.getElementById('klassenbildung-data').textContent);
+            const v = data.varianten[0];
+            const js = window.__kbTest.bewerte(v.zuordnung).chips;
+            const schluessel = c => c.kind + '|' + c.regel_id + '|' + c.regel_typ;
+            const vonVb = new Map(v.chips.map(c => [schluessel(c), c]));
+            const abw = [];
+            js.forEach(c => {
+                const k = schluessel(c);
+                const b = vonVb.get(k);
+                if (!b) { abw.push('nur im Browser: ' + k); return; }
+                if (b.text !== c.text) abw.push(k + ' | Kern: ' + b.text + ' | Browser: ' + c.text);
+                if (b.status !== c.status) abw.push(k + ' | Status Kern: ' + b.status + ' | Browser: ' + c.status);
+                vonVb.delete(k);
+            });
+            vonVb.forEach((_, k) => abw.push('nur im Kern: ' + k));
+            return abw;
+        }")
+
+        Assert.AreEqual(0, abweichungen.Length,
+                        "Live-Bewertung weicht vom Kern ab:" & vbLf & String.Join(vbLf, abweichungen))
+    End Function
+
+    ''' <summary>Klassen werden dem Nutzer IMMER als Label gezeigt (1a,
+    ''' 1b, ...), nie als Laufnummer - die Nummer ist ein internes Detail
+    ''' des Solvers und bleibt auf die YAML-WERTE beschraenkt.</summary>
+    <TestMethod>
+    Public Async Function KlassenErscheinenAlsLabelNichtAlsNummer() As Task
+        Await SeiteOeffnenAsync(KlassenbildungSeite())
+
+        Dim text = Await Seite.Locator("#haupt").InnerTextAsync()
+        Dim titel = String.Join(" ", Await Seite.Locator("[title]").AllInnerTextsAsync())
+        Dim alleTitel = Await Seite.EvaluateAsync(Of String)("() => Array.from(document.querySelectorAll('[title]')).map(e => e.title).join(' | ')")
+
+        Dim roh = New Text.RegularExpressions.Regex("(?i)klasse\s+\d+(?![a-z])")
+        Assert.IsFalse(roh.IsMatch(text), "rohe Klassennummer im sichtbaren Text: " & roh.Match(text).Value)
+        Assert.IsFalse(roh.IsMatch(alleTitel), "rohe Klassennummer in einem Tooltip: " & roh.Match(alleTitel).Value)
+        StringAssert.Matches(text, New Text.RegularExpressions.Regex("\b1[ab]\b"), "es werden gar keine Labels angezeigt")
+    End Function
+
     ''' <summary>DER Regressionstest fuer Stufe E: ohne
     ''' window.chrome.webview muss der Viewer weiterhin der
     ''' YAML-Export-Weg sein. Dass er per Doppelklick funktioniert, ist
