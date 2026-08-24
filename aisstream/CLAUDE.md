@@ -438,6 +438,25 @@ Live gegengeprüft mit drei echten Ostsee-MMSIs ohne Namen im Stream: alle
 drei bekommen ihn aus dem Register (Bore Wave, Viggen, Meri) — vorher blieben
 alle drei `-`.
 
+### Das Foto flackerte, weil renderDetail zu oft lief
+
+`renderDetail()` läuft bei **jeder** eingehenden Nachricht (über
+`refreshVisibleShips()`) und setzte dabei `detailBody.innerHTML` neu. Das
+Foto hing mit drin, also entstand jedes Mal ein **frisches `<img>`** — der
+Browser begann den Ladevorgang von vorn. Bei einem Schiff, das im
+Sekundentakt meldet, wurde das Bild nie fertig oder verschwand wieder.
+
+Das Foto steht deshalb in einem **eigenen Container `#detailMedia`
+außerhalb** des neu gebauten Bereichs und wird nur angefasst, wenn sich die
+URL ändert (`detailMedia.dataset.src`). Beim Schiffswechsel wird er geleert,
+sonst hinge das alte Bild am neuen Schiff, bis dessen Registerabfrage durch
+ist.
+
+Gemessen: **eine** Bildanfrage vor und nach 15 Nachrichten in Folge.
+
+**Regel:** Nichts, was Netzwerkressourcen lädt, gehört in einen Bereich, der
+per `innerHTML` neu aufgebaut wird.
+
 ### Namen auf der Karte
 
 Bis dahin war der Name nur im Popup, also erst nach einem Klick sichtbar.
@@ -636,6 +655,51 @@ Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
 | `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_filters` | Einstellungen & Filterauswahl | unbegrenzt |
 | `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss |
 | `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d |
+| `aisstream_ais` | **eine** JSON-Map MMSI → Position und Fahrtdaten | **30 min** |
+
+### AIS-Cache (`aisstream_ais`, 30 Minuten)
+
+Alles, was schnell veraltet: `lat`, `lon`, `speed`, `course`, `heading`,
+`navStatus`, `rot`, `accuracy`, `raim`, `maneuver`, `fixType`,
+`msgTimestamp`, `destination`, `eta`, `draught`, `time` — je MMSI mit dem
+Empfangszeitpunkt.
+
+Der frühere Einwand („ein drei Wochen altes Ziel als aktuell anzuzeigen wäre
+irreführend") gilt hier nicht mehr, weil **die Tabelle das Alter in Sekunden
+direkt hinter dem Namen führt**. Damit ist jederzeit sichtbar, wie frisch ein
+Wert ist, und 30 Minuten sind eine brauchbare Kontextspanne.
+
+- Beim Laden wiederhergestellt, aber **nur, wenn der Livestream nichts
+  Frischeres hat** (`entry.updatedAt >= rec.at` → überspringen)
+- `entry.updatedAt` bleibt der **Empfangs**zeitpunkt, nicht der Ladezeitpunkt —
+  sonst zeigte die Altersspalte nach jedem Reload 0 s. `setPosition()` stempelt
+  die Gegenwart in den Track, das wird danach zurückgesetzt
+- `pruneStaleShips()` räumt alle 60 s auch zur Laufzeit auf: Was länger als
+  30 Minuten keine Meldung hatte, verschwindet aus Tabelle und Karte. Das
+  schließt zugleich den alten offenen Punkt „Ship-Map wächst unbegrenzt"
+- Cap 1500 Einträge, älteste zuerst; Schreiben um 5 s debounced plus
+  `pagehide`/`visibilitychange`
+
+**`loadAisCache()` steht bewusst ganz unten im Verdrahtungsblock**, nicht bei
+den anderen Cache-Aufrufen: Es legt über `setPosition()` Marker an und braucht
+damit alles, was weiter oben per `var` initialisiert wird — `TYPE_COLORS`, die
+Filter und so weiter. Dieselbe Ladereihenfolge-Falle wie zweimal zuvor.
+
+### Altersspalte
+
+Direkt hinter dem Namen, rechtsbündig, in Sekunden. Farbschwellen: ab 120 s
+normal statt gedämpft, ab 600 s orange, ab 1800 s rot.
+
+`tickAges()` läuft im Sekundentakt und schreibt **nur die Zellen** neu, kein
+Tabellenneuaufbau. Ohne Ticker fror die Zahl genau bei den Schiffen ein, bei
+denen sie interessant ist — denen, von denen nichts mehr hereinkommt.
+
+Auf dem Telefon sitzt das Alter oben rechts in der Karte, links daneben die
+Flagge (`.c-age` und `.c-flag` sind dort absolut positioniert).
+
+**Achtung bei Testskripten:** Die Spalte sitzt an Position 4 und hat alle
+folgenden verschoben. Zellen deshalb über ihre Klasse ansprechen
+(`td.c-sog`, `td.c-cog`, …), nicht über `nth-child`.
 
 ### Schiffsstatik-Cache (`aisstream_static`)
 
@@ -648,11 +712,11 @@ kommt bei Class A nur alle sechs Minuten, bei Class B noch seltener.
 `vendor`, `serial`, `station` und die statischen Inland-Felder (`eni`,
 `eriCode`, `eriLabel`, `eriLength`, `eriBeam`).
 
-**Bewusst nicht gespeichert:** Positionen, Track, `destination`, `eta`,
-`draught`, `loaded`, `blueCones`. Das sind Reisedaten — ein drei Wochen
-altes Ziel als „aktuell" anzuzeigen wäre irreführend, und der Tiefgang
-ändert sich mit jeder Beladung. Wer hier Felder ergänzt: Diese Grenze
-bitte halten.
+**Hier bewusst nicht gespeichert:** Positionen, Track, `destination`, `eta`,
+`draught`, `loaded`, `blueCones` — die liegen im **AIS-Cache mit 30 Minuten
+TTL** (siehe oben). Die Trennung ist der Punkt: Identität und Rumpf ändern
+sich über Jahre nicht, Reisedaten in Minuten. Wer hier Felder ergänzt: Diese
+Grenze bitte halten.
 
 Mechanik:
 - Eine **einzelne** Map statt eines Schlüssels pro MMSI — ein Lesevorgang
@@ -802,6 +866,8 @@ verifiziert:
   zeigen immer dieselbe Auswahl, Zustand wird gemerkt
 - **Autostart**: Snapshot laden und verbinden beim Seitenaufruf, beides
   abschaltbar; Verbinden nur mit bereits gespeichertem Key
+- **Alter der Daten** in Sekunden, rechtsbündig direkt hinter dem Namen,
+  sekündlich mitlaufend und ab 600 s farblich markiert
 - **Freitextsuche** über Tabelle (MMSI, Name, Rufzeichen, IMO, Ziel, Typ,
   Land, Stationsart), 150 ms debounced
 - Rohdaten-Ansicht je MMSI (letzte Nachricht je Typ als JSON) + „JSON
@@ -1007,6 +1073,6 @@ alle Tests waren Wegwerf-Skripte im Scratchpad der jeweiligen Session.
 - Die **Statik** überlebt einen Reload inzwischen (siehe eigenen Abschnitt),
   Positionen und Tracks weiterhin nicht — das ist Absicht. Ein Deeplink
   `?mmsi=…`, der die Detailansicht direkt öffnet, fehlt noch
-- `MAX_TRACK_POINTS` (300) und die Ship-Map wachsen unbegrenzt über die
-  Sitzung; bei sehr langen Läufen wäre ein Aufräumen alter MMSIs
-  (`STALE_AFTER_MS` wird bisher nur für das Badge genutzt) sinnvoll
+- `MAX_TRACK_POINTS` (300) begrenzt die Tracklänge; die Ship-Map räumt
+  `pruneStaleShips()` inzwischen alle 60 s auf (30 Minuten ohne Meldung →
+  raus)
