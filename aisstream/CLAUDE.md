@@ -165,6 +165,97 @@ Node-Skript, `FilterMessageTypes: ["BinaryBroadcastMessage",
 "AddressedBinaryMessage"]`, Box über der Rhein-/Maasdelta
 (`[[51.0,3.8],[52.3,7.6]]`), ein paar Minuten mitzählen.
 
+## Anreicherung per IMO/MMSI: Digitraffic + Wikidata
+
+Zwei Quellen, beide **frei, ohne Schlüssel und mit `access-control-allow-origin: *`**
+— passt damit zur Architektur ohne Backend. Am 24. Aug. 2026 verifiziert.
+
+### Die Kette (die Reihenfolge ist der Punkt)
+
+```
+MMSI --> Digitraffic /vessels/{mmsi} --> IMO-Nummer
+                                          |
+MMSI --> Wikidata P587 ---(kein Treffer)--+--> Wikidata P458
+```
+
+Der Umweg über die IMO lohnt sich messbar: In einer Stichprobe von 75 realen
+Schiffen (Wattenmeer, Rhein, Ostsee) fand Wikidata **8 Schiffe über die MMSI
+und 9 weitere ausschließlich über die IMO-Nummer aus Digitraffic**. Ohne die
+Kette wäre also gut die Hälfte der Treffer verloren gegangen.
+
+### Trefferquoten — Erwartungen niedrig halten
+
+| Quelle | Treffer von 75 | Anmerkung |
+|---|---|---|
+| Digitraffic kennt die MMSI | 16 (21 %) | stark Ostsee-lastig, es ist finnisches AIS |
+| davon mit IMO-Nummer | 15 | |
+| Wikidata gesamt | 17 (23 %) | nur bekanntere Schiffe |
+
+**Am Rhein: null Treffer.** Binnenschiffe und kleine Boote sind in beiden
+Quellen praktisch nicht erfasst. Das ist kein Fehler, das ist die Realität
+offener Schiffsdaten — im UI steht die Zahl deshalb direkt dran.
+
+### `GET https://meri.digitraffic.fi/api/ais/v1/vessels/{mmsi}`
+
+Liefert die AIS-Statik: `imo`, `callSign`, `destination`, `eta`, `draught`,
+`shipType`, `posType`, `referencePointA..D`. Ohne MMSI im Pfad kommt die
+komplette Liste (~790 Schiffe, 39 KB) — `?mmsi=` als Query wird mit HTTP 400
+abgelehnt, es muss der Pfad sein.
+
+Kodierung, gegen echte Daten geprüft:
+- `draught` in **Dezimetern** (68 = 6,8 m)
+- `eta` als ein Integer: `month<<16 | day<<11 | hour<<6 | minute`.
+  Der Wert `1596` ist der Sentinel „keine Angabe" (Monat 0, Tag 0, Stunde 24,
+  Minute 60) — `etaLabel()` fängt das bereits ab
+- `referencePointA..D` in **Metern**, A+B = Länge, C+D = Breite
+- **Achtung `curl`:** Der Dienst verlangt `Accept-Encoding: gzip` und
+  antwortet sonst mit HTTP 406. Browser senden den Header ohnehin immer,
+  aber `curl` braucht `--compressed`
+
+### Wikidata SPARQL
+
+`https://query.wikidata.org/sparql?format=json&query=…` — **`format=json` in
+der Query-String statt eines `Accept`-Headers**, das spart den
+CORS-Preflight bei jeder Abfrage.
+
+Genutzte Properties: `P458` IMO, `P587` MMSI, `P2317` Rufzeichen, `P1093`
+Bruttoraumzahl, `P2790` Nettoraumzahl, `P2043` Länge, `P2261` Breite,
+`P2262` Tiefgang, `P2052` Geschwindigkeit, `P729` Indienststellung, `P31`
+Typ, `P289` Schiffsklasse, `P127` Eigner, `P137` Betreiber, `P176` Werft,
+`P8047` Flaggenstaat, `P532` Registerhafen, `P18` Foto.
+
+Drei Dinge, die Zeit gekostet haben:
+
+- **`P2067` („Masse") ist als Tragfähigkeit unbrauchbar.** Für die Emma
+  Mærsk (170 793 BRZ) liefert sie 16 810 t — die echte Tragfähigkeit liegt
+  bei rund 156 000 t. Die Property ist bewusst **nicht** eingebunden; die
+  eigene Schätzung aus den Maßen ist deutlich näher dran.
+- **Eine TEU-Property gibt es nicht.** Auch nicht bei der Emma Mærsk. Dafür
+  liefert `P31` den *echten* Schiffstyp („Containerschiff", „Massengutfrachter",
+  „RoRo-Schiff", „Fähre") — und genau das kann der ITU-Typcode 70–79 nicht.
+  Der Client nutzt das: Bestätigt Wikidata ein Containerschiff, entfällt beim
+  TEU-Wert der Zusatz „falls Containerschiff"; sagt Wikidata Bulker oder
+  Tanker, wird die TEU-Schätzung ganz unterdrückt.
+- **`P18` liefert `http://`-URLs.** Auf der per HTTPS ausgelieferten Seite ist
+  das Mixed Content und wird blockiert — das Bild bleibt einfach leer. Die
+  URL muss auf `https://` gehoben werden (macht `fetchWikidata()`).
+
+### Umsetzung im Client
+
+- **Nur für das geöffnete Schiff**, nie für die ganze Tabelle. Beide APIs sind
+  Gemeingut; Abfragen laufen serialisiert mit 350 ms Abstand (`throttled()`)
+- **Cache in `localStorage`** unter `aisstream_enrich_<mmsi>`, 30 Tage für
+  Treffer. **Auch Fehlschläge werden gecacht** (3 Tage) — bei 77 % Miss-Rate
+  ist das der eigentliche Gewinn, sonst fragt jedes Öffnen erneut vergeblich an
+- **Getrennte Töpfe:** Digitraffic landet unter `enrich.dt`, Wikidata auf der
+  obersten Ebene. Grund: Beide haben ein Feld `beam`, und beim flachen Mergen
+  erschien Digitraffics Live-AIS-Breite stillschweigend in der Wikidata-Zeile
+- **Anreicherung überschreibt nie den Livestream**, sie füllt nur Lücken —
+  der Stream ist aktuell, das Register kann Jahre alt sein
+- **Plausibilitätsfilter:** Fehlkonfigurierte Transponder senden `"0"` als
+  Rufzeichen. `plausibleCallSign()` verwirft das; mit Müll anreichern ist
+  schlechter als das Feld leer zu lassen
+
 ## Protokoll-Fallstricke (bereits gelöst, aber gut zu wissen)
 
 Alle über mehrere Debugging-Runden mit dem User empirisch/per Doku
@@ -282,6 +373,11 @@ verifiziert:
   - Passagierzahlen werden **bewusst nicht geschätzt** — Fähre und
     Kreuzfahrtschiff gleicher Länge liegen um eine Größenordnung
     auseinander. Echte Zahlen gibt es nur über FI 55
+- **Registeranreicherung je MMSI** (siehe eigenen Abschnitt oben): Digitraffic
+  liefert IMO, Rufzeichen, Ziel, ETA, Tiefgang und Maße, Wikidata
+  Bruttoraumzahl, Schiffsklasse, Eigner, Betreiber, Werft, Baujahr,
+  Registerhafen, Foto und den echten Schiffstyp. Läuft automatisch beim
+  Öffnen eines Schiffs (abschaltbar) oder per Button, mit lokalem Cache
 - "Token holen"-Button für openwaters.io (self-serve, kein Login)
 - Fällt Leaflet/CDN aus, degradiert die App auf reine Tabellen-Ansicht statt
   komplett zu brechen
@@ -300,8 +396,16 @@ langlebigen Datensatz, der über alle Nachrichtentypen hinweg angereichert wird:
   maneuver, fixType, msgTimestamp, time,
   counts:{<MessageType>:n}, total, lastMessageType,
   track:[{lat,lon,t,sog}], raw:{<MessageType>:<letzte Message>},
+  inland:{eni,eriCode,eriLabel,eriLength,eriBeam,eriDraught,blueCones,loaded},
+  persons:{crew,passengers,personnel}, personsAt,
+  enrich:{ sources:[...], dt:{<Digitraffic>}, <Wikidata-Felder> },
+  enrichState:'loading'|'done'|'empty'|'error', enrichError,
+  snapshotSource, snapshotSeen,
   firstSeen, updatedAt, marker }
 ```
+
+`enrich.dt` und die Wikidata-Felder liegen bewusst getrennt — beide Quellen
+haben ein `beam`, siehe Anreicherungsabschnitt.
 
 Zentrale Funktionen: `getShip(mmsi)` legt den Datensatz an, `recordMessage()`
 zählt/merkt die Rohnachricht, `setPosition()` schreibt Position + Track +
@@ -427,13 +531,15 @@ alle Tests waren Wegwerf-Skripte im Scratchpad der jeweiligen Session.
 
 - Sobald AISstream.io stabil zurück ist: Default-Server-URL ggf. wieder auf
   `wss://stream.aisstream.io/v0/stream` umstellen (siehe oben)
-- Für echte TEU-/Bruttoraumzahl-/Passagierkapazitätsdaten führt kein Weg an
-  einem Schiffsregister vorbei (Join über die IMO-Nummer aus
-  `ShipStaticData`). Wikidata (`P458` = IMO) ist frei und CORS-fähig, deckt
-  aber fast nur prominente Schiffe ab und hat keine gepflegte TEU-Property;
-  kommerzielle APIs (Datalastic, Data Docked) hätten die Felder, brauchen
-  aber einen Key — und ein Key im Browser-JS ist öffentlich, das bräuchte
-  einen kleinen Proxy und damit erstmals ein Backend
+- Die Bruttoraumzahl kommt jetzt aus Wikidata, **eine echte TEU-Zahl gibt es
+  weiterhin nirgends frei**. Dafür bräuchte es eine kommerzielle API
+  (Datalastic, Data Docked) — mit Key, und ein Key im Browser-JS ist
+  öffentlich, das hieße einen kleinen Proxy und damit erstmals ein Backend.
+  Die geschätzte TEU-Zahl ist der bewusste Ersatz
+- Weitere freie Quellen, die noch niemand geprüft hat: Kystverket (Norwegen)
+  und BarentsWatch haben offene AIS-Daten, letzteres allerdings mit
+  Registrierung. Für die Nordsee wäre das die naheliegende Ergänzung zu
+  Digitraffic, das ja vor allem die Ostsee abdeckt
 - Kein automatisiertes Test-Setup — bei größeren Änderungen die
   Playwright-Smoke-Tests wie oben beschrieben neu aufsetzen. Da jetzt echte
   Live-Tests möglich sind (HTTPS-Relay + ws-Brücke), wäre ein kleines

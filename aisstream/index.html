@@ -303,6 +303,50 @@
     #detail { width: 100%; }
     .detail-actions button { flex: 1 1 100%; }
   }
+  /* --- Anreicherung aus Schiffsregistern ----------------------------- */
+  .enrich-photo {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-top: 0.6rem;
+    display: block;
+  }
+  .enrich-photo-credit {
+    font-size: 0.68rem;
+    color: var(--muted);
+    margin-top: 0.25rem;
+  }
+  .src {
+    display: inline-block;
+    font-size: 0.62rem;
+    padding: 0 0.28rem;
+    margin-left: 0.3rem;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    vertical-align: 1px;
+    white-space: nowrap;
+  }
+  .src.wd { border-color: #6b8cc7; color: #9db8e8; }
+  .src.dt { border-color: #4f9e7a; color: #7fd0aa; }
+  .enrich-status {
+    font-size: 0.74rem;
+    color: var(--muted);
+    margin-top: 0.5rem;
+    line-height: 1.4;
+  }
+  .enrich-status.err { color: var(--err); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-right: 0.35rem;
+    vertical-align: -1px;
+  }
 </style>
 </head>
 <body>
@@ -380,6 +424,21 @@
       <button id="snapshotBtn">Snapshot laden (ohne Verbindung, ohne Key)</button>
     </div>
 
+    <h2 style="margin-top:1.2rem">Schiffsregister</h2>
+    <div class="checkboxes">
+      <label><input type="checkbox" id="autoEnrich" checked /> Beim Öffnen eines Schiffs automatisch abfragen</label>
+    </div>
+    <p class="hint" style="margin-top:0.35rem">
+      Fragt <a href="https://meri.digitraffic.fi" target="_blank" rel="noopener">Digitraffic</a>
+      (IMO, Rufzeichen, Ziel, Maße) und
+      <a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>
+      (Bruttoraumzahl, Reederei, Werft, Baujahr, Foto, echter Schiffstyp) ab &ndash;
+      beide frei und ohne Schlüssel, immer nur für das geöffnete Schiff.
+      Ergebnisse werden lokal zwischengespeichert. Trefferquote in einer
+      Stichprobe von 75 Schiffen: Digitraffic 21&nbsp;%, Wikidata 23&nbsp;% &ndash;
+      Binnenschiffe und kleine Boote sind praktisch nie erfasst.
+    </p>
+
     <div class="stats">
       <div>Nachrichten<br /><b id="msgCount">0</b></div>
       <div>Schiffe sichtbar<br /><b id="shipCount">0</b></div>
@@ -450,6 +509,7 @@
     <button type="button" id="detailCenter">Auf Karte zentrieren</button>
     <button type="button" id="detailTrack">Track anzeigen</button>
     <button type="button" id="detailLookup">Bei openwaters nachschlagen</button>
+    <button type="button" id="detailEnrich">Schiffsregister abfragen</button>
     <button type="button" id="detailRawToggle">Rohdaten</button>
     <button type="button" id="detailCopy">JSON kopieren</button>
   </div>
@@ -670,6 +730,7 @@
   var tableBody = document.getElementById("shipTableBody");
   var mmsiFilterInput = document.getElementById("mmsiFilter");
   var snapshotBtn = document.getElementById("snapshotBtn");
+  var autoEnrichInput = document.getElementById("autoEnrich");
   var searchInput = document.getElementById("shipSearch");
   var searchHintEl = document.getElementById("searchHint");
   var knownCountEl = document.getElementById("knownCount");
@@ -1183,7 +1244,10 @@
   function formatTons(value) {
     if (value == null) return null;
     if (value >= 10000) return Math.round(value / 1000) + " 000 t";
-    return Math.round(value / 100) * 100 + " t";
+    if (value >= 1000) return Math.round(value / 100) * 100 + " t";
+    // Rounding a 25 t launch to the nearest 100 t reports "0 t".
+    if (value >= 100) return Math.round(value / 10) * 10 + " t";
+    return Math.max(1, Math.round(value)) + " t";
   }
 
   // Sums the great-circle legs of a stored track, in nautical miles.
@@ -1282,7 +1346,9 @@
       entry.mmsi, entry.name, entry.callSign, entry.imo, entry.destination,
       entry.typeDetail, entry.typeLabel, entry.station,
       info.country, info.iso, info.category,
-      entry.inland && entry.inland.eni, entry.inland && entry.inland.eriLabel
+      entry.inland && entry.inland.eni, entry.inland && entry.inland.eriLabel,
+      entry.enrich && entry.enrich.typeLabel, entry.enrich && entry.enrich.owner,
+      entry.enrich && entry.enrich.operator, entry.enrich && entry.enrich.shipClass
     ].join(" ").toLowerCase();
     return haystack.indexOf(needle) !== -1;
   }
@@ -1534,6 +1600,269 @@
     }
   }
 
+  /* --- Anreicherung aus Schiffsregistern ------------------------------ */
+
+  // Two keyless, CORS-enabled sources, queried in a chain: Digitraffic
+  // supplies the IMO number for an MMSI, and that IMO roughly doubles the
+  // Wikidata hit rate over looking up the MMSI alone (measured over 75 live
+  // ships: 8 hits by MMSI, 9 more only reachable via the IMO).
+  var DIGITRAFFIC_VESSEL = "https://meri.digitraffic.fi/api/ais/v1/vessels/";
+  var WIKIDATA_SPARQL = "https://query.wikidata.org/sparql";
+  var ENRICH_TTL_HIT = 30 * 24 * 3600 * 1000;
+  var ENRICH_TTL_MISS = 3 * 24 * 3600 * 1000;
+  var ENRICH_GAP_MS = 350;
+
+  var enrichInFlight = {};
+  var enrichQueue = Promise.resolve();
+
+  // Both APIs are public goods; serialise lookups with a small gap rather
+  // than firing one request per ship in the table.
+  function throttled(fn) {
+    var run = enrichQueue.then(function () { return fn(); });
+    enrichQueue = run.catch(function () {}).then(function () {
+      return new Promise(function (r) { setTimeout(r, ENRICH_GAP_MS); });
+    });
+    return run;
+  }
+
+  function enrichCacheGet(mmsi) {
+    try {
+      var raw = localStorage.getItem("aisstream_enrich_" + mmsi);
+      if (!raw) return null;
+      var entry = JSON.parse(raw);
+      var ttl = entry.found ? ENRICH_TTL_HIT : ENRICH_TTL_MISS;
+      if (Date.now() - entry.at > ttl) {
+        localStorage.removeItem("aisstream_enrich_" + mmsi);
+        return null;
+      }
+      return entry;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function enrichCacheSet(mmsi, data, found) {
+    try {
+      localStorage.setItem("aisstream_enrich_" + mmsi,
+        JSON.stringify({ at: Date.now(), found: found, data: data }));
+    } catch (e) {
+      // Quota exhausted - the cache is a convenience, not a requirement.
+    }
+  }
+
+  // Misconfigured transponders broadcast placeholders like "0" or "@@@@" in
+  // the call sign field. Enriching a ship with junk is worse than leaving the
+  // field empty, so require something that could actually be a call sign.
+  function plausibleCallSign(value) {
+    var call = cleanText(value);
+    if (!call) return null;
+    if (call.length < 3) return null;
+    if (/^0+$/.test(call)) return null;
+    if (!/[A-Za-z]/.test(call)) return null;
+    return call;
+  }
+
+  // AIS packs the ETA into one integer: month<<16 | day<<11 | hour<<6 | minute.
+  function decodeAisEta(value) {
+    if (value == null) return null;
+    var n = Number(value);
+    if (!n) return null;
+    return etaLabel({ Month: n >> 16, Day: (n >> 11) & 0x1f, Hour: (n >> 6) & 0x1f, Minute: n & 0x3f });
+  }
+
+  function fetchDigitraffic(mmsi) {
+    return fetch(DIGITRAFFIC_VESSEL + encodeURIComponent(mmsi)).then(function (res) {
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error("Digitraffic HTTP " + res.status);
+      return res.json();
+    }).then(function (v) {
+      if (!v) return null;
+      var out = { source: "digitraffic" };
+      if (v.imo) out.imo = String(v.imo);
+      var call = plausibleCallSign(v.callSign);
+      if (call) out.callSign = call;
+      var dest = cleanText(v.destination);
+      if (dest) out.destination = dest;
+      var eta = decodeAisEta(v.eta);
+      if (eta) out.eta = eta;
+      // Draught arrives in decimetres, dimensions already in metres.
+      if (v.draught) out.draught = v.draught / 10;
+      if (v.shipType != null) out.typeCode = v.shipType;
+      var length = (v.referencePointA || 0) + (v.referencePointB || 0);
+      var beam = (v.referencePointC || 0) + (v.referencePointD || 0);
+      if (length && beam) {
+        out.length = length;
+        out.beam = beam;
+        out.dim = { A: v.referencePointA, B: v.referencePointB, C: v.referencePointC, D: v.referencePointD };
+      }
+      return out;
+    });
+  }
+
+  function wikidataQuery(clause) {
+    var query =
+      "SELECT ?ship ?shipLabel ?typeLabel ?imo ?mmsi ?callsign ?gt ?nt ?loa ?beam " +
+      "?draft ?speed ?built ?classLabel ?ownerLabel ?operatorLabel ?builderLabel " +
+      "?flagLabel ?homeportLabel ?image WHERE { " + clause +
+      " OPTIONAL { ?ship wdt:P458 ?imo } OPTIONAL { ?ship wdt:P587 ?mmsi }" +
+      " OPTIONAL { ?ship wdt:P2317 ?callsign } OPTIONAL { ?ship wdt:P1093 ?gt }" +
+      " OPTIONAL { ?ship wdt:P2790 ?nt } OPTIONAL { ?ship wdt:P2043 ?loa }" +
+      " OPTIONAL { ?ship wdt:P2261 ?beam } OPTIONAL { ?ship wdt:P2262 ?draft }" +
+      " OPTIONAL { ?ship wdt:P2052 ?speed } OPTIONAL { ?ship wdt:P729 ?built }" +
+      " OPTIONAL { ?ship wdt:P31 ?type } OPTIONAL { ?ship wdt:P289 ?class }" +
+      " OPTIONAL { ?ship wdt:P127 ?owner } OPTIONAL { ?ship wdt:P137 ?operator }" +
+      " OPTIONAL { ?ship wdt:P176 ?builder } OPTIONAL { ?ship wdt:P8047 ?flag }" +
+      " OPTIONAL { ?ship wdt:P532 ?homeport } OPTIONAL { ?ship wdt:P18 ?image }" +
+      ' SERVICE wikibase:label { bd:serviceParam wikibase:language "de,en" } } LIMIT 1';
+    // format=json in the query string avoids an Accept header and with it a
+    // CORS preflight on every lookup.
+    return fetch(WIKIDATA_SPARQL + "?format=json&query=" + encodeURIComponent(query))
+      .then(function (res) {
+        if (!res.ok) throw new Error("Wikidata HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (json) {
+        var rows = json && json.results && json.results.bindings;
+        if (!rows || !rows.length) return null;
+        var r = rows[0];
+        var val = function (k) { return r[k] ? r[k].value : null; };
+        var num = function (k) { return r[k] ? Number(r[k].value) : null; };
+        var out = { source: "wikidata", entity: val("ship") };
+        out.name = val("shipLabel");
+        // A bare Q-id means Wikidata has the item but no label in de/en.
+        if (out.name && /^Q\d+$/.test(out.name)) out.name = null;
+        out.typeLabel = val("typeLabel");
+        out.imo = val("imo");
+        out.mmsi = val("mmsi");
+        out.callSign = val("callsign");
+        out.gt = num("gt");
+        out.nt = num("nt");
+        out.loa = num("loa");
+        out.beam = num("beam");
+        out.draft = num("draft");
+        out.speed = num("speed");
+        out.built = val("built") ? val("built").slice(0, 10) : null;
+        out.shipClass = val("classLabel");
+        out.owner = val("ownerLabel");
+        out.operator = val("operatorLabel");
+        out.builder = val("builderLabel");
+        out.flag = val("flagLabel");
+        out.homeport = val("homeportLabel");
+        // Wikidata hands out http:// URLs for P18; on an https page that is
+        // mixed content and gets blocked, so upgrade the scheme.
+        var img = val("image");
+        out.image = img ? img.replace(/^http:\/\//i, "https://") : null;
+        return out;
+      });
+  }
+
+  function fetchWikidata(mmsi, imo) {
+    return wikidataQuery('?ship wdt:P587 "' + mmsi + '" .').then(function (hit) {
+      if (hit || !imo) return hit;
+      return wikidataQuery('?ship wdt:P458 "' + imo + '" .');
+    });
+  }
+
+  // Wikidata knows what an ITU type code cannot express: whether a "cargo
+  // ship" is a container ship, a bulker or a heavy-lift vessel.
+  var CONTAINER_RE = /container/i;
+  var NON_CONTAINER_RE = /massengut|bulk|tanker|fähre|ferry|passagier|kreuzfahrt|schlepper|tug|roro|ro-ro|schwergut|fisch|bagger|forschung|yacht|segel/i;
+
+  function applyEnrichment(entry, data) {
+    entry.enrich = data;
+    if (!data) return;
+    var dt = data.dt || {};
+    // Both sources only fill gaps; neither overwrites what the live stream
+    // said, because the stream is current and a registry may be years old.
+    var fill = function (key, value) {
+      if (value != null && value !== "" && (entry[key] == null || entry[key] === "")) entry[key] = value;
+    };
+    fill("imo", dt.imo || data.imo);
+    fill("callSign", dt.callSign || data.callSign);
+    fill("destination", dt.destination);
+    fill("eta", dt.eta);
+    fill("draught", dt.draught);
+    fill("name", data.name);
+    if (dt.dim && !entry.dim) {
+      entry.dim = dt.dim;
+      entry.size = shipSize(dt.dim) || entry.size;
+    }
+    if (dt.typeCode != null && entry.typeCode == null) {
+      entry.typeCode = dt.typeCode;
+      entry.typeLabel = entry.typeLabel || shipTypeLabel(dt.typeCode);
+      entry.typeDetail = entry.typeDetail || shipTypeDetail(dt.typeCode);
+    }
+    if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
+  }
+
+  // Runs the provider chain for one MMSI. Cached results - including misses -
+  // are reused so reopening a ship costs nothing.
+  function enrichShip(mmsi, force) {
+    mmsi = String(mmsi);
+    var entry = ships.get(mmsi);
+    if (!entry) return Promise.resolve(null);
+
+    if (!force) {
+      var cached = enrichCacheGet(mmsi);
+      if (cached) {
+        applyEnrichment(entry, cached.data);
+        entry.enrichState = cached.found ? "done" : "empty";
+        return Promise.resolve(cached.data);
+      }
+      if (enrichInFlight[mmsi]) return enrichInFlight[mmsi];
+    }
+
+    entry.enrichState = "loading";
+    entry.enrichError = null;
+    if (selectedMmsi === mmsi) renderDetail(entry);
+
+    var job = throttled(function () {
+      return fetchDigitraffic(mmsi).catch(function (e) {
+        entry.enrichError = e.message;
+        return null;
+      });
+    }).then(function (dt) {
+      var imo = (dt && dt.imo) || entry.imo || null;
+      return throttled(function () {
+        return fetchWikidata(mmsi, imo).catch(function (e) {
+          entry.enrichError = e.message;
+          return null;
+        });
+      }).then(function (wd) {
+        if (!dt && !wd) return null;
+        // Kept in separate buckets on purpose: both sources have a "beam",
+        // and Digitraffic's live AIS beam is not Wikidata's registry beam.
+        // Flattening them made the registry panel mix the two silently.
+        var merged = { sources: [] };
+        if (dt) { merged.dt = dt; merged.sources.push("Digitraffic"); }
+        if (wd) {
+          Object.keys(wd).forEach(function (k) {
+            if (wd[k] != null && wd[k] !== "" && k !== "source") merged[k] = wd[k];
+          });
+          merged.sources.push("Wikidata");
+        }
+        return merged;
+      });
+    }).then(function (data) {
+      applyEnrichment(entry, data);
+      entry.enrichState = data ? "done" : "empty";
+      enrichCacheSet(mmsi, data, !!data);
+      delete enrichInFlight[mmsi];
+      refreshVisibleShips();
+      if (selectedMmsi === mmsi) renderDetail(entry);
+      return data;
+    }).catch(function (e) {
+      entry.enrichState = "error";
+      entry.enrichError = e.message;
+      delete enrichInFlight[mmsi];
+      if (selectedMmsi === mmsi) renderDetail(entry);
+      return null;
+    });
+
+    enrichInFlight[mmsi] = job;
+    return job;
+  }
+
   /* --- openwaters-Snapshot (REST, ohne WebSocket und ohne Key) -------- */
 
   // Derives the REST base from whatever stream URL is configured, so a
@@ -1706,11 +2035,16 @@
     }
 
     var code = Number(entry.typeCode) || 0;
-    if (code >= 70 && code <= 79) {
+    var known = entry.enrich && entry.enrich.typeLabel;
+    // A registry type settles what the ITU code leaves open: code 70-79 is
+    // just "cargo", but Wikidata says container ship or bulker outright.
+    var isContainer = known && CONTAINER_RE.test(known);
+    var notContainer = known && NON_CONTAINER_RE.test(known);
+    if (isContainer || (code >= 70 && code <= 79 && !notContainer)) {
       var teu = estimateTeu(length, beam);
       if (teu) {
-        out.teu = "≈ " + (Math.round(teu / 50) * 50).toLocaleString("de-DE") +
-          " TEU, falls Containerschiff";
+        out.teu = "≈ " + (Math.round(teu / 50) * 50).toLocaleString("de-DE") + " TEU" +
+          (isContainer ? "" : ", falls Containerschiff");
       }
     } else if (code >= 60 && code <= 69) {
       // Passenger capacity does not follow from hull size - a ferry and a
@@ -1752,6 +2086,8 @@
       ? ["crew", "passengers", "personnel"].reduce(function (sum, k) { return sum + (persons[k] || 0); }, 0)
       : null;
     var inland = entry.inland || {};
+    var reg = entry.enrich || {};
+    var regDt = reg.dt || {};
     var est = capacityEstimate(entry);
 
     var travelled = entry.track.length > 1 ? trackDistanceNm(entry.track) : 0;
@@ -1828,6 +2164,30 @@
         ["Entfernung", distance],
         ["Peilung", bearing]
       ]) +
+      section("Aus Digitraffic (AIS-Statik)", [
+        ["IMO-Nummer", regDt.imo],
+        ["Rufzeichen", regDt.callSign],
+        ["Ziel", regDt.destination],
+        ["ETA", regDt.eta],
+        ["Tiefgang", regDt.draught ? regDt.draught.toFixed(1) + " m" : null],
+        ["Maße", regDt.length && regDt.beam ? regDt.length + " × " + regDt.beam + " m" : null]
+      ]) +
+      section("Schiffsregister (Wikidata)", [
+        ["Typ laut Register", reg.typeLabel],
+        ["Schiffsklasse", reg.shipClass],
+        ["Bruttoraumzahl", reg.gt ? reg.gt.toLocaleString("de-DE") + " BRZ" : null],
+        ["Nettoraumzahl", reg.nt ? reg.nt.toLocaleString("de-DE") + " NRZ" : null],
+        ["Länge über alles", reg.loa ? reg.loa + " m" : null],
+        ["Breite", reg.beam ? reg.beam + " m" : null],
+        ["Konstruktionstiefgang", reg.draft ? reg.draft + " m" : null],
+        ["Dienstgeschwindigkeit", reg.speed ? reg.speed + " kn" : null],
+        ["In Dienst gestellt", reg.built],
+        ["Eigner", reg.owner],
+        ["Betreiber", reg.operator],
+        ["Bauwerft", reg.builder],
+        ["Flaggenstaat (Register)", reg.flag],
+        ["Registerhafen", reg.homeport]
+      ]) +
       section("Empfang", [
         ["Zuletzt gesehen", relativeTime(entry.updatedAt)],
         ["openwaters-Quelle", entry.snapshotSource],
@@ -1840,6 +2200,28 @@
         ["Strecke im Track", travelled ? travelled.toFixed(2) + " sm" : null],
         ["Ø Geschwindigkeit", span > 0.002 && travelled ? (travelled / span).toFixed(1) + " kn" : null]
       ]);
+
+    // Photo and lookup status live below the field list, above the links.
+    var extra = "";
+    if (reg.image) {
+      extra += '<img class="enrich-photo" src="' + esc(reg.image) + '" alt="" loading="lazy" />' +
+        '<div class="enrich-photo-credit">Foto: Wikimedia Commons' +
+        (reg.entity ? ' &middot; <a href="' + esc(reg.entity) + '" target="_blank" rel="noopener">Wikidata</a>' : "") +
+        "</div>";
+    }
+    if (reg.sources && reg.sources.length) {
+      extra += '<div class="enrich-status">Quellen: ' + esc(reg.sources.join(" + ")) + "</div>";
+    }
+    if (entry.enrichState === "loading") {
+      extra += '<div class="enrich-status"><span class="spinner"></span>Schiffsregister wird abgefragt…</div>';
+    } else if (entry.enrichState === "empty") {
+      extra += '<div class="enrich-status">Kein Registereintrag zu dieser MMSI gefunden. ' +
+        'Digitraffic deckt vor allem die Ostsee ab, Wikidata nur bekanntere Schiffe.</div>';
+    } else if (entry.enrichState === "error") {
+      extra += '<div class="enrich-status err">Registerabfrage fehlgeschlagen: ' +
+        esc(entry.enrichError || "unbekannter Fehler") + "</div>";
+    }
+    detailBody.insertAdjacentHTML("beforeend", extra);
 
     detailRaw.textContent = JSON.stringify(entry.raw, null, 2);
 
@@ -1863,6 +2245,7 @@
     detailEl.setAttribute("aria-hidden", "false");
     renderDetail(ships.get(mmsi));
     refreshVisibleShips();
+    if (autoEnrichInput.checked) enrichShip(mmsi, false);
   }
 
   function closeDetail() {
@@ -2118,6 +2501,11 @@
 
   document.getElementById("detailLookup").addEventListener("click", function () {
     if (selectedMmsi) lookupMmsi(selectedMmsi);
+  });
+
+  document.getElementById("detailEnrich").addEventListener("click", function () {
+    // An explicit click re-queries even if a miss was cached.
+    if (selectedMmsi) enrichShip(selectedMmsi, true);
   });
 
   document.getElementById("detailRawToggle").addEventListener("click", function () {
