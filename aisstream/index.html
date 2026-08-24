@@ -2912,16 +2912,23 @@
   }
 
   var enrichInFlight = {};
-  var enrichQueue = Promise.resolve();
   // Bumped when the caches are cleared, so a lookup that was already in
   // flight cannot write its result back into the freshly emptied cache.
   var cacheGeneration = 0;
 
-  // Both APIs are public goods; serialise lookups with a small gap rather
-  // than firing one request per ship in the table.
-  function throttled(fn) {
-    var run = enrichQueue.then(function () { return fn(); });
-    enrichQueue = run.catch(function () {}).then(function () {
+  // Je Host eine eigene Warteschlange. Alle APIs sind oeffentliche Dienste,
+  // und Wikidata wie Wikimedia haben auf zu dichte Abfragen schon mit 429
+  // geantwortet - deshalb bleibt es pro Host bei einer Anfrage zur Zeit mit
+  // festem Abstand. Frueher lief alles durch EINE Warteschlange, wodurch
+  // sich Hosts gegenseitig blockierten: gemessen mit 250 ms Serverlatenz
+  // brauchten drei Schiffe 5,8 s fuer zwoelf Anfragen, obwohl sie an drei
+  // verschiedene Hosts gingen.
+  var hostQueues = {};
+
+  function throttled(host, fn) {
+    var prev = hostQueues[host] || Promise.resolve();
+    var run = prev.then(function () { return fn(); });
+    hostQueues[host] = run.catch(function () {}).then(function () {
       return new Promise(function (r) { setTimeout(r, ENRICH_GAP_MS); });
     });
     return run;
@@ -3113,11 +3120,12 @@
     });
   }
 
-  function fetchWikidata(mmsi, imo) {
-    return wikidataQuery('?ship wdt:P587 "' + mmsi + '" .').then(function (hit) {
-      if (hit || !imo) return hit;
-      return wikidataQuery('?ship wdt:P458 "' + imo + '" .');
-    });
+  function wikidataByMmsi(mmsi) {
+    return wikidataQuery('?ship wdt:P587 "' + mmsi + '" .');
+  }
+
+  function wikidataByImo(imo) {
+    return wikidataQuery('?ship wdt:P458 "' + imo + '" .');
   }
 
   // Wikidata knows what an ITU type code cannot express: whether a "cargo
@@ -3180,44 +3188,60 @@
     if (selectedMmsi === mmsi) renderDetail(entry);
 
     var generation = cacheGeneration;
-    var job = throttled(function () {
-      return fetchDigitraffic(mmsi).catch(function (e) {
-        entry.enrichError = e.message;
-        return null;
-      });
-    }).then(function (dt) {
+    var soft = function (e) {
+      entry.enrichError = e.message;
+      return null;
+    };
+
+    // Digitraffic und die Wikidata-Abfrage ueber die MMSI haengen nicht
+    // voneinander ab und starten deshalb gleichzeitig. Nur die beiden
+    // Nachschlaege ueber die IMO - Wikidata-Fallback und das Commons-Foto -
+    // brauchen wirklich erst das Ergebnis von Digitraffic.
+    var dtJob = throttled("digitraffic", function () {
+      return fetchDigitraffic(mmsi).catch(soft);
+    });
+    var wdJob = throttled("wikidata", function () {
+      return wikidataByMmsi(mmsi).catch(soft);
+    });
+
+    var job = Promise.all([dtJob, wdJob]).then(function (pair) {
+      var dt = pair[0];
+      var wd = pair[1];
       var imo = (dt && dt.imo) || entry.imo || null;
-      return throttled(function () {
-        return fetchWikidata(mmsi, imo).catch(function (e) {
-          entry.enrichError = e.message;
-          return null;
+      if (wd || !imo) return { dt: dt, wd: wd, imo: imo };
+      return throttled("wikidata", function () {
+        return wikidataByImo(imo).catch(soft);
+      }).then(function (hit) {
+        return { dt: dt, wd: hit, imo: imo };
+      });
+    }).then(function (res) {
+      var dt = res.dt;
+      var wd = res.wd;
+      var imo = res.imo;
+      if (!dt && !wd) return null;
+      // Kept in separate buckets on purpose: both sources have a "beam",
+      // and Digitraffic's live AIS beam is not Wikidata's registry beam.
+      // Flattening them made the registry panel mix the two silently.
+      var merged = { sources: [] };
+      if (dt) { merged.dt = dt; merged.sources.push("Digitraffic"); }
+      if (wd) {
+        Object.keys(wd).forEach(function (k) {
+          if (wd[k] != null && wd[k] !== "" && k !== "source") merged[k] = wd[k];
         });
-      }).then(function (wd) {
-        if (!dt && !wd) return null;
-        // Kept in separate buckets on purpose: both sources have a "beam",
-        // and Digitraffic's live AIS beam is not Wikidata's registry beam.
-        // Flattening them made the registry panel mix the two silently.
-        var merged = { sources: [] };
-        if (dt) { merged.dt = dt; merged.sources.push("Digitraffic"); }
-        if (wd) {
-          Object.keys(wd).forEach(function (k) {
-            if (wd[k] != null && wd[k] !== "" && k !== "source") merged[k] = wd[k];
-          });
-          merged.sources.push("Wikidata");
+        merged.sources.push("Wikidata");
+      }
+      // Nur ergaenzend: Wikidatas eigenes Foto hat Vorrang, es ist dem
+      // Schiff eindeutig zugeordnet statt ueber eine Textsuche gefunden.
+      if (merged.image || !imo) return merged;
+      return throttled("commons", function () {
+        return fetchCommonsPhoto(imo).catch(function () { return null; });
+      }).then(function (photo) {
+        if (photo) {
+          merged.image = photo.image;
+          merged.imageCredit = photo.imageCredit;
+          merged.sources.push("Commons");
         }
-        // Nur ergaenzend: Wikidatas eigenes Foto hat Vorrang, es ist dem
-        // Schiff eindeutig zugeordnet statt ueber eine Textsuche gefunden.
-        if (merged.image || !imo) return merged;
-        return throttled(function () {
-          return fetchCommonsPhoto(imo).catch(function () { return null; });
-        }).then(function (photo) {
-          if (photo) {
-            merged.image = photo.image;
-            merged.imageCredit = photo.imageCredit;
-            merged.sources.push("Commons");
-          }
-          return merged;
-        });
+        return merged;
       });
     }).then(function (data) {
       applyEnrichment(entry, data);

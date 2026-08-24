@@ -270,12 +270,14 @@ Drei Dinge, die Zeit gekostet haben:
   Tanker, wird die TEU-Schätzung ganz unterdrückt.
 - **`P18` liefert `http://`-URLs.** Auf der per HTTPS ausgelieferten Seite ist
   das Mixed Content und wird blockiert — das Bild bleibt einfach leer. Die
-  URL muss auf `https://` gehoben werden (macht `fetchWikidata()`).
+  URL muss auf `https://` gehoben werden (macht `wikidataQuery()`).
 
 ### Umsetzung im Client
 
-- **Nur für das geöffnete Schiff**, nie für die ganze Tabelle. Beide APIs sind
-  Gemeingut; Abfragen laufen serialisiert mit 350 ms Abstand (`throttled()`)
+- **Nur für das geöffnete Schiff**, nie für die ganze Tabelle. Alle APIs sind
+  Gemeingut; pro Host läuft **eine** Abfrage zur Zeit mit 350 ms Abstand
+  (`throttled(host, fn)`) — verschiedene Hosts laufen parallel, siehe
+  „Registerabfragen parallelisieren" weiter unten
 - **Cache in `localStorage`** unter `aisstream_enrich_<mmsi>`, 30 Tage für
   Treffer. **Auch Fehlschläge werden gecacht** (3 Tage) — bei 77 % Miss-Rate
   ist das der eigentliche Gewinn, sonst fragt jedes Öffnen erneut vergeblich an
@@ -722,6 +724,36 @@ an die Reihe, der Zustand blieb auf „wird abgefragt".
 Jeder Abruf hat deshalb jetzt eine harte Frist (`fetchWithTimeout`,
 12 s für Register, 15 s für Bilder, per `AbortController`). Wer eine weitere
 Quelle einhängt: dieselbe Frist benutzen, nicht das nackte `fetch`.
+
+### Registerabfragen parallelisieren: eine Schlange **je Host**
+
+Die eine globale Warteschlange kostete mehr, als sie schützte: Sie hielt auch
+Anfragen an *verschiedene* Hosts auseinander. Gemessen mit künstlich 250 ms
+Serverlatenz je Anfrage (`scratchpad/timing.js`, Playwright, jeder Host-Treffer
+mit Zeitstempel):
+
+| | vorher (eine Schlange) | nachher (je Host) |
+|---|---|---|
+| ein Schiff, ganze Kette | 1716 ms | 1113 ms |
+| drei Schiffe, 12 Anfragen | 5806 ms | 3470 ms |
+
+**Was parallel darf und was nicht.** Pro Schiff sind `fetchDigitraffic(mmsi)`
+und die Wikidata-Abfrage **über die MMSI** voneinander unabhängig — sie starten
+zusammen über `Promise.all`. Wirklich abhängig sind nur die beiden Nachschläge
+über die **IMO**: der Wikidata-Fallback (`wikidataByImo`) und das Commons-Foto,
+denn die IMO liefert erst Digitraffic. Deshalb ist `fetchWikidata(mmsi, imo)` in
+`wikidataByMmsi()` und `wikidataByImo()` aufgeteilt.
+
+**Die Höflichkeit bleibt gleich.** Wikidata und Wikimedia haben dieser Sandbox
+schon 429/403 zurückgegeben — pro Host ändert sich nichts: weiterhin eine
+Anfrage zur Zeit, weiterhin 350 ms Abstand. In der Messung liegen die
+Wikidata-Treffer 605–611 ms auseinander (250 ms Latenz + 350 ms Pause), also
+nie überlappend. Wer eine Quelle ergänzt: **eigenen Host-Schlüssel** vergeben
+(`throttled("commons", …)`), nicht einen fremden mitbenutzen — sonst bremsen
+sich zwei Dienste wieder gegenseitig aus.
+
+Die Frist von oben bleibt trotzdem nötig: Eine hängende Anfrage blockiert jetzt
+nur noch ihren eigenen Host, aber den vollständig.
 
 ### Bildzwischenspeicher (Cache Storage, nicht localStorage)
 
