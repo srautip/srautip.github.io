@@ -392,6 +392,18 @@
     border-width: 3px;
     box-shadow: 0 0 0 1.5px #ffffff, 0 0 0 2px rgba(11, 11, 11, 0.45);
   }
+  /* Eigener Standort: kleines schwarzes Kreuz. Bewusst eine andere Form als
+     jeder Schiffsmarker - ein Kreis in irgendeiner Farbe waere als "noch ein
+     Schiff" lesbar. Der helle Umriss haelt es auf dunklen Kacheln sichtbar. */
+  .own-pos svg { display: block; }
+  .own-pos .halo { stroke: #ffffff; stroke-width: 3.5; opacity: 0.85; }
+  .own-pos .cross { stroke: #0b0b0b; stroke-width: 2; }
+  .map-legend .sw.cross {
+    border: 0;
+    box-shadow: none;
+    background: none;
+    display: flex; align-items: center; justify-content: center;
+  }
   .map-legend {
     background: rgba(255, 255, 255, 0.94);
     border-radius: 6px;
@@ -808,10 +820,13 @@
     <h2 style="margin-top:1.2rem">Karte</h2>
     <div class="checkboxes">
       <label><input type="checkbox" id="showLabels" checked /> Schiffsnamen auf der Karte</label>
+      <label><input type="checkbox" id="ownPos" checked /> Eigenen Standort als ✕ anzeigen</label>
     </div>
     <p class="hint" style="margin-top:0.35rem">
       Namen werden ab Zoomstufe 12 eingeblendet und aktualisieren sich, sobald
-      der Name aus einer weiteren Quelle bekannt wird.
+      der Name aus einer weiteren Quelle bekannt wird. Der eigene Standort
+      kommt vom Browser und wird nirgendwohin gesendet; beim ersten Mal fragt
+      der Browser um Erlaubnis.
     </p>
 
     <h2 style="margin-top:1.2rem">Beim Laden der Seite</h2>
@@ -1162,6 +1177,7 @@
   var filterCountEl = document.getElementById("filterCount");
   var filterResetEl = document.getElementById("filterReset");
   var showLabelsInput = document.getElementById("showLabels");
+  var ownPosInput = document.getElementById("ownPos");
   var autoSnapshotInput = document.getElementById("autoSnapshot");
   var autoConnectInput = document.getElementById("autoConnect");
   var staticCacheCountEl = document.getElementById("staticCacheCount");
@@ -1187,6 +1203,7 @@
 
   if (localStorage.getItem("aisstream_auto_enrich") === "0") autoEnrichInput.checked = false;
   if (localStorage.getItem("aisstream_show_labels") === "0") showLabelsInput.checked = false;
+  if (localStorage.getItem("aisstream_own_pos") === "0") ownPosInput.checked = false;
   if (localStorage.getItem("aisstream_auto_snapshot") === "0") autoSnapshotInput.checked = false;
   if (localStorage.getItem("aisstream_auto_connect") === "0") autoConnectInput.checked = false;
 
@@ -1440,7 +1457,10 @@
       body += '<b class="sep">Form</b>' +
         '<div class="row"><span class="sw" style="background:' + NEUTRAL_COLOR + '"></span>Schiff</div>' +
         '<div class="row"><span class="sw diamond" style="background:' + NEUTRAL_COLOR + '"></span>Seezeichen</div>' +
-        '<div class="row"><span class="sw square" style="background:' + NEUTRAL_COLOR + '"></span>Landstation</div>';
+        '<div class="row"><span class="sw square" style="background:' + NEUTRAL_COLOR + '"></span>Landstation</div>' +
+        '<div class="row"><span class="sw cross">' +
+        '<svg width="11" height="11" fill="none" stroke="#0b0b0b" stroke-width="2" stroke-linecap="round">' +
+        '<path d="M2 2L9 9M9 2L2 9"/></svg></span>Eigener Standort</div>';
 
       div.innerHTML =
         '<button type="button" class="legend-head" aria-expanded="true">' +
@@ -1487,6 +1507,103 @@
       return div;
     };
     legend.addTo(map);
+  }
+
+  /* --- Eigener Standort ------------------------------------------------ */
+
+  // Ein eigener Layer, nicht in `ships`: Der Standort ist kein Schiff, darf
+  // also weder in der Tabelle auftauchen noch von den Filtern oder von
+  // pruneStaleShips() erwischt werden.
+  var OWN_POS_PX = 18;
+  var ownPosMarker = null;
+  var ownPosWatch = null;
+  var ownPosLogged = false;
+  var ownPosErrLogged = false;
+
+  function ownPosIcon() {
+    var h = OWN_POS_PX / 2;
+    var d = 5.5;
+    var line = function (cls) {
+      return '<path class="' + cls + '" d="M' + (h - d) + ' ' + (h - d) + 'L' + (h + d) + ' ' + (h + d) +
+        'M' + (h + d) + ' ' + (h - d) + 'L' + (h - d) + ' ' + (h + d) + '"/>';
+    };
+    return L.divIcon({
+      className: "own-pos",
+      // Heller Umriss zuerst, darueber das schwarze Kreuz - sonst verschwindet
+      // es ueber dunklem Wasser und in Waldflaechen.
+      html: '<svg width="' + OWN_POS_PX + '" height="' + OWN_POS_PX + '" fill="none" ' +
+        'stroke-linecap="round">' + line("halo") + line("cross") + "</svg>",
+      iconSize: [OWN_POS_PX, OWN_POS_PX],
+      iconAnchor: [h, h]
+    });
+  }
+
+  function showOwnPos(lat, lon) {
+    if (!mapAvailable) return;
+    if (ownPosMarker) {
+      ownPosMarker.setLatLng([lat, lon]);
+      return;
+    }
+    // interactive:false - der Standort darf Klicks auf darunterliegende
+    // Schiffsmarker nicht abfangen. zIndexOffset haelt ihn trotzdem obenauf.
+    ownPosMarker = L.marker([lat, lon], {
+      icon: ownPosIcon(),
+      interactive: false,
+      keyboard: false,
+      zIndexOffset: 1000
+    }).addTo(map);
+  }
+
+  function hideOwnPos() {
+    if (ownPosMarker && mapAvailable) map.removeLayer(ownPosMarker);
+    ownPosMarker = null;
+  }
+
+  function stopOwnPos() {
+    if (ownPosWatch != null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(ownPosWatch);
+    }
+    ownPosWatch = null;
+    ownPosLogged = false;
+    hideOwnPos();
+  }
+
+  function startOwnPos() {
+    if (!mapAvailable || ownPosWatch != null) return;
+    if (!navigator.geolocation) {
+      log("Standort: Der Browser bietet keine Ortung an.");
+      return;
+    }
+    ownPosWatch = navigator.geolocation.watchPosition(function (pos) {
+      showOwnPos(pos.coords.latitude, pos.coords.longitude);
+      ownPosErrLogged = false;
+      if (!ownPosLogged) {
+        ownPosLogged = true;
+        log("Eigener Standort: " + pos.coords.latitude.toFixed(4) + ", " +
+          pos.coords.longitude.toFixed(4) +
+          (pos.coords.accuracy ? " (±" + Math.round(pos.coords.accuracy) + " m)" : ""));
+      }
+    }, function (err) {
+      // Nur die verweigerte Freigabe beendet die Ortung - dann Schalter aus
+      // und merken, sonst fragt jeder Reload erneut und wird erneut
+      // abgelehnt. Alles andere (kein Fix im Gebaeude, Tunnel, kurzer
+      // Timeout) ist voruebergehend: Die Ueberwachung laeuft weiter und das
+      // Kreuz bleibt auf der letzten bekannten Position stehen. Ein
+      // stopOwnPos() an dieser Stelle hat das Kreuz beim ersten Aussetzer
+      // dauerhaft verschwinden lassen.
+      if (err && err.code === 1) {
+        ownPosInput.checked = false;
+        try { localStorage.setItem("aisstream_own_pos", "0"); } catch (e) {}
+        log("Standort: Freigabe abgelehnt - Anzeige ausgeschaltet.");
+        stopOwnPos();
+        return;
+      }
+      if (ownPosErrLogged) return;
+      ownPosErrLogged = true;
+      log("Standort vorübergehend nicht verfügbar." +
+        (err && err.message ? " (" + err.message + ")" : "") +
+        (ownPosMarker ? " Letzte bekannte Position bleibt stehen." : ""));
+    }, { enableHighAccuracy: false, maximumAge: 30000, timeout: 20000 });
   }
 
   // AIS ship type codes (ITU-R M.1371), collapsed to broad categories.
@@ -4113,6 +4230,11 @@
     if (document.visibilityState === "hidden") { saveStaticCache(); saveAisCache(); }
   });
 
+  ownPosInput.addEventListener("change", function () {
+    localStorage.setItem("aisstream_own_pos", ownPosInput.checked ? "1" : "0");
+    if (ownPosInput.checked) startOwnPos(); else stopOwnPos();
+  });
+
   showLabelsInput.addEventListener("change", function () {
     localStorage.setItem("aisstream_show_labels", showLabelsInput.checked ? "1" : "0");
     refreshAllLabels();
@@ -4143,6 +4265,8 @@
 
   var restored = loadAisCache();
   if (restored) log(restored + " Schiff(e) aus dem 30-Minuten-Zwischenspeicher wiederhergestellt.");
+
+  if (ownPosInput.checked) startOwnPos();
 
   setInterval(tickAges, 1000);
   setInterval(pruneStaleShips, 60000);

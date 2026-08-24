@@ -385,6 +385,45 @@ Fehlertyp wie bei `loadStaticCache()`.
 nicht. Alles, was auf die Konstanten weiter unten zugreift, gehört in den
 Verdrahtungsblock am Ende der IIFE, nicht in den Init oben.
 
+### Eigener Standort: schwarzes ✕, eigener Layer
+
+Ein kleines schwarzes Kreuz mit hellem Umriss, `OWN_POS_PX` = 18 px.
+
+- **Form statt Farbe:** Ein Kreis in irgendeiner Farbe wäre als „noch ein
+  Schiff" lesbar — die Kreisfläche ist in dieser Karte bereits vollständig für
+  Schiffstypen vergeben. Das Kreuz ist die einzige Marke, die keiner
+  Schiffskategorie gehört. Der weiße Umriss (`.halo`, zuerst gezeichnet, 3,5 px)
+  hält es über dunklem Wasser und Waldflächen sichtbar.
+- **Nicht in `ships`:** eigener Layer, also weder in der Tabelle noch von den
+  Filtern noch von `pruneStaleShips()` erfasst. Wer den Standort in `ships`
+  legt, bekommt ihn als Geisterschiff in Tabelle, Zähler und AIS-Cache.
+- **`interactive: false`** — sonst fängt das Kreuz Klicks auf darunterliegende
+  Schiffsmarker ab. `zIndexOffset: 1000` hält es trotzdem obenauf. Geprüft mit
+  `elementFromPoint` auf der Kreuzmitte: dort liegt der `leaflet-container`,
+  nicht der Marker.
+- **`watchPosition`**, nicht `getCurrentPosition`: der Standort soll mitlaufen.
+  `enableHighAccuracy: false` — Metergenauigkeit bringt auf einer Seekarte
+  nichts und kostet auf dem Telefon Akku.
+- Schalter `aisstream_own_pos`, standardmäßig **an**. Der Browser fragt beim
+  ersten Mal um Erlaubnis; die Position wird nirgendwohin gesendet.
+
+**Der Fehlerpfad ist der eigentliche Knackpunkt.** Erste Fassung rief bei
+*jedem* Fehler `stopOwnPos()` — Watch beenden, Kreuz entfernen. Im Test
+verschwand das Kreuz prompt bei der ersten Positionsänderung, weil Chromium
+dabei kurz `POSITION_UNAVAILABLE` liefert. Auf dem Telefon wäre es beim ersten
+Tunnel oder Gebäude für immer weg gewesen.
+
+Jetzt beendet **nur `code === 1`** (Freigabe verweigert) die Ortung — dann
+Schalter aus und merken, sonst fragt jeder Reload erneut und wird erneut
+abgelehnt. Alles andere ist vorübergehend: Die Überwachung läuft weiter, das
+Kreuz bleibt auf der letzten bekannten Position, und die Meldung erscheint
+**einmal** (`ownPosErrLogged`), nicht bei jedem Aussetzer.
+
+**Test-Hinweis:** Ein Playwright-Kontext ohne erteilte Freigabe ruft *gar
+keinen* Callback auf — weder Erfolg noch Fehler, auch nach 12 s nicht. Die
+Fehlercodes muss man per `addInitScript` selbst stellen
+(`scratchpad/ownpos.js`), sonst prüft man Chromium statt der eigenen Logik.
+
 ## Namen kommen verzögert — `syncMarker()` ist die einzige Nachziehstelle
 
 Ein Schiffsname trudelt aus bis zu fünf Quellen ein, zeitlich versetzt:
@@ -654,7 +693,7 @@ Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
 
 | Schlüssel | Inhalt | TTL |
 |---|---|---|
-| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_filters` | Einstellungen & Filterauswahl | unbegrenzt |
+| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_own_pos`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_filters` | Einstellungen & Filterauswahl | unbegrenzt |
 | `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss, max. `ENRICH_MAX` = 400 |
 | `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d, max. 2000 |
 | `aisstream_ais` | **eine** JSON-Map MMSI → Position, Fahrtdaten, Personen an Bord, Binnenangaben | **30 min**, max. 1500 |
