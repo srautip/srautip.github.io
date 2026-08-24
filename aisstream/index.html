@@ -1255,6 +1255,28 @@
     return deg + "° (" + compass(deg) + ")";
   }
 
+  // ITU-R M.1371 packs "not available" into the top value of each field.
+  // Decoded that is SOG 102.3 kn (raw 1023), COG 360.0° (raw 3600) and
+  // heading 511°. They must become null at ingest, otherwise a ship with no
+  // speed fix shows up doing 102 knots — which is exactly what happened.
+  function normalizeSog(sog) {
+    if (sog == null) return null;
+    sog = Number(sog);
+    return sog >= 102.3 ? null : sog;
+  }
+
+  function normalizeCog(cog) {
+    if (cog == null) return null;
+    cog = Number(cog);
+    return cog >= 360 ? null : cog;
+  }
+
+  function normalizeHeading(hdg) {
+    if (hdg == null) return null;
+    hdg = Number(hdg);
+    return (hdg === 511 || hdg < 0 || hdg > 359) ? null : hdg;
+  }
+
   // Second of the UTC minute the fix was taken; 60-63 are status sentinels.
   function fixSecondLabel(ts) {
     if (ts == null) return null;
@@ -1785,8 +1807,8 @@
         "<td>" + esc(entry.destination || "-") + "</td>" +
         "<td>" + entry.lat.toFixed(4) + "</td>" +
         "<td>" + entry.lon.toFixed(4) + "</td>" +
-        "<td>" + (entry.speed != null ? esc(entry.speed) : "-") + "</td>" +
-        "<td>" + (entry.course != null ? esc(entry.course) : "-") + "</td>" +
+        "<td>" + (entry.speed != null ? esc(entry.speed.toFixed(1)) : "-") + "</td>" +
+        "<td>" + (entry.course != null ? esc(entry.course.toFixed(0) + "° " + compass(entry.course)) : "-") + "</td>" +
         "<td>" + esc(entry.time || "-") + "</td>";
       tableBody.appendChild(row);
     });
@@ -1882,9 +1904,11 @@
       var lon = meta.longitude != null ? meta.longitude : (msg && msg.Longitude);
       if (lat == null || lon == null) return;
       if (msg) {
-        entry.speed = msg.Sog != null ? msg.Sog : entry.speed;
-        entry.course = msg.Cog != null ? msg.Cog : entry.course;
-        entry.heading = msg.TrueHeading != null ? msg.TrueHeading : entry.heading;
+        // Assign whenever the field is present, even if it normalises to
+        // null - "no fix right now" must clear a stale value, not keep it.
+        if (msg.Sog != null) entry.speed = normalizeSog(msg.Sog);
+        if (msg.Cog != null) entry.course = normalizeCog(msg.Cog);
+        if (msg.TrueHeading != null) entry.heading = normalizeHeading(msg.TrueHeading);
         if (msg.PositionAccuracy != null) entry.accuracy = msg.PositionAccuracy;
         if (msg.Raim != null) entry.raim = msg.Raim;
         if (msg.Timestamp != null) entry.msgTimestamp = msg.Timestamp;
@@ -2306,9 +2330,9 @@
       entry.typeLabel = entry.typeLabel || shipTypeLabel(props.type);
       entry.typeDetail = entry.typeDetail || shipTypeDetail(props.type);
     }
-    if (props.sog != null) entry.speed = entry.speed != null ? entry.speed : props.sog;
-    if (props.cog != null) entry.course = entry.course != null ? entry.course : props.cog;
-    if (props.heading != null) entry.heading = entry.heading != null ? entry.heading : props.heading;
+    if (props.sog != null && entry.speed == null) entry.speed = normalizeSog(props.sog);
+    if (props.cog != null && entry.course == null) entry.course = normalizeCog(props.cog);
+    if (props.heading != null && entry.heading == null) entry.heading = normalizeHeading(props.heading);
     if (props.nav_status != null && entry.navStatus == null) entry.navStatus = props.nav_status;
     if (props.kind === "aton") entry.station = entry.station || "Seezeichen";
     if (props.kind === "base") entry.station = entry.station || "Landstation";

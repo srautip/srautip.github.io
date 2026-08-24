@@ -165,6 +165,38 @@ Node-Skript, `FilterMessageTypes: ["BinaryBroadcastMessage",
 "AddressedBinaryMessage"]`, Box über der Rhein-/Maasdelta
 (`[[51.0,3.8],[52.3,7.6]]`), ein paar Minuten mitzählen.
 
+## Warum so viele Schiffe „unbekannt" sind (gemessen)
+
+Häufige Nutzerfrage: Schiffe haben einen **Namen**, aber keinen Typ, kein
+Rufzeichen, keine Größe. Das ist kein Fehler, sondern die Bauart von AIS.
+
+**Der Name kommt aus `MetaData.ShipName` und liegt an *jeder* Nachricht an** —
+der Server (aisstream/openwaters) füllt ihn aus seinem eigenen Statik-Cache.
+**Typ, Größe und Rufzeichen kommen ausschließlich aus einer echten
+`ShipStaticData` (Msg 5, alle 6 Minuten) bzw. `StaticDataReport` (Msg 24,
+seltener).** Der Server kennt das Schiff also, der Client hat die Nachricht
+aber noch nicht selbst gesehen.
+
+Messung, 5 Minuten über der Inneren Deutschen Bucht
+(`[[53.65,7.40],[53.90,8.25]]`), 24. Aug. 2026:
+
+| | |
+|---|---|
+| Verschiedene MMSIs | 62 |
+| davon mit Namen | 54 (87 %) |
+| davon mit Statiknachricht | **12 (19 %)** |
+| Wartezeit bis zur Statik | Median 14 s, Maximum 273 s |
+
+Die Schiffe ohne Typ hatten ausnahmslos nur `PositionReport` empfangen.
+
+**Drei Wege, das abzukürzen** (alle im Client vorhanden):
+1. **Snapshot laden** — `GET /v1/vessels?bbox=…` hat für denselben Ausschnitt
+   bei **75 %** der Schiffe einen Typ, gegen 19 % aus 5 Minuten Livestream.
+   Mit Abstand der schnellste Hebel.
+2. **Statik-Cache** — beim nächsten Besuch sind bekannte Schiffe sofort benannt.
+3. **Registeranreicherung** — Digitraffic/Wikidata je MMSI, allerdings mit
+   niedriger Trefferquote (siehe unten).
+
 ## Anreicherung per IMO/MMSI: Digitraffic + Wikidata
 
 Zwei Quellen, beide **frei, ohne Schlüssel und mit `access-control-allow-origin: *`**
@@ -435,10 +467,22 @@ verifiziert:
 - **`Fixtype` vs. `FixType`:** `ShipStaticData` nutzt `FixType`,
   `AidsToNavigationReport`/`BaseStationReport` schreiben `Fixtype`. Der Code
   prüft beide Schreibweisen.
-- **Sentinel-Werte:** `TrueHeading` 511 = keine Angabe, `RateOfTurn` -128 =
-  keine Angabe / ±127 = „dreht schneller als 5°/30 s", `Timestamp` 60–63 =
-  Statuscodes statt Sekunden, `Eta.Month`/`Day` 0 = keine Angabe. Alles in
-  den jeweiligen `*Label()`-Helfern behandelt.
+- **Sentinel-Werte:** `Sog` 102.3 (Rohwert 1023) und `Cog` 360.0 (Rohwert
+  3600) heißen **„nicht verfügbar"**, ebenso `TrueHeading` 511. Dazu
+  `RateOfTurn` -128 = keine Angabe / ±127 = „dreht schneller als 5°/30 s",
+  `Timestamp` 60–63 = Statuscodes statt Sekunden, `Eta.Month`/`Day` 0 = keine
+  Angabe.
+  SOG und COG werden **beim Einlesen** auf `null` normalisiert
+  (`normalizeSog`/`normalizeCog`/`normalizeHeading`), nicht erst beim
+  Anzeigen — sonst rutscht der Rohwert an jedem Helfer vorbei, der ihn direkt
+  ausgibt. Genau das ist passiert: Die Tabelle zeigte ein Schiff mit
+  „102,3 kn" und „Kurs 360". Gemessen über der Deutschen Bucht steckt in
+  **11 % aller Positionsmeldungen** ein COG-Sentinel und in 1 % ein
+  SOG-Sentinel — das ist kein Randfall.
+  **Achtung bei der Zuweisung:** Die Felder werden gesetzt, sobald die
+  Nachricht sie *mitbringt*, nicht wenn der Wert nicht-null ist. Eine Meldung
+  „gerade kein Fix" muss einen alten Wert löschen statt ihn stehen zu lassen;
+  gültige Nullen (0 kn, Kurs 0°) müssen aber erhalten bleiben.
 - **Namen kommen aus dem Netz:** Tabellen-/Popup-Rendering läuft über
   `innerHTML`, deshalb geht jeder Streamwert durch `esc()`. Nicht entfernen.
 
