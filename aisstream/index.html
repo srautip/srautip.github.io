@@ -364,7 +364,15 @@
   }
   .ship-mark.aton { border-radius: 2px; transform: rotate(45deg); }
   .ship-mark.base { border-radius: 2px; }
-  .ship-mark.unknown-size { background: #ffffff !important; }
+  /* Unbekannte Länge: Ring statt Fläche. Die Fuellung durch Weiss zu
+     ersetzen hat die Typfarbe ausgeloescht - und weil der Livestream fast
+     nie Masse liefert, waren praktisch alle Marker weiss. Der Farbring ist
+     mit 3px breit genug, dass der Farbton lesbar bleibt. */
+  .ship-mark.unknown-size {
+    background: #ffffff;
+    border-width: 3px;
+    box-shadow: 0 0 0 1.5px #ffffff, 0 0 0 2px rgba(11, 11, 11, 0.45);
+  }
   .map-legend {
     background: rgba(255, 255, 255, 0.94);
     border-radius: 6px;
@@ -412,6 +420,11 @@
   .map-legend .sizes span {
     display: flex; flex-direction: column; align-items: center; gap: 2px;
     color: #52514e; font-size: 0.62rem;
+  }
+  .map-legend .sizes i.unknown-size {
+    background: #ffffff;
+    border-width: 3px;
+    box-shadow: 0 0 0 1.5px #ffffff, 0 0 0 2px rgba(11, 11, 11, 0.45);
   }
   .map-legend .sizes i {
     background: #6b6b68;
@@ -928,6 +941,9 @@
   })();
   var NEUTRAL_COLOR = "#6b6b68";
   var MARKER_HIT_PX = 24;
+  // Der Ring fuer unbekannte Laenge braucht etwas mehr Durchmesser als der
+  // kleinste gefuellte Punkt, sonst frisst die 3px-Kontur das Loch auf.
+  var UNKNOWN_PX = 11;
 
   // Diameters in px; the smallest is 8 so a marker stays clickable.
   var SIZE_STEPS = [
@@ -997,7 +1013,7 @@
     var step = sizeStep(entry);
     // An unknown hull length must not read as "small": it gets the smallest
     // dot but hollow, so absent data looks different from a small boat.
-    var px = step ? step.px : SIZE_STEPS[0].px;
+    var px = step ? step.px : UNKNOWN_PX;
     var shape = entry.station === "Seezeichen" ? " aton"
       : entry.station === "Landstation" ? " base" : "";
     var hollow = step ? "" : " unknown-size";
@@ -1009,7 +1025,7 @@
       className: "",
       html: '<div class="ship-hit" style="width:' + box + "px;height:" + box + 'px;">' +
         '<div class="ship-mark' + shape + hollow + '" style="width:' + px + "px;height:" + px +
-        "px;background:" + color + ";border-color:" + (step ? "#ffffff" : color) + ';"></div></div>',
+        "px;" + (step ? "background:" + color : "border-color:" + color) + ';"></div></div>',
       iconSize: [box, box],
       iconAnchor: [box / 2, box / 2]
     });
@@ -1041,9 +1057,10 @@
       SIZE_STEPS.forEach(function (st) {
         body += '<span><i style="width:' + st.px + "px;height:" + st.px + 'px"></i>' + st.key + "</span>";
       });
-      body += '<span><i class="unknown-size" style="width:8px;height:8px;border-color:' +
-        NEUTRAL_COLOR + '"></i>?</span></div>';
-      body += '<div class="note">S &lt; 50 m · M 50–100 · L 100–200 · XL ≥ 200 · ? unbekannt</div>';
+      body += '<span><i class="unknown-size" style="width:' + UNKNOWN_PX + "px;height:" + UNKNOWN_PX +
+        'px;border-color:' + NEUTRAL_COLOR + '"></i>?</span></div>';
+      body += '<div class="note">S &lt; 50 m · M 50–100 · L 100–200 · XL ≥ 200<br/>' +
+        'Ring = Länge unbekannt, Farbe bleibt der Typ</div>';
       body += '<b class="sep">Form</b>' +
         '<div class="row"><span class="sw" style="background:' + NEUTRAL_COLOR + '"></span>Schiff</div>' +
         '<div class="row"><span class="sw diamond" style="background:' + NEUTRAL_COLOR + '"></span>Seezeichen</div>' +

@@ -330,12 +330,30 @@ und jeder Marker trägt einen weißen Ring, der ihn von der Kachel und von
 | M | 50–100 m | 11 px |
 | L | 100–200 m | 15 px |
 | XL | ≥ 200 m | 20 px |
-| ? | unbekannt | 8 px, **hohl** |
+| ? | unbekannt | 11 px, **Ring** (3 px Kontur in der Typfarbe, weißer Kern) |
 
-Die hohle Darstellung ist wichtig: Ein Schiff ohne Maßangabe darf nicht wie
-ein kleines Boot aussehen. Im Livebetrieb ist das der Normalfall — bis die
-erste `ShipStaticData` eintrifft (Class A alle sechs Minuten) sind alle
-Schiffe grau und hohl. Genau dafür gibt es den Statik-Cache.
+Ein Schiff ohne Maßangabe darf nicht wie ein kleines Boot aussehen, deshalb
+die eigene Darstellung. **Der Ring ist aber genau so gebaut, dass die
+Typfarbe erhalten bleibt** — siehe die Falle direkt darunter.
+
+Im Livebetrieb ist „Länge unbekannt" der **Normalfall**, nicht die Ausnahme:
+Der Snapshot liefert Typen, aber keine Maße, und der Stream liefert Maße nur
+mit einer `ShipStaticData`. In einem Testlauf über der Deutschen Bucht hatten
+**26 von 26** Markern keine Länge, aber 18 davon einen bekannten Typ.
+
+### Die Falle: Größenkodierung darf die Farbkodierung nicht überschreiben
+
+Erste Fassung setzte für unbekannte Länge `background: #ffffff !important`
+und schob die Typfarbe in einen 1,5-px-Rand. Ergebnis auf der echten Karte:
+**alle Marker weiß**, die Farbkodierung praktisch unsichtbar — obwohl bei
+zwei Dritteln der Typ bekannt war. Der Fehler fiel im synthetischen Test
+nicht auf, weil dort jedes Schiff Maße mitbekam; erst echte Snapshot-Daten
+haben ihn gezeigt.
+
+**Regel:** Die Füllung bzw. die 3-px-Kontur trägt immer die Typfarbe. Wer die
+Größendarstellung anfasst, darf den Farbkanal nicht dafür verbrauchen — und
+sollte gegen echte Daten testen, nicht gegen Fixtures mit vollständigen
+Feldern.
 
 **Form** trennt die Entitätsklassen, ohne eine Farbe zu verbrauchen: Kreis =
 Schiff, Raute = Seezeichen, Quadrat = Landstation.
