@@ -354,6 +354,19 @@
     vertical-align: -1px;
   }
   /* --- Kartenmarker & Legende ---------------------------------------- */
+  .ship-label {
+    background: rgba(255, 255, 255, 0.88);
+    border: none;
+    border-radius: 3px;
+    box-shadow: none;
+    padding: 0 3px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #0b0b0b;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .ship-label::before { display: none; }
   .ship-hit {
     display: flex;
     align-items: center;
@@ -755,6 +768,7 @@
       <label><input type="checkbox" value="ShipStaticData" checked /> ShipStaticData (Typ, Größe, IMO, Ziel)</label>
       <label><input type="checkbox" value="StandardClassBPositionReport" checked /> StandardClassBPositionReport</label>
       <label><input type="checkbox" value="StaticDataReport" checked /> StaticDataReport (Class-B-Name/Rufzeichen)</label>
+      <label><input type="checkbox" value="ExtendedClassBPositionReport" checked /> ExtendedClassBPositionReport (Position + Name)</label>
       <label><input type="checkbox" value="AidsToNavigationReport" /> AidsToNavigationReport (Seezeichen)</label>
       <label><input type="checkbox" value="BaseStationReport" /> BaseStationReport (Landstationen)</label>
       <label><input type="checkbox" value="BinaryBroadcastMessage" /> BinaryBroadcastMessage (Binnen-AIS)</label>
@@ -776,6 +790,15 @@
     <div class="actions" style="margin-top:0.5rem">
       <button id="snapshotBtn">Snapshot laden (ohne Verbindung, ohne Key)</button>
     </div>
+
+    <h2 style="margin-top:1.2rem">Karte</h2>
+    <div class="checkboxes">
+      <label><input type="checkbox" id="showLabels" checked /> Schiffsnamen auf der Karte</label>
+    </div>
+    <p class="hint" style="margin-top:0.35rem">
+      Namen werden ab Zoomstufe 12 eingeblendet und aktualisieren sich, sobald
+      der Name aus einer weiteren Quelle bekannt wird.
+    </p>
 
     <h2 style="margin-top:1.2rem">Beim Laden der Seite</h2>
     <div class="checkboxes">
@@ -1115,6 +1138,7 @@
   var autoEnrichInput = document.getElementById("autoEnrich");
   var filterCountEl = document.getElementById("filterCount");
   var filterResetEl = document.getElementById("filterReset");
+  var showLabelsInput = document.getElementById("showLabels");
   var autoSnapshotInput = document.getElementById("autoSnapshot");
   var autoConnectInput = document.getElementById("autoConnect");
   var staticCacheCountEl = document.getElementById("staticCacheCount");
@@ -1136,6 +1160,7 @@
   if (storedMmsiFilter) mmsiFilterInput.value = storedMmsiFilter;
 
   if (localStorage.getItem("aisstream_auto_enrich") === "0") autoEnrichInput.checked = false;
+  if (localStorage.getItem("aisstream_show_labels") === "0") showLabelsInput.checked = false;
   if (localStorage.getItem("aisstream_auto_snapshot") === "0") autoSnapshotInput.checked = false;
   if (localStorage.getItem("aisstream_auto_connect") === "0") autoConnectInput.checked = false;
 
@@ -1222,6 +1247,8 @@
   })();
   var NEUTRAL_COLOR = "#6b6b68";
   var MARKER_HIT_PX = 24;
+  // Darunter ueberlagern sich die Namen zu Brei.
+  var LABEL_MIN_ZOOM = 12;
   // Der Ring fuer unbekannte Laenge braucht etwas mehr Durchmesser als der
   // kleinste gefuellte Punkt, sonst frisst die 3px-Kontur das Loch auf.
   var UNKNOWN_PX = 11;
@@ -1312,6 +1339,48 @@
     });
   }
 
+  // Namen erscheinen erst nach und nach: MetaData liefert ihn bei jeder
+  // Nachricht, ShipStaticData/StaticDataReport erst alle paar Minuten, der
+  // Snapshot und die Registerabfrage nochmal spaeter. Frueher hing an jedem
+  // Zweig ein eigenes bindPopup - und mehrere Zweige hatten keines, sodass
+  // der Marker den alten Namen behielt. Deshalb genau eine Funktion, die
+  // Symbol, Popup und Beschriftung nachzieht; sie wird nach jeder Nachricht
+  // und nach jeder externen Quelle aufgerufen.
+  function syncMarker(entry) {
+    if (!entry.marker) return;
+    refreshMarkerIcon(entry);
+    var popup = popupHtml(entry);
+    if (popup !== entry.popupHtml) {
+      entry.popupHtml = popup;
+      // bindPopup ruft intern setContent - ein bereits geoeffnetes Popup
+      // aktualisiert sich damit sofort, ohne Klick.
+      entry.marker.bindPopup(popup);
+    }
+    syncLabel(entry);
+  }
+
+  function labelVisible() {
+    return mapAvailable && showLabelsInput.checked && map.getZoom() >= LABEL_MIN_ZOOM;
+  }
+
+  function syncLabel(entry) {
+    if (!entry.marker) return;
+    var text = labelVisible() ? entry.name : null;
+    if (text === entry.labelText) return;
+    entry.labelText = text;
+    if (entry.marker.getTooltip()) entry.marker.unbindTooltip();
+    if (text) {
+      entry.marker.bindTooltip(text, {
+        permanent: true, direction: "right", offset: [10, 0],
+        className: "ship-label", opacity: 1
+      });
+    }
+  }
+
+  function refreshAllLabels() {
+    ships.forEach(syncLabel);
+  }
+
   function refreshMarkerIcon(entry) {
     if (!entry.marker) return;
     var key = iconKey(entry);
@@ -1363,10 +1432,14 @@
 
       // Deckel aus der tatsaechlichen Kartenhoehe, damit der Kopf immer
       // innerhalb der Karte bleibt und antippbar ist.
+      // Die Legende sitzt unten links und waechst nach oben. Oben sitzen die
+      // Zoomknoepfe - ohne reservierten Platz wuchs sie bei einer 420px hohen
+      // Karte darueber und fing deren Klicks ab.
+      var TOP_RESERVE_PX = 90;
       var fitToMap = function () {
         var mapEl = document.getElementById("map");
         if (!mapEl) return;
-        div.style.maxHeight = Math.max(80, mapEl.clientHeight - 24) + "px";
+        div.style.maxHeight = Math.max(80, mapEl.clientHeight - TOP_RESERVE_PX) + "px";
       };
 
       var setOpen = function (open) {
@@ -2087,8 +2160,7 @@
         entry.markerShown = false;
         entry.marker.on("click", function () { openDetail(entry.mmsi); });
       }
-      refreshMarkerIcon(entry);
-      entry.marker.bindPopup(popupHtml(entry));
+      syncMarker(entry);
     }
     if (selectedMmsi === entry.mmsi && trackLayer) drawTrack(entry);
   }
@@ -2411,7 +2483,8 @@
     var metaName = cleanText(meta.ShipName);
     if (metaName) entry.name = metaName;
 
-    if (type === "PositionReport" || type === "StandardClassBPositionReport") {
+    if (type === "PositionReport" || type === "StandardClassBPositionReport" ||
+        type === "ExtendedClassBPositionReport") {
       var lat = meta.latitude != null ? meta.latitude : (msg && msg.Latitude);
       var lon = meta.longitude != null ? meta.longitude : (msg && msg.Longitude);
       if (lat == null || lon == null) return;
@@ -2424,6 +2497,22 @@
         if (msg.PositionAccuracy != null) entry.accuracy = msg.PositionAccuracy;
         if (msg.Raim != null) entry.raim = msg.Raim;
         if (msg.Timestamp != null) entry.msgTimestamp = msg.Timestamp;
+        if (type === "ExtendedClassBPositionReport") {
+          // Msg 19 bringt zusaetzlich Statik mit - genau die Felder, auf die
+          // man sonst minutenlang wartet.
+          entry.aisClass = "B";
+          entry.name = cleanText(msg.Name) || entry.name;
+          if (msg.ShipType != null && entry.typeCode == null) {
+            entry.typeCode = msg.ShipType;
+            entry.typeLabel = shipTypeLabel(msg.ShipType) || entry.typeLabel;
+            entry.typeDetail = shipTypeDetail(msg.ShipType) || entry.typeDetail;
+          }
+          if (msg.Dimension && !entry.dim) {
+            entry.dim = msg.Dimension;
+            entry.size = shipSize(msg.Dimension) || entry.size;
+          }
+          rememberStatic(entry);
+        }
         if (type === "PositionReport") {
           entry.navStatus = msg.NavigationalStatus != null ? msg.NavigationalStatus : entry.navStatus;
           entry.rot = msg.RateOfTurn != null ? msg.RateOfTurn : entry.rot;
@@ -2451,8 +2540,7 @@
       entry.fixType = msg.FixType != null ? msg.FixType : (msg.Fixtype != null ? msg.Fixtype : entry.fixType);
       entry.staticFromCache = null;
       rememberStatic(entry);
-      refreshMarkerIcon(entry);
-      if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
+      syncMarker(entry);
       refreshVisibleShips();
     } else if (type === "StaticDataReport" && msg) {
       // Class B splits its static data across part A (name) and part B
@@ -2475,8 +2563,7 @@
       entry.serial = partB.SerialNumber != null ? String(partB.SerialNumber) : entry.serial;
       entry.staticFromCache = null;
       rememberStatic(entry);
-      refreshMarkerIcon(entry);
-      if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
+      syncMarker(entry);
       refreshVisibleShips();
     } else if (type === "AidsToNavigationReport" && msg) {
       entry.station = "Seezeichen";
@@ -2509,6 +2596,11 @@
       // Unhandled type: still counted above, so the detail view shows it.
       refreshVisibleShips();
     }
+
+    // Ein Netz unter allen Zweigen: MetaData.ShipName kommt bei *jeder*
+    // Nachricht mit, auch bei Typen ohne eigene Behandlung. Ohne diese Zeile
+    // behielt der Marker in solchen Faellen den alten Namen.
+    syncMarker(entry);
   }
 
   // Application specific messages carry their payload as opaque binary; the
@@ -2533,15 +2625,13 @@
       if (stat.eriLength && stat.eriBeam) entry.size = stat.eriLength + "×" + stat.eriBeam;
       if (stat.eriDraught) entry.draught = stat.eriDraught;
       rememberStatic(entry);
-      refreshMarkerIcon(entry);
-      if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
+      syncMarker(entry);
     } else if (dac === 200 && fi === 55) {
       var persons = decodeInlandPersons(bits);
       if (!persons) return;
       entry.persons = Object.assign({}, entry.persons, persons);
       entry.personsAt = Date.now();
-      refreshMarkerIcon(entry);
-      if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
+      syncMarker(entry);
     }
   }
 
@@ -2741,8 +2831,7 @@
       entry.typeDetail = entry.typeDetail || shipTypeDetail(dt.typeCode);
     }
     rememberStatic(entry);
-    refreshMarkerIcon(entry);
-    if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
+    syncMarker(entry);
   }
 
   // Runs the provider chain for one MMSI. Cached results - including misses -
@@ -3552,6 +3641,12 @@
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "hidden") saveStaticCache();
   });
+
+  showLabelsInput.addEventListener("change", function () {
+    localStorage.setItem("aisstream_show_labels", showLabelsInput.checked ? "1" : "0");
+    refreshAllLabels();
+  });
+  if (mapAvailable) map.on("zoomend", refreshAllLabels);
 
   [["aisstream_auto_snapshot", autoSnapshotInput], ["aisstream_auto_connect", autoConnectInput]]
     .forEach(function (pair) {

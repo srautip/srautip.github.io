@@ -383,6 +383,55 @@ Fehlertyp wie bei `loadStaticCache()`.
 nicht. Alles, was auf die Konstanten weiter unten zugreift, gehört in den
 Verdrahtungsblock am Ende der IIFE, nicht in den Init oben.
 
+## Namen kommen verzögert — `syncMarker()` ist die einzige Nachziehstelle
+
+Ein Schiffsname trudelt aus bis zu fünf Quellen ein, zeitlich versetzt:
+
+1. `MetaData.ShipName` — liegt an **jeder** Nachricht an, auch an Typen ohne
+   eigene Behandlung
+2. `ShipStaticData` (Msg 5) / `StaticDataReport` (Msg 24) — alle paar Minuten
+3. `ExtendedClassBPositionReport` (Msg 19) — Position **und** Name in einem
+4. openwaters-Snapshot bzw. Einzelnachschlag
+5. Registeranreicherung (Digitraffic/Wikidata)
+
+Früher hing an jedem Zweig ein eigenes `bindPopup(popupHtml(entry))` — sechs
+Stellen. **Drei Pfade hatten keines**, dort behielt der Marker den alten
+Namen, obwohl die Tabelle ihn längst zeigte:
+
+- der `else`-Zweig für unbehandelte Nachrichtentypen (und dort wird
+  `MetaData.ShipName` trotzdem übernommen)
+- `AidsToNavigationReport` / `BaseStationReport` ohne Koordinaten
+- Binärnachrichten außerhalb von DAC 200
+
+**Regel:** Es gibt genau eine Funktion, die einen Marker nachzieht —
+`syncMarker(entry)` (Symbol, Popup, Beschriftung). Sie wird **einmal am Ende
+von `processMessageText()`** aufgerufen, also hinter allen Zweigen, plus in
+`applyEnrichment()` und `applySnapshotFeature()`. Wer einen Nachrichtentyp
+ergänzt, muss nichts weiter tun. Kein neues `bindPopup` in einen Zweig
+schreiben.
+
+`syncMarker()` vergleicht das erzeugte HTML mit `entry.popupHtml` und bindet
+nur bei echter Änderung neu. Leaflets `bindPopup` ruft intern `setContent`,
+ein **bereits geöffnetes** Popup aktualisiert sich damit sofort, ohne Klick —
+getestet.
+
+### Namen auf der Karte
+
+Bis dahin war der Name nur im Popup, also erst nach einem Klick sichtbar.
+Jetzt zeigt die Karte ihn als Beschriftung (Leaflet-Tooltip, `permanent`),
+ab **Zoomstufe 12** (`LABEL_MIN_ZOOM`) — darunter überlagern sich die Namen
+zu Brei. Abschaltbar über „Schiffsnamen auf der Karte", gemerkt in
+`aisstream_show_labels`. `refreshAllLabels()` hängt an `zoomend` und am
+Schalter.
+
+### `ExtendedClassBPositionReport` (Msg 19) fiel komplett durch
+
+Der Typ landete im `else`-Zweig, seine **Position wurde also gar nicht
+ausgewertet** — obwohl er Position, Name, Schiffstyp und Maße in einer
+einzigen Nachricht trägt. Im weltweiten openwaters-Bestand kamen 17 von
+55 402 Einträgen darüber. Jetzt wie die anderen Positionsberichte behandelt
+und im UI standardmäßig abonniert.
+
 ## Abfragebox ist größer als die Sicht
 
 Alle Serveranfragen — WebSocket-Subscription **und** `GET /v1/vessels` —
@@ -521,6 +570,9 @@ ausgeblendet — die stehen in der Detailansicht.
   `resize`/`orientationchange` eine `maxHeight` aus der echten Kartenhöhe,
   der Rumpf scrollt darin. Wer an der Kartenhöhe dreht: diesen Deckel
   mitprüfen.
+  `TOP_RESERVE_PX` = 90 hält zusätzlich die **Zoomknöpfe** frei: Bei einer
+  420 px hohen Karte wuchs die aufgeklappte Legende bis in sie hinein und
+  fing deren Klicks ab — das Herauszoomen war blockiert.
 
 ### Zwei CSS-Fallen, beide dieselbe Ursache
 
@@ -558,7 +610,7 @@ Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
 
 | Schlüssel | Inhalt | TTL |
 |---|---|---|
-| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_filters` | Einstellungen & Filterauswahl | unbegrenzt |
+| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_filters` | Einstellungen & Filterauswahl | unbegrenzt |
 | `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss |
 | `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d |
 
@@ -698,6 +750,9 @@ verifiziert:
   ETA), Entfernung/Peilung zur Kartenmitte sowie Empfangsstatistik
   (Nachrichten gesamt und je Typ, erste/letzte Sichtung, Trackpunkte,
   zurückgelegte Strecke, Ø Geschwindigkeit)
+- **Schiffsnamen auf der Karte** ab Zoomstufe 12, abschaltbar; Namen werden
+  über `syncMarker()` aus allen Quellen zuverlässig nachgezogen (siehe
+  eigenen Abschnitt oben)
 - **Kartenmarker kodieren Typ und Größe** (siehe eigenen Abschnitt oben):
   sechs validierte Kategoriefarben, vier Größenstufen S/M/L/XL am Durchmesser,
   Form trennt Schiff / Seezeichen / Landstation, einklappbare Legende
