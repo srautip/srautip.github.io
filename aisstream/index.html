@@ -205,10 +205,11 @@
     <h2>Verbindung</h2>
 
     <label for="serverUrl">Server-URL</label>
-    <input type="text" id="serverUrl" value="wss://ais.openwaters.io/v1/stream" autocomplete="off" />
+    <input type="text" id="serverUrl" value="wss://ais.openwaters.io/v0/stream" autocomplete="off" />
 
-    <label for="apiKey">API-Key</label>
-    <input type="password" id="apiKey" placeholder="Dein API-Key" autocomplete="off" />
+    <label for="apiKey">API-Key (openwaters-Token, ak1....)</label>
+    <input type="password" id="apiKey" placeholder="ak1...." autocomplete="off" />
+    <button type="button" id="getTokenBtn" style="margin-top:0.4rem">Token holen (kostenlos, ohne Anmeldung)</button>
 
     <h2 style="margin-top:1.2rem">Bounding Box</h2>
     <div class="bbox-grid">
@@ -252,12 +253,17 @@
     <p class="hint">
       Der API-Key wird ausschließlich lokal im Browser gehalten und direkt per
       WebSocket an die oben eingetragene Server-URL gesendet — es gibt keinen
-      Server dazwischen. Standardmäßig voreingestellt ist
-      <a href="https://openwaters.io/ais" target="_blank" rel="noopener">openwaters.io/ais</a>
-      (inoffizieller Drittanbieter mit gleichem Protokoll, als Ausweichlösung
-      während der AISstream.io-Störung). Offizieller Dienst mit eigenem Key:
-      <a href="https://aisstream.io" target="_blank" rel="noopener">aisstream.io</a>
-      (dort <code>wss://stream.aisstream.io/v0/stream</code> eintragen).
+      Server dazwischen. Standardmäßig voreingestellt ist der
+      <code>/v0/stream</code>-Kompatibilitätsendpunkt von
+      <a href="https://openwaters.io/ais" target="_blank" rel="noopener">openwaters.io</a>
+      (inoffizieller Drittanbieter, spiegelt das aisstream.io-Protokoll 1:1, als
+      Ausweichlösung während der AISstream.io-Störung). Dafür brauchst du einen
+      openwaters-Token (<code>ak1....</code>) statt eines alten aisstream.io-Keys
+      — per Klick auf „Token holen" oben kostenlos und ohne Anmeldung erzeugen.
+      Sobald AISstream.io wieder läuft, dort
+      <code>wss://stream.aisstream.io/v0/stream</code> eintragen und den
+      offiziellen <a href="https://aisstream.io" target="_blank" rel="noopener">aisstream.io</a>-Key
+      verwenden.
     </p>
   </section>
 
@@ -306,6 +312,7 @@
   var disconnectBtn = document.getElementById("disconnectBtn");
   var serverUrlInput = document.getElementById("serverUrl");
   var apiKeyInput = document.getElementById("apiKey");
+  var getTokenBtn = document.getElementById("getTokenBtn");
   var latMinInput = document.getElementById("latMin");
   var lonMinInput = document.getElementById("lonMin");
   var latMaxInput = document.getElementById("latMax");
@@ -565,8 +572,10 @@
 
       var subscription = {
         APIKey: apiKey,
-        // AISstream.io expects each point as [Longitude, Latitude] (GeoJSON order).
-        BoundingBoxes: [[[lonMin, latMin], [lonMax, latMax]]]
+        // Each corner is [Latitude, Longitude] (confirmed against the
+        // openwaters.io /v0/stream docs, which mirror aisstream.io's wire
+        // format exactly).
+        BoundingBoxes: [[[latMin, lonMin], [latMax, lonMax]]]
       };
       if (messageTypes.length > 0) {
         subscription.FilterMessageTypes = messageTypes;
@@ -610,8 +619,57 @@
     }
   }
 
+  function toBase64Url(buffer) {
+    var bytes = new Uint8Array(buffer);
+    var binary = "";
+    for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  function mintToken() {
+    if (!(window.crypto && crypto.subtle && crypto.subtle.generateKey)) {
+      log("Web Crypto API (Ed25519) nicht verfügbar - Token kann in diesem Browser nicht automatisch erzeugt werden.");
+      return;
+    }
+    getTokenBtn.disabled = true;
+    log("Erzeuge Schlüsselpaar und fordere Token von openwaters.io an…");
+    crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"])
+      .then(function (keyPair) {
+        return crypto.subtle.exportKey("raw", keyPair.publicKey);
+      })
+      .then(function (rawPublicKey) {
+        return fetch("https://ais.openwaters.io/v1/keys", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pubkey: toBase64Url(rawPublicKey), bind_ip: false })
+        });
+      })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.text().then(function (text) {
+            throw new Error("HTTP " + res.status + ": " + text);
+          });
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        apiKeyInput.value = data.token;
+        localStorage.setItem("aisstream_api_key", data.token);
+        var c = data.claims || {};
+        log("Token erhalten (Rolle: " + c.role + ", " + c.conns + " Verbindungen, " +
+          c.rate + " Nachr./s, " + c.area + " sq° Fläche). In API-Key-Feld eingetragen.");
+      })
+      .catch(function (e) {
+        log("Token-Anfrage fehlgeschlagen: " + e.message);
+      })
+      .finally(function () {
+        getTokenBtn.disabled = false;
+      });
+  }
+
   connectBtn.addEventListener("click", connect);
   disconnectBtn.addEventListener("click", disconnect);
+  getTokenBtn.addEventListener("click", mintToken);
 })();
 </script>
 </body>
