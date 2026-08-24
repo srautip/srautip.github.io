@@ -211,7 +211,7 @@
     <input type="password" id="apiKey" placeholder="ak1...." autocomplete="off" />
     <button type="button" id="getTokenBtn" style="margin-top:0.4rem">Token holen (kostenlos, ohne Anmeldung)</button>
 
-    <h2 style="margin-top:1.2rem">Bounding Box</h2>
+    <h2 style="margin-top:1.2rem">Bounding Box <span style="font-weight:400;text-transform:none;color:var(--muted)">(folgt der Kartenansicht)</span></h2>
     <div class="bbox-grid">
       <div>
         <label for="latMin">Lat min</label>
@@ -234,7 +234,7 @@
     <h2 style="margin-top:1.2rem">Nachrichtentypen</h2>
     <div class="checkboxes" id="msgTypes">
       <label><input type="checkbox" value="PositionReport" checked /> PositionReport</label>
-      <label><input type="checkbox" value="ShipStaticData" /> ShipStaticData</label>
+      <label><input type="checkbox" value="ShipStaticData" checked /> ShipStaticData (liefert Typ &amp; Größe)</label>
       <label><input type="checkbox" value="StandardClassBPositionReport" /> StandardClassBPositionReport</label>
     </div>
 
@@ -245,7 +245,7 @@
 
     <div class="stats">
       <div>Nachrichten<br /><b id="msgCount">0</b></div>
-      <div>Schiffe<br /><b id="shipCount">0</b></div>
+      <div>Schiffe sichtbar<br /><b id="shipCount">0</b></div>
     </div>
 
     <div class="log" id="log"></div>
@@ -270,13 +270,15 @@
   <section>
     <div id="map"></div>
     <div class="panel" style="margin-top:1rem">
-      <h2>Zuletzt empfangene Schiffe</h2>
+      <h2>Schiffe im aktuellen Kartenausschnitt</h2>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
               <th>MMSI</th>
               <th>Name</th>
+              <th>Typ</th>
+              <th>Größe (L×B, m)</th>
               <th>Lat</th>
               <th>Lon</th>
               <th>Speed (kn)</th>
@@ -354,6 +356,17 @@
       'color:var(--muted);font-size:0.85rem;text-align:center;padding:1rem;">' +
       "Karte konnte nicht geladen werden (Leaflet/OpenStreetMap nicht erreichbar).<br/>" +
       "Live-Daten funktionieren trotzdem &ndash; siehe Tabelle unten.</div>";
+  } else {
+    updateBboxFieldsFromMap();
+    var mapMoveTimer = null;
+    map.on("moveend", function () {
+      clearTimeout(mapMoveTimer);
+      mapMoveTimer = setTimeout(function () {
+        updateBboxFieldsFromMap();
+        sendSubscription();
+        refreshVisibleShips();
+      }, 400);
+    });
   }
 
   function log(msg) {
@@ -383,6 +396,43 @@
     });
   }
 
+  // AIS ship type codes (ITU-R M.1371), collapsed to broad categories.
+  function shipTypeLabel(code) {
+    if (code == null) return null;
+    code = Number(code);
+    if (!code) return null;
+    if (code >= 20 && code <= 29) return "Wing in Ground";
+    if (code === 30) return "Fischerei";
+    if (code === 31 || code === 32 || code === 52) return "Schlepper";
+    if (code === 33) return "Bagger";
+    if (code === 34) return "Taucherarbeiten";
+    if (code === 35) return "Militär";
+    if (code === 36) return "Segelschiff";
+    if (code === 37) return "Sportboot";
+    if (code >= 40 && code <= 49) return "Hochgeschwindigkeitsfahrzeug";
+    if (code === 50) return "Lotsenboot";
+    if (code === 51) return "Such-/Rettungsschiff";
+    if (code === 53) return "Hafenboot";
+    if (code === 54) return "Ölbekämpfung";
+    if (code === 55) return "Polizei/Behörde";
+    if (code === 58) return "Medizinisch";
+    if (code >= 60 && code <= 69) return "Passagierschiff";
+    if (code >= 70 && code <= 79) return "Frachtschiff";
+    if (code >= 80 && code <= 89) return "Tanker";
+    if (code >= 90 && code <= 99) return "Sonstiges";
+    return "Typ " + code;
+  }
+
+  // Dimension {A,B,C,D} = distances from the GPS antenna to bow/stern/port/
+  // starboard in meters; 0 means "not available" per spec.
+  function shipSize(dim) {
+    if (!dim) return null;
+    var length = (Number(dim.A) || 0) + (Number(dim.B) || 0);
+    var width = (Number(dim.C) || 0) + (Number(dim.D) || 0);
+    if (!length || !width) return null;
+    return length + "×" + width;
+  }
+
   function upsertShip(mmsi, data) {
     var existing = ships.get(mmsi) || {};
     if (mapAvailable) {
@@ -392,6 +442,7 @@
         data.marker = L.marker([data.lat, data.lon], { icon: shipIcon() }).addTo(map);
       }
     }
+    data.updatedAt = Date.now();
     var entry = Object.assign({}, existing, data);
     if (!entry.marker && existing.marker) entry.marker = existing.marker;
     ships.set(mmsi, entry);
@@ -399,35 +450,46 @@
     if (mapAvailable && entry.marker) {
       entry.marker.bindPopup(
         "<b>" + (entry.name || "MMSI " + mmsi) + "</b><br/>" +
+        (entry.typeLabel ? "Typ: " + entry.typeLabel + "<br/>" : "") +
+        (entry.size ? "Größe: " + entry.size + " m<br/>" : "") +
         "MMSI: " + mmsi + "<br/>" +
         "Speed: " + (entry.speed != null ? entry.speed + " kn" : "-") + "<br/>" +
         "Kurs: " + (entry.course != null ? entry.course + "°" : "-")
       );
     }
-    shipCountEl.textContent = ships.size;
-    renderTableRow(mmsi, entry);
+    refreshVisibleShips();
   }
 
-  function renderTableRow(mmsi, entry) {
-    var row = document.getElementById("row-" + mmsi);
-    if (!row) {
-      row = document.createElement("tr");
-      row.id = "row-" + mmsi;
-      tableBody.prepend(row);
-      while (tableBody.rows.length > MAX_TABLE_ROWS) {
-        tableBody.deleteRow(tableBody.rows.length - 1);
-      }
-    } else {
-      tableBody.prepend(row);
-    }
-    row.innerHTML =
-      "<td>" + mmsi + "</td>" +
-      "<td>" + (entry.name || "-") + "</td>" +
-      "<td>" + entry.lat.toFixed(4) + "</td>" +
-      "<td>" + entry.lon.toFixed(4) + "</td>" +
-      "<td>" + (entry.speed != null ? entry.speed : "-") + "</td>" +
-      "<td>" + (entry.course != null ? entry.course : "-") + "</td>" +
-      "<td>" + (entry.time || "-") + "</td>";
+  // Rebuilds the table from `ships`, filtered to whatever is currently
+  // inside the map's visible bounds (not just the subscribed area).
+  function refreshVisibleShips() {
+    var entries = [];
+    ships.forEach(function (entry, mmsi) {
+      if (entry.lat == null || entry.lon == null) return;
+      if (mapAvailable && !map.getBounds().contains([entry.lat, entry.lon])) return;
+      entries.push([mmsi, entry]);
+    });
+    entries.sort(function (a, b) { return (b[1].updatedAt || 0) - (a[1].updatedAt || 0); });
+    entries = entries.slice(0, MAX_TABLE_ROWS);
+
+    tableBody.innerHTML = "";
+    entries.forEach(function (pair) {
+      var mmsi = pair[0];
+      var entry = pair[1];
+      var row = document.createElement("tr");
+      row.innerHTML =
+        "<td>" + mmsi + "</td>" +
+        "<td>" + (entry.name || "-") + "</td>" +
+        "<td>" + (entry.typeLabel || "-") + "</td>" +
+        "<td>" + (entry.size || "-") + "</td>" +
+        "<td>" + entry.lat.toFixed(4) + "</td>" +
+        "<td>" + entry.lon.toFixed(4) + "</td>" +
+        "<td>" + (entry.speed != null ? entry.speed : "-") + "</td>" +
+        "<td>" + (entry.course != null ? entry.course : "-") + "</td>" +
+        "<td>" + (entry.time || "-") + "</td>";
+      tableBody.appendChild(row);
+    });
+    shipCountEl.textContent = entries.length;
   }
 
   function isGzip(bytes) {
@@ -515,9 +577,15 @@
       });
     } else if (type === "ShipStaticData" && msg) {
       var existing = ships.get(mmsi) || {};
-      existing.name = (msg.ShipName || existing.name || "").trim();
-      ships.set(mmsi, existing);
-      if (existing.lat != null) renderTableRow(mmsi, existing);
+      var name = meta.ShipName ? meta.ShipName.trim() : (msg.Name ? String(msg.Name).trim() : existing.name);
+      var updated = Object.assign({}, existing, {
+        name: name,
+        typeLabel: shipTypeLabel(msg.Type) || existing.typeLabel,
+        size: shipSize(msg.Dimension) || existing.size,
+        updatedAt: Date.now()
+      });
+      ships.set(mmsi, updated);
+      if (updated.lat != null) refreshVisibleShips();
     }
   }
 
@@ -532,6 +600,44 @@
       reconnectTimer = null;
       connect();
     }, delay);
+  }
+
+  // Reads the current form values and (re-)sends a subscription on the
+  // open socket. Used both for the initial connect and whenever the map
+  // view changes, so the live subscription always tracks what's on screen.
+  function sendSubscription() {
+    if (!socket || socket.readyState !== 1 /* OPEN */) return;
+
+    var apiKey = apiKeyInput.value.trim();
+    var latMin = parseFloat(latMinInput.value);
+    var lonMin = parseFloat(lonMinInput.value);
+    var latMax = parseFloat(latMaxInput.value);
+    var lonMax = parseFloat(lonMaxInput.value);
+    if (!apiKey || [latMin, lonMin, latMax, lonMax].some(isNaN)) return;
+
+    var messageTypes = selectedMessageTypes();
+    var subscription = {
+      APIKey: apiKey,
+      // Each corner is [Latitude, Longitude] (confirmed against the
+      // openwaters.io /v0/stream docs, which mirror aisstream.io's wire
+      // format exactly).
+      BoundingBoxes: [[[latMin, lonMin], [latMax, lonMax]]]
+    };
+    if (messageTypes.length > 0) {
+      subscription.FilterMessageTypes = messageTypes;
+    }
+    log("Subscription gesendet: BBox [" + latMin.toFixed(4) + "," + lonMin.toFixed(4) + "] - [" +
+      latMax.toFixed(4) + "," + lonMax.toFixed(4) + "]");
+    socket.send(JSON.stringify(subscription));
+  }
+
+  function updateBboxFieldsFromMap() {
+    if (!mapAvailable) return;
+    var b = map.getBounds();
+    latMinInput.value = b.getSouth().toFixed(4);
+    lonMinInput.value = b.getWest().toFixed(4);
+    latMaxInput.value = b.getNorth().toFixed(4);
+    lonMaxInput.value = b.getEast().toFixed(4);
   }
 
   function connect() {
@@ -555,16 +661,10 @@
     }
     localStorage.setItem("aisstream_api_key", apiKey);
 
-    var latMin = parseFloat(latMinInput.value);
-    var lonMin = parseFloat(lonMinInput.value);
-    var latMax = parseFloat(latMaxInput.value);
-    var lonMax = parseFloat(lonMaxInput.value);
-    if ([latMin, lonMin, latMax, lonMax].some(isNaN)) {
+    if ([latMinInput, lonMinInput, latMaxInput, lonMaxInput].some(function (el) { return isNaN(parseFloat(el.value)); })) {
       alert("Bitte gültige Bounding-Box-Koordinaten eingeben.");
       return;
     }
-
-    var messageTypes = selectedMessageTypes();
 
     setStatus("", "verbinde…");
     connectBtn.disabled = true;
@@ -576,19 +676,7 @@
       setStatus("connected", "verbunden");
       disconnectBtn.disabled = false;
       log("WebSocket verbunden, sende Subscription…");
-
-      var subscription = {
-        APIKey: apiKey,
-        // Each corner is [Latitude, Longitude] (confirmed against the
-        // openwaters.io /v0/stream docs, which mirror aisstream.io's wire
-        // format exactly).
-        BoundingBoxes: [[[latMin, lonMin], [latMax, lonMax]]]
-      };
-      if (messageTypes.length > 0) {
-        subscription.FilterMessageTypes = messageTypes;
-      }
-      log("Subscription gesendet: BBox [" + latMin + "," + lonMin + "] - [" + latMax + "," + lonMax + "]");
-      socket.send(JSON.stringify(subscription));
+      sendSubscription();
     };
 
     socket.onmessage = handleMessage;
