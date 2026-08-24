@@ -655,14 +655,58 @@ Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
 | `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_filters` | Einstellungen & Filterauswahl | unbegrenzt |
 | `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss |
 | `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d |
-| `aisstream_ais` | **eine** JSON-Map MMSI → Position und Fahrtdaten | **30 min** |
+| `aisstream_ais` | **eine** JSON-Map MMSI → Position, Fahrtdaten, Personen an Bord, Binnenangaben | **30 min** |
+
+Dazu ein Speicher **außerhalb** von `localStorage`:
+
+| Speicher | Inhalt | Grenze |
+|---|---|---|
+| Cache Storage `aisstream-photos-v1` | Schiffsfotos als Blob (Miniatur 480 px) | 120 Bilder, älteste zuerst |
+
+### Bildzwischenspeicher (Cache Storage, nicht localStorage)
+
+Die Bild-URL lag längst im Anreicherungs-Cache, die **Bilddaten** aber nicht —
+die holte der Browser bei jedem Laden neu.
+
+**Warum Cache Storage und nicht `localStorage`:** Dort müssten Bilder als
+Data-URL liegen, also Base64 mit ~33 % Aufschlag, in einem Kontingent von
+insgesamt ~5 MB, das sich Statik- und AIS-Cache schon teilen. Cache Storage
+legt Blobs nativ ab, hat ein eigenes, weit größeres Kontingent und braucht
+**keinen Service Worker** — `caches.open()` funktioniert direkt im
+Fensterkontext.
+
+**`?width=480` ist Pflicht, nicht Kosmetik.** Ohne den Parameter liefert
+Commons das Original (bei der Emma Mærsk mehrere MB), und die Umleitung
+landete im Test sogar auf einer HTML-Seite statt auf dem Bild — ein
+plausibler Miterklärer für „Bilder erscheinen nicht zuverlässig". Mit
+`width=480` kommen rund 50 KB als `image/jpeg` mit
+`access-control-allow-origin: *`, direkt und ohne Umleitungskette.
+
+Ablauf in `cachedPhoto(url)`: Treffer → Blob → Object-URL; sonst einmal
+`fetch`, ablegen, anzeigen. Schlägt beides fehl oder fehlt Cache Storage,
+wird die nackte URL zurückgegeben — lieber ein Bild aus dem Netz als keins.
+
+- Cap `PHOTO_MAX` = 120; `cache.keys()` liefert Einfügereihenfolge, die
+  ältesten fliegen zuerst
+- **Object-URLs müssen widerrufen werden**, sonst bleibt der Blob im
+  Speicher. `releaseDetailPhoto()` macht das beim Schiffswechsel, beim
+  Leeren und vor jedem Neuladen
+- Das asynchrone Ergebnis prüft vor dem Einsetzen, ob noch dasselbe Schiff
+  offen ist — sonst klebte das Bild am nächsten
+- „Zwischenspeicher leeren" löscht auch diesen Speicher
+
+Gemessen: erster Besuch ein Netzabruf, nach einem Reload **null**.
 
 ### AIS-Cache (`aisstream_ais`, 30 Minuten)
 
 Alles, was schnell veraltet: `lat`, `lon`, `speed`, `course`, `heading`,
 `navStatus`, `rot`, `accuracy`, `raim`, `maneuver`, `fixType`,
 `msgTimestamp`, `destination`, `eta`, `draught`, `time` — je MMSI mit dem
-Empfangszeitpunkt.
+Empfangszeitpunkt. Dazu `persons` (Besatzung/Passagiere aus DAC 200 FI 55),
+`personsAt` und `inland` (ENI, ERI-Typ, blaue Kegel, beladen/unbeladen):
+Die lagen vorher **nirgends** — der Statik-Cache hält nur die dauerhaften
+Binnenfelder, die Zahl der Personen an Bord und die Ladungsangaben gingen
+bei jedem Reload verloren.
 
 Der frühere Einwand („ein drei Wochen altes Ziel als aktuell anzuzeigen wäre
 irreführend") gilt hier nicht mehr, weil **die Tabelle das Alter in Sekunden
@@ -868,6 +912,10 @@ verifiziert:
   abschaltbar; Verbinden nur mit bereits gespeichertem Key
 - **Alter der Daten** in Sekunden, rechtsbündig direkt hinter dem Namen,
   sekündlich mitlaufend und ab 600 s farblich markiert
+- **Lokale Zwischenspeicher**: Schiffsstatik (60 d), AIS-Daten inklusive
+  Personen an Bord (30 min), Registerdaten je MMSI (30 d) und Schiffsfotos
+  als Blob im Cache Storage — alles über einen Knopf leerbar, mit
+  Zählerständen im UI
 - **Freitextsuche** über Tabelle (MMSI, Name, Rufzeichen, IMO, Ziel, Typ,
   Land, Stationsart), 150 ms debounced
 - Rohdaten-Ansicht je MMSI (letzte Nachricht je Typ als JSON) + „JSON
