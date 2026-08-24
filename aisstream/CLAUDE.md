@@ -61,6 +61,71 @@ Ed25519-Keypair aus der WebCrypto-API). Der Button ergibt bei
 `stream.aisstream.io` keinen Sinn und funktioniert dort nicht — falls der
 User dauerhaft zurückwechselt, ggf. den Button ausblenden/umbenennen.
 
+## openwaters REST: `GET /v1/vessels` (am 24. Aug. 2026 verifiziert)
+
+Wichtig, weil in einer früheren Session noch als „ungeprüfter offener Punkt"
+notiert: Der Endpunkt ist **live erreichbar und aus dem Browser nutzbar** —
+`access-control-allow-origin: *`, kein Key, kein Login.
+
+**Zwei Query-Parameter funktionieren, alles andere wird stillschweigend
+ignoriert** (empirisch durchprobiert):
+
+| Parameter | Wirkung |
+|---|---|
+| `bbox=latMin,lonMin,latMax,lonMax` | Filtert auf die Box. **Lat zuerst**, wie bei `BoundingBoxes` im WebSocket. |
+| `mmsi=a,b,c` | Ein oder mehrere MMSIs, kommagetrennt. Wiederholter Parameter (`?mmsi=a&mmsi=b`) wirkt **nicht** — nur der erste zählt. |
+
+`minLat`/`maxLat`, `kind`, `since`, `limit` und `/v1/vessels/<mmsi>` gibt es
+nicht — die ersten vier liefern kommentarlos den kompletten Weltbestand
+(≈ 55 000 Features, ~17 MB), der Pfad-Zugriff ein 404. **Ohne `bbox` also
+niemals abrufen**, sonst lädt der Browser 17 MB.
+
+**Rückgabe ist GeoJSON** (`FeatureCollection`), Properties je Feature:
+
+```
+kind (vessel|aton|base), mmsi, msg_type, seen, source, station,
+sog, name, type, cog, nav_status, heading
+```
+
+**Es gibt hier kein IMO, kein Rufzeichen, kein Ziel, keine Dimensionen und
+keinen Tiefgang.** Das ist eine reine Positions-/Namens-Momentaufnahme, kein
+Schiffsregister — für TEU, Bruttoraumzahl oder Passagierkapazität also
+unbrauchbar. Nützlich ist er als *Snapshot ohne WebSocket und ohne Key* und
+zum Nachschlagen einzelner MMSIs, weil openwaters mehrere Quellen bündelt
+(`aishub`, `aisstream`, `kystverket`, `digitraffic` sowie privat
+eingespeiste Empfänger) und dadurch Schiffe kennt, die der eigene Stream
+gerade nicht liefert.
+
+## Application Specific Messages — implementiert, aber der Feed führt sie nicht
+
+Der Client dekodiert `BinaryBroadcastMessage` (Msg 8) und
+`AddressedBinaryMessage` (Msg 6) für zwei Binnen-AIS-Funktionen:
+
+- **DAC 200 / FI 10** — ENI-Nummer, Länge/Breite auf 1/10 m, ERI-Schiffstyp,
+  blaue Kegel, Tiefgang auf 1/100 m, beladen/unbeladen
+- **DAC 200 / FI 55** — Besatzung (8 Bit), **Passagiere (13 Bit)**,
+  Bordpersonal (8 Bit)
+
+**Erwarte davon auf dem openwaters-Feed nichts.** Messung vom 24. Aug. 2026:
+5 Minuten Subscription über der Rhein-/Maasdelta (dichteste
+Binnenschifffahrt Europas, Box `[[51.0,3.8],[52.3,7.6]]`) ergaben 4783
+Nachrichten — davon **0 binäre**. Der weltweite `/v1/vessels`-Bestand
+enthielt zeitgleich 5 `BinaryBroadcastMessage` unter 55 402 Einträgen. Die
+Upstream-Aggregatoren reichen ASM praktisch nicht durch.
+
+Der Dekoder ist trotzdem drin und getestet, weil er sofort trägt, sobald ein
+Feed sie liefert — etwa ein eigener AIS-Empfänger (openwaters nimmt eigene
+Quellen per `udp:`/`http:ed25519:` entgegen) oder das offizielle
+aisstream.io. Die Checkboxen sind deshalb **standardmäßig aus**, mit
+erklärendem Hinweistext im UI.
+
+**Kodierung von `BinaryData`:** Im aisstream-Modell nur als `string`
+deklariert, ohne Format — und es gab kein Live-Sample zum Gegenprüfen (siehe
+oben: der Feed liefert keine). `binaryDataToBits()` erkennt deshalb zur
+Laufzeit Base64 (auch URL-safe), Hex und reine Bitstrings. Alle drei sind
+per Round-Trip getestet. Wer je ein echtes Sample in die Finger bekommt:
+bitte hier notieren, dann kann die Erkennung entfallen.
+
 ## Protokoll-Fallstricke (bereits gelöst, aber gut zu wissen)
 
 Alle über mehrere Debugging-Runden mit dem User empirisch/per Doku
@@ -153,6 +218,31 @@ verifiziert:
 - Rohdaten-Ansicht je MMSI (letzte Nachricht je Typ als JSON) + „JSON
   kopieren" in die Zwischenablage + Deeplinks zu MarineTraffic, VesselFinder
   und OpenStreetMap
+- **Snapshot-Button**: holt `GET /v1/vessels?bbox=…` für den aktuellen
+  Ausschnitt und füllt Karte und Tabelle — ohne WebSocket-Verbindung und
+  ohne API-Key. Warnt, wenn kein geladenes Schiff im Kartenausschnitt liegt
+  (passiert, wenn die Box von Hand abweichend gesetzt wurde)
+- **„Bei openwaters nachschlagen"** in der Detailansicht: Einzelabfrage per
+  `?mmsi=`, ergänzt fehlende Felder und weist die Quelle aus. Beides nur
+  aktiv, wenn die Server-URL auf `openwaters.io` zeigt — die REST-Basis wird
+  aus der Server-URL abgeleitet, damit ein Wechsel zu aisstream.io nicht
+  stillschweigend weiter openwaters abfragt
+- **Binnen-AIS-Dekoder** für DAC 200 FI 10 / FI 55 (siehe eigenen Abschnitt
+  oben) — ENI, ERI-Typ, blaue Kegel, beladen/unbeladen, Personen an Bord
+- **Größen- und Kapazitätsabschätzung** aus den AIS-Maßen:
+  - Größenklasse: bei Seeschiffen aus Schleusenmaßen (Panamax, Neopanamax,
+    Kiel-Kanal, Seaway, Küstenmotorschiff-Größe, „zu groß für Panama"), bei
+    Binnenschiffen CEMT I–VIb. Das ist keine Schätzung, sondern Geometrie
+  - Verdrängung `Δ = 0,96·LOA · B · T · Cb · 1,025` mit typabhängigem
+    Blockkoeffizienten, plus Tragfähigkeit über einen typabhängigen Anteil.
+    Gegengeprüft an VLCC, Panamax-Bulker und Feeder
+  - TEU über `0,011375 · (L·B)^1,4225`, gefittet an elf Referenzschiffen von
+    500 TEU bis MSC Gulsun (23 756 TEU): mittlere Abweichung 7,8 %, max
+    15,6 %. **Immer als „falls Containerschiff" ausgewiesen**, weil der
+    ITU-Typcode 70–79 Container-, Bulk- und Stückgutfrachter nicht trennt
+  - Passagierzahlen werden **bewusst nicht geschätzt** — Fähre und
+    Kreuzfahrtschiff gleicher Länge liegen um eine Größenordnung
+    auseinander. Echte Zahlen gibt es nur über FI 55
 - "Token holen"-Button für openwaters.io (self-serve, kein Login)
 - Fällt Leaflet/CDN aus, degradiert die App auf reine Tabellen-Ansicht statt
   komplett zu brechen
@@ -182,11 +272,24 @@ Tabelle, Popup und Detailansicht ziehen automatisch nach.
 
 ## Testen — wichtig, sonst verschwendest du Zeit
 
-**In dieser Sandbox/Remote-Umgebung sind blockiert:** `aisstream.io`,
-`ais.openwaters.io`, `unpkg.com` (Leaflet-CDN), diverse
-Vessel-Tracking-Seiten. Ein echter Verbindungstest gegen die echten Server
-ist von hier aus **nicht möglich** (Proxy-Policy, nicht umgehbar/nicht
-umgehen).
+**Stand 24. Aug. 2026 — das hat sich geändert:** `ais.openwaters.io` ist
+aus der Sandbox **per `curl` und Node erreichbar** (REST *und* WebSocket,
+inklusive Token-Minting über `POST /v1/keys`). Damit sind echte
+Endpunkt-Tests möglich — genau so wurden die `/v1/vessels`-Parameter und der
+ASM-Befund oben verifiziert.
+
+**Aber: Chromium kommt weiterhin nicht raus.** Der Agent-Proxy lässt
+curl/Node durch und resettet Browser-Verbindungen (`ERR_CONNECTION_RESET`)
+— auch für `unpkg.com`. Konsequenz für Tests:
+
+- Netzabhängige Pfade **nicht** live aus dem Test-Browser prüfen. Stattdessen
+  Antworten vorab per `curl` holen, als Datei ablegen und im Test per
+  `page.route(...)` ausliefern. So wird gegen *echte* Daten getestet, ohne am
+  Proxy zu scheitern.
+- `page.route()` mit Glob (`'**host/pfad**'`) matcht diese URLs **nicht**
+  zuverlässig — Regex nehmen: `page.route(/ais\.openwaters\.io\/v1\/vessels/, …)`.
+- `--proxy-server=…` an Chromium zu hängen hilft nicht, der Reset kommt
+  trotzdem.
 
 **Wie bisher getestet wurde (funktioniert zuverlässig):**
 1. `python3 -m http.server 8000` im Repo-Root, Seite unter
@@ -214,8 +317,13 @@ Session. Bei Bedarf neu aufsetzen nach obigem Muster.
 
 - Sobald AISstream.io stabil zurück ist: Default-Server-URL ggf. wieder auf
   `wss://stream.aisstream.io/v0/stream` umstellen (siehe oben)
-- `GET /v1/vessels` (openwaters, kein Auth nötig) wäre eine Alternative/
-  Ergänzung zum WebSocket-Stream für einen reinen Snapshot ohne Live-Verbindung
+- Für echte TEU-/Bruttoraumzahl-/Passagierkapazitätsdaten führt kein Weg an
+  einem Schiffsregister vorbei (Join über die IMO-Nummer aus
+  `ShipStaticData`). Wikidata (`P458` = IMO) ist frei und CORS-fähig, deckt
+  aber fast nur prominente Schiffe ab und hat keine gepflegte TEU-Property;
+  kommerzielle APIs (Datalastic, Data Docked) hätten die Felder, brauchen
+  aber einen Key — und ein Key im Browser-JS ist öffentlich, das bräuchte
+  einen kleinen Proxy und damit erstmals ein Backend
 - Kein automatisiertes Test-Setup — bei größeren Änderungen die
   Playwright-Smoke-Tests wie oben beschrieben neu aufsetzen
 - Schiffsdaten sind rein flüchtig: Reload verwirft alle gesammelten MMSIs

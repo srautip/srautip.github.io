@@ -360,11 +360,24 @@
       <label><input type="checkbox" value="StaticDataReport" checked /> StaticDataReport (Class-B-Name/Rufzeichen)</label>
       <label><input type="checkbox" value="AidsToNavigationReport" /> AidsToNavigationReport (Seezeichen)</label>
       <label><input type="checkbox" value="BaseStationReport" /> BaseStationReport (Landstationen)</label>
+      <label><input type="checkbox" value="BinaryBroadcastMessage" /> BinaryBroadcastMessage (Binnen-AIS)</label>
+      <label><input type="checkbox" value="AddressedBinaryMessage" /> AddressedBinaryMessage (Personen an Bord)</label>
     </div>
+    <p class="hint" style="margin-top:0.35rem">
+      Die beiden Binärtypen liefern bei Binnenschiffen ENI-Nummer, ERI-Typ,
+      blaue Kegel, beladen/unbeladen und die Zahl der Personen an Bord.
+      <strong>Achtung:</strong> Der openwaters-Feed führt diese Nachrichten
+      derzeit nicht (in einem Testlauf über der Rhein-/Maasdelta: 4783
+      Nachrichten, davon 0 binäre). Sinnvoll erst mit einem Feed, der sie
+      durchreicht &ndash; etwa einem eigenen AIS-Empfänger.
+    </p>
 
     <div class="actions">
       <button class="primary" id="connectBtn">Verbinden</button>
       <button id="disconnectBtn" disabled>Trennen</button>
+    </div>
+    <div class="actions" style="margin-top:0.5rem">
+      <button id="snapshotBtn">Snapshot laden (ohne Verbindung, ohne Key)</button>
     </div>
 
     <div class="stats">
@@ -436,6 +449,7 @@
   <div class="detail-actions">
     <button type="button" id="detailCenter">Auf Karte zentrieren</button>
     <button type="button" id="detailTrack">Track anzeigen</button>
+    <button type="button" id="detailLookup">Bei openwaters nachschlagen</button>
     <button type="button" id="detailRawToggle">Rohdaten</button>
     <button type="button" id="detailCopy">JSON kopieren</button>
   </div>
@@ -586,6 +600,47 @@
     3: "Gefahrgut Kategorie C", 4: "Gefahrgut Kategorie D"
   };
 
+  // ERI ship/convoy types (UNECE Annex E), carried by inland AIS DAC 200
+  // FI 10. Far more granular than the ITU type in message 5 - it separates
+  // cabin ships from ferries and tanker barges from freight barges.
+  var ERI_TYPE = {
+    8000: "Fahrzeug, Typ unbekannt", 8010: "Motorgüterschiff", 8020: "Motortankschiff",
+    8021: "Motortankschiff (Flüssigfracht Typ N)", 8022: "Motortankschiff (Flüssigfracht Typ C)",
+    8023: "Motortankschiff (Trockenfracht wie Flüssigfracht)", 8030: "Containerschiff",
+    8040: "Gastankschiff", 8050: "Motorgüterschiff, Schlepper", 8060: "Motortankschiff, Schlepper",
+    8070: "Motorgüterschiff mit längsseits gekuppelten Fahrzeugen",
+    8080: "Motorgüterschiff mit Tankschiff", 8090: "Motorgüterschiff schiebt Güterschiff(e)",
+    8100: "Motorgüterschiff schiebt Tankschiff(e)", 8110: "Schlepper, Güterschiff",
+    8120: "Schlepper, Tankschiff", 8130: "Schlepper, Güterschiff gekuppelt",
+    8140: "Schlepper, Güter-/Tankschiff gekuppelt", 8150: "Güterleichter", 8160: "Tankleichter",
+    8161: "Tankleichter (Flüssigfracht Typ N)", 8162: "Tankleichter (Flüssigfracht Typ C)",
+    8163: "Tankleichter (Trockenfracht wie Flüssigfracht)", 8170: "Güterleichter mit Containern",
+    8180: "Gasleichter", 8210: "Schubverband, 1 Güterleichter",
+    8220: "Schubverband, 2 Güterleichter", 8230: "Schubverband, 3 Güterleichter",
+    8240: "Schubverband, 4 Güterleichter", 8250: "Schubverband, 5 Güterleichter",
+    8260: "Schubverband, 6 Güterleichter", 8270: "Schubverband, 7 Güterleichter",
+    8280: "Schubverband, 8 Güterleichter", 8290: "Schubverband, 9+ Güterleichter",
+    8310: "Schubverband, 1 Tank-/Gasleichter", 8320: "Schubverband, 2 Leichter (min. 1 Tank/Gas)",
+    8330: "Schubverband, 3 Leichter (min. 1 Tank/Gas)", 8340: "Schubverband, 4 Leichter (min. 1 Tank/Gas)",
+    8350: "Schubverband, 5 Leichter (min. 1 Tank/Gas)", 8360: "Schubverband, 6 Leichter (min. 1 Tank/Gas)",
+    8370: "Schubverband, 7 Leichter (min. 1 Tank/Gas)", 8380: "Schubverband, 8 Leichter (min. 1 Tank/Gas)",
+    8390: "Schubverband, 9+ Leichter (min. 1 Tank/Gas)", 8400: "Schlepper, einzeln",
+    8410: "Schlepper mit Anhang", 8420: "Schlepper, assistierend", 8430: "Schubboot, einzeln",
+    8440: "Fahrgastschiff (Fähre, Kreuzfahrt, Rotkreuzschiff)", 8441: "Fähre",
+    8442: "Rotkreuzschiff", 8443: "Kabinenschiff", 8444: "Fahrgastschiff ohne Übernachtung",
+    8450: "Dienstfahrzeug (Polizei, Hafendienst)",
+    8460: "Arbeitsfahrzeug (Schwimmkran, Kabelleger, Tonnenleger, Bagger)",
+    8470: "Geschlepptes Objekt", 8480: "Fischereifahrzeug", 8490: "Bunkerschiff",
+    8500: "Tankleichter, Chemie", 8510: "Objekt, nicht näher bezeichnet",
+    1500: "Stückgutschiff (See)", 1510: "Unit Carrier (See)", 1520: "Massengutschiff (See)",
+    1530: "Tankschiff (See)", 1540: "Flüssiggastanker (See)",
+    1850: "Sportboot über 20 m", 1900: "Schnellschiff", 1910: "Tragflügelboot",
+    1920: "Katamaran (schnell)"
+  };
+
+  // Inland AIS "loaded/unloaded" indicator, DAC 200 FI 10.
+  var LOADED_STATE = { 1: "beladen", 2: "unbeladen" };
+
 
   var socket = null;
   var msgCount = 0;
@@ -614,6 +669,7 @@
   var logEl = document.getElementById("log");
   var tableBody = document.getElementById("shipTableBody");
   var mmsiFilterInput = document.getElementById("mmsiFilter");
+  var snapshotBtn = document.getElementById("snapshotBtn");
   var searchInput = document.getElementById("shipSearch");
   var searchHintEl = document.getElementById("searchHint");
   var knownCountEl = document.getElementById("knownCount");
@@ -930,6 +986,206 @@
     return "vor " + Math.round(seconds / 3600) + " h";
   }
 
+  /* --- Binärnachrichten (Application Specific Messages) -------------- */
+
+  // aisstream types BinaryData as a plain string without declaring an
+  // encoding, and the payload never appears on the openwaters feed (see
+  // CLAUDE.md), so there was no live sample to check against. Accept the
+  // three plausible encodings and pick whichever the value actually is.
+  function binaryDataToBits(value) {
+    if (value == null) return null;
+    if (Array.isArray(value)) return bytesToBits(new Uint8Array(value));
+    var text = String(value).trim();
+    if (!text) return null;
+    if (/^[01]+$/.test(text) && text.length > 8) {
+      // Already a bit string.
+      return text.split("").map(Number);
+    }
+    if (/^[0-9a-fA-F]+$/.test(text) && text.length % 2 === 0) {
+      var hex = new Uint8Array(text.length / 2);
+      for (var i = 0; i < hex.length; i++) hex[i] = parseInt(text.substr(i * 2, 2), 16);
+      return bytesToBits(hex);
+    }
+    try {
+      var normalized = text.replace(/-/g, "+").replace(/_/g, "/");
+      while (normalized.length % 4) normalized += "=";
+      var raw = atob(normalized);
+      var bytes = new Uint8Array(raw.length);
+      for (var j = 0; j < raw.length; j++) bytes[j] = raw.charCodeAt(j);
+      return bytesToBits(bytes);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function bytesToBits(bytes) {
+    var bits = [];
+    for (var i = 0; i < bytes.length; i++) {
+      for (var b = 7; b >= 0; b--) bits.push((bytes[i] >> b) & 1);
+    }
+    return bits;
+  }
+
+  // Sequential MSB-first reader over the bit array, mirroring how the
+  // ITU-R M.1371 field tables are laid out.
+  function BitReader(bits) {
+    this.bits = bits;
+    this.pos = 0;
+  }
+  BitReader.prototype.remaining = function () { return this.bits.length - this.pos; };
+  BitReader.prototype.u = function (n) {
+    if (this.remaining() < n) return null;
+    var value = 0;
+    for (var i = 0; i < n; i++) value = value * 2 + this.bits[this.pos++];
+    return value;
+  };
+  // 6-bit ASCII per ITU-R M.1371 Table 47: 0-31 map to '@'..'_', 32-63 to ' '..'?'.
+  BitReader.prototype.text = function (chars) {
+    var out = "";
+    for (var i = 0; i < chars; i++) {
+      var code = this.u(6);
+      if (code == null) break;
+      out += String.fromCharCode(code < 32 ? code + 64 : code);
+    }
+    return cleanText(out);
+  };
+
+  // DAC 200 FI 10 - inland ship static and voyage related data (message 8).
+  // Field widths per EU 2019/838 Annex / CESNI Inland AIS test standard.
+  function decodeInlandStatic(bits) {
+    var r = new BitReader(bits);
+    if (r.remaining() < 112) return null;
+    var eni = r.text(8);
+    var lengthDm = r.u(13);
+    var beamDm = r.u(10);
+    var eriCode = r.u(14);
+    var cones = r.u(3);
+    var draughtCm = r.u(11);
+    var loaded = r.u(2);
+    var out = {};
+    if (eni) out.eni = eni;
+    // Lengths are in 1/10 m, draught in 1/100 m; 0 means "not available".
+    if (lengthDm) out.eriLength = lengthDm / 10;
+    if (beamDm) out.eriBeam = beamDm / 10;
+    if (eriCode) {
+      out.eriCode = eriCode;
+      out.eriLabel = ERI_TYPE[eriCode] || "ERI-Code " + eriCode;
+    }
+    // 0-3 blue cones, 4 = B-flag, 5 = unknown.
+    if (cones != null && cones <= 4) out.blueCones = cones;
+    if (draughtCm) out.eriDraught = draughtCm / 100;
+    if (LOADED_STATE[loaded]) out.loaded = LOADED_STATE[loaded];
+    return Object.keys(out).length ? out : null;
+  }
+
+  // DAC 200 FI 55 - number of persons on board (message 6).
+  // 255 / 8191 / 255 are the respective "unknown" sentinels.
+  function decodeInlandPersons(bits) {
+    var r = new BitReader(bits);
+    if (r.remaining() < 29) return null;
+    var crew = r.u(8);
+    var passengers = r.u(13);
+    var personnel = r.u(8);
+    var out = {};
+    if (crew != null && crew !== 255) out.crew = crew;
+    if (passengers != null && passengers !== 8191) out.passengers = passengers;
+    if (personnel != null && personnel !== 255) out.personnel = personnel;
+    return Object.keys(out).length ? out : null;
+  }
+
+  /* --- Größen- und Kapazitätsabschätzung ----------------------------- */
+
+  // Canal and lock limits are hard facts, not estimates: a hull either fits
+  // the chamber or it does not. Ordered widest-first so the first match wins.
+  var SIZE_CLASSES = [
+    { name: "Neopanamax-Klasse", maxL: 366, maxB: 51.25, maxT: 15.2 },
+    { name: "Panamax-Klasse", maxL: 294.1, maxB: 32.31, maxT: 12.04 },
+    { name: "Kiel-Kanal-tauglich", maxL: 235, maxB: 32.5, maxT: 9.5 },
+    { name: "Seaway-tauglich", maxL: 225.6, maxB: 23.8, maxT: 8.08 }
+  ];
+
+  // CEMT waterway classes for inland vessels - the standard hull sizes
+  // European waterways and locks are dimensioned for. Narrowest first.
+  var CEMT_CLASSES = [
+    { name: "CEMT I (Péniche/Spits)", maxL: 40, maxB: 5.2 },
+    { name: "CEMT II (Kempenaar)", maxL: 57, maxB: 6.7 },
+    { name: "CEMT III (Gustav-Koenigs-Typ)", maxL: 82, maxB: 8.3 },
+    { name: "CEMT IV (Europaschiff)", maxL: 87, maxB: 9.6 },
+    { name: "CEMT Va (Großmotorgüterschiff)", maxL: 112, maxB: 11.5 },
+    { name: "CEMT Vb (Schubverband, 2 Leichter)", maxL: 190, maxB: 11.5 },
+    { name: "CEMT VIa (Schubverband, 2 Leichter breit)", maxL: 112, maxB: 22.9 },
+    { name: "CEMT VIb (Schubverband, 4 Leichter)", maxL: 195, maxB: 22.9 }
+  ];
+
+  // isInland must come from an actual inland AIS report - a 90 m coaster has
+  // barge-like dimensions but is a sea-going ship, and calling it a pushed
+  // convoy would be plainly wrong.
+  function sizeClass(length, beam, draught, isInland) {
+    if (isInland) {
+      for (var j = 0; j < CEMT_CLASSES.length; j++) {
+        var e = CEMT_CLASSES[j];
+        if (length <= e.maxL && beam <= e.maxB) return e.name;
+      }
+      return "über CEMT VIb (Großverband)";
+    }
+    var fits = [];
+    for (var i = 0; i < SIZE_CLASSES.length; i++) {
+      var c = SIZE_CLASSES[i];
+      if (length <= c.maxL && beam <= c.maxB && (!draught || draught <= c.maxT)) fits.push(c.name);
+    }
+    if (!fits.length) return "zu groß für die Panamaschleusen (ULCV/Capesize-Klasse)";
+    // "Clears the Seaway" is true of anything small, so name the coaster
+    // range explicitly instead of implying the ship ever goes there.
+    if (fits[fits.length - 1] === "Seaway-tauglich" && length < 120 && beam < 20) {
+      return "Küstenmotorschiff-Größe";
+    }
+    // The narrowest passage a hull still clears is the informative one.
+    return fits[fits.length - 1];
+  }
+
+  // Block coefficients by ITU ship type. Full-bodied tankers and bulkers sit
+  // near 0.82, fine-lined container and passenger hulls far lower.
+  function blockCoefficient(typeCode) {
+    var code = Number(typeCode) || 0;
+    if (code >= 80 && code <= 89) return 0.82;
+    if (code >= 70 && code <= 79) return 0.75;
+    if (code >= 60 && code <= 69) return 0.62;
+    if (code >= 40 && code <= 49) return 0.45;
+    return 0.60;
+  }
+
+  // Delta = L_wl * B * T * Cb * rho. AIS reports LOA, and waterline length
+  // runs about 96% of that on merchant hulls.
+  function displacementTons(length, beam, draught, typeCode) {
+    if (!length || !beam || !draught) return null;
+    return 0.96 * length * beam * draught * blockCoefficient(typeCode) * 1.025;
+  }
+
+  // Deadweight as a fraction of displacement: high for tankers and bulkers,
+  // very low for passenger ships, which are mostly enclosed volume.
+  function deadweightFraction(typeCode) {
+    var code = Number(typeCode) || 0;
+    if (code >= 80 && code <= 89) return 0.86;
+    if (code >= 70 && code <= 79) return 0.82;
+    if (code >= 60 && code <= 69) return 0.35;
+    return 0.70;
+  }
+
+  // Power law fitted over eleven reference container ships from 500 TEU
+  // feeders to the 23 756 TEU MSC Gulsun: mean absolute error 7.8%, worst
+  // case 15.6%. Only meaningful if the hull really is a container ship -
+  // the ITU type code cannot tell one from a bulker.
+  function estimateTeu(length, beam) {
+    if (!length || !beam) return null;
+    return 0.011375 * Math.pow(length * beam, 1.4225);
+  }
+
+  function formatTons(value) {
+    if (value == null) return null;
+    if (value >= 10000) return Math.round(value / 1000) + " 000 t";
+    return Math.round(value / 100) * 100 + " t";
+  }
+
   // Sums the great-circle legs of a stored track, in nautical miles.
   function trackDistanceNm(track) {
     var total = 0;
@@ -1007,7 +1263,9 @@
       ["Status", navStatusLabel(entry.navStatus)],
       ["Speed", entry.speed != null ? entry.speed + " kn" : null],
       ["Kurs", courseLabel(entry.course)],
-      ["Ziel", entry.destination]
+      ["Ziel", entry.destination],
+      ["Passagiere", entry.persons && entry.persons.passengers],
+      ["ENI", entry.inland && entry.inland.eni]
     ];
     var html = "<b>" + esc(displayName(entry)) + "</b><br/>MMSI: " + esc(entry.mmsi) + "<br/>";
     rows.forEach(function (row) {
@@ -1023,7 +1281,8 @@
     var haystack = [
       entry.mmsi, entry.name, entry.callSign, entry.imo, entry.destination,
       entry.typeDetail, entry.typeLabel, entry.station,
-      info.country, info.iso, info.category
+      info.country, info.iso, info.category,
+      entry.inland && entry.inland.eni, entry.inland && entry.inland.eriLabel
     ].join(" ").toLowerCase();
     return haystack.indexOf(needle) !== -1;
   }
@@ -1235,10 +1494,171 @@
       var baseLon = meta.longitude != null ? meta.longitude : msg.Longitude;
       if (baseLat != null && baseLon != null) setPosition(entry, baseLat, baseLon, meta.time_utc);
       refreshVisibleShips();
+    } else if (type === "BinaryBroadcastMessage" || type === "AddressedBinaryMessage") {
+      applyBinaryMessage(entry, msg);
+      refreshVisibleShips();
     } else {
       // Unhandled type: still counted above, so the detail view shows it.
       refreshVisibleShips();
     }
+  }
+
+  // Application specific messages carry their payload as opaque binary; the
+  // ApplicationID says which field layout applies. Only the two inland
+  // functions we can actually use are decoded, the rest is just noted.
+  function applyBinaryMessage(entry, msg) {
+    if (!msg || !msg.ApplicationID) return;
+    var dac = Number(msg.ApplicationID.DesignatedAreaCode);
+    var fi = Number(msg.ApplicationID.FunctionIdentifier);
+    entry.lastAsm = "DAC " + dac + " / FI " + fi;
+    var bits = binaryDataToBits(msg.BinaryData);
+    if (!bits) return;
+
+    if (dac === 200 && fi === 10) {
+      var stat = decodeInlandStatic(bits);
+      if (!stat) return;
+      entry.inland = Object.assign({}, entry.inland, stat);
+      entry.station = entry.station || "Binnenschiff";
+      if (stat.eriLabel) entry.typeDetail = stat.eriLabel;
+      // The inland report is the more precise source: decimetres for the
+      // hull, centimetres for the draught.
+      if (stat.eriLength && stat.eriBeam) entry.size = stat.eriLength + "×" + stat.eriBeam;
+      if (stat.eriDraught) entry.draught = stat.eriDraught;
+      if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
+    } else if (dac === 200 && fi === 55) {
+      var persons = decodeInlandPersons(bits);
+      if (!persons) return;
+      entry.persons = Object.assign({}, entry.persons, persons);
+      entry.personsAt = Date.now();
+      if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
+    }
+  }
+
+  /* --- openwaters-Snapshot (REST, ohne WebSocket und ohne Key) -------- */
+
+  // Derives the REST base from whatever stream URL is configured, so a
+  // switch back to stream.aisstream.io does not silently query openwaters.
+  function vesselsApiBase() {
+    var url = serverUrlInput.value.trim();
+    var match = /^wss?:\/\/([^\/]+)/i.exec(url);
+    if (!match) return null;
+    var host = match[1];
+    if (!/openwaters\.io$/i.test(host)) return null;
+    return "https://" + host + "/v1/vessels";
+  }
+
+  // One GeoJSON feature -> the same ship record the WebSocket path builds,
+  // so snapshot and live data land in one table.
+  function applySnapshotFeature(feature) {
+    var props = feature && feature.properties;
+    var coords = feature && feature.geometry && feature.geometry.coordinates;
+    if (!props || !coords || props.mmsi == null) return false;
+    var entry = getShip(String(props.mmsi));
+    entry.total = entry.total || 0;
+    var name = cleanText(props.name);
+    if (name) entry.name = name;
+    if (props.type != null) {
+      entry.typeCode = entry.typeCode != null ? entry.typeCode : props.type;
+      entry.typeLabel = entry.typeLabel || shipTypeLabel(props.type);
+      entry.typeDetail = entry.typeDetail || shipTypeDetail(props.type);
+    }
+    if (props.sog != null) entry.speed = entry.speed != null ? entry.speed : props.sog;
+    if (props.cog != null) entry.course = entry.course != null ? entry.course : props.cog;
+    if (props.heading != null) entry.heading = entry.heading != null ? entry.heading : props.heading;
+    if (props.nav_status != null && entry.navStatus == null) entry.navStatus = props.nav_status;
+    if (props.kind === "aton") entry.station = entry.station || "Seezeichen";
+    if (props.kind === "base") entry.station = entry.station || "Landstation";
+    entry.snapshotSource = props.source || props.station || "openwaters";
+    entry.snapshotSeen = props.seen;
+    // The snapshot carries its own timestamp; using it (rather than "now")
+    // keeps sorting and the stale badge honest for ships nobody has heard
+    // from in a while.
+    var seenAt = props.seen ? Date.parse(props.seen) : NaN;
+    setPosition(entry, coords[1], coords[0], props.seen);
+    entry.updatedAt = isNaN(seenAt) ? Date.now() : seenAt;
+    if (!entry.firstSeen || entry.updatedAt < entry.firstSeen) entry.firstSeen = entry.updatedAt;
+    return true;
+  }
+
+  function loadSnapshot() {
+    var base = vesselsApiBase();
+    if (!base) {
+      log("Snapshot gibt es nur für openwaters-Server (/v1/vessels). Aktuelle Server-URL passt nicht.");
+      return;
+    }
+    var latMin = parseFloat(latMinInput.value), lonMin = parseFloat(lonMinInput.value);
+    var latMax = parseFloat(latMaxInput.value), lonMax = parseFloat(lonMaxInput.value);
+    if ([latMin, lonMin, latMax, lonMax].some(isNaN)) {
+      log("Snapshot braucht gültige Bounding-Box-Koordinaten.");
+      return;
+    }
+    // Same corner order as the WebSocket subscription: latitude first.
+    var url = base + "?bbox=" + [latMin, lonMin, latMax, lonMax].join(",");
+    snapshotBtn.disabled = true;
+    log("Lade Snapshot aus dem aktuellen Kartenausschnitt…");
+    fetch(url)
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        var features = (data && data.features) || [];
+        var added = 0;
+        var inView = 0;
+        features.forEach(function (f) {
+          if (!applySnapshotFeature(f)) return;
+          added++;
+          var c = f.geometry.coordinates;
+          if (!mapAvailable || map.getBounds().contains([c[1], c[0]])) inView++;
+        });
+        refreshVisibleShips();
+        log("Snapshot: " + added + " Schiffe übernommen (" + ships.size + " MMSIs bekannt).");
+        // The table only shows what is inside the map view. If the box was
+        // edited by hand the snapshot can land entirely off-screen, so say
+        // so rather than leaving an apparently empty result.
+        if (added > 0 && inView === 0 && mapAvailable) {
+          log("Keines davon liegt im aktuellen Kartenausschnitt – Karte auf die Bounding Box verschieben.");
+        }
+      })
+      .catch(function (e) {
+        log("Snapshot fehlgeschlagen: " + e.message);
+      })
+      .finally(function () {
+        snapshotBtn.disabled = false;
+      });
+  }
+
+  // Single-MMSI lookup for the detail drawer. The endpoint answers from a
+  // pool of several upstream feeds, so it can know a ship the live
+  // subscription never delivered.
+  function lookupMmsi(mmsi) {
+    var base = vesselsApiBase();
+    if (!base) {
+      log("Nachschlagen gibt es nur für openwaters-Server (/v1/vessels).");
+      return;
+    }
+    log("Schlage MMSI " + mmsi + " bei openwaters nach…");
+    fetch(base + "?mmsi=" + encodeURIComponent(mmsi))
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        var features = (data && data.features) || [];
+        if (!features.length) {
+          log("openwaters kennt MMSI " + mmsi + " nicht.");
+          return;
+        }
+        features.forEach(applySnapshotFeature);
+        refreshVisibleShips();
+        var entry = ships.get(String(mmsi));
+        if (entry) renderDetail(entry);
+        log("MMSI " + mmsi + " bei openwaters gefunden (Quelle: " +
+          ((entry && entry.snapshotSource) || "unbekannt") + ").");
+      })
+      .catch(function (e) {
+        log("Nachschlagen fehlgeschlagen: " + e.message);
+      });
   }
 
   /* --- Detailansicht je MMSI ---------------------------------------- */
@@ -1260,6 +1680,48 @@
       html += "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>";
     });
     return html + "</dl>";
+  }
+
+  // Everything here is derived from the hull dimensions AIS already gives
+  // us. Size class is a hard fact (it fits the lock or it does not); the
+  // tonnages are physics with a type-dependent block coefficient; the TEU
+  // figure is a fitted correlation and only valid if the ship really is a
+  // container ship, which the ITU type code cannot tell us.
+  function capacityEstimate(entry) {
+    var dim = entry.dim;
+    var length = entry.inland && entry.inland.eriLength ? entry.inland.eriLength
+      : (dim ? (Number(dim.A) || 0) + (Number(dim.B) || 0) : 0);
+    var beam = entry.inland && entry.inland.eriBeam ? entry.inland.eriBeam
+      : (dim ? (Number(dim.C) || 0) + (Number(dim.D) || 0) : 0);
+    if (!length || !beam) return {};
+
+    var draught = Number(entry.draught) || 0;
+    var isInland = !!(entry.inland && (entry.inland.eni || entry.inland.eriCode));
+    var out = { sizeClass: sizeClass(length, beam, draught, isInland) };
+
+    var displacement = displacementTons(length, beam, draught, entry.typeCode);
+    if (displacement) {
+      out.displacement = formatTons(displacement) + " (bei " + draught.toFixed(1) + " m Tiefgang)";
+      out.deadweight = formatTons(displacement * deadweightFraction(entry.typeCode));
+    }
+
+    var code = Number(entry.typeCode) || 0;
+    if (code >= 70 && code <= 79) {
+      var teu = estimateTeu(length, beam);
+      if (teu) {
+        out.teu = "≈ " + (Math.round(teu / 50) * 50).toLocaleString("de-DE") +
+          " TEU, falls Containerschiff";
+      }
+    } else if (code >= 60 && code <= 69) {
+      // Passenger capacity does not follow from hull size - a ferry and a
+      // cruise ship of equal length differ by an order of magnitude. Only
+      // the inland FI 55 message carries a real count.
+      out.teu = entry.persons ? null : "Passagierzahl nicht aus Maßen ableitbar";
+    }
+
+    out.basis = "geschätzt aus " + length.toFixed(0) + " × " + beam.toFixed(0) + " m" +
+      (draught ? " × " + draught.toFixed(1) + " m" : " (ohne Tiefgang)");
+    return out;
   }
 
   function renderDetail(entry) {
@@ -1284,6 +1746,13 @@
       var brg = bearingDeg(center.lat, center.lng, entry.lat, entry.lon);
       bearing = brg.toFixed(0) + "° (" + compass(brg) + ")";
     }
+
+    var persons = entry.persons || {};
+    var personsTotal = ["crew", "passengers", "personnel"].some(function (k) { return persons[k] != null; })
+      ? ["crew", "passengers", "personnel"].reduce(function (sum, k) { return sum + (persons[k] || 0); }, 0)
+      : null;
+    var inland = entry.inland || {};
+    var est = capacityEstimate(entry);
 
     var travelled = entry.track.length > 1 ? trackDistanceNm(entry.track) : 0;
     var span = entry.track.length > 1
@@ -1330,12 +1799,38 @@
         ["Ziel", entry.destination],
         ["ETA", entry.eta]
       ]) +
+      section("Personen an Bord (Binnen-AIS)", [
+        ["Passagiere", persons.passengers],
+        ["Besatzung", persons.crew],
+        ["Bordpersonal", persons.personnel],
+        ["Gesamt", personsTotal],
+        ["Gemeldet", entry.personsAt ? relativeTime(entry.personsAt) : null]
+      ]) +
+      section("Binnenschifffahrt (Inland-AIS)", [
+        ["ENI-Nummer", inland.eni],
+        ["ERI-Typ", inland.eriLabel],
+        ["ERI-Code", inland.eriCode],
+        ["Maße (ERI)", inland.eriLength && inland.eriBeam
+          ? inland.eriLength.toFixed(1) + " × " + inland.eriBeam.toFixed(1) + " m" : null],
+        ["Tiefgang (ERI)", inland.eriDraught ? inland.eriDraught.toFixed(2) + " m" : null],
+        ["Ladung", inland.loaded],
+        ["Gefahrgut", inland.blueCones == null ? null
+          : (inland.blueCones === 4 ? "B-Flagge" : inland.blueCones + " blaue Kegel")]
+      ]) +
+      section("Größe & Kapazität (berechnet)", [
+        ["Größenklasse", est.sizeClass],
+        ["Verdrängung", est.displacement],
+        ["Tragfähigkeit ≈", est.deadweight],
+        ["Containerkapazität", est.teu],
+        ["Grundlage", est.basis]
+      ]) +
       section("Relativ zur Kartenmitte", [
         ["Entfernung", distance],
         ["Peilung", bearing]
       ]) +
       section("Empfang", [
         ["Zuletzt gesehen", relativeTime(entry.updatedAt)],
+        ["openwaters-Quelle", entry.snapshotSource],
         ["Zeitstempel (UTC)", entry.time],
         ["Erstmals gesehen", relativeTime(entry.firstSeen)],
         ["Nachrichten gesamt", entry.total],
@@ -1617,6 +2112,12 @@
     }
     drawTrack(entry);
     map.fitBounds(trackLayer.getBounds().pad(0.2));
+  });
+
+  snapshotBtn.addEventListener("click", loadSnapshot);
+
+  document.getElementById("detailLookup").addEventListener("click", function () {
+    if (selectedMmsi) lookupMmsi(selectedMmsi);
   });
 
   document.getElementById("detailRawToggle").addEventListener("click", function () {
