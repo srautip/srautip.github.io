@@ -2717,6 +2717,10 @@
       if (!v) return null;
       var out = { source: "digitraffic" };
       if (v.imo) out.imo = String(v.imo);
+      // Der Name stand von Anfang an in der Antwort, wurde hier aber nie
+      // ausgelesen - Rufzeichen und Typ kamen an, der Name nicht.
+      var dtName = cleanText(v.name);
+      if (dtName) out.name = dtName;
       var call = plausibleCallSign(v.callSign);
       if (call) out.callSign = call;
       var dest = cleanText(v.destination);
@@ -2820,7 +2824,8 @@
     fill("destination", dt.destination);
     fill("eta", dt.eta);
     fill("draught", dt.draught);
-    fill("name", data.name);
+    // Wikidata zuerst (gepflegter Registername), sonst Digitraffic.
+    fill("name", data.name || dt.name);
     if (dt.dim && !entry.dim) {
       entry.dim = dt.dim;
       entry.size = shipSize(dt.dim) || entry.size;
@@ -2846,6 +2851,10 @@
       if (cached) {
         applyEnrichment(entry, cached.data);
         entry.enrichState = cached.found ? "done" : "empty";
+        // Ohne das schreibt der Cache Name, IMO und Rufzeichen zwar in den
+        // Datensatz, aber Tabelle und Detailansicht bleiben auf dem alten
+        // Stand, bis zufaellig die naechste Nachricht fuer das Schiff kommt.
+        refreshVisibleShips();
         return Promise.resolve(cached.data);
       }
       if (enrichInFlight[mmsi]) return enrichInFlight[mmsi];

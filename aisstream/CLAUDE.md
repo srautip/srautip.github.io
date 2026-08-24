@@ -392,7 +392,8 @@ Ein Schiffsname trudelt aus bis zu fünf Quellen ein, zeitlich versetzt:
 2. `ShipStaticData` (Msg 5) / `StaticDataReport` (Msg 24) — alle paar Minuten
 3. `ExtendedClassBPositionReport` (Msg 19) — Position **und** Name in einem
 4. openwaters-Snapshot bzw. Einzelnachschlag
-5. Registeranreicherung (Digitraffic/Wikidata)
+5. Registeranreicherung (Digitraffic/Wikidata) — auch aus deren
+   `localStorage`-Cache, siehe unten
 
 Früher hing an jedem Zweig ein eigenes `bindPopup(popupHtml(entry))` — sechs
 Stellen. **Drei Pfade hatten keines**, dort behielt der Marker den alten
@@ -414,6 +415,28 @@ schreiben.
 nur bei echter Änderung neu. Leaflets `bindPopup` ruft intern `setContent`,
 ein **bereits geöffnetes** Popup aktualisiert sich damit sofort, ohne Klick —
 getestet.
+
+### Und die Tabelle
+
+Die Tabelle wird bei jedem `refreshVisibleShips()` komplett neu gebaut, sie
+kann also nur veralten, wenn der Neubau **nicht angestoßen** wird. Genau das
+passierte im **Cache-Pfad von `enrichShip()`**: Bei einem Treffer aus
+`localStorage` schrieb `applyEnrichment()` Name, IMO, Rufzeichen und Ziel in
+den Datensatz und die Funktion kehrte zurück — ohne Neubau. Die Zeile blieb
+auf altem Stand, bis zufällig die nächste Nachricht für dieses Schiff kam.
+Der Cache-Zweig ruft jetzt selbst `refreshVisibleShips()`.
+
+**Der eigentliche Grund, warum Namen aus Registern nie ankamen:**
+`fetchDigitraffic()` hat das Feld `name` schlicht **nicht ausgelesen** —
+`imo`, `callSign`, `destination`, `eta`, `draught`, `shipType` und die
+Dimensionen wurden übernommen, der Name fiel durch. Deshalb sah es so aus,
+als „aktualisiere sich der Name nicht", während Rufzeichen und Typ sehr wohl
+erschienen. `applyEnrichment()` nimmt jetzt `data.name || dt.name`
+(Wikidata zuerst, weil gepflegter Registername, sonst Digitraffic).
+
+Live gegengeprüft mit drei echten Ostsee-MMSIs ohne Namen im Stream: alle
+drei bekommen ihn aus dem Register (Bore Wave, Viggen, Meri) — vorher blieben
+alle drei `-`.
 
 ### Namen auf der Karte
 
