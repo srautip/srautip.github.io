@@ -310,11 +310,11 @@
     .detail-actions button { flex: 1 1 100%; }
   }
   /* --- Anreicherung aus Schiffsregistern ----------------------------- */
+  #detailMedia:not(:empty) { margin-bottom: 0.9rem; }
   .enrich-photo {
     width: 100%;
     border-radius: 8px;
     border: 1px solid var(--border);
-    margin-top: 0.6rem;
     display: block;
   }
   .enrich-photo-credit {
@@ -947,8 +947,11 @@
     <button type="button" id="detailClose" title="Schließen">&times;</button>
   </div>
   <div class="detail-sub" id="detailSub"></div>
-  <div id="detailBody"></div>
+  <!-- Das Foto steht oben, direkt unter dem Namen. Der Container bleibt auch
+       leer stehen: renderDetail() laeuft bei jeder Nachricht, und ein neu
+       erzeugtes <img> wuerde das Bild jedes Mal neu laden und flackern. -->
   <div id="detailMedia"></div>
+  <div id="detailBody"></div>
   <div class="detail-actions">
     <button type="button" id="detailCenter">Auf Karte zentrieren</button>
     <button type="button" id="detailTrack">Track anzeigen</button>

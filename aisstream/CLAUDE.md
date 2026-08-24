@@ -522,6 +522,13 @@ Gemessen: **eine** Bildanfrage vor und nach 15 Nachrichten in Folge.
 **Regel:** Nichts, was Netzwerkressourcen lädt, gehört in einen Bereich, der
 per `innerHTML` neu aufgebaut wird.
 
+**Platz im Panel:** `#detailMedia` steht **oben**, zwischen `.detail-sub` und
+`#detailBody` — der Name, seine Flaggen-/Klassenzeile, dann das Foto, dann die
+Daten. Unter der Sub-Zeile und nicht darüber, weil die Zeile sonst als
+Bildunterschrift des Fotos gelesen wird statt als Untertitel des Namens. Der
+Container bleibt an dieser Stelle auch dann stehen, wenn er leer ist; er darf
+nicht in `#detailBody` wandern (siehe oben).
+
 ### Namen auf der Karte
 
 Bis dahin war der Name nur im Popup, also erst nach einem Klick sichtbar.
