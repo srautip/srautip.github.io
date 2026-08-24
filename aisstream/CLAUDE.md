@@ -90,6 +90,26 @@ verifiziert:
 - **Name-Feld:** `MetaData.ShipName` ist die verlässliche Quelle für den
   Schiffsnamen bei **jedem** Nachrichtentyp — nicht `Message.<Typ>.ShipName`
   (das Feld existiert im Message-Body nicht unter diesem Namen).
+- **`@`-Padding:** AIS füllt Textfelder fester Breite (`Name`, `CallSign`,
+  `Destination`) mit `@` auf. Ohne Bereinigung steht in der UI
+  `NORDLICHT@@@@@@`. Dafür gibt es `cleanText()`.
+- **Optionale Felder nie blind überschreiben:** Nicht jeder `PositionReport`
+  trägt `PositionAccuracy`/`Raim`/`SpecialManoeuvreIndicator`. Ein
+  `entry.x = msg.X` ohne `!= null`-Guard löscht bereits bekannte Werte
+  wieder — beim Anreichern pro MMSI immer nur bei vorhandenem Feld setzen.
+- **Class B splittet die Statikdaten:** `StaticDataReport` (Msg 24) liefert
+  den Namen in `Message.StaticDataReport.ReportA.Name` und Rufzeichen/Typ/
+  Dimensionen/Hersteller in `.ReportB`. Ohne diesen Typ bleiben Class-B-Boote
+  namenlos — `ShipStaticData` (Msg 5) senden sie nicht.
+- **`Fixtype` vs. `FixType`:** `ShipStaticData` nutzt `FixType`,
+  `AidsToNavigationReport`/`BaseStationReport` schreiben `Fixtype`. Der Code
+  prüft beide Schreibweisen.
+- **Sentinel-Werte:** `TrueHeading` 511 = keine Angabe, `RateOfTurn` -128 =
+  keine Angabe / ±127 = „dreht schneller als 5°/30 s", `Timestamp` 60–63 =
+  Statuscodes statt Sekunden, `Eta.Month`/`Day` 0 = keine Angabe. Alles in
+  den jeweiligen `*Label()`-Helfern behandelt.
+- **Namen kommen aus dem Netz:** Tabellen-/Popup-Rendering läuft über
+  `innerHTML`, deshalb geht jeder Streamwert durch `esc()`. Nicht entfernen.
 
 ## Implementierte Features
 
@@ -107,9 +127,58 @@ verifiziert:
   (`map.getBounds().contains(...)`), nicht nur auf die Subscription-Box
 - Schiffstyp (lesbare Kategorie) + Größe (L×B in Metern) aus
   `ShipStaticData`, in Tabelle und Marker-Popup
+- **Detailansicht je MMSI** (Drawer rechts, öffnet per Klick auf Tabellenzeile,
+  Marker-Popup-Link oder `openDetail()`; schließt per `Esc`). Zeigt gruppiert:
+  Identität (MMSI-Kategorie, Flaggenstaat, MID, Name, Rufzeichen, IMO,
+  AIS-Klasse, Transponder), Schiff (Typ inkl. Gefahrgutkategorie, Typcode,
+  L×B, Tiefgang, Antennen-Offsets), Navigation (Status, SOG, COG, Heading,
+  Drehrate, Positionsgenauigkeit, RAIM, EPFD, Ortungssekunde), Reise (Ziel,
+  ETA), Entfernung/Peilung zur Kartenmitte sowie Empfangsstatistik
+  (Nachrichten gesamt und je Typ, erste/letzte Sichtung, Trackpunkte,
+  zurückgelegte Strecke, Ø Geschwindigkeit)
+- **MMSI-Dekodierung offline** (`decodeMmsi()`): Stationsart nach ITU-R M.585
+  (Schiff / Küstenfunkstelle / Gruppenruf / SAR-Luftfahrzeug / Seezeichen /
+  Beiboot / AIS-SART / MOB / EPIRB / Handfunkgerät) plus MID → Flaggenstaat
+  mit Flaggen-Emoji (`MID_DATA`, ~250 Einträge, kein Netzzugriff nötig)
+- **Positionshistorie je MMSI** (bis `MAX_TRACK_POINTS` = 300 Punkte), auf
+  Wunsch als Polyline auf der Karte („Track anzeigen", zoomt auf den Track)
+- **Mehr Nachrichtentypen ausgewertet:** `StaticDataReport` (Class-B-Name,
+  Rufzeichen, Typ, Hersteller), `AidsToNavigationReport` (Seezeichen inkl.
+  virtuell/außer Position), `BaseStationReport` (Landstationen)
+- **MMSI-Filter** (`FiltersShipMMSI`) im UI, kommagetrennt, in `localStorage`
+  persistiert; wird beim `change`-Event neu subscribed (nicht bei jedem
+  Tastendruck)
+- **Freitextsuche** über Tabelle (MMSI, Name, Rufzeichen, IMO, Ziel, Typ,
+  Land, Stationsart), 150 ms debounced
+- Rohdaten-Ansicht je MMSI (letzte Nachricht je Typ als JSON) + „JSON
+  kopieren" in die Zwischenablage + Deeplinks zu MarineTraffic, VesselFinder
+  und OpenStreetMap
 - "Token holen"-Button für openwaters.io (self-serve, kein Login)
 - Fällt Leaflet/CDN aus, degradiert die App auf reine Tabellen-Ansicht statt
   komplett zu brechen
+
+## Datenmodell (`ships`)
+
+`ships` ist eine `Map` von **MMSI als String** (nicht Number — `MetaData.MMSI`
+kommt als Zahl, wird in `processMessageText()` bewusst normalisiert) auf einen
+langlebigen Datensatz, der über alle Nachrichtentypen hinweg angereichert wird:
+
+```
+{ mmsi, mmsiInfo:{category,mid,country,iso,flag},
+  name, callSign, imo, aisClass, vendor, serial, station,
+  typeCode, typeLabel, typeDetail, dim, size, draught, destination, eta,
+  lat, lon, speed, course, heading, navStatus, rot, accuracy, raim,
+  maneuver, fixType, msgTimestamp, time,
+  counts:{<MessageType>:n}, total, lastMessageType,
+  track:[{lat,lon,t,sog}], raw:{<MessageType>:<letzte Message>},
+  firstSeen, updatedAt, marker }
+```
+
+Zentrale Funktionen: `getShip(mmsi)` legt den Datensatz an, `recordMessage()`
+zählt/merkt die Rohnachricht, `setPosition()` schreibt Position + Track +
+Marker. Wer einen neuen Nachrichtentyp ergänzt, hängt einfach einen weiteren
+`else if`-Zweig in `processMessageText()` an und füllt die passenden Felder —
+Tabelle, Popup und Detailansicht ziehen automatisch nach.
 
 ## Testen — wichtig, sonst verschwendest du Zeit
 
@@ -145,9 +214,14 @@ Session. Bei Bedarf neu aufsetzen nach obigem Muster.
 
 - Sobald AISstream.io stabil zurück ist: Default-Server-URL ggf. wieder auf
   `wss://stream.aisstream.io/v0/stream` umstellen (siehe oben)
-- `FiltersShipMMSI` (Filter nach bestimmten MMSIs) ist von der API
-  unterstützt, aber im UI noch nicht angeboten
 - `GET /v1/vessels` (openwaters, kein Auth nötig) wäre eine Alternative/
   Ergänzung zum WebSocket-Stream für einen reinen Snapshot ohne Live-Verbindung
 - Kein automatisiertes Test-Setup — bei größeren Änderungen die
   Playwright-Smoke-Tests wie oben beschrieben neu aufsetzen
+- Schiffsdaten sind rein flüchtig: Reload verwirft alle gesammelten MMSIs
+  samt Track. Eine Persistenz in `localStorage`/IndexedDB wäre der nächste
+  logische Schritt, ebenso ein Deeplink `?mmsi=…`, der die Detailansicht
+  direkt öffnet
+- `MAX_TRACK_POINTS` (300) und die Ship-Map wachsen unbegrenzt über die
+  Sitzung; bei sehr langen Läufen wäre ein Aufräumen alter MMSIs
+  (`STALE_AFTER_MS` wird bisher nur für das Badge genutzt) sinnvoll

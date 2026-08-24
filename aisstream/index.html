@@ -189,6 +189,120 @@
     padding: 0.5rem;
     margin-top: 0.75rem;
   }
+  /* --- Per-MMSI Detailansicht --------------------------------------- */
+  .search-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .search-row input[type="search"] {
+    flex: 1;
+    padding: 0.4rem 0.55rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--text);
+    font-size: 0.82rem;
+  }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--panel-2); }
+  tbody tr.selected { background: #24365a; }
+  .flag { font-size: 1rem; margin-right: 0.25rem; }
+  .badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .badge.live { border-color: var(--ok); color: var(--ok); }
+  .badge.stale { border-color: var(--err); color: var(--err); }
+  #detail {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 380px;
+    max-width: 100%;
+    height: 100%;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.45);
+    padding: 1rem 1.1rem 2rem;
+    overflow-y: auto;
+    z-index: 1200;
+    transform: translateX(100%);
+    transition: transform 0.18s ease-out;
+  }
+  #detail.open { transform: translateX(0); }
+  .detail-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+  .detail-head h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1.25;
+    word-break: break-word;
+  }
+  .detail-sub { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.9rem; }
+  #detailClose {
+    flex: 0 0 auto;
+    width: 28px;
+    padding: 0.1rem;
+    line-height: 1;
+    font-size: 1rem;
+  }
+  #detail h4 {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 1.1rem 0 0.4rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.25rem;
+  }
+  .kv {
+    display: grid;
+    grid-template-columns: 42% 1fr;
+    gap: 0.28rem 0.6rem;
+    font-size: 0.79rem;
+  }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; word-break: break-word; }
+  .detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 1rem;
+  }
+  .detail-actions button { flex: 1 1 45%; font-size: 0.78rem; padding: 0.45rem; }
+  .detail-links { font-size: 0.78rem; margin-top: 0.6rem; line-height: 1.6; }
+  .detail-links a { color: var(--accent); margin-right: 0.7rem; }
+  #detailRaw {
+    display: none;
+    max-height: 260px;
+    overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.68rem;
+    background: var(--panel-2);
+    border-radius: 6px;
+    padding: 0.5rem;
+    margin-top: 0.6rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--muted);
+  }
+  @media (max-width: 640px) {
+    #detail { width: 100%; }
+    .detail-actions button { flex: 1 1 100%; }
+  }
 </style>
 </head>
 <body>
@@ -231,11 +345,21 @@
       </div>
     </div>
 
+    <h2 style="margin-top:1.2rem">MMSI-Filter <span style="font-weight:400;text-transform:none;color:var(--muted)">(optional)</span></h2>
+    <input type="text" id="mmsiFilter" placeholder="z. B. 211234560, 244123456" autocomplete="off" />
+    <p class="hint" style="margin-top:0.35rem">
+      Kommagetrennte MMSIs &ndash; der Server liefert dann nur noch diese Schiffe
+      (<code>FiltersShipMMSI</code>). Leer lassen für alle Schiffe in der Box.
+    </p>
+
     <h2 style="margin-top:1.2rem">Nachrichtentypen</h2>
     <div class="checkboxes" id="msgTypes">
       <label><input type="checkbox" value="PositionReport" checked /> PositionReport</label>
-      <label><input type="checkbox" value="ShipStaticData" checked /> ShipStaticData (liefert Typ &amp; Größe)</label>
-      <label><input type="checkbox" value="StandardClassBPositionReport" /> StandardClassBPositionReport</label>
+      <label><input type="checkbox" value="ShipStaticData" checked /> ShipStaticData (Typ, Größe, IMO, Ziel)</label>
+      <label><input type="checkbox" value="StandardClassBPositionReport" checked /> StandardClassBPositionReport</label>
+      <label><input type="checkbox" value="StaticDataReport" checked /> StaticDataReport (Class-B-Name/Rufzeichen)</label>
+      <label><input type="checkbox" value="AidsToNavigationReport" /> AidsToNavigationReport (Seezeichen)</label>
+      <label><input type="checkbox" value="BaseStationReport" /> BaseStationReport (Landstationen)</label>
     </div>
 
     <div class="actions">
@@ -246,6 +370,7 @@
     <div class="stats">
       <div>Nachrichten<br /><b id="msgCount">0</b></div>
       <div>Schiffe sichtbar<br /><b id="shipCount">0</b></div>
+      <div>MMSIs bekannt<br /><b id="knownCount">0</b></div>
     </div>
 
     <div class="log" id="log"></div>
@@ -270,15 +395,23 @@
   <section>
     <div id="map"></div>
     <div class="panel" style="margin-top:1rem">
-      <h2>Schiffe im aktuellen Kartenausschnitt</h2>
+      <h2>Schiffe im aktuellen Kartenausschnitt <span style="font-weight:400;text-transform:none;color:var(--muted)">&ndash; Zeile anklicken für Details</span></h2>
+      <div class="search-row">
+        <input type="search" id="shipSearch" placeholder="Suche nach MMSI, Name, Rufzeichen, IMO oder Ziel…" autocomplete="off" />
+        <span class="badge" id="searchHint">&nbsp;</span>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
               <th>MMSI</th>
+              <th>Flagge</th>
               <th>Name</th>
+              <th>Rufz.</th>
               <th>Typ</th>
+              <th>Status</th>
               <th>Größe (L×B, m)</th>
+              <th>Ziel</th>
               <th>Lat</th>
               <th>Lon</th>
               <th>Speed (kn)</th>
@@ -293,12 +426,166 @@
   </section>
 </main>
 
+<aside id="detail" aria-hidden="true">
+  <div class="detail-head">
+    <h3 id="detailTitle">&ndash;</h3>
+    <button type="button" id="detailClose" title="Schließen">&times;</button>
+  </div>
+  <div class="detail-sub" id="detailSub"></div>
+  <div id="detailBody"></div>
+  <div class="detail-actions">
+    <button type="button" id="detailCenter">Auf Karte zentrieren</button>
+    <button type="button" id="detailTrack">Track anzeigen</button>
+    <button type="button" id="detailRawToggle">Rohdaten</button>
+    <button type="button" id="detailCopy">JSON kopieren</button>
+  </div>
+  <pre id="detailRaw"></pre>
+  <div class="detail-links" id="detailLinks"></div>
+</aside>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 (function () {
   "use strict";
 
   var MAX_TABLE_ROWS = 200;
+  var MAX_TRACK_POINTS = 300;
+  var STALE_AFTER_MS = 10 * 60 * 1000;
+
+  // ITU-R M.585 Maritime Identification Digits: "MID:ISO2:Land".
+  // Kept as one string so the lookup table stays readable in a single file.
+  var MID_DATA = [
+    "201:AL:Albanien", "202:AD:Andorra", "203:AT:Österreich", "204:PT:Portugal (Azoren)",
+    "205:BE:Belgien", "206:BY:Belarus", "207:BG:Bulgarien", "208:VA:Vatikanstadt",
+    "209:CY:Zypern", "210:CY:Zypern", "211:DE:Deutschland", "212:CY:Zypern",
+    "213:GE:Georgien", "214:MD:Moldau", "215:MT:Malta", "216:AM:Armenien",
+    "218:DE:Deutschland", "219:DK:Dänemark", "220:DK:Dänemark", "224:ES:Spanien",
+    "225:ES:Spanien", "226:FR:Frankreich", "227:FR:Frankreich", "228:FR:Frankreich",
+    "229:MT:Malta", "230:FI:Finnland", "231:FO:Färöer", "232:GB:Vereinigtes Königreich",
+    "233:GB:Vereinigtes Königreich", "234:GB:Vereinigtes Königreich", "235:GB:Vereinigtes Königreich",
+    "236:GI:Gibraltar", "237:GR:Griechenland", "238:HR:Kroatien", "239:GR:Griechenland",
+    "240:GR:Griechenland", "241:GR:Griechenland", "242:MA:Marokko", "243:HU:Ungarn",
+    "244:NL:Niederlande", "245:NL:Niederlande", "246:NL:Niederlande", "247:IT:Italien",
+    "248:MT:Malta", "249:MT:Malta", "250:IE:Irland", "251:IS:Island",
+    "252:LI:Liechtenstein", "253:LU:Luxemburg", "254:MC:Monaco", "255:PT:Portugal (Madeira)",
+    "256:MT:Malta", "257:NO:Norwegen", "258:NO:Norwegen", "259:NO:Norwegen",
+    "261:PL:Polen", "262:ME:Montenegro", "263:PT:Portugal", "264:RO:Rumänien",
+    "265:SE:Schweden", "266:SE:Schweden", "267:SK:Slowakei", "268:SM:San Marino",
+    "269:CH:Schweiz", "270:CZ:Tschechien", "271:TR:Türkei", "272:UA:Ukraine",
+    "273:RU:Russland", "274:MK:Nordmazedonien", "275:LV:Lettland", "276:EE:Estland",
+    "277:LT:Litauen", "278:SI:Slowenien", "279:RS:Serbien",
+    "301:AI:Anguilla", "303:US:USA (Alaska)", "304:AG:Antigua und Barbuda",
+    "305:AG:Antigua und Barbuda", "306:CW:Curaçao / Karibische Niederlande", "307:AW:Aruba",
+    "308:BS:Bahamas", "309:BS:Bahamas", "310:BM:Bermuda", "311:BS:Bahamas",
+    "312:BZ:Belize", "314:BB:Barbados", "316:CA:Kanada", "319:KY:Kaimaninseln",
+    "321:CR:Costa Rica", "323:CU:Kuba", "325:DM:Dominica", "327:DO:Dominikanische Republik",
+    "329:GP:Guadeloupe", "330:GD:Grenada", "331:GL:Grönland", "332:GT:Guatemala",
+    "334:HN:Honduras", "336:HT:Haiti", "338:US:USA", "339:JM:Jamaika",
+    "341:KN:St. Kitts und Nevis", "343:LC:St. Lucia", "345:MX:Mexiko", "347:MQ:Martinique",
+    "348:MS:Montserrat", "350:NI:Nicaragua", "351:PA:Panama", "352:PA:Panama",
+    "353:PA:Panama", "354:PA:Panama", "355:PA:Panama", "356:PA:Panama", "357:PA:Panama",
+    "358:PR:Puerto Rico", "359:SV:El Salvador", "361:PM:St. Pierre und Miquelon",
+    "362:TT:Trinidad und Tobago", "364:TC:Turks- und Caicosinseln", "366:US:USA",
+    "367:US:USA", "368:US:USA", "369:US:USA", "370:PA:Panama", "371:PA:Panama",
+    "372:PA:Panama", "373:PA:Panama", "374:PA:Panama", "375:VC:St. Vincent und die Grenadinen",
+    "376:VC:St. Vincent und die Grenadinen", "377:VC:St. Vincent und die Grenadinen",
+    "378:VG:Britische Jungferninseln", "379:VI:Amerikanische Jungferninseln",
+    "401:AF:Afghanistan", "403:SA:Saudi-Arabien", "405:BD:Bangladesch", "408:BH:Bahrain",
+    "410:BT:Bhutan", "412:CN:China", "413:CN:China", "414:CN:China", "416:TW:Taiwan",
+    "417:LK:Sri Lanka", "419:IN:Indien", "422:IR:Iran", "423:AZ:Aserbaidschan",
+    "425:IQ:Irak", "428:IL:Israel", "431:JP:Japan", "432:JP:Japan", "434:TM:Turkmenistan",
+    "436:KZ:Kasachstan", "437:UZ:Usbekistan", "438:JO:Jordanien", "440:KR:Südkorea",
+    "441:KR:Südkorea", "443:PS:Palästina", "445:KP:Nordkorea", "447:KW:Kuwait",
+    "450:LB:Libanon", "451:KG:Kirgisistan", "453:MO:Macau", "455:MV:Malediven",
+    "457:MN:Mongolei", "459:NP:Nepal", "461:OM:Oman", "463:PK:Pakistan", "466:QA:Katar",
+    "468:SY:Syrien", "470:AE:Vereinigte Arabische Emirate", "471:AE:Vereinigte Arabische Emirate",
+    "472:TJ:Tadschikistan", "473:YE:Jemen", "475:YE:Jemen", "477:HK:Hongkong",
+    "478:BA:Bosnien und Herzegowina",
+    "501:TF:Französische Süd- und Antarktisgebiete", "503:AU:Australien", "506:MM:Myanmar",
+    "508:BN:Brunei", "510:FM:Mikronesien", "511:PW:Palau", "512:NZ:Neuseeland",
+    "514:KH:Kambodscha", "515:KH:Kambodscha", "516:CX:Weihnachtsinsel", "518:CK:Cookinseln",
+    "520:FJ:Fidschi", "523:CC:Kokosinseln", "525:ID:Indonesien", "529:KI:Kiribati",
+    "531:LA:Laos", "533:MY:Malaysia", "536:MP:Nördliche Marianen", "538:MH:Marshallinseln",
+    "540:NC:Neukaledonien", "542:NU:Niue", "544:NR:Nauru", "546:PF:Französisch-Polynesien",
+    "548:PH:Philippinen", "550:TL:Osttimor", "553:PG:Papua-Neuguinea", "555:PN:Pitcairninseln",
+    "557:SB:Salomonen", "559:AS:Amerikanisch-Samoa", "561:WS:Samoa", "563:SG:Singapur",
+    "564:SG:Singapur", "565:SG:Singapur", "566:SG:Singapur", "567:TH:Thailand",
+    "570:TO:Tonga", "572:TV:Tuvalu", "574:VN:Vietnam", "576:VU:Vanuatu", "577:VU:Vanuatu",
+    "578:WF:Wallis und Futuna",
+    "601:ZA:Südafrika", "603:AO:Angola", "605:DZ:Algerien",
+    "607:TF:St. Paul und Amsterdam", "608:SH:Ascension", "609:BI:Burundi", "610:BJ:Benin",
+    "611:BW:Botswana", "612:CF:Zentralafrikanische Republik", "613:CM:Kamerun",
+    "615:CG:Kongo", "616:KM:Komoren", "617:CV:Kap Verde", "618:TF:Crozet-Archipel",
+    "619:CI:Côte d'Ivoire", "620:KM:Komoren", "621:DJ:Dschibuti", "622:EG:Ägypten",
+    "624:ET:Äthiopien", "625:ER:Eritrea", "626:GA:Gabun", "627:GH:Ghana", "629:GM:Gambia",
+    "630:GW:Guinea-Bissau", "631:GQ:Äquatorialguinea", "632:GN:Guinea", "633:BF:Burkina Faso",
+    "634:KE:Kenia", "635:TF:Kerguelen", "636:LR:Liberia", "637:LR:Liberia", "638:SS:Südsudan",
+    "642:LY:Libyen", "644:LS:Lesotho", "645:MU:Mauritius", "647:MG:Madagaskar", "649:ML:Mali",
+    "650:MZ:Mosambik", "654:MR:Mauretanien", "655:MW:Malawi", "656:NE:Niger", "657:NG:Nigeria",
+    "659:NA:Namibia", "660:RE:Réunion", "661:RW:Ruanda", "662:SD:Sudan", "663:SN:Senegal",
+    "664:SC:Seychellen", "665:SH:St. Helena", "666:SO:Somalia", "667:SL:Sierra Leone",
+    "668:ST:São Tomé und Príncipe", "669:SZ:Eswatini", "670:TD:Tschad", "671:TG:Togo",
+    "672:TN:Tunesien", "674:TZ:Tansania", "675:UG:Uganda", "676:CD:DR Kongo",
+    "677:TZ:Tansania", "678:ZM:Sambia", "679:ZW:Simbabwe",
+    "701:AR:Argentinien", "710:BR:Brasilien", "720:BO:Bolivien", "725:CL:Chile",
+    "730:CO:Kolumbien", "735:EC:Ecuador", "740:FK:Falklandinseln", "745:GF:Französisch-Guayana",
+    "750:GY:Guyana", "755:PY:Paraguay", "760:PE:Peru", "765:SR:Suriname", "770:UY:Uruguay",
+    "775:VE:Venezuela"
+  ];
+
+  var MID_MAP = (function () {
+    var map = {};
+    for (var i = 0; i < MID_DATA.length; i++) {
+      var parts = MID_DATA[i].split(":");
+      map[parts[0]] = { iso: parts[1], country: parts[2] };
+    }
+    return map;
+  })();
+
+  // ITU-R M.1371 navigational status codes (message 1/2/3, field 2).
+  var NAV_STATUS = {
+    0: "In Fahrt (Maschine)",
+    1: "Vor Anker",
+    2: "Manövrierunfähig",
+    3: "Manövrierbehindert",
+    4: "Durch Tiefgang beschränkt",
+    5: "Festgemacht",
+    6: "Auf Grund",
+    7: "Fischerei",
+    8: "In Fahrt (Segel)",
+    9: "Reserviert (Gefahrgut, HSC)",
+    10: "Reserviert (Gefahrgut, WIG)",
+    11: "Schleppverband (achtern)",
+    12: "Schleppverband (voraus/längsseits)",
+    13: "Reserviert",
+    14: "AIS-SART / MOB / EPIRB aktiv",
+    15: "Nicht definiert"
+  };
+
+  // ITU-R M.1371 EPFD / position fixing device codes.
+  var FIX_TYPE = {
+    0: "unbekannt", 1: "GPS", 2: "GLONASS", 3: "GPS + GLONASS", 4: "Loran-C",
+    5: "Chayka", 6: "Integriertes Navigationssystem", 7: "Vermessen", 8: "Galileo",
+    15: "interne GNSS"
+  };
+
+  // ITU-R M.1371 aid-to-navigation types (message 21).
+  var ATON_TYPE = {
+    0: "Nicht spezifiziert", 1: "Referenzpunkt", 2: "RACON", 3: "Feste Offshore-Struktur",
+    4: "Reserviert", 5: "Leuchtfeuer ohne Sektoren", 6: "Leuchtfeuer mit Sektoren",
+    7: "Leitfeuer (vorn)", 8: "Leitfeuer (hinten)", 9: "Kardinal Nord",
+    10: "Kardinal Ost", 11: "Kardinal Süd", 12: "Kardinal West",
+    13: "Steuerbord-Tonne", 14: "Backbord-Tonne", 15: "Bevorzugter Weg Steuerbord",
+    16: "Bevorzugter Weg Backbord", 17: "Mittefahrwasser-Tonne", 18: "Untiefen-Tonne",
+    19: "Sondertonne", 20: "Leuchttonne", 21: "Leuchtschiff / LANBY / Rigs"
+  };
+
+  // Second digit of ITU-R M.1371 ship type codes 2x/4x/6x/7x/8x.
+  var CARGO_HAZARD = {
+    1: "Gefahrgut Kategorie A", 2: "Gefahrgut Kategorie B",
+    3: "Gefahrgut Kategorie C", 4: "Gefahrgut Kategorie D"
+  };
+
 
   var socket = null;
   var msgCount = 0;
@@ -306,7 +593,10 @@
   var reconnectAttempt = 0;
   var manualDisconnect = true;
   var RECONNECT_DELAYS = [2000, 5000, 10000, 20000, 30000];
-  var ships = new Map(); // mmsi -> { name, lat, lon, speed, course, time, marker }
+  // mmsi (string) -> accumulated record, see getShip()
+  var ships = new Map();
+  var selectedMmsi = null;
+  var trackLayer = null;
 
   var statusDot = document.getElementById("statusDot");
   var statusText = document.getElementById("statusText");
@@ -323,9 +613,22 @@
   var shipCountEl = document.getElementById("shipCount");
   var logEl = document.getElementById("log");
   var tableBody = document.getElementById("shipTableBody");
+  var mmsiFilterInput = document.getElementById("mmsiFilter");
+  var searchInput = document.getElementById("shipSearch");
+  var searchHintEl = document.getElementById("searchHint");
+  var knownCountEl = document.getElementById("knownCount");
+  var detailEl = document.getElementById("detail");
+  var detailTitle = document.getElementById("detailTitle");
+  var detailSub = document.getElementById("detailSub");
+  var detailBody = document.getElementById("detailBody");
+  var detailRaw = document.getElementById("detailRaw");
+  var detailLinks = document.getElementById("detailLinks");
 
   var storedKey = localStorage.getItem("aisstream_api_key");
   if (storedKey) apiKeyInput.value = storedKey;
+
+  var storedMmsiFilter = localStorage.getItem("aisstream_mmsi_filter");
+  if (storedMmsiFilter) mmsiFilterInput.value = storedMmsiFilter;
 
   // Server URLs shipped as the default in a previous version - if that's
   // all that's stored, drop it instead of shadowing a corrected default.
@@ -433,63 +736,344 @@
     return length + "×" + width;
   }
 
-  function upsertShip(mmsi, data) {
-    var existing = ships.get(mmsi) || {};
-    if (mapAvailable) {
-      if (existing.marker) {
-        existing.marker.setLatLng([data.lat, data.lon]);
-      } else {
-        data.marker = L.marker([data.lat, data.lon], { icon: shipIcon() }).addTo(map);
-      }
-    }
-    data.updatedAt = Date.now();
-    var entry = Object.assign({}, existing, data);
-    if (!entry.marker && existing.marker) entry.marker = existing.marker;
-    ships.set(mmsi, entry);
+  /* --- Per-MMSI Aufbereitung ---------------------------------------- */
 
-    if (mapAvailable && entry.marker) {
-      entry.marker.bindPopup(
-        "<b>" + (entry.name || "MMSI " + mmsi) + "</b><br/>" +
-        (entry.typeLabel ? "Typ: " + entry.typeLabel + "<br/>" : "") +
-        (entry.size ? "Größe: " + entry.size + " m<br/>" : "") +
-        "MMSI: " + mmsi + "<br/>" +
-        "Speed: " + (entry.speed != null ? entry.speed + " kn" : "-") + "<br/>" +
-        "Kurs: " + (entry.course != null ? entry.course + "°" : "-")
+  function esc(value) {
+    if (value == null) return "";
+    return String(value)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  // AIS pads fixed-width string fields with "@"; strip those plus whitespace.
+  function cleanText(value) {
+    if (value == null) return null;
+    var text = String(value).replace(/@+/g, " ").trim();
+    return text.length ? text : null;
+  }
+
+  function flagEmoji(iso) {
+    if (!iso || iso.length !== 2) return "";
+    try {
+      return String.fromCodePoint(
+        0x1f1e6 + iso.charCodeAt(0) - 65,
+        0x1f1e6 + iso.charCodeAt(1) - 65
       );
+    } catch (e) {
+      return "";
     }
-    refreshVisibleShips();
+  }
+
+  function midInfo(mid) {
+    var hit = MID_MAP[mid];
+    if (!hit) return { mid: mid, country: "unbekannt (MID " + mid + ")", iso: null, flag: "" };
+    return { mid: mid, country: hit.country, iso: hit.iso, flag: flagEmoji(hit.iso) };
+  }
+
+  // Decodes the structural meaning of an MMSI per ITU-R M.585: which kind of
+  // station it identifies and which three digits carry the flag state (MID).
+  function decodeMmsi(mmsi) {
+    var digits = String(mmsi == null ? "" : mmsi).replace(/\D/g, "");
+    var out = { raw: digits, category: "Unbekannt", mid: null, country: null, iso: null, flag: "" };
+    if (!digits) return out;
+    // MMSIs below 9 digits are transmitted with leading zeros stripped.
+    while (digits.length < 9) digits = "0" + digits;
+
+    var spec;
+    if (digits.slice(0, 3) === "111") {
+      spec = { category: "SAR-Luftfahrzeug", midAt: 3 };
+    } else if (digits.slice(0, 3) === "970") {
+      spec = { category: "AIS-SART (Suchgerät)", midAt: 3 };
+    } else if (digits.slice(0, 3) === "972") {
+      spec = { category: "MOB-Gerät (Mann über Bord)", midAt: null };
+    } else if (digits.slice(0, 3) === "974") {
+      spec = { category: "EPIRB-AIS (Notfunkbake)", midAt: null };
+    } else if (digits.slice(0, 2) === "00") {
+      spec = { category: "Küstenfunkstelle", midAt: 2 };
+    } else if (digits.charAt(0) === "0") {
+      spec = { category: "Gruppenruf (Schiffsgruppe)", midAt: 1 };
+    } else if (digits.slice(0, 2) === "99") {
+      spec = { category: "Seezeichen (AtoN)", midAt: 2 };
+    } else if (digits.slice(0, 2) === "98") {
+      spec = { category: "Beiboot eines Mutterschiffs", midAt: 2 };
+    } else if (digits.charAt(0) === "8") {
+      spec = { category: "Handfunkgerät mit DSC", midAt: 1 };
+    } else {
+      spec = { category: "Schiff", midAt: 0 };
+    }
+
+    out.category = spec.category;
+    if (spec.midAt != null) {
+      var info = midInfo(digits.substr(spec.midAt, 3));
+      out.mid = info.mid;
+      out.country = info.country;
+      out.iso = info.iso;
+      out.flag = info.flag;
+    }
+    return out;
+  }
+
+  // Broad label from shipTypeLabel() plus the cargo/hazard nuance encoded in
+  // the code's second digit (only meaningful for 2x/4x/6x/7x/8x).
+  function shipTypeDetail(code) {
+    var base = shipTypeLabel(code);
+    if (!base) return null;
+    code = Number(code);
+    var tens = Math.floor(code / 10);
+    if ([2, 4, 6, 7, 8].indexOf(tens) === -1) return base;
+    var hazard = CARGO_HAZARD[code % 10];
+    return hazard ? base + " (" + hazard + ")" : base;
+  }
+
+  function navStatusLabel(code) {
+    if (code == null) return null;
+    var hit = NAV_STATUS[Number(code)];
+    return hit ? hit : "Status " + code;
+  }
+
+  function fixTypeLabel(code) {
+    if (code == null) return null;
+    var hit = FIX_TYPE[Number(code)];
+    return hit ? hit : "Code " + code;
+  }
+
+  function atonTypeLabel(code) {
+    if (code == null) return null;
+    var hit = ATON_TYPE[Number(code)];
+    return hit ? hit : "Typ " + code;
+  }
+
+  // Rate of turn: -128 means "no information", ±127 means "turning faster
+  // than 5°/30s"; everything else is a signed turn rate in degrees/minute.
+  function rotLabel(rot) {
+    if (rot == null) return null;
+    rot = Number(rot);
+    if (rot === -128) return "keine Angabe";
+    if (rot === 0) return "keine Drehung";
+    if (rot >= 127) return "dreht nach Steuerbord (> 5°/30 s)";
+    if (rot <= -127) return "dreht nach Backbord (> 5°/30 s)";
+    return (rot > 0 ? "Steuerbord " : "Backbord ") + Math.abs(rot) + "°/min";
+  }
+
+  // "Voraussichtliche Ankunft" is broadcast as month/day/hour/minute only;
+  // month 0, day 0, hour 24 or minute 60 each mean "not available".
+  function etaLabel(eta) {
+    if (!eta) return null;
+    var month = Number(eta.Month), day = Number(eta.Day);
+    var hour = Number(eta.Hour), minute = Number(eta.Minute);
+    if (!month || !day) return null;
+    var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+    var text = pad(day) + "." + pad(month) + ".";
+    if (hour < 24 && minute < 60) text += " " + pad(hour) + ":" + pad(minute) + " UTC";
+    return text;
+  }
+
+  function compass(deg) {
+    if (deg == null) return null;
+    var names = ["N", "NNO", "NO", "ONO", "O", "OSO", "SO", "SSO",
+                 "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+    return names[Math.round((Number(deg) % 360) / 22.5) % 16];
+  }
+
+  function headingLabel(deg) {
+    if (deg == null) return null;
+    deg = Number(deg);
+    // 511 is the spec's "heading not available" sentinel.
+    if (deg === 511 || deg < 0 || deg > 359) return null;
+    return deg + "° (" + compass(deg) + ")";
+  }
+
+  // Second of the UTC minute the fix was taken; 60-63 are status sentinels.
+  function fixSecondLabel(ts) {
+    if (ts == null) return null;
+    ts = Number(ts);
+    if (ts <= 59) return "Sekunde " + ts;
+    if (ts === 60) return "keine Zeitangabe";
+    if (ts === 61) return "manuelle Eingabe";
+    if (ts === 62) return "Koppelnavigation (geschätzt)";
+    if (ts === 63) return "Positionssystem außer Betrieb";
+    return null;
+  }
+
+  function courseLabel(deg) {
+    if (deg == null) return null;
+    deg = Number(deg);
+    if (deg >= 360) return null;
+    return deg.toFixed(1) + "° (" + compass(deg) + ")";
+  }
+
+  // Great-circle distance in nautical miles.
+  function haversineNm(lat1, lon1, lat2, lon2) {
+    var rad = Math.PI / 180;
+    var dLat = (lat2 - lat1) * rad;
+    var dLon = (lon2 - lon1) * rad;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) / 1.852;
+  }
+
+  function bearingDeg(lat1, lon1, lat2, lon2) {
+    var rad = Math.PI / 180;
+    var dLon = (lon2 - lon1) * rad;
+    var y = Math.sin(dLon) * Math.cos(lat2 * rad);
+    var x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) -
+      Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos(dLon);
+    return (Math.atan2(y, x) / rad + 360) % 360;
+  }
+
+  function relativeTime(ts) {
+    if (!ts) return "-";
+    var seconds = Math.round((Date.now() - ts) / 1000);
+    if (seconds < 5) return "gerade eben";
+    if (seconds < 60) return "vor " + seconds + " s";
+    if (seconds < 3600) return "vor " + Math.round(seconds / 60) + " min";
+    return "vor " + Math.round(seconds / 3600) + " h";
+  }
+
+  // Sums the great-circle legs of a stored track, in nautical miles.
+  function trackDistanceNm(track) {
+    var total = 0;
+    for (var i = 1; i < track.length; i++) {
+      total += haversineNm(track[i - 1].lat, track[i - 1].lon, track[i].lat, track[i].lon);
+    }
+    return total;
+  }
+
+  /* --- Schiffsregister ---------------------------------------------- */
+
+  // Every MMSI gets one long-lived record that accumulates whatever the
+  // various message types reveal about it, plus its own message statistics
+  // and position history.
+  function getShip(mmsi) {
+    var entry = ships.get(mmsi);
+    if (!entry) {
+      entry = {
+        mmsi: mmsi,
+        mmsiInfo: decodeMmsi(mmsi),
+        counts: {},
+        total: 0,
+        track: [],
+        raw: {},
+        firstSeen: Date.now()
+      };
+      ships.set(mmsi, entry);
+    }
+    return entry;
+  }
+
+  function recordMessage(entry, type, msg) {
+    entry.counts[type] = (entry.counts[type] || 0) + 1;
+    entry.total++;
+    entry.lastMessageType = type;
+    if (msg) entry.raw[type] = msg;
+    entry.updatedAt = Date.now();
+  }
+
+  function setPosition(entry, lat, lon, timeUtc) {
+    entry.lat = lat;
+    entry.lon = lon;
+    entry.time = timeUtc || new Date().toISOString();
+
+    var last = entry.track[entry.track.length - 1];
+    if (!last || last.lat !== lat || last.lon !== lon) {
+      entry.track.push({ lat: lat, lon: lon, t: Date.now(), sog: entry.speed });
+      if (entry.track.length > MAX_TRACK_POINTS) entry.track.shift();
+    }
+
+    if (mapAvailable) {
+      if (entry.marker) {
+        entry.marker.setLatLng([lat, lon]);
+      } else {
+        entry.marker = L.marker([lat, lon], { icon: shipIcon() }).addTo(map);
+        entry.marker.on("click", function () { openDetail(entry.mmsi); });
+      }
+      entry.marker.bindPopup(popupHtml(entry));
+    }
+    if (selectedMmsi === entry.mmsi && trackLayer) drawTrack(entry);
+  }
+
+  function displayName(entry) {
+    return entry.name || "MMSI " + entry.mmsi;
+  }
+
+  function popupHtml(entry) {
+    var info = entry.mmsiInfo || {};
+    var rows = [
+      ["Typ", entry.typeDetail || entry.typeLabel],
+      ["Flagge", info.country ? (info.flag + " " + info.country) : null],
+      ["Rufzeichen", entry.callSign],
+      ["IMO", entry.imo],
+      ["Größe", entry.size ? entry.size + " m" : null],
+      ["Status", navStatusLabel(entry.navStatus)],
+      ["Speed", entry.speed != null ? entry.speed + " kn" : null],
+      ["Kurs", courseLabel(entry.course)],
+      ["Ziel", entry.destination]
+    ];
+    var html = "<b>" + esc(displayName(entry)) + "</b><br/>MMSI: " + esc(entry.mmsi) + "<br/>";
+    rows.forEach(function (row) {
+      if (row[1] != null && row[1] !== "") html += esc(row[0]) + ": " + esc(row[1]) + "<br/>";
+    });
+    return html + '<a href="#" data-detail-mmsi="' + esc(entry.mmsi) + '">Alle Details &rsaquo;</a>';
+  }
+
+  // Free-text search across the identity fields we know for an MMSI.
+  function matchesSearch(entry, needle) {
+    if (!needle) return true;
+    var info = entry.mmsiInfo || {};
+    var haystack = [
+      entry.mmsi, entry.name, entry.callSign, entry.imo, entry.destination,
+      entry.typeDetail, entry.typeLabel, entry.station,
+      info.country, info.iso, info.category
+    ].join(" ").toLowerCase();
+    return haystack.indexOf(needle) !== -1;
   }
 
   // Rebuilds the table from `ships`, filtered to whatever is currently
-  // inside the map's visible bounds (not just the subscribed area).
+  // inside the map's visible bounds (not just the subscribed area) and to
+  // the free-text search box.
   function refreshVisibleShips() {
+    var needle = searchInput.value.trim().toLowerCase();
     var entries = [];
-    ships.forEach(function (entry, mmsi) {
+    var hiddenBySearch = 0;
+    ships.forEach(function (entry) {
       if (entry.lat == null || entry.lon == null) return;
       if (mapAvailable && !map.getBounds().contains([entry.lat, entry.lon])) return;
-      entries.push([mmsi, entry]);
+      if (!matchesSearch(entry, needle)) { hiddenBySearch++; return; }
+      entries.push(entry);
     });
-    entries.sort(function (a, b) { return (b[1].updatedAt || 0) - (a[1].updatedAt || 0); });
-    entries = entries.slice(0, MAX_TABLE_ROWS);
+    entries.sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+    var shown = entries.slice(0, MAX_TABLE_ROWS);
 
     tableBody.innerHTML = "";
-    entries.forEach(function (pair) {
-      var mmsi = pair[0];
-      var entry = pair[1];
+    shown.forEach(function (entry) {
+      var info = entry.mmsiInfo || {};
       var row = document.createElement("tr");
+      row.dataset.mmsi = entry.mmsi;
+      if (entry.mmsi === selectedMmsi) row.className = "selected";
       row.innerHTML =
-        "<td>" + mmsi + "</td>" +
-        "<td>" + (entry.name || "-") + "</td>" +
-        "<td>" + (entry.typeLabel || "-") + "</td>" +
-        "<td>" + (entry.size || "-") + "</td>" +
+        "<td>" + esc(entry.mmsi) + "</td>" +
+        '<td title="' + esc(info.country || "") + '"><span class="flag">' + (info.flag || "") + "</span>" +
+          esc(info.iso || "") + "</td>" +
+        "<td>" + esc(entry.name || "-") + "</td>" +
+        "<td>" + esc(entry.callSign || "-") + "</td>" +
+        "<td>" + esc(entry.typeDetail || entry.typeLabel || "-") + "</td>" +
+        "<td>" + esc(navStatusLabel(entry.navStatus) || "-") + "</td>" +
+        "<td>" + esc(entry.size || "-") + "</td>" +
+        "<td>" + esc(entry.destination || "-") + "</td>" +
         "<td>" + entry.lat.toFixed(4) + "</td>" +
         "<td>" + entry.lon.toFixed(4) + "</td>" +
-        "<td>" + (entry.speed != null ? entry.speed : "-") + "</td>" +
-        "<td>" + (entry.course != null ? entry.course : "-") + "</td>" +
-        "<td>" + (entry.time || "-") + "</td>";
+        "<td>" + (entry.speed != null ? esc(entry.speed) : "-") + "</td>" +
+        "<td>" + (entry.course != null ? esc(entry.course) : "-") + "</td>" +
+        "<td>" + esc(entry.time || "-") + "</td>";
       tableBody.appendChild(row);
     });
-    shipCountEl.textContent = entries.length;
+    shipCountEl.textContent = shown.length;
+    knownCountEl.textContent = ships.size;
+    searchHintEl.textContent = needle
+      ? shown.length + " Treffer, " + hiddenBySearch + " ausgeblendet"
+      : ships.size + " MMSIs bekannt";
+
+    if (selectedMmsi && ships.has(selectedMmsi)) renderDetail(ships.get(selectedMmsi));
   }
 
   function isGzip(bytes) {
@@ -554,39 +1138,244 @@
     msgCountEl.textContent = msgCount;
 
     var meta = payload.MetaData || {};
-    var mmsi = meta.MMSI;
-    if (mmsi == null) {
+    if (meta.MMSI == null) {
       log("Unerwartete Nachricht ohne MMSI: " + dataText.slice(0, 200));
       return;
     }
+    var mmsi = String(meta.MMSI);
 
     var type = payload.MessageType;
     var msg = payload.Message && payload.Message[type];
+    var entry = getShip(mmsi);
+    recordMessage(entry, type, msg);
+
+    // MetaData.ShipName is the reliable name source for every message type.
+    var metaName = cleanText(meta.ShipName);
+    if (metaName) entry.name = metaName;
 
     if (type === "PositionReport" || type === "StandardClassBPositionReport") {
       var lat = meta.latitude != null ? meta.latitude : (msg && msg.Latitude);
       var lon = meta.longitude != null ? meta.longitude : (msg && msg.Longitude);
       if (lat == null || lon == null) return;
-      upsertShip(mmsi, {
-        name: meta.ShipName ? meta.ShipName.trim() : (ships.get(mmsi) || {}).name,
-        lat: lat,
-        lon: lon,
-        speed: msg ? msg.Sog : null,
-        course: msg ? msg.Cog : null,
-        time: meta.time_utc || new Date().toISOString()
-      });
+      if (msg) {
+        entry.speed = msg.Sog != null ? msg.Sog : entry.speed;
+        entry.course = msg.Cog != null ? msg.Cog : entry.course;
+        entry.heading = msg.TrueHeading != null ? msg.TrueHeading : entry.heading;
+        if (msg.PositionAccuracy != null) entry.accuracy = msg.PositionAccuracy;
+        if (msg.Raim != null) entry.raim = msg.Raim;
+        if (msg.Timestamp != null) entry.msgTimestamp = msg.Timestamp;
+        if (type === "PositionReport") {
+          entry.navStatus = msg.NavigationalStatus != null ? msg.NavigationalStatus : entry.navStatus;
+          entry.rot = msg.RateOfTurn != null ? msg.RateOfTurn : entry.rot;
+          if (msg.SpecialManoeuvreIndicator != null) entry.maneuver = msg.SpecialManoeuvreIndicator;
+          entry.aisClass = "A";
+        } else {
+          entry.aisClass = "B";
+        }
+      }
+      setPosition(entry, lat, lon, meta.time_utc);
+      refreshVisibleShips();
     } else if (type === "ShipStaticData" && msg) {
-      var existing = ships.get(mmsi) || {};
-      var name = meta.ShipName ? meta.ShipName.trim() : (msg.Name ? String(msg.Name).trim() : existing.name);
-      var updated = Object.assign({}, existing, {
-        name: name,
-        typeLabel: shipTypeLabel(msg.Type) || existing.typeLabel,
-        size: shipSize(msg.Dimension) || existing.size,
-        updatedAt: Date.now()
-      });
-      ships.set(mmsi, updated);
-      if (updated.lat != null) refreshVisibleShips();
+      entry.aisClass = "A";
+      entry.name = cleanText(msg.Name) || entry.name;
+      entry.callSign = cleanText(msg.CallSign) || entry.callSign;
+      entry.imo = msg.ImoNumber ? String(msg.ImoNumber) : entry.imo;
+      entry.destination = cleanText(msg.Destination) || entry.destination;
+      entry.eta = etaLabel(msg.Eta) || entry.eta;
+      entry.draught = msg.MaximumStaticDraught || entry.draught;
+      entry.typeCode = msg.Type != null ? msg.Type : entry.typeCode;
+      entry.typeLabel = shipTypeLabel(msg.Type) || entry.typeLabel;
+      entry.typeDetail = shipTypeDetail(msg.Type) || entry.typeDetail;
+      entry.dim = msg.Dimension || entry.dim;
+      entry.size = shipSize(msg.Dimension) || entry.size;
+      entry.fixType = msg.FixType != null ? msg.FixType : (msg.Fixtype != null ? msg.Fixtype : entry.fixType);
+      if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
+      refreshVisibleShips();
+    } else if (type === "StaticDataReport" && msg) {
+      // Class B splits its static data across part A (name) and part B
+      // (call sign, ship type, dimensions, transponder vendor).
+      entry.aisClass = "B";
+      var partA = msg.ReportA || {};
+      var partB = msg.ReportB || {};
+      entry.name = cleanText(partA.Name) || entry.name;
+      entry.callSign = cleanText(partB.CallSign) || entry.callSign;
+      if (partB.ShipType != null) {
+        entry.typeCode = partB.ShipType;
+        entry.typeLabel = shipTypeLabel(partB.ShipType) || entry.typeLabel;
+        entry.typeDetail = shipTypeDetail(partB.ShipType) || entry.typeDetail;
+      }
+      if (partB.Dimension) {
+        entry.dim = partB.Dimension;
+        entry.size = shipSize(partB.Dimension) || entry.size;
+      }
+      entry.vendor = cleanText(partB.VendorIDName) || entry.vendor;
+      entry.serial = partB.SerialNumber != null ? String(partB.SerialNumber) : entry.serial;
+      if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
+      refreshVisibleShips();
+    } else if (type === "AidsToNavigationReport" && msg) {
+      entry.station = "Seezeichen";
+      entry.name = cleanText((msg.Name || "") + (msg.NameExtension || "")) || entry.name;
+      entry.typeLabel = atonTypeLabel(msg.Type) || entry.typeLabel;
+      entry.typeDetail = entry.typeLabel;
+      entry.atonVirtual = msg.VirtualAtoN;
+      entry.atonOffPosition = msg.OffPosition;
+      entry.dim = msg.Dimension || entry.dim;
+      entry.size = shipSize(msg.Dimension) || entry.size;
+      entry.fixType = msg.Fixtype != null ? msg.Fixtype : (msg.FixType != null ? msg.FixType : entry.fixType);
+      var atonLat = meta.latitude != null ? meta.latitude : msg.Latitude;
+      var atonLon = meta.longitude != null ? meta.longitude : msg.Longitude;
+      if (atonLat != null && atonLon != null) setPosition(entry, atonLat, atonLon, meta.time_utc);
+      refreshVisibleShips();
+    } else if (type === "BaseStationReport" && msg) {
+      entry.station = "Landstation";
+      entry.typeLabel = entry.typeLabel || "AIS-Basisstation";
+      entry.typeDetail = entry.typeLabel;
+      entry.fixType = msg.Fixtype != null ? msg.Fixtype : (msg.FixType != null ? msg.FixType : entry.fixType);
+      var baseLat = meta.latitude != null ? meta.latitude : msg.Latitude;
+      var baseLon = meta.longitude != null ? meta.longitude : msg.Longitude;
+      if (baseLat != null && baseLon != null) setPosition(entry, baseLat, baseLon, meta.time_utc);
+      refreshVisibleShips();
+    } else {
+      // Unhandled type: still counted above, so the detail view shows it.
+      refreshVisibleShips();
     }
+  }
+
+  /* --- Detailansicht je MMSI ---------------------------------------- */
+
+  function drawTrack(entry) {
+    if (!mapAvailable) return;
+    if (trackLayer) { map.removeLayer(trackLayer); trackLayer = null; }
+    if (!entry || entry.track.length < 2) return;
+    trackLayer = L.polyline(entry.track.map(function (p) { return [p.lat, p.lon]; }), {
+      color: "#3fa9ff", weight: 2, opacity: 0.8
+    }).addTo(map);
+  }
+
+  function section(title, rows) {
+    var visible = rows.filter(function (r) { return r[1] != null && r[1] !== ""; });
+    if (!visible.length) return "";
+    var html = "<h4>" + esc(title) + "</h4><dl class=\"kv\">";
+    visible.forEach(function (r) {
+      html += "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>";
+    });
+    return html + "</dl>";
+  }
+
+  function renderDetail(entry) {
+    var info = entry.mmsiInfo || {};
+    var stale = entry.updatedAt && (Date.now() - entry.updatedAt) > STALE_AFTER_MS;
+
+    detailTitle.textContent = displayName(entry);
+    detailSub.innerHTML =
+      '<span class="badge ' + (stale ? "stale" : "live") + '">' +
+      (stale ? "veraltet" : "aktuell") + "</span> " +
+      esc(info.flag + " " + (info.country || "")) + " &middot; " +
+      esc(entry.station || (entry.aisClass ? "AIS-Klasse " + entry.aisClass : info.category));
+
+    var counts = Object.keys(entry.counts).sort().map(function (k) {
+      return k + ": " + entry.counts[k];
+    }).join(", ");
+
+    var distance = null, bearing = null;
+    if (mapAvailable && entry.lat != null) {
+      var center = map.getCenter();
+      distance = haversineNm(center.lat, center.lng, entry.lat, entry.lon).toFixed(2) + " sm";
+      var brg = bearingDeg(center.lat, center.lng, entry.lat, entry.lon);
+      bearing = brg.toFixed(0) + "° (" + compass(brg) + ")";
+    }
+
+    var travelled = entry.track.length > 1 ? trackDistanceNm(entry.track) : 0;
+    var span = entry.track.length > 1
+      ? (entry.track[entry.track.length - 1].t - entry.track[0].t) / 3600000
+      : 0;
+
+    detailBody.innerHTML =
+      section("Identität", [
+        ["MMSI", entry.mmsi],
+        ["MMSI-Kategorie", info.category],
+        ["Flaggenstaat", info.country],
+        ["MID", info.mid],
+        ["Name", entry.name],
+        ["Rufzeichen", entry.callSign],
+        ["IMO-Nummer", entry.imo],
+        ["AIS-Klasse", entry.aisClass],
+        ["Transponder", entry.vendor],
+        ["Seriennummer", entry.serial]
+      ]) +
+      section("Schiff", [
+        ["Typ", entry.typeDetail || entry.typeLabel],
+        ["Typcode", entry.typeCode],
+        ["Länge × Breite", entry.size ? entry.size + " m" : null],
+        ["Tiefgang", entry.draught ? entry.draught + " m" : null],
+        ["Antenne (Bug/Heck)", entry.dim ? entry.dim.A + " m / " + entry.dim.B + " m" : null],
+        ["Antenne (Bb/Stb)", entry.dim ? entry.dim.C + " m / " + entry.dim.D + " m" : null],
+        ["Virtuelles Seezeichen", entry.atonVirtual == null ? null : (entry.atonVirtual ? "ja" : "nein")],
+        ["Außer Position", entry.atonOffPosition == null ? null : (entry.atonOffPosition ? "ja" : "nein")]
+      ]) +
+      section("Navigation", [
+        ["Status", navStatusLabel(entry.navStatus)],
+        ["Geschwindigkeit", entry.speed != null ? entry.speed + " kn" : null],
+        ["Kurs über Grund", courseLabel(entry.course)],
+        ["Steuerkurs", headingLabel(entry.heading)],
+        ["Drehrate", rotLabel(entry.rot)],
+        ["Spezialmanöver", entry.maneuver === 2 ? "ja" : (entry.maneuver === 1 ? "nein" : null)],
+        ["Position", entry.lat != null ? entry.lat.toFixed(5) + ", " + entry.lon.toFixed(5) : null],
+        ["Positionsgenauigkeit", entry.accuracy == null ? null : (entry.accuracy ? "hoch (< 10 m)" : "niedrig (> 10 m)")],
+        ["RAIM", entry.raim == null ? null : (entry.raim ? "in Betrieb" : "nicht in Betrieb")],
+        ["Positionsquelle", fixTypeLabel(entry.fixType)],
+        ["Zeitpunkt der Ortung", fixSecondLabel(entry.msgTimestamp)]
+      ]) +
+      section("Reise", [
+        ["Ziel", entry.destination],
+        ["ETA", entry.eta]
+      ]) +
+      section("Relativ zur Kartenmitte", [
+        ["Entfernung", distance],
+        ["Peilung", bearing]
+      ]) +
+      section("Empfang", [
+        ["Zuletzt gesehen", relativeTime(entry.updatedAt)],
+        ["Zeitstempel (UTC)", entry.time],
+        ["Erstmals gesehen", relativeTime(entry.firstSeen)],
+        ["Nachrichten gesamt", entry.total],
+        ["Nach Typ", counts],
+        ["Letzter Typ", entry.lastMessageType],
+        ["Trackpunkte", entry.track.length],
+        ["Strecke im Track", travelled ? travelled.toFixed(2) + " sm" : null],
+        ["Ø Geschwindigkeit", span > 0.002 && travelled ? (travelled / span).toFixed(1) + " kn" : null]
+      ]);
+
+    detailRaw.textContent = JSON.stringify(entry.raw, null, 2);
+
+    var mmsiQuery = encodeURIComponent(entry.mmsi);
+    detailLinks.innerHTML =
+      '<a href="https://www.marinetraffic.com/en/ais/details/ships/mmsi:' + mmsiQuery +
+        '" target="_blank" rel="noopener">MarineTraffic</a>' +
+      '<a href="https://www.vesselfinder.com/vessels?name=' + mmsiQuery +
+        '" target="_blank" rel="noopener">VesselFinder</a>' +
+      (entry.lat != null
+        ? '<a href="https://www.openstreetmap.org/?mlat=' + entry.lat + '&mlon=' + entry.lon +
+          '#map=12/' + entry.lat + '/' + entry.lon + '" target="_blank" rel="noopener">OpenStreetMap</a>'
+        : "");
+  }
+
+  function openDetail(mmsi) {
+    mmsi = String(mmsi);
+    if (!ships.has(mmsi)) return;
+    selectedMmsi = mmsi;
+    detailEl.classList.add("open");
+    detailEl.setAttribute("aria-hidden", "false");
+    renderDetail(ships.get(mmsi));
+    refreshVisibleShips();
+  }
+
+  function closeDetail() {
+    selectedMmsi = null;
+    detailEl.classList.remove("open");
+    detailEl.setAttribute("aria-hidden", "true");
+    if (trackLayer) { map.removeLayer(trackLayer); trackLayer = null; }
+    refreshVisibleShips();
   }
 
   function scheduleReconnect() {
@@ -626,9 +1415,21 @@
     if (messageTypes.length > 0) {
       subscription.FilterMessageTypes = messageTypes;
     }
+    var mmsiFilter = parseMmsiFilter();
+    if (mmsiFilter.length > 0) {
+      subscription.FiltersShipMMSI = mmsiFilter;
+    }
     log("Subscription gesendet: BBox [" + latMin.toFixed(4) + "," + lonMin.toFixed(4) + "] - [" +
-      latMax.toFixed(4) + "," + lonMax.toFixed(4) + "]");
+      latMax.toFixed(4) + "," + lonMax.toFixed(4) + "]" +
+      (mmsiFilter.length ? ", MMSI-Filter: " + mmsiFilter.join(", ") : ""));
     socket.send(JSON.stringify(subscription));
+  }
+
+  // The API takes MMSIs as strings; accept any separator the user types.
+  function parseMmsiFilter() {
+    return mmsiFilterInput.value.split(/[\s,;]+/)
+      .map(function (v) { return v.trim(); })
+      .filter(function (v) { return /^\d{1,9}$/.test(v); });
   }
 
   function updateBboxFieldsFromMap() {
@@ -660,6 +1461,7 @@
       return;
     }
     localStorage.setItem("aisstream_api_key", apiKey);
+    localStorage.setItem("aisstream_mmsi_filter", mmsiFilterInput.value.trim());
 
     if ([latMinInput, lonMinInput, latMaxInput, lonMaxInput].some(function (el) { return isNaN(parseFloat(el.value)); })) {
       alert("Bitte gültige Bounding-Box-Koordinaten eingeben.");
@@ -765,6 +1567,87 @@
   connectBtn.addEventListener("click", connect);
   disconnectBtn.addEventListener("click", disconnect);
   getTokenBtn.addEventListener("click", mintToken);
+
+  tableBody.addEventListener("click", function (evt) {
+    var row = evt.target.closest("tr");
+    if (row && row.dataset.mmsi) openDetail(row.dataset.mmsi);
+  });
+
+  // "Alle Details" link inside a Leaflet popup.
+  document.addEventListener("click", function (evt) {
+    var link = evt.target.closest("[data-detail-mmsi]");
+    if (!link) return;
+    evt.preventDefault();
+    openDetail(link.getAttribute("data-detail-mmsi"));
+  });
+
+  var searchTimer = null;
+  searchInput.addEventListener("input", function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(refreshVisibleShips, 150);
+  });
+
+  // Re-subscribing on every keystroke would spam the server; apply the MMSI
+  // filter once the field loses focus or the user hits Enter.
+  mmsiFilterInput.addEventListener("change", function () {
+    localStorage.setItem("aisstream_mmsi_filter", mmsiFilterInput.value.trim());
+    sendSubscription();
+  });
+
+  document.getElementById("detailClose").addEventListener("click", closeDetail);
+
+  document.getElementById("detailCenter").addEventListener("click", function () {
+    var entry = selectedMmsi && ships.get(selectedMmsi);
+    if (!entry || !mapAvailable || entry.lat == null) return;
+    map.setView([entry.lat, entry.lon], Math.max(map.getZoom(), 13));
+    if (entry.marker) entry.marker.openPopup();
+  });
+
+  document.getElementById("detailTrack").addEventListener("click", function () {
+    var entry = selectedMmsi && ships.get(selectedMmsi);
+    if (!entry || !mapAvailable) return;
+    if (trackLayer) {
+      map.removeLayer(trackLayer);
+      trackLayer = null;
+      return;
+    }
+    if (entry.track.length < 2) {
+      log("Für MMSI " + entry.mmsi + " liegen noch zu wenige Positionen für einen Track vor.");
+      return;
+    }
+    drawTrack(entry);
+    map.fitBounds(trackLayer.getBounds().pad(0.2));
+  });
+
+  document.getElementById("detailRawToggle").addEventListener("click", function () {
+    detailRaw.style.display = detailRaw.style.display === "block" ? "none" : "block";
+  });
+
+  document.getElementById("detailCopy").addEventListener("click", function () {
+    var entry = selectedMmsi && ships.get(selectedMmsi);
+    if (!entry) return;
+    var dump = Object.assign({}, entry);
+    delete dump.marker;
+    var text = JSON.stringify(dump, null, 2);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        log("Daten zu MMSI " + entry.mmsi + " in die Zwischenablage kopiert.");
+      }, function () {
+        log("Kopieren fehlgeschlagen - Rohdaten stattdessen unten einblenden.");
+      });
+    } else {
+      log("Zwischenablage nicht verfügbar - Rohdaten stattdessen unten einblenden.");
+    }
+  });
+
+  document.addEventListener("keydown", function (evt) {
+    if (evt.key === "Escape" && selectedMmsi) closeDetail();
+  });
+
+  // Keeps the "zuletzt gesehen" / stale badge honest while nothing arrives.
+  setInterval(function () {
+    if (selectedMmsi && ships.has(selectedMmsi)) renderDetail(ships.get(selectedMmsi));
+  }, 15000);
 })();
 </script>
 </body>
