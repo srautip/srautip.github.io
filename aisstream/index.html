@@ -406,24 +406,44 @@
       "<td>" + (entry.time || "-") + "</td>";
   }
 
+  function isGzip(bytes) {
+    return bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
+  }
+
+  function decompressGzip(buffer) {
+    if (typeof DecompressionStream !== "function") {
+      return Promise.reject(new Error("Gzip-Dekomprimierung wird von diesem Browser nicht unterstützt."));
+    }
+    var stream = new Blob([buffer]).stream().pipeThrough(new DecompressionStream("gzip"));
+    return new Response(stream).text();
+  }
+
   function handleMessage(evt) {
     // The server may send text or binary WebSocket frames; binary frames
-    // arrive as a Blob (or ArrayBuffer) rather than a ready-to-parse string.
+    // arrive as a Blob (or ArrayBuffer) rather than a ready-to-parse string,
+    // and per the SubscriptionConfirmation may additionally be gzip-compressed.
     if (typeof evt.data === "string") {
       processMessageText(evt.data);
-    } else if (evt.data instanceof Blob) {
-      evt.data.text().then(processMessageText).catch(function (e) {
-        log("Konnte Binär-Nachricht (Blob) nicht lesen: " + e.message);
-      });
-    } else if (evt.data instanceof ArrayBuffer) {
-      try {
-        processMessageText(new TextDecoder("utf-8").decode(evt.data));
-      } catch (e) {
-        log("Konnte Binär-Nachricht (ArrayBuffer) nicht lesen: " + e.message);
-      }
-    } else {
-      log("Unbekanntes Nachrichtenformat empfangen (" + Object.prototype.toString.call(evt.data) + ").");
+      return;
     }
+
+    var bufferPromise = evt.data instanceof Blob ? evt.data.arrayBuffer()
+      : evt.data instanceof ArrayBuffer ? Promise.resolve(evt.data)
+      : null;
+    if (!bufferPromise) {
+      log("Unbekanntes Nachrichtenformat empfangen (" + Object.prototype.toString.call(evt.data) + ").");
+      return;
+    }
+
+    bufferPromise.then(function (buffer) {
+      var bytes = new Uint8Array(buffer);
+      if (isGzip(bytes)) {
+        return decompressGzip(buffer).then(processMessageText);
+      }
+      processMessageText(new TextDecoder("utf-8").decode(bytes));
+    }).catch(function (e) {
+      log("Konnte Binär-Nachricht nicht lesen: " + e.message);
+    });
   }
 
   function processMessageText(dataText) {
@@ -436,6 +456,11 @@
     }
     if (payload.error) {
       log("Fehler vom Server: " + payload.error);
+      return;
+    }
+    if (payload.MessageType === "SubscriptionConfirmation") {
+      var compressed = payload.Message && payload.Message.CompressionEnabled;
+      log("Subscription bestätigt" + (compressed ? " (Kompression aktiv)." : "."));
       return;
     }
 
