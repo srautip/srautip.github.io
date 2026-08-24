@@ -325,8 +325,15 @@
   var storedKey = localStorage.getItem("aisstream_api_key");
   if (storedKey) apiKeyInput.value = storedKey;
 
+  // Server URLs shipped as the default in a previous version - if that's
+  // all that's stored, drop it instead of shadowing a corrected default.
+  var SUPERSEDED_DEFAULT_URLS = ["wss://ais.openwaters.io/v1/stream"];
   var storedUrl = localStorage.getItem("aisstream_server_url");
-  if (storedUrl) serverUrlInput.value = storedUrl;
+  if (storedUrl && SUPERSEDED_DEFAULT_URLS.indexOf(storedUrl) === -1) {
+    serverUrlInput.value = storedUrl;
+  } else if (storedUrl) {
+    localStorage.removeItem("aisstream_server_url");
+  }
 
   var map = null;
   var mapAvailable = typeof L !== "undefined";
