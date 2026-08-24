@@ -655,9 +655,14 @@ Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
 | Schlüssel | Inhalt | TTL |
 |---|---|---|
 | `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_filters` | Einstellungen & Filterauswahl | unbegrenzt |
-| `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss |
-| `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d |
-| `aisstream_ais` | **eine** JSON-Map MMSI → Position, Fahrtdaten, Personen an Bord, Binnenangaben | **30 min** |
+| `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss, max. `ENRICH_MAX` = 400 |
+| `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d, max. 2000 |
+| `aisstream_ais` | **eine** JSON-Map MMSI → Position, Fahrtdaten, Personen an Bord, Binnenangaben | **30 min**, max. 1500 |
+
+**Alle drei brauchen eine Obergrenze.** Das Kontingent liegt bei ~5 MB und
+teilen sich alle Schlüssel; wer einen vierten Speicher ergänzt, gibt ihm ein
+Limit *und* ein sinnvolles Verhalten bei `QuotaExceededError` — siehe unten,
+das war ein echter Datenverlust.
 
 Dazu ein Speicher **außerhalb** von `localStorage`:
 
@@ -880,6 +885,58 @@ Mechanik:
   Klick auf „Zwischenspeicher leeren" ihr Ergebnis zurück — der Zähler
   sprang auf 1. Deshalb gibt es `cacheGeneration`: `enrichShip()` merkt sich
   den Stand beim Start und schreibt nur, wenn er unverändert ist.
+
+### Voller Speicher löschte den kompletten AIS-Cache (behoben)
+
+Symptom aus dem Betrieb: **nach einem Reload waren alle AIS-Daten weg** —
+keine Schiffe, keine Marker, keine Tabellenzeilen, und **keine einzige
+Meldung im Log**.
+
+Ursache waren zwei Fehler, die zusammenspielten:
+
+1. **Der Anreicherungs-Cache hatte keine Obergrenze.** Er legt einen
+   Schlüssel je nachgeschlagener MMSI an, und abgelaufene Einträge
+   verschwanden nur, wenn *genau diese* MMSI noch einmal geöffnet wurde. Wer
+   viele verschiedene Schiffe ansieht, füllt damit über Wochen das ganze
+   ~5-MB-Kontingent mit Einträgen, die nie wieder jemand liest.
+2. **Der AIS-Cache löschte sich bei Platzmangel selbst.** Im `catch` des
+   Speichervorgangs stand ein blankes `localStorage.removeItem(AIS_CACHE_KEY)`.
+   Der AIS-Cache wird am häufigsten geschrieben (alle 5 s, debounced), also
+   traf ihn die volle Quota zuerst — und er warf jedes Mal *alles* weg.
+
+Nachgestellt mit Playwright (`scratchpad/aiscache.js`): localStorage bis zur
+Quota mit gültigen Anreicherungseinträgen gefüllt, 400 Schiffe gestreamt,
+neu geladen.
+
+| | vorher | nachher |
+|---|---|---|
+| Einträge im AIS-Cache | 0 | 400 |
+| Tabellenzeilen nach Reload | 0 | 68 (= im Kartenausschnitt) |
+| Marker nach Reload | 0 | 104 |
+| Hinweis im Log | keiner | Aufräummeldung |
+
+**Was jetzt passiert**, in dieser Reihenfolge:
+
+- `pruneEnrichCache(false)` läuft **beim Start**: erst alles Abgelaufene raus,
+  dann auf `ENRICH_MAX` = 400 deckeln, ältester Eintrag zuerst. Wichtig beim
+  Nachbauen: erst alle Schlüssel einsammeln, *dann* löschen — ein
+  `removeItem` mitten in der `localStorage.key(i)`-Schleife verschiebt die
+  Indizes und überspringt Einträge.
+- `saveAisCache()` schrumpft statt zu löschen: bei `QuotaExceededError` erst
+  `pruneEnrichCache(true)` (deckelt auf die Hälfte), dann notfalls die
+  Zeilenzahl halbieren, bis es passt — die **neuesten** Schiffe bleiben.
+- Reicht selbst das nicht (Quota von fremden Schlüsseln belegt), bleibt der
+  **alte Stand stehen**, es gibt aber eine Logmeldung. Ein veralteter Cache
+  ist besser als keiner: Beim Laden fällt ohnehin alles über 30 Minuten
+  heraus, und die Alterspalte weist den Rest aus.
+- `enrichCacheSet()` räumt bei Quota auf und versucht **einmal** erneut.
+- `updateCacheCounts()` läuft jetzt nach jedem AIS-Speichervorgang. Vorher
+  zeigte der Zähler im Einstellungsbereich `0`, während 400 Einträge im
+  Speicher lagen — er wurde nur vom Statik-Cache aktualisiert.
+
+**Regel für neue Speicher:** Ein Cache, der bei Platzmangel den eigenen
+Bestand wegwirft, ist schlimmer als gar kein Cache — er verliert Daten
+lautlos und genau dann, wenn am meisten drinsteht.
 
 „Zwischenspeicher leeren" räumt **nur den Speicher**, nicht die laufende
 Sitzung. Die Namen der Schiffe, die man gerade ansieht, verschwinden zu

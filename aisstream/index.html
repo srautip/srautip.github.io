@@ -2195,17 +2195,41 @@
     });
     // Bei Platzmangel die aeltesten zuerst opfern.
     rows.sort(function (a, b) { return b.updatedAt - a.updatedAt; });
-    var out = {};
-    rows.slice(0, AIS_MAX).forEach(function (entry) {
-      var rec = { at: entry.updatedAt };
-      AIS_FIELDS.forEach(function (f) { if (entry[f] != null) rec[f] = entry[f]; });
-      out[entry.mmsi] = rec;
-    });
-    try {
-      localStorage.setItem(AIS_CACHE_KEY, JSON.stringify(out));
-    } catch (e) {
-      try { localStorage.removeItem(AIS_CACHE_KEY); } catch (e2) {}
+    rows = rows.slice(0, AIS_MAX);
+
+    // Frueher stand hier ein blankes removeItem im catch: War das Kontingent
+    // voll, loeschte der Speichervorgang den kompletten AIS-Cache - nach dem
+    // naechsten Reload war die Karte leer, ohne eine einzige Meldung. Der
+    // Cache muss stattdessen schrumpfen, so wie es der Statik-Cache tut.
+    var limit = rows.length;
+    var freed = false;
+    while (limit > 0) {
+      var out = {};
+      rows.slice(0, limit).forEach(function (entry) {
+        var rec = { at: entry.updatedAt };
+        AIS_FIELDS.forEach(function (f) { if (entry[f] != null) rec[f] = entry[f]; });
+        out[entry.mmsi] = rec;
+      });
+      try {
+        localStorage.setItem(AIS_CACHE_KEY, JSON.stringify(out));
+        if (limit < rows.length) {
+          log("Speicher knapp: nur die " + limit + " neuesten von " + rows.length +
+            " Schiffen zwischengespeichert.");
+        }
+        updateCacheCounts();
+        return;
+      } catch (e) {
+        // Erst den Platz zurueckholen, der ohnehin tot ist, statt frische
+        // Positionen wegzuwerfen.
+        if (!freed) { freed = true; pruneEnrichCache(true); continue; }
+        limit = Math.floor(limit / 2);
+      }
     }
+    // Bewusst KEIN removeItem: Ein vorhandener aelterer Stand ist besser als
+    // gar keiner. Beim Laden faellt ohnehin alles heraus, was ueber der
+    // 30-Minuten-Grenze liegt, und die Alterspalte weist den Rest aus.
+    log("Kein Platz im lokalen Speicher - AIS-Daten werden nicht zwischengespeichert.");
+    updateCacheCounts();
   }
 
   function loadAisCache() {
@@ -2890,6 +2914,7 @@
   var WIKIDATA_SPARQL = "https://query.wikidata.org/sparql";
   var ENRICH_TTL_HIT = 30 * 24 * 3600 * 1000;
   var ENRICH_TTL_MISS = 3 * 24 * 3600 * 1000;
+  var ENRICH_MAX = 400;
   var ENRICH_GAP_MS = 350;
 
   // Alle Registerabfragen laufen serialisiert durch eine Warteschlange.
@@ -2951,12 +2976,57 @@
   }
 
   function enrichCacheSet(mmsi, data, found) {
+    var key = "aisstream_enrich_" + mmsi;
+    var payload = JSON.stringify({ at: Date.now(), found: found, data: data });
     try {
-      localStorage.setItem("aisstream_enrich_" + mmsi,
-        JSON.stringify({ at: Date.now(), found: found, data: data }));
+      localStorage.setItem(key, payload);
+      return;
+    } catch (e) {}
+    // Kontingent voll: aufraeumen und einmal erneut versuchen.
+    pruneEnrichCache(true);
+    try { localStorage.setItem(key, payload); } catch (e2) {}
+  }
+
+  // Der Anreicherungs-Cache legt einen Schluessel je nachgeschlagener MMSI an
+  // und hatte bis hierher keine Obergrenze. Abgelaufene Eintraege verschwanden
+  // nur, wenn genau diese MMSI noch einmal geoeffnet wurde - wer viele
+  // verschiedene Schiffe ansieht, fuellt damit auf Dauer das ganze
+  // localStorage-Kontingent, und der AIS-Cache stirbt als erster.
+  function pruneEnrichCache(aggressive) {
+    var items = [];
+    try {
+      // Erst sammeln, dann loeschen: Ein removeItem waehrend der Schleife
+      // verschiebt die Indizes und ueberspringt Eintraege.
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k.indexOf("aisstream_enrich_") !== 0) continue;
+        var at = 0, found = false;
+        try {
+          var parsed = JSON.parse(localStorage.getItem(k));
+          at = parsed.at || 0;
+          found = !!parsed.found;
+        } catch (e) {}
+        items.push({ key: k, at: at, ttl: found ? ENRICH_TTL_HIT : ENRICH_TTL_MISS });
+      }
     } catch (e) {
-      // Quota exhausted - the cache is a convenience, not a requirement.
+      return 0;
     }
+    var now = Date.now();
+    var live = [];
+    var removed = 0;
+    var drop = function (it) {
+      try { localStorage.removeItem(it.key); removed++; } catch (e) {}
+    };
+    items.forEach(function (it) {
+      if (!it.at || now - it.at > it.ttl) drop(it);
+      else live.push(it);
+    });
+    var cap = aggressive ? Math.floor(ENRICH_MAX / 2) : ENRICH_MAX;
+    if (live.length > cap) {
+      live.sort(function (a, b) { return a.at - b.at; });
+      live.slice(0, live.length - cap).forEach(drop);
+    }
+    return removed;
   }
 
   // Misconfigured transponders broadcast placeholders like "0" or "@@@@" in
@@ -4066,6 +4136,11 @@
   // Ganz bewusst hier unten und nicht oben bei den anderen Cache-Aufrufen:
   // loadAisCache legt ueber setPosition Marker an und braucht damit alles,
   // was weiter oben per var initialisiert wird (TYPE_COLORS, Filter, ...).
+  // Vor dem Wiederherstellen aufraeumen: schafft Platz fuer den AIS-Cache,
+  // bevor der erste Speichervorgang gegen ein volles Kontingent laeuft.
+  var enrichDropped = pruneEnrichCache(false);
+  if (enrichDropped) log(enrichDropped + " veraltete Registereintraege aus dem Zwischenspeicher entfernt.");
+
   var restored = loadAisCache();
   if (restored) log(restored + " Schiff(e) aus dem 30-Minuten-Zwischenspeicher wiederhergestellt.");
 
