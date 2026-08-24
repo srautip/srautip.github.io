@@ -441,6 +441,52 @@
     font-size: 0.7rem;
     padding: 0.25rem 0.5rem;
   }
+  /* --- Filterleiste ---------------------------------------------------- */
+  .filterbar {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.1rem;
+  }
+  .filtergroup { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem; }
+  .filtergroup > .lbl {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin-right: 0.15rem;
+  }
+  .chip {
+    all: unset;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.76rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .chip:hover { border-color: var(--accent); }
+  .chip[aria-pressed="true"] { color: var(--text); border-color: var(--accent); background: #24365a; }
+  .chip .dot-sw {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+  }
+  .filter-count { font-size: 0.75rem; color: var(--muted); margin-left: auto; }
+  .filter-count b { color: var(--text); }
+  #filterReset { all: unset; cursor: pointer; font-size: 0.74rem; color: var(--accent); }
+  #filterReset[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -518,6 +564,16 @@
       <button id="snapshotBtn">Snapshot laden (ohne Verbindung, ohne Key)</button>
     </div>
 
+    <h2 style="margin-top:1.2rem">Beim Laden der Seite</h2>
+    <div class="checkboxes">
+      <label><input type="checkbox" id="autoSnapshot" checked /> Snapshot automatisch laden</label>
+      <label><input type="checkbox" id="autoConnect" checked /> Automatisch verbinden</label>
+    </div>
+    <p class="hint" style="margin-top:0.35rem">
+      Automatisch verbinden geht nur, wenn bereits ein API-Key gespeichert ist &ndash;
+      sonst wird es beim Laden übersprungen, ohne zu stören.
+    </p>
+
     <h2 style="margin-top:1.2rem">Schiffsregister</h2>
     <div class="checkboxes">
       <label><input type="checkbox" id="autoEnrich" checked /> Beim Öffnen eines Schiffs automatisch abfragen</label>
@@ -572,6 +628,12 @@
   </section>
 
   <section>
+    <div class="filterbar">
+      <div class="filtergroup" id="typeFilter"><span class="lbl">Typ</span></div>
+      <div class="filtergroup" id="statusFilter"><span class="lbl">Status</span></div>
+      <button type="button" id="filterReset" hidden>Filter zurücksetzen</button>
+      <span class="filter-count" id="filterCount"></span>
+    </div>
     <div id="map"></div>
     <div class="panel" style="margin-top:1rem">
       <h2>Schiffe im aktuellen Kartenausschnitt <span style="font-weight:400;text-transform:none;color:var(--muted)">&ndash; Zeile anklicken für Details</span></h2>
@@ -838,6 +900,10 @@
   var mmsiFilterInput = document.getElementById("mmsiFilter");
   var snapshotBtn = document.getElementById("snapshotBtn");
   var autoEnrichInput = document.getElementById("autoEnrich");
+  var filterCountEl = document.getElementById("filterCount");
+  var filterResetEl = document.getElementById("filterReset");
+  var autoSnapshotInput = document.getElementById("autoSnapshot");
+  var autoConnectInput = document.getElementById("autoConnect");
   var staticCacheCountEl = document.getElementById("staticCacheCount");
   var enrichCacheCountEl = document.getElementById("enrichCacheCount");
   var searchInput = document.getElementById("shipSearch");
@@ -857,6 +923,8 @@
   if (storedMmsiFilter) mmsiFilterInput.value = storedMmsiFilter;
 
   if (localStorage.getItem("aisstream_auto_enrich") === "0") autoEnrichInput.checked = false;
+  if (localStorage.getItem("aisstream_auto_snapshot") === "0") autoSnapshotInput.checked = false;
+  if (localStorage.getItem("aisstream_auto_connect") === "0") autoConnectInput.checked = false;
 
   // Server URLs shipped as the default in a previous version - if that's
   // all that's stored, drop it instead of shadowing a corrected default.
@@ -1741,6 +1809,7 @@
       } else {
         entry.marker = L.marker([lat, lon], { icon: shipIcon(entry) }).addTo(map);
         entry.iconKey = iconKey(entry);
+        entry.markerShown = true;
         entry.marker.on("click", function () { openDetail(entry.mmsi); });
       }
       refreshMarkerIcon(entry);
@@ -1775,6 +1844,128 @@
     return html + '<a href="#" data-detail-mmsi="' + esc(entry.mmsi) + '">Alle Details &rsaquo;</a>';
   }
 
+  /* --- Filter: wirken gleichermaßen auf Karte und Tabelle ------------- */
+
+  // Navigational status codes grouped into the distinctions a reader
+  // actually makes. Anything not listed (incl. a missing status) is "other".
+  var STATUS_GROUPS = [
+    { key: "underway", label: "In Fahrt", codes: [0, 8] },
+    { key: "moored", label: "Vor Anker / fest", codes: [1, 5] },
+    { key: "restricted", label: "Eingeschränkt", codes: [2, 3, 4, 6, 11, 12] },
+    { key: "fishing", label: "Fischerei", codes: [7] },
+    { key: "other", label: "Sonstige / unbekannt", codes: [] }
+  ];
+
+  function statusGroup(entry) {
+    var code = entry.navStatus;
+    if (code != null) {
+      for (var i = 0; i < STATUS_GROUPS.length; i++) {
+        if (STATUS_GROUPS[i].codes.indexOf(Number(code)) !== -1) return STATUS_GROUPS[i].key;
+      }
+    }
+    return "other";
+  }
+
+  // An empty set means "no restriction", not "nothing" - that keeps the
+  // default state (everything visible) and the reset identical.
+  var filterTypes = {};
+  var filterStatuses = {};
+
+  function anyActive(map) {
+    for (var k in map) if (map[k]) return true;
+    return false;
+  }
+
+  function passesFilters(entry) {
+    if (anyActive(filterTypes)) {
+      var cat = typeCategory(entry) || "other";
+      if (!filterTypes[cat]) return false;
+    }
+    if (anyActive(filterStatuses)) {
+      if (!filterStatuses[statusGroup(entry)]) return false;
+    }
+    return true;
+  }
+
+  function saveFilters() {
+    try {
+      localStorage.setItem("aisstream_filters",
+        JSON.stringify({ types: filterTypes, statuses: filterStatuses }));
+    } catch (e) {}
+  }
+
+  function loadFilters() {
+    try {
+      var raw = localStorage.getItem("aisstream_filters");
+      if (!raw) return;
+      var parsed = JSON.parse(raw);
+      filterTypes = parsed.types || {};
+      filterStatuses = parsed.statuses || {};
+    } catch (e) {}
+  }
+
+  // The map is the other half of the same slice: a filtered-out ship must
+  // leave the map, not just the table.
+  function applyMapFilter() {
+    if (!mapAvailable) return;
+    ships.forEach(function (entry) {
+      if (!entry.marker) return;
+      var show = passesFilters(entry);
+      if (show === entry.markerShown) return;
+      entry.markerShown = show;
+      if (show) map.addLayer(entry.marker);
+      else map.removeLayer(entry.marker);
+    });
+  }
+
+  function buildFilterChips() {
+    var typeBox = document.getElementById("typeFilter");
+    var statusBox = document.getElementById("statusFilter");
+
+    var chip = function (label, active, swatch) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.setAttribute("aria-pressed", active ? "true" : "false");
+      b.innerHTML = (swatch ? '<span class="dot-sw" style="background:' + swatch + '"></span>' : "") +
+        esc(label);
+      return b;
+    };
+
+    TYPE_COLORS.concat([{ key: "other", label: "Sonstige / unbekannt", color: NEUTRAL_COLOR }])
+      .forEach(function (t) {
+        var b = chip(t.label, !!filterTypes[t.key], t.color);
+        b.addEventListener("click", function () {
+          filterTypes[t.key] = !filterTypes[t.key];
+          b.setAttribute("aria-pressed", filterTypes[t.key] ? "true" : "false");
+          saveFilters();
+          refreshVisibleShips();
+        });
+        typeBox.appendChild(b);
+      });
+
+    STATUS_GROUPS.forEach(function (g) {
+      var b = chip(g.label, !!filterStatuses[g.key], null);
+      b.addEventListener("click", function () {
+        filterStatuses[g.key] = !filterStatuses[g.key];
+        b.setAttribute("aria-pressed", filterStatuses[g.key] ? "true" : "false");
+        saveFilters();
+        refreshVisibleShips();
+      });
+      statusBox.appendChild(b);
+    });
+
+    document.getElementById("filterReset").addEventListener("click", function () {
+      filterTypes = {};
+      filterStatuses = {};
+      saveFilters();
+      Array.prototype.forEach.call(document.querySelectorAll(".filterbar .chip"), function (b) {
+        b.setAttribute("aria-pressed", "false");
+      });
+      refreshVisibleShips();
+    });
+  }
+
   // Free-text search across the identity fields we know for an MMSI.
   function matchesSearch(entry, needle) {
     if (!needle) return true;
@@ -1797,9 +1988,13 @@
     var needle = searchInput.value.trim().toLowerCase();
     var entries = [];
     var hiddenBySearch = 0;
+    var inView = 0;
+    var hiddenByFilter = 0;
     ships.forEach(function (entry) {
       if (entry.lat == null || entry.lon == null) return;
       if (mapAvailable && !map.getBounds().contains([entry.lat, entry.lon])) return;
+      inView++;
+      if (!passesFilters(entry)) { hiddenByFilter++; return; }
       if (!matchesSearch(entry, needle)) { hiddenBySearch++; return; }
       entries.push(entry);
     });
@@ -1832,6 +2027,15 @@
     shipCountEl.textContent = shown.length;
     knownCountEl.textContent = ships.size;
     updateCacheCounts();
+
+    // Map and table always show the same slice.
+    applyMapFilter();
+    var filtered = anyActive(filterTypes) || anyActive(filterStatuses);
+    filterResetEl.hidden = !filtered;
+    filterCountEl.innerHTML = filtered
+      ? "<b>" + entries.length + "</b> von " + inView + " im Ausschnitt · " +
+        hiddenByFilter + " ausgefiltert"
+      : "<b>" + inView + "</b> im Kartenausschnitt";
     searchHintEl.textContent = needle
       ? shown.length + " Treffer, " + hiddenBySearch + " ausgeblendet"
       : ships.size + " MMSIs bekannt";
@@ -2957,6 +3161,8 @@
   });
 
   addMapLegend();
+  loadFilters();
+  buildFilterChips();
 
   snapshotBtn.addEventListener("click", loadSnapshot);
   document.getElementById("clearCacheBtn").addEventListener("click", clearAllCaches);
@@ -3006,10 +3212,38 @@
     if (document.visibilityState === "hidden") saveStaticCache();
   });
 
+  [["aisstream_auto_snapshot", autoSnapshotInput], ["aisstream_auto_connect", autoConnectInput]]
+    .forEach(function (pair) {
+      pair[1].addEventListener("change", function () {
+        localStorage.setItem(pair[0], pair[1].checked ? "1" : "0");
+      });
+    });
+
   // Keeps the "zuletzt gesehen" / stale badge honest while nothing arrives.
   setInterval(function () {
     if (selectedMmsi && ships.has(selectedMmsi)) renderDetail(ships.get(selectedMmsi));
   }, 15000);
+
+  /* --- Autostart ------------------------------------------------------ */
+
+  // Snapshot first: it needs no key, answers in one request and fills the
+  // map immediately, while the stream only trickles in over minutes.
+  if (autoSnapshotInput.checked && vesselsApiBase()) {
+    loadSnapshot();
+  }
+
+  if (autoConnectInput.checked) {
+    // Never auto-connect without a stored key - connect() would pop an
+    // alert on every single page load, which is worse than doing nothing.
+    if (apiKeyInput.value.trim()) {
+      log("Automatische Verbindung beim Laden…");
+      connect();
+    } else {
+      log("Automatisch verbinden übersprungen: noch kein API-Key gespeichert.");
+    }
+  }
+
+  refreshVisibleShips();
 })();
 </script>
 </body>

@@ -383,13 +383,66 @@ Fehlertyp wie bei `loadStaticCache()`.
 nicht. Alles, was auf die Konstanten weiter unten zugreift, gehört in den
 Verdrahtungsblock am Ende der IIFE, nicht in den Init oben.
 
+## Filter und Autostart
+
+### Filter wirken auf Karte **und** Tabelle
+
+Eine gemeinsame Filterleiste über beidem (nicht je Ansicht eine eigene —
+Karte und Tabelle zeigen immer denselben Ausschnitt der Daten). Zwei
+Gruppen, beide als Mehrfachauswahl:
+
+- **Typ** — die sechs Kategoriefarben plus „Sonstige / unbekannt", jeder Chip
+  mit seinem Farbpunkt, damit der Bezug zur Karte sofort da ist
+- **Status** — Navigationsstatus zu fünf Gruppen zusammengefasst:
+  `In Fahrt` (0, 8) · `Vor Anker / fest` (1, 5) · `Eingeschränkt`
+  (2, 3, 4, 6, 11, 12) · `Fischerei` (7) · `Sonstige / unbekannt` (Rest und
+  fehlender Status)
+
+Zentral ist `passesFilters(entry)` — **eine** Funktion, die `refreshVisibleShips()`
+für die Tabelle und `applyMapFilter()` für die Marker benutzen. Wer einen
+Filter ergänzt, fasst nur diese Stelle an; beide Ansichten ziehen automatisch
+nach.
+
+**Leere Auswahl heißt „keine Einschränkung", nicht „nichts"** (`anyActive()`).
+Damit sind Startzustand und Zurücksetzen identisch, und ein versehentlich
+leergeklickter Filter blendet nicht die ganze Karte aus.
+
+`applyMapFilter()` nimmt Marker wirklich per `removeLayer` von der Karte,
+statt sie nur transparent zu schalten — sonst blieben ihre 24-px-Klickflächen
+liegen und würden Treffer abfangen. Der Zustand hängt an
+`entry.markerShown`, damit nicht bei jedem Durchlauf alle Layer angefasst
+werden.
+
+Auswahl steckt in `aisstream_filters`. Gegengeprüft mit echten
+Snapshot-Daten: Tabelle und Karte zeigen bei jeder Kombination dieselbe
+Anzahl.
+
+### Autostart beim Laden
+
+Zwei Schalter, beide vorbelegt und in `aisstream_auto_snapshot` /
+`aisstream_auto_connect` gemerkt:
+
+1. **Snapshot zuerst** — braucht keinen Key, antwortet in einer Anfrage und
+   füllt die Karte sofort, während der Stream nur langsam eintröpfelt.
+2. **Dann verbinden** — aber **nur, wenn schon ein Key gespeichert ist**.
+   Sonst würde `connect()` bei *jedem* Seitenaufruf ein `alert()` werfen;
+   stattdessen gibt es eine Zeile im Log und sonst nichts.
+
+Beides steht am Ende der IIFE, nach allen `var`-Initialisierungen (siehe die
+Ladereihenfolge-Falle weiter oben).
+
+**Für Tests wichtig:** Ist ein Key gespeichert, ist `#connectBtn` nach dem
+Laden bereits **deaktiviert**, weil die Seite von selbst verbindet. Skripte
+müssen den Klick überspringen:
+`if (!await page.evaluate(()=>document.getElementById('connectBtn').disabled)) await page.click('#connectBtn');`
+
 ## Was in `localStorage` liegt
 
 Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
 
 | Schlüssel | Inhalt | TTL |
 |---|---|---|
-| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open` | Einstellungen | unbegrenzt |
+| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_filters` | Einstellungen & Filterauswahl | unbegrenzt |
 | `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss |
 | `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d |
 
@@ -544,6 +597,11 @@ verifiziert:
 - **MMSI-Filter** (`FiltersShipMMSI`) im UI, kommagetrennt, in `localStorage`
   persistiert; wird beim `change`-Event neu subscribed (nicht bei jedem
   Tastendruck)
+- **Filterleiste über Karte und Tabelle** (siehe eigenen Abschnitt oben):
+  Schiffstyp und Navigationsstatus als Mehrfachauswahl, beide Ansichten
+  zeigen immer dieselbe Auswahl, Zustand wird gemerkt
+- **Autostart**: Snapshot laden und verbinden beim Seitenaufruf, beides
+  abschaltbar; Verbinden nur mit bereits gespeichertem Key
 - **Freitextsuche** über Tabelle (MMSI, Name, Rufzeichen, IMO, Ziel, Typ,
   Land, Stationsart), 150 ms debounced
 - Rohdaten-Ansicht je MMSI (letzte Nachricht je Typ als JSON) + „JSON
