@@ -388,7 +388,16 @@
     color: #0b0b0b;
     box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
     max-width: 200px;
+    /* Die Legende ist ein bottomleft-Control und waechst nach oben. Ohne
+       Hoehendeckel ragte sie auf dem iPhone ueber die Karte hinaus und ihr
+       Kopf - der einzige Weg, sie wieder zuzuklappen - lag ausserhalb.
+       maxHeight wird beim Oeffnen aus der Kartenhoehe gesetzt. */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
+  .map-legend .legend-head { flex: 0 0 auto; }
+  .map-legend .legend-body { overflow-y: auto; -webkit-overflow-scrolling: touch; }
   .map-legend b {
     display: block;
     font-size: 0.66rem;
@@ -1344,16 +1353,34 @@
 
       var head = div.querySelector(".legend-head");
       var bodyEl = div.querySelector(".legend-body");
+      // Eigener Schluessel fuer schmale Displays: Auf dem Telefon soll die
+      // Legende grundsaetzlich zu starten, unabhaengig davon, wie sie am
+      // Desktop zuletzt stand.
+      var isNarrow = function () { return window.innerWidth <= 700; };
+      var storageKey = function () {
+        return isNarrow() ? "aisstream_legend_open_sm" : "aisstream_legend_open";
+      };
+
+      // Deckel aus der tatsaechlichen Kartenhoehe, damit der Kopf immer
+      // innerhalb der Karte bleibt und antippbar ist.
+      var fitToMap = function () {
+        var mapEl = document.getElementById("map");
+        if (!mapEl) return;
+        div.style.maxHeight = Math.max(80, mapEl.clientHeight - 24) + "px";
+      };
+
       var setOpen = function (open) {
         bodyEl.style.display = open ? "block" : "none";
         head.setAttribute("aria-expanded", open ? "true" : "false");
         div.querySelector(".chev").textContent = open ? "▾" : "▸";
-        try { localStorage.setItem("aisstream_legend_open", open ? "1" : "0"); } catch (e) {}
+        if (open) fitToMap();
+        try { localStorage.setItem(storageKey(), open ? "1" : "0"); } catch (e) {}
       };
-      // Auf einer 250px hohen Telefonkarte verdeckt die aufgeklappte Legende
-      // fast alles - dort standardmaessig zu, sofern nichts gemerkt ist.
-      var stored = localStorage.getItem("aisstream_legend_open");
-      setOpen(stored != null ? stored !== "0" : window.innerWidth > 700);
+
+      var stored = localStorage.getItem(storageKey());
+      setOpen(isNarrow() ? stored === "1" : stored !== "0");
+      window.addEventListener("resize", fitToMap);
+      window.addEventListener("orientationchange", fitToMap);
       head.addEventListener("click", function () {
         setOpen(head.getAttribute("aria-expanded") !== "true");
       });
@@ -1586,6 +1613,47 @@
     deg = Number(deg);
     if (deg >= 360) return null;
     return deg.toFixed(1) + "° (" + compass(deg) + ")";
+  }
+
+  /* --- Abfragebox: weiter als die Sicht -------------------------------- */
+
+  // Requests reach this far beyond the visible map. Ships are then already
+  // known when the user pans, instead of appearing minutes later - a Class A
+  // ship only repeats its static data every six minutes, so a fresh
+  // subscription starts blind. The table and the markers keep filtering on
+  // the exact viewport, so the wider box is invisible to the reader.
+  var API_MARGIN_KM = 50;
+  // openwaters' personal token caps the box at 400 square degrees and drops
+  // anything larger without a word (see CLAUDE.md), so the margin is skipped
+  // rather than pushing a request over that line.
+  var MAX_BOX_SQDEG = 400;
+
+  function boxArea(box) {
+    return Math.abs(box.latMax - box.latMin) * Math.abs(box.lonMax - box.lonMin);
+  }
+
+  function expandBox(latMin, lonMin, latMax, lonMax) {
+    var plain = { latMin: latMin, lonMin: lonMin, latMax: latMax, lonMax: lonMax, margin: false };
+    var dLat = API_MARGIN_KM / 111.32;
+    // A degree of longitude shrinks towards the poles; size the margin on the
+    // outermost latitude so it is at least 50 km everywhere inside the box.
+    var worstLat = Math.min(89, Math.max(Math.abs(latMin), Math.abs(latMax)));
+    var dLon = API_MARGIN_KM / (111.32 * Math.max(0.05, Math.cos(worstLat * Math.PI / 180)));
+    var wide = {
+      latMin: Math.max(-90, latMin - dLat),
+      lonMin: Math.max(-180, lonMin - dLon),
+      latMax: Math.min(90, latMax + dLat),
+      lonMax: Math.min(180, lonMax + dLon),
+      margin: true
+    };
+    if (boxArea(wide) > MAX_BOX_SQDEG && boxArea(plain) <= MAX_BOX_SQDEG) return plain;
+    return wide;
+  }
+
+  function boxLabel(box) {
+    return "[" + box.latMin.toFixed(4) + "," + box.lonMin.toFixed(4) + "] - [" +
+      box.latMax.toFixed(4) + "," + box.lonMax.toFixed(4) + "]" +
+      (box.margin ? " (+" + API_MARGIN_KM + " km Rand)" : "");
   }
 
   // Great-circle distance in nautical miles.
@@ -2014,9 +2082,9 @@
       if (entry.marker) {
         entry.marker.setLatLng([lat, lon]);
       } else {
-        entry.marker = L.marker([lat, lon], { icon: shipIcon(entry) }).addTo(map);
+        entry.marker = L.marker([lat, lon], { icon: shipIcon(entry) });
         entry.iconKey = iconKey(entry);
-        entry.markerShown = true;
+        entry.markerShown = false;
         entry.marker.on("click", function () { openDetail(entry.mmsi); });
       }
       refreshMarkerIcon(entry);
@@ -2111,13 +2179,23 @@
     } catch (e) {}
   }
 
+  // Requests cover 50 km beyond the view, so far more ships are in memory
+  // than on screen. Markers outside stay off the map: they would be invisible
+  // anyway, and keeping hundreds of unseen nodes around costs on a phone.
+  // A small pad keeps the ones just past the edge in place so nothing pops in
+  // while panning; the table uses the exact bounds.
+  function markerInView(entry) {
+    if (!mapAvailable) return true;
+    return map.getBounds().pad(0.25).contains([entry.lat, entry.lon]);
+  }
+
   // The map is the other half of the same slice: a filtered-out ship must
   // leave the map, not just the table.
   function applyMapFilter() {
     if (!mapAvailable) return;
     ships.forEach(function (entry) {
       if (!entry.marker) return;
-      var show = passesFilters(entry);
+      var show = passesFilters(entry) && markerInView(entry);
       if (show === entry.markerShown) return;
       entry.markerShown = show;
       if (show) map.addLayer(entry.marker);
@@ -2796,9 +2874,10 @@
       return;
     }
     // Same corner order as the WebSocket subscription: latitude first.
-    var url = base + "?bbox=" + [latMin, lonMin, latMax, lonMax].join(",");
+    var box = expandBox(latMin, lonMin, latMax, lonMax);
+    var url = base + "?bbox=" + [box.latMin, box.lonMin, box.latMax, box.lonMax].join(",");
     snapshotBtn.disabled = true;
-    log("Lade Snapshot aus dem aktuellen Kartenausschnitt…");
+    log("Lade Snapshot: BBox " + boxLabel(box) + "…");
     fetch(url)
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
@@ -2815,7 +2894,8 @@
           if (!mapAvailable || map.getBounds().contains([c[1], c[0]])) inView++;
         });
         refreshVisibleShips();
-        log("Snapshot: " + added + " Schiffe übernommen (" + ships.size + " MMSIs bekannt).");
+        log("Snapshot: " + added + " Schiffe übernommen, " + inView +
+          " davon im Kartenausschnitt (" + ships.size + " MMSIs bekannt).");
         // The table only shows what is inside the map view. If the box was
         // edited by hand the snapshot can land entirely off-screen, so say
         // so rather than leaving an apparently empty result.
@@ -3158,13 +3238,14 @@
     var lonMax = parseFloat(lonMaxInput.value);
     if (!apiKey || [latMin, lonMin, latMax, lonMax].some(isNaN)) return;
 
+    var box = expandBox(latMin, lonMin, latMax, lonMax);
     var messageTypes = selectedMessageTypes();
     var subscription = {
       APIKey: apiKey,
       // Each corner is [Latitude, Longitude] (confirmed against the
       // openwaters.io /v0/stream docs, which mirror aisstream.io's wire
       // format exactly).
-      BoundingBoxes: [[[latMin, lonMin], [latMax, lonMax]]]
+      BoundingBoxes: [[[box.latMin, box.lonMin], [box.latMax, box.lonMax]]]
     };
     if (messageTypes.length > 0) {
       subscription.FilterMessageTypes = messageTypes;
@@ -3173,9 +3254,12 @@
     if (mmsiFilter.length > 0) {
       subscription.FiltersShipMMSI = mmsiFilter;
     }
-    log("Subscription gesendet: BBox [" + latMin.toFixed(4) + "," + lonMin.toFixed(4) + "] - [" +
-      latMax.toFixed(4) + "," + lonMax.toFixed(4) + "]" +
+    log("Subscription gesendet: BBox " + boxLabel(box) +
       (mmsiFilter.length ? ", MMSI-Filter: " + mmsiFilter.join(", ") : ""));
+    if (boxArea(box) > MAX_BOX_SQDEG) {
+      log("Achtung: " + boxArea(box).toFixed(0) + " Quadratgrad - über dem Limit von " +
+        MAX_BOX_SQDEG + ", der Server verwirft solche Subscriptions kommentarlos. Weiter hineinzoomen.");
+    }
     socket.send(JSON.stringify(subscription));
   }
 

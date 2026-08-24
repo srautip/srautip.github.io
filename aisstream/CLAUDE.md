@@ -383,6 +383,38 @@ Fehlertyp wie bei `loadStaticCache()`.
 nicht. Alles, was auf die Konstanten weiter unten zugreift, gehört in den
 Verdrahtungsblock am Ende der IIFE, nicht in den Init oben.
 
+## Abfragebox ist größer als die Sicht
+
+Alle Serveranfragen — WebSocket-Subscription **und** `GET /v1/vessels` —
+gehen mit **50 km Rand** in jede Richtung raus (`API_MARGIN_KM`,
+`expandBox()`). Tabelle und Marker filtern weiterhin auf die *exakte*
+Kartensicht, der Rand ist für den Leser also unsichtbar.
+
+**Warum:** Eine frische Subscription startet blind. Ein Class-A-Schiff
+wiederholt seine Statik nur alle sechs Minuten, und beim Verschieben der
+Karte wären die neu hereinkommenden Schiffe erst nach Minuten benannt. Mit
+Rand liegen sie schon im Speicher. Nachgemessen: Karte nach Norden gezogen →
+die vorher außerhalb liegenden Schiffe stehen **sofort** in der Tabelle,
+**ohne** neue Snapshot-Anfrage.
+
+Details:
+- Längengrade schrumpfen polwärts, deshalb wird der Ost-West-Rand über die
+  **äußerste** Breite des Kastens berechnet — sonst wären es im Norden
+  weniger als 50 km. Gemessen ergibt das 49,9–50,2 km auf allen vier Seiten.
+- **Flächendeckel:** Der openwaters-Token erlaubt 400 Quadratgrad und
+  verwirft größere Subscriptions kommentarlos (siehe oben). `expandBox()`
+  lässt den Rand deshalb weg, wenn er den Kasten über diese Grenze schieben
+  würde, und der Client warnt im Log, wenn schon die reine Sicht darüber
+  liegt.
+- Der Log schreibt die tatsächlich gesendete Box samt „(+50 km Rand)", damit
+  nicht verwirrt, dass die Bbox-Felder etwas anderes zeigen.
+
+**Marker folgen der Sicht, nicht der Abfragebox.** Ohne das lagen bei 20
+sichtbaren Schiffen 610 Marker im DOM — unnötige Last, gerade auf dem
+Telefon. `markerInView()` nimmt sie mit `getBounds().pad(0.25)` von der
+Karte; der kleine Rand verhindert, dass beim Verschieben Marker sichtbar
+aufpoppen. Danach: ~69 statt 610.
+
 ## Filter und Autostart
 
 ### Filter wirken auf Karte **und** Tabelle
@@ -479,8 +511,16 @@ ausgeblendet — die stehen in der Detailansicht.
 - `-webkit-text-size-adjust: 100%`, sonst vergrößert iOS Text im Querformat
 - `map.invalidateSize()` nach `resize` und `orientationchange` (debounced) —
   Leaflet kennt die Höhe einer `vh`-Karte sonst nicht nach dem Drehen
-- Legende startet unter 700 px **zugeklappt**, sofern nichts gemerkt ist:
-  aufgeklappt verdeckt sie fast die ganze 250-px-Karte
+- **Legende auf dem Telefon:** startet zugeklappt und merkt sich das unter
+  einem *eigenen* Schlüssel (`aisstream_legend_open_sm`), damit eine
+  Desktop-Einstellung nicht aufs Telefon durchschlägt.
+  Wichtiger noch: Die Legende ist ein `bottomleft`-Control und **wächst nach
+  oben**. Aufgeklappt war sie 339 px hoch in einer 250-px-Karte — ihr Kopf,
+  der einzige Weg zum Zuklappen, lag damit *über* der Karte und war nicht
+  mehr antippbar. `fitToMap()` setzt beim Öffnen und bei jedem
+  `resize`/`orientationchange` eine `maxHeight` aus der echten Kartenhöhe,
+  der Rumpf scrollt darin. Wer an der Kartenhöhe dreht: diesen Deckel
+  mitprüfen.
 
 ### Zwei CSS-Fallen, beide dieselbe Ursache
 
@@ -518,7 +558,7 @@ Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
 
 | Schlüssel | Inhalt | TTL |
 |---|---|---|
-| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_filters` | Einstellungen & Filterauswahl | unbegrenzt |
+| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_filters` | Einstellungen & Filterauswahl | unbegrenzt |
 | `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss |
 | `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d |
 
@@ -676,6 +716,9 @@ verifiziert:
 - **Angepasst für iPhone und iPad** (siehe eigenen Abschnitt oben): Technik
   hinter einer Schublade, Tabelle als Kartenliste, Safe-Area-Ränder,
   kein Zoom beim Fokus in Eingabefelder
+- **Abfragebox mit 50 km Rand** (siehe eigenen Abschnitt oben): Server
+  liefern mehr als sichtbar ist, Tabelle und Marker filtern exakt auf die
+  Kartensicht — beim Verschieben sind Schiffe sofort da
 - **Filterleiste über Karte und Tabelle** (siehe eigenen Abschnitt oben):
   Schiffstyp und Navigationsstatus als Mehrfachauswahl, beide Ansichten
   zeigen immer dieselbe Auswahl, Zustand wird gemerkt
