@@ -850,8 +850,9 @@
       (Bruttoraumzahl, Reederei, Werft, Baujahr, Foto, echter Schiffstyp) sowie
       &ndash; falls Wikidata kein Foto hat &ndash;
       <a href="https://commons.wikimedia.org" target="_blank" rel="noopener">Wikimedia&nbsp;Commons</a>
-      nach einem Bild mit der IMO im Dateinamen ab &ndash;
-      beide frei und ohne Schlüssel, immer nur für das geöffnete Schiff.
+      über dessen Kategorie zur IMO-Nummer ab. Commons genügt die IMO, das
+      Schiff muss in keinem der beiden Register stehen &ndash;
+      alle drei frei und ohne Schlüssel, immer nur für das geöffnete Schiff.
       Ergebnisse werden lokal zwischengespeichert. Trefferquote in einer
       Stichprobe von 75 Schiffen: Digitraffic 21&nbsp;%, Wikidata 23&nbsp;% &ndash;
       Binnenschiffe und kleine Boote sind praktisch nie erfasst.
@@ -3076,6 +3077,8 @@
   var ENRICH_TTL_HIT = 30 * 24 * 3600 * 1000;
   var ENRICH_TTL_MISS = 3 * 24 * 3600 * 1000;
   var ENRICH_MAX = 400;
+  // 2: IMO auch aus Wikidata, Commons ueber die IMO-Kategorie statt Volltext.
+  var ENRICH_VERSION = 2;
   var ENRICH_GAP_MS = 350;
 
   // Alle Registerabfragen laufen serialisiert durch eine Warteschlange.
@@ -3125,6 +3128,14 @@
       var raw = localStorage.getItem("aisstream_enrich_" + mmsi);
       if (!raw) return null;
       var entry = JSON.parse(raw);
+      // Aendert sich die Abfragekette, sind alte Fehltreffer wertlos: Sie
+      // wurden mit weniger Quellen erzeugt und wuerden das Ergebnis sonst
+      // bis zu 30 Tage lang festhalten. Beim Hochzaehlen von ENRICH_VERSION
+      // fragt der Client betroffene Schiffe neu ab.
+      if (entry.v !== ENRICH_VERSION) {
+        localStorage.removeItem("aisstream_enrich_" + mmsi);
+        return null;
+      }
       var ttl = entry.found ? ENRICH_TTL_HIT : ENRICH_TTL_MISS;
       if (Date.now() - entry.at > ttl) {
         localStorage.removeItem("aisstream_enrich_" + mmsi);
@@ -3138,7 +3149,7 @@
 
   function enrichCacheSet(mmsi, data, found) {
     var key = "aisstream_enrich_" + mmsi;
-    var payload = JSON.stringify({ at: Date.now(), found: found, data: data });
+    var payload = JSON.stringify({ v: ENRICH_VERSION, at: Date.now(), found: found, data: data });
     try {
       localStorage.setItem(key, payload);
       return;
@@ -3161,12 +3172,14 @@
       for (var i = 0; i < localStorage.length; i++) {
         var k = localStorage.key(i);
         if (k.indexOf("aisstream_enrich_") !== 0) continue;
-        var at = 0, found = false;
+        var at = 0, found = false, version = null;
         try {
           var parsed = JSON.parse(localStorage.getItem(k));
           at = parsed.at || 0;
           found = !!parsed.found;
+          version = parsed.v;
         } catch (e) {}
+        if (version !== ENRICH_VERSION) at = 0;
         items.push({ key: k, at: at, ttl: found ? ENRICH_TTL_HIT : ENRICH_TTL_MISS });
       }
     } catch (e) {
@@ -3317,38 +3330,119 @@
     return text.length ? text : null;
   }
 
+  var COMMONS_II = "&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=" + PHOTO_WIDTH;
+
+  function commonsQuery(params) {
+    return fetchWithTimeout(COMMONS_API + "?" + params + "&format=json&origin=*")
+      .then(function (res) {
+        if (!res.ok) throw new Error("Commons HTTP " + res.status);
+        return res.json();
+      });
+  }
+
+  // fetchCommonsPhoto setzt mehrere Abrufe hintereinander ab, steckt selbst
+  // aber schon in einem throttled("commons")-Platz. Ein throttled() darin
+  // wuerde auf den eigenen Platz warten und die Warteschlange dauerhaft
+  // blockieren - der Abstand wird deshalb hier von Hand eingelegt.
+  function afterGap(value) {
+    return new Promise(function (r) {
+      setTimeout(function () { r(value); }, ENRICH_GAP_MS);
+    });
+  }
+
+  function commonsCredit(page) {
+    var info = page.imageinfo[0];
+    var meta = info.extmetadata || {};
+    return {
+      image: info.thumburl || info.url,
+      imageCredit: {
+        artist: stripHtml(meta.Artist && meta.Artist.value),
+        licence: stripHtml(meta.LicenseShortName && meta.LicenseShortName.value),
+        page: page.title
+          ? "https://commons.wikimedia.org/wiki/" + encodeURIComponent(page.title)
+          : null
+      }
+    };
+  }
+
+  function commonsPick(pages, imo) {
+    var files = [];
+    Object.keys(pages || {}).forEach(function (k) {
+      var page = pages[k];
+      if (!page || page.ns !== 6 || !page.imageinfo) return;
+      if (!/\.(jpe?g|png)$/i.test(page.title)) return;
+      files.push(page);
+    });
+    if (!files.length) return null;
+    // Dateien mit der IMO im Namen zuerst, sonst alphabetisch: Die Auswahl
+    // muss ueber Sitzungen hinweg dieselbe bleiben, sonst zeigt dasselbe
+    // Schiff bei jedem Abruf ein anderes Bild.
+    files.sort(function (a, b) {
+      var ai = a.title.indexOf(String(imo)) !== -1 ? 0 : 1;
+      var bi = b.title.indexOf(String(imo)) !== -1 ? 0 : 1;
+      if (ai !== bi) return ai - bi;
+      return a.title < b.title ? -1 : 1;
+    });
+    return commonsCredit(files[0]);
+  }
+
+  function commonsFirstSubcat(pages) {
+    var sub = null;
+    Object.keys(pages || {}).forEach(function (k) {
+      if (!sub && pages[k] && pages[k].ns === 14) sub = pages[k].title;
+    });
+    return sub;
+  }
+
+  // Commons pflegt fuer Schiffe eine Kategorie je IMO-Nummer. Sie enthaelt
+  // meist keine Dateien direkt, sondern die Namenskategorie des Schiffs -
+  // daher zwei Schritte. Das ist kuratiert statt geraten und schlaegt die
+  // Volltextsuche deutlich: In einer Stichprobe von 25 Schiffen fand die
+  // Kategorie zu 24, die Volltextsuche nur zu 6; 18 waren ausschliesslich
+  // ueber die Kategorie erreichbar.
+  function commonsByCategory(imo) {
+    return commonsQuery("action=query&generator=categorymembers&gcmtitle=" +
+      encodeURIComponent("Category:IMO " + imo) + "&gcmtype=file|subcat&gcmlimit=20" + COMMONS_II
+    ).then(function (json) {
+      var pages = json && json.query && json.query.pages;
+      var hit = commonsPick(pages, imo);
+      if (hit) return hit;
+      var sub = commonsFirstSubcat(pages);
+      if (!sub) return null;
+      return afterGap().then(function () {
+        return commonsQuery("action=query&generator=categorymembers&gcmtitle=" +
+          encodeURIComponent(sub) + "&gcmtype=file&gcmlimit=20" + COMMONS_II);
+      }).then(function (json2) {
+        return commonsPick(json2 && json2.query && json2.query.pages, imo);
+      });
+    });
+  }
+
+  // Rueckfall: Volltextsuche. Hier bleibt die strenge Titelregel noetig - ohne
+  // sie lieferte die Suche schon "Aftermath of Severn Bore wave" als Foto
+  // eines Schiffs, weil im Beschreibungstext "IMO" und die Zahl vorkamen.
+  function commonsBySearch(imo) {
+    return commonsQuery("action=query&generator=search&gsrsearch=" +
+      encodeURIComponent("IMO " + imo) + "&gsrnamespace=6&gsrlimit=10" + COMMONS_II
+    ).then(function (json) {
+      var pages = json && json.query && json.query.pages;
+      var strict = {};
+      Object.keys(pages || {}).forEach(function (k) {
+        if (pages[k].title && pages[k].title.indexOf(String(imo)) !== -1) strict[k] = pages[k];
+      });
+      return commonsPick(strict, imo);
+    });
+  }
+
   function fetchCommonsPhoto(imo) {
     if (!imo) return Promise.resolve(null);
-    var url = COMMONS_API + "?action=query&generator=search" +
-      "&gsrsearch=" + encodeURIComponent("IMO " + imo) +
-      "&gsrnamespace=6&gsrlimit=10" +
-      "&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=" + PHOTO_WIDTH +
-      "&format=json&origin=*";
-    return fetchWithTimeout(url).then(function (res) {
-      if (!res.ok) throw new Error("Commons HTTP " + res.status);
-      return res.json();
-    }).then(function (json) {
-      var pages = json && json.query && json.query.pages;
-      if (!pages) return null;
-      var hit = null;
-      Object.keys(pages).forEach(function (k) {
-        var page = pages[k];
-        if (hit || !page.imageinfo || !/\.(jpe?g|png)$/i.test(page.title)) return;
-        if (page.title.indexOf(String(imo)) === -1) return;
-        hit = page;
+    return commonsByCategory(imo).catch(function () { return null; })
+      .then(function (hit) {
+        if (hit) return hit;
+        return afterGap()
+          .then(function () { return commonsBySearch(imo); })
+          .catch(function () { return null; });
       });
-      if (!hit) return null;
-      var info = hit.imageinfo[0];
-      var meta = info.extmetadata || {};
-      return {
-        image: info.thumburl || info.url,
-        imageCredit: {
-          artist: stripHtml(meta.Artist && meta.Artist.value),
-          licence: stripHtml(meta.LicenseShortName && meta.LicenseShortName.value),
-          page: hit.title ? "https://commons.wikimedia.org/wiki/" + encodeURIComponent(hit.title) : null
-        }
-      };
-    });
   }
 
   function wikidataByMmsi(mmsi) {
@@ -3448,8 +3542,12 @@
     }).then(function (res) {
       var dt = res.dt;
       var wd = res.wd;
-      var imo = res.imo;
-      if (!dt && !wd) return null;
+      // Auch Wikidata kennt die IMO-Nummer (P458), und oft ist sie von dort
+      // die einzige: Digitraffic deckt vor allem die Ostsee ab, und die
+      // AIS-Statiknachricht mit der IMO kommt nur alle paar Minuten. Fehlte
+      // sie hier, blieb das Foto aus, obwohl Commons welche hat - genau der
+      // Fall MAERSK VIRGINIA.
+      var imo = res.imo || (wd && wd.imo) || null;
       // Kept in separate buckets on purpose: both sources have a "beam",
       // and Digitraffic's live AIS beam is not Wikidata's registry beam.
       // Flattening them made the registry panel mix the two silently.
@@ -3463,7 +3561,11 @@
       }
       // Nur ergaenzend: Wikidatas eigenes Foto hat Vorrang, es ist dem
       // Schiff eindeutig zugeordnet statt ueber eine Textsuche gefunden.
-      if (merged.image || !imo) return merged;
+      if (merged.image || !imo) return merged.sources.length ? merged : null;
+      // Commons ist eine eigenstaendige Quelle und braucht nur die IMO. Hier
+      // stand frueher ein Ausstieg, sobald weder Digitraffic noch Wikidata
+      // etwas hatten - damit blieb ein Schiff, das in keinem der beiden
+      // Register steht, ohne Bild, auch wenn Commons Fotos davon fuehrt.
       return throttled("commons", function () {
         return fetchCommonsPhoto(imo).catch(function () { return null; });
       }).then(function (photo) {
@@ -3472,7 +3574,7 @@
           merged.imageCredit = photo.imageCredit;
           merged.sources.push("Commons");
         }
-        return merged;
+        return merged.sources.length ? merged : null;
       });
     }).then(function (data) {
       applyEnrichment(entry, data);

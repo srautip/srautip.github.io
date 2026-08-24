@@ -782,6 +782,67 @@ aus `extmetadata` und werden unter dem Bild ausgewiesen, dazu ein Link auf die
 Dateiseite. Ohne das wäre die Einbindung nicht lizenzkonform — beim Ergänzen
 weiterer Bildquellen bitte genauso halten.
 
+### MAERSK VIRGINIA hatte kein Bild — zwei Löcher in der Kette
+
+Gemeldeter Fall: Zu einem Schiff, von dem Commons **drei** Fotos führt, zeigte
+der Client keines. Nachgestellt in `scratchpad/mvtest.js`, Wikidata-Antwort
+gestellt, Commons echt.
+
+Wikidata kennt das Schiff (Q52351254, MMSI 477195100, IMO 9235531), hat aber
+**kein P18**. Zwei unabhängige Fehler verhinderten trotzdem den Commons-Griff:
+
+1. **Die IMO kam nie aus Wikidata.** Der Bezugswert stand als
+   `(dt && dt.imo) || entry.imo` fest, *bevor* das Wikidata-Ergebnis vorlag —
+   und ohne IMO wird Commons übersprungen. Digitraffic deckt vor allem die
+   Ostsee ab, und die AIS-Statiknachricht mit der IMO kommt nur alle paar
+   Minuten: Ob ein Foto erschien, hing damit daran, ob zufällig schon eine
+   Msg 5 eingetroffen war. Im Test: ohne Msg 5 kein Bild, mit Msg 5 Bild.
+2. **`if (!dt && !wd) return null;`** brach ab, sobald beide Register leer
+   waren — Commons braucht aber nur die IMO. Ein Schiff, das in keinem der
+   beiden Register steht, blieb ohne Bild, obwohl Commons Fotos davon hat.
+
+Beides behoben: Die IMO wird auch aus `wd.imo` genommen, und der Abbruch fiel
+weg (`merged.sources.length ? merged : null` am Ende). Commons ist damit eine
+**eigenständige dritte Quelle**, kein Anhängsel der beiden Register.
+
+### Commons: Kategorie zur IMO statt Volltextsuche
+
+Commons pflegt für Schiffe `Category:IMO <nummer>`. Sie enthält meist keine
+Dateien direkt, sondern die **Namenskategorie** des Schiffs — daher zwei
+Schritte. Das ist kuratiert statt geraten, und der Unterschied ist groß.
+Gemessen an 25 Schiffen mit IMO aus Wikidata (`scratchpad/commonsroutes.js`):
+
+| Weg | findet ein Foto |
+|---|---|
+| Volltextsuche `IMO <nr>` + strenge Titelregel | 6 von 25 |
+| Kategorie `IMO <nr>` → Unterkategorie | **24 von 25** |
+| davon nur über die Kategorie erreichbar | 18 |
+
+Die Volltextsuche bleibt als Rückfall, **mit** der strengen Titelregel — ohne
+sie lieferte sie „Aftermath of Severn Bore wave" als Schiffsfoto, weil im
+Beschreibungstext „IMO" und die Zahl vorkamen. Innerhalb der Kategorie ist die
+Regel unnötig: Wer dort einsortiert ist, gehört zum Schiff. Genau deshalb
+kommen jetzt auch die sechs „Maersk Virginia, Fremantle, 2015"-Aufnahmen in
+Frage, die die Titelregel verworfen hätte.
+
+**Auswahl stabil halten:** Aus der Kategorie kommen bis zu 20 Dateien. Sortiert
+wird IMO-im-Namen zuerst, sonst alphabetisch — sonst zeigt dasselbe Schiff bei
+jedem Abruf ein anderes Bild.
+
+**Falle:** `fetchCommonsPhoto()` setzt bis zu drei Abrufe hintereinander ab,
+läuft aber selbst schon in einem `throttled("commons")`-Platz. Ein `throttled()`
+darin würde auf den eigenen Platz warten und die Warteschlange **dauerhaft**
+blockieren — kein Timeout greift, weil die Anfrage nie startet. Der Abstand
+zwischen den Teilabrufen wird deshalb von Hand eingelegt (`afterGap()`).
+
+### Cache-Version: alte Fehltreffer festhalten wäre schlimmer als kein Cache
+
+Der Anreicherungs-Cache hält Fehlschläge 3 Tage, Treffer 30. Ändert sich die
+Abfragekette, sind die alten Einträge mit weniger Quellen entstanden und würden
+das schlechtere Ergebnis genau so lange konservieren — der Nutzer sieht den Fix
+nicht. Jeder Eintrag trägt deshalb `v: ENRICH_VERSION`; passt sie nicht, wird
+er beim Lesen verworfen und neu abgefragt. **Beim Ändern der Kette hochzählen.**
+
 ### Hängende Abfrage blockierte die ganze Warteschlange
 
 Beim Testen der Commons-Anbindung fiel auf: Alle Registerabfragen laufen
