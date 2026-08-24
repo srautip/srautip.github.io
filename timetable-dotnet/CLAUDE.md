@@ -31,6 +31,18 @@ pauschal die volle Suite zu fahren:
   `dotnet run --project SchoolTestRunner -- run --all` - nur der echte
   Lauf belegt, dass die committeten Beispiel-Outputs unveraendert bleiben.
 
+- **Aenderungen an einem Fenster unter `TimetableGui/Masken/`**: die
+  Suite prueft ViewModels und laeuft sonst headless - ein
+  `StaticResource`-Schluessel, den es nicht gibt, oder ein
+  `FindResource` im Code-Behind knallt deshalb erst beim FENSTERAUFBAU
+  und ist kein Compilerfehler. `Fensterprobe.vb` haelt das Werkzeug bereit:
+  eigener STA-Thread, `Application.InitializeComponent` einmal, Fenster
+  bauen, Ausnahme an den Test zurueckreichen (`RegelnFensterTests`,
+  `ProjektAssistentFensterTests` nutzen es). Wer ein neues Fenster
+  anlegt, haengt dort eine Aufbau-Pruefung an, statt sich auf einen
+  manuellen Start zu verlassen. (Live belegt: `schrift-mono` stand in
+  der Vorlage, aber nicht in `Tokens.xaml`.)
+
 - **Aenderungen an `TimetableWorkflow/Templates/design-tokens.css` oder
   `design-basis.css`** (Designsystem-Quellen, arc42 8.16): beide Dateien
   werden NICHT zur Laufzeit injiziert - die zwei Viewer-Vorlagen und
@@ -138,6 +150,8 @@ Faelle - und ausgerechnet der gefaehrlichste bleibt still.
 | `Region(...)`-Funktion, lokal `Dim region = Region(...)` | - | `BC30980` |
 | Helfer `Schule(name)` neben Parameter `schule`; `Schule(schule)` | indiziert den STRING statt die Funktion zu rufen | `BC30311: Value of type 'Char' cannot be converted to 'Projekt'` |
 | `Melde(SolveProgress)` in einer Klasse mit geerbtem `Melde(name)` | Ueberladung kollidiert mit der Basis | Fehler beim Ueberschreiben |
+| `x:Name="Matrix"` im XAML, dazu `Private _matrix` im Code-Behind | WPF erzeugt `_Matrix` - fuer VB derselbe Bezeichner | `BC30260: '_matrix' is already declared` |
+| `“` (U+201C) in einem VB-String, z.B. `"“Pruefen"` | VB akzeptiert die typografischen Anfuehrungszeichen ALS STRINGBEGRENZER - der String endet dort | Folgefehler an ganz anderer Stelle |
 
 Die erste Zeile ist der Punkt: **ein Test hat sie gefunden, nicht der
 Compiler.** Wer eine Eigenschaft im Konstruktor setzt, prueft ihren

@@ -65,6 +65,12 @@
     <FontFamily x:Key="schrift-symbole">Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol</FontFamily>
     <FontFamily x:Key="schrift-stapel">Segoe UI, Tahoma, sans-serif</FontFamily>
 
+    <!-- Dicktengleiche Schrift fuer YAML- und JSON-Ansichten. Kein
+         Kanon-Eintrag: der Web-Stapel beginnt mit ui-monospace, das
+         WPF nicht kennt - hier gilt dieselbe Begruendung wie beim
+         Schriftstapel oben. -->
+    <FontFamily x:Key="schrift-mono">Consolas, Cascadia Mono, Courier New, monospace</FontFamily>
+
     <sys:Double x:Key="grad-titel">20</sys:Double>
     <sys:Double x:Key="grad-kopf">15</sys:Double>
     <sys:Double x:Key="grad-basis">13</sys:Double>

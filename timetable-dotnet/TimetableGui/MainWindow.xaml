@@ -40,6 +40,7 @@
             <MenuItem Header="_Extras">
                 <MenuItem Header="Stammdaten…" Click="AufStammdaten" />
                 <MenuItem Header="Klassenbildung: Eingaben…" Click="AufKlassenbildungEingaben" />
+                <MenuItem Header="Regeln…" Click="AufRegeln" />
             <Separator />
             <MenuItem Header="Browserdaten bereinigen" Click="AufBrowserdatenBereinigen" />
             </MenuItem>

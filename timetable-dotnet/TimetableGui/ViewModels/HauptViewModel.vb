@@ -48,6 +48,11 @@ Public Interface IDialoge
     ''' <summary>`bestaetigen` verlangt eine zweite Eingabe (beim Anlegen).
     ''' Nothing bei Abbruch.</summary>
     Function PasswortAbfragen(titel As String, bestaetigen As Boolean) As String
+    ''' <summary>Fuehrt durch den Projekt-Assistenten (6.1) und liefert
+    ''' den Entwurf, oder Nothing bei Abbruch. Der Assistent ist ein
+    ''' Fenster und gehoert deshalb zu den uebrigen Dialogen - das
+    ''' HauptViewModel soll auch weiterhin ohne WPF laufen.</summary>
+    Function ProjektAssistent() As ProjektEntwurf
     Sub Hinweis(titel As String, text As String)
     Function Frage(titel As String, text As String) As Boolean
 End Interface
@@ -277,18 +282,31 @@ Public NotInheritable Class HauptViewModel
     ' Projekt
     ' ---------------------------------------------------------------
 
+    ''' <summary>"Datei -> Neues Projekt" ist seit Stufe F5 der
+    ''' ASSISTENT (6.1), nicht mehr die leere Datei. Begruendung steht
+    ''' im Konzept: "der Nutzer sieht in Minuten ein erstes Ergebnis".
+    ''' Ein leeres Projekt waere formal richtig und praktisch nutzlos -
+    ''' vor dem ersten Rechnen laegen dann acht Masken.</summary>
     Public Sub Neu()
-        Dim passwort = _dialoge.PasswortAbfragen("Passwort fuer das neue Projekt", bestaetigen:=True)
-        If passwort Is Nothing Then Return
-        Dim pfad = _dialoge.ProjektdateiSpeichernUnter("Neues Projekt.splanx")
-        If pfad Is Nothing Then Return
+        Dim entwurf = _dialoge.ProjektAssistent()
+        If entwurf Is Nothing Then Return
 
         Dim p As New Projekt()
+        p.Manifest.SchulName = entwurf.Bestand.SchulName
+        p.Manifest.Schuljahr = entwurf.Schuljahr
         p.Manifest.Angelegt = _jetzt()
         p.Manifest.Geaendert = _jetzt()
-        Uebernehme(p, pfad, passwort)
-        SpeichereAuf(pfad)
-        Meldung = "Neues Projekt angelegt."
+        p.Bestand = entwurf.Bestand
+        ' Woher der Startbestand stammt, gehoert ins Protokoll: spaeter
+        ' ist einer generierten Schule nicht mehr anzusehen, dass ihre
+        ' Zahlen aus einem Template kommen und nicht aus dem Sekretariat.
+        p.Protokolliere(Umgebung.Benutzer, "assistent",
+                        "Projekt per Assistent erzeugt: " & String.Join(" | ", entwurf.Bericht),
+                        _jetzt())
+
+        Uebernehme(p, entwurf.Pfad, entwurf.Passwort)
+        SpeichereAuf(entwurf.Pfad)
+        Meldung = $"Neues Projekt angelegt: {p.Bestand.Klassen.Count} Klassen, {p.Bestand.Lehrkraefte.Count} Lehrkraefte."
     End Sub
 
     Public Sub Oeffnen()

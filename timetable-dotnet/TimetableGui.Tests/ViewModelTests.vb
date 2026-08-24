@@ -40,6 +40,25 @@ Friend NotInheritable Class TestDialoge
         Return Passwort
     End Function
 
+    ''' <summary>Was der Projekt-Assistent (6.1) liefern soll. Vorgabe
+    ''' ist ein LEERES Projekt am `SpeichernPfad` - genau das, was
+    ''' "Neues Projekt" vor Stufe F5 erzeugte. Tests, die den Assistenten
+    ''' selbst meinen, setzen `AssistentEntwurf`; `AssistentBricht`
+    ''' probt den Abbruch.</summary>
+    Public Property AssistentEntwurf As ProjektEntwurf
+    Public Property AssistentBricht As Boolean
+    Public ReadOnly Property AssistentGefragt As Integer
+
+    Public Function ProjektAssistent() As ProjektEntwurf Implements IDialoge.ProjektAssistent
+        _AssistentGefragt += 1
+        If AssistentBricht Then Return Nothing
+        If AssistentEntwurf IsNot Nothing Then Return AssistentEntwurf
+        If SpeichernPfad Is Nothing Then Return Nothing
+        Return New ProjektEntwurf With {
+            .Bestand = New TimetableCore.Stammdatenbestand(),
+            .Pfad = SpeichernPfad, .Passwort = Passwort}
+    End Function
+
     Public Sub Hinweis(titel As String, text As String) Implements IDialoge.Hinweis
         Hinweise.Add($"{titel}: {text}")
     End Sub

@@ -40,7 +40,7 @@ Class MainWindow
             Return
         End If
         If _modell.Bereich = Bereich.Regeln Then
-            KlassenbildungEingabenOeffnen()
+            RegelnOeffnen()
             _modell.Bereich = Bereich.Start
             Return
         End If
@@ -86,6 +86,25 @@ Class MainWindow
         Dim f As New KlassenbildungFenster(_modell.Projekt, New WpfDialoge(Me)) With {.Owner = Me}
         AddHandler f.Geaendert, Sub() _modell.Geaendert = True
         f.ShowDialog()
+    End Sub
+
+    ''' <summary>Die Regelverwaltung (6.10). Sie sitzt auf dem
+    ''' Seitenleisten-Eintrag "Regeln"; die Eingaben der Klassenbildung,
+    ''' die dort zwischenzeitlich lagen, bleiben ueber Extras erreichbar -
+    ''' sie sind Stammdaten eines anderen Laufs, keine Regeln.</summary>
+    Private Sub RegelnOeffnen()
+        If Not _modell.ProjektOffen Then
+            MessageBox.Show(Me, "Erst ein Projekt anlegen, öffnen oder eine Schule übernehmen.",
+                            "Regeln", MessageBoxButton.OK, MessageBoxImage.Information)
+            Return
+        End If
+        Dim f As New RegelnFenster(_modell.Projekt, New WpfDialoge(Me)) With {.Owner = Me}
+        AddHandler f.Geaendert, Sub() _modell.Geaendert = True
+        f.ShowDialog()
+    End Sub
+
+    Private Sub AufRegeln(sender As Object, e As RoutedEventArgs)
+        RegelnOeffnen()
     End Sub
 
     Private Sub AufStammdaten(sender As Object, e As RoutedEventArgs)
@@ -165,6 +184,12 @@ Friend NotInheritable Class WpfDialoge
     Public Function PasswortAbfragen(titel As String, bestaetigen As Boolean) As String Implements IDialoge.PasswortAbfragen
         Dim d As New PasswortFenster(titel, bestaetigen) With {.Owner = _besitzer}
         If d.ShowDialog() = True Then Return d.Passwort
+        Return Nothing
+    End Function
+
+    Public Function ProjektAssistent() As ProjektEntwurf Implements IDialoge.ProjektAssistent
+        Dim d As New ProjektAssistent(Me) With {.Owner = _besitzer}
+        If d.ShowDialog() = True Then Return d.Entwurf
         Return Nothing
     End Function
 

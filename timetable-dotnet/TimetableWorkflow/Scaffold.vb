@@ -21,6 +21,50 @@ Public Module Scaffold
     ''' 1).</summary>
     Public Sub Run(testsRoot As String, schule As String, bundesland As String, schulart As String,
                     klassenstufenAnzahl As Integer, lehrerAnzahl As Integer, Optional zuege As Integer = 2)
+        Dim inputDir = IO.Path.Combine(testsRoot, schule, "input")
+        If IO.Directory.Exists(inputDir) Then
+            Throw New InvalidOperationException(
+                $"'{inputDir}' existiert bereits - kein Ueberschreiben eines vorhandenen Testfalls. " &
+                "Loesche das Verzeichnis von Hand, falls ein Neuaufbau gewuenscht ist.")
+        End If
+
+        Dim b = Baue(bundesland, schulart, klassenstufenAnzahl, lehrerAnzahl, zuege,
+                     $"{schule} (per CLI generiert)")
+
+        IO.Directory.CreateDirectory(inputDir)
+        YamlStammdaten.SaveStammdatenYaml(b, IO.Path.Combine(inputDir, "stammdaten.yaml"))
+        IO.File.WriteAllText(IO.Path.Combine(inputDir, "constraints.yaml"), LeereConstraints())
+
+        Console.WriteLine($"Erzeugt: {inputDir}/stammdaten.yaml ({b.Klassen.Count} Klassen, {b.Lehrkraefte.Count} Lehrkraefte, {b.Faecher.Count} Faecher)")
+        Console.WriteLine($"Erzeugt: {inputDir}/constraints.yaml (leer, mit Beispiel-Kommentar)")
+    End Sub
+
+    ''' <summary>Der kommentierte Rumpf einer leeren constraints.yaml.
+    ''' Eigene Funktion, seit der Projekt-Assistent (gui-ui-konzept 6.1)
+    ''' denselben Text braucht - ein zweiter Wortlaut waere eine zweite
+    ''' Wahrheit.</summary>
+    Public Function LeereConstraints() As String
+        Return "# Zusaetzliche, handverfasste Regeln der 2. Solver-Stufe (siehe tests/README.md)." & vbLf &
+            "# Nur Typen, die die Stammdaten NICHT bereits abdecken - z.B. teacher_availability," & vbLf &
+            "# forbidden_slot, room_requirement. Oberste Ebene ist eine YAML-Liste, ein Mapping" & vbLf &
+            "# pro Constraint. Beispiel (auskommentiert):" & vbLf &
+            "#" & vbLf &
+            "# - type: room_requirement" & vbLf &
+            "#   class: 1a" & vbLf &
+            "#   subject: Sport" & vbLf &
+            "#   allowed_rooms: [Turnhalle1, Turnhalle2]" & vbLf
+    End Function
+
+    ''' <summary>Derselbe Bestand, den `Run` in eine Datei schreibt - nur
+    ''' im Speicher und ohne Dateisystem. Der Projekt-Assistent der
+    ''' Oberflaeche (6.1) haengt HIER an statt eine eigene Erzeugung
+    ''' mitzubringen: sonst haetten CLI und GUI zwei Vorstellungen davon,
+    ''' wie eine frische Schule aussieht - und die eine wuerde still von
+    ''' der anderen abweichen.</summary>
+    Public Function Baue(bundesland As String, schulart As String,
+                         klassenstufenAnzahl As Integer, lehrerAnzahl As Integer,
+                         Optional zuege As Integer = 2,
+                         Optional schulName As String = Nothing) As Stammdatenbestand
         Dim template = Templates.TemplateFuer(bundesland, schulart)
 
         If klassenstufenAnzahl < 1 OrElse klassenstufenAnzahl > template.Klassenstufen.Count Then
@@ -36,18 +80,11 @@ Public Module Scaffold
                 "sonst bliebe mindestens ein Kernfach ganz ohne qualifizierte Lehrkraft.")
         End If
 
-        Dim inputDir = IO.Path.Combine(testsRoot, schule, "input")
-        If IO.Directory.Exists(inputDir) Then
-            Throw New InvalidOperationException(
-                $"'{inputDir}' existiert bereits - kein Ueberschreiben eines vorhandenen Testfalls. " &
-                "Loesche das Verzeichnis von Hand, falls ein Neuaufbau gewuenscht ist.")
-        End If
-
         Dim gewaehlt = template.Klassenstufen.Take(klassenstufenAnzahl).ToList()
         Dim zuegeBuchstaben = Enumerable.Range(0, zuege).Select(Function(i) Chr(Asc("a"c) + i)).ToList()
 
         Dim b As New Stammdatenbestand With {
-            .SchulName = $"{schule} (per CLI generiert)",
+            .SchulName = If(schulName, "Neue Schule"),
             .Bundesland = bundesland, .Schulart = schulart,
             .Tage = New List(Of String) From {"Mo", "Di", "Mi", "Do", "Fr"},
             .PeriodsPerDay = template.PeriodsPerDay
@@ -114,22 +151,8 @@ Public Module Scaffold
                 "Generiertes Grundgeruest ist ungueltig (interner Fehler in Scaffold.vb/Templates.vb):" & vbLf & String.Join(vbLf, errors))
         End If
 
-        IO.Directory.CreateDirectory(inputDir)
-        YamlStammdaten.SaveStammdatenYaml(b, IO.Path.Combine(inputDir, "stammdaten.yaml"))
-        IO.File.WriteAllText(IO.Path.Combine(inputDir, "constraints.yaml"),
-            "# Zusaetzliche, handverfasste Regeln der 2. Solver-Stufe (siehe tests/README.md)." & vbLf &
-            "# Nur Typen, die die Stammdaten NICHT bereits abdecken - z.B. teacher_availability," & vbLf &
-            "# forbidden_slot, room_requirement. Oberste Ebene ist eine YAML-Liste, ein Mapping" & vbLf &
-            "# pro Constraint. Beispiel (auskommentiert):" & vbLf &
-            "#" & vbLf &
-            "# - type: room_requirement" & vbLf &
-            "#   class: 1a" & vbLf &
-            "#   subject: Sport" & vbLf &
-            "#   allowed_rooms: [Turnhalle1, Turnhalle2]" & vbLf)
-
-        Console.WriteLine($"Erzeugt: {inputDir}/stammdaten.yaml ({b.Klassen.Count} Klassen, {b.Lehrkraefte.Count} Lehrkraefte, {b.Faecher.Count} Faecher)")
-        Console.WriteLine($"Erzeugt: {inputDir}/constraints.yaml (leer, mit Beispiel-Kommentar)")
-    End Sub
+        Return b
+    End Function
 
     ''' <summary>Gesamter Wochenstunden-Bedarf der Faecher eines Pools ueber
     ''' alle bereits in `b.Klassen`/`b.Faecher` gebauten Klassen - dieselbe

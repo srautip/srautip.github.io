@@ -300,6 +300,53 @@ schreibt und danach die passende `Validate*`-API grün sieht;
 Kaskaden-Umbenennung und Lösch-Konsequenzen als eigene Tests gegen ein
 Beispielprojekt.
 
+**Nachtrag zu F5 (Projekt-Assistent).** Der Assistent nutzt die
+Scaffold-Logik als Motor, wie geplant – aber sie schrieb bisher nur Dateien.
+Deshalb ist `Scaffold.Run` in `Run` (Datei) und **`Scaffold.Baue`** (Bestand im
+Speicher) geteilt; CLI und Assistent haben damit weiterhin GENAU EINE
+Vorstellung davon, wie eine frische Schule aussieht. Belegt ist das durch
+einen Vorher/Nachher-Vergleich der `new`-Ausgabe: byteweise identisch.
+
+Zwei Dinge sind größer ausgefallen als der Konzepttext vermuten lässt:
+
+- Die **Gruppen-Vorlage** „Religion ev/kath/Ethik“ teilt nicht Kinder auf ein
+  Fach auf, sondern **spaltet das Fach selbst**. Ein Parallelverbund verlangt
+  paarweise verschiedene Fächer – genau deshalb heißen die Fächer im
+  GMS-Beispiel `Religion-ev`, `Religion-kath`, `Ethik` und nicht dreimal
+  „Religion“. `GruppenVorlagen.Anwenden` erledigt darum vier Dinge auf einmal:
+  Fach spalten, Qualifikationen mitnehmen, Gruppen mit Verbund anlegen,
+  Kinder verteilen. Wer nur eines davon täte, hinterließe einen Bestand, den
+  `ValidateStammdaten` zu Recht ablehnt.
+- Nach der Aufspaltung tragen **Gruppen** den Bedarf, nicht mehr die Klassen:
+  drei parallele Gruppen je Stufe statt zwei Klassen. Der Assistent bemisst
+  die Lehrkräfte deshalb nach – sonst hätte der Nutzer ein Projekt, das
+  der Solver als infeasible zurückgibt, ohne dass er wüsste, warum.
+
+**Datei → Neues Projekt** legt seither kein leeres Projekt mehr an. Ein leeres
+wäre formal richtig und praktisch nutzlos: vor dem ersten Rechnen lägen dann
+acht Masken. Die Herkunft des Startbestands landet im Audit-Log – einer
+generierten Schule sieht man später nicht mehr an, dass ihre Zahlen aus einem
+Template stammen und nicht aus dem Sekretariat.
+
+**Nachtrag zu F3 (Regeln).** Zwei Entscheidungen, die beim Umsetzen fielen:
+
+- Der Seitenleisten-Eintrag *Regeln* zeigte seit F4 auf die
+  Klassenbildungs-Eingaben. Er zeigt jetzt auf die Regelverwaltung; die
+  Klassenbildungs-Eingaben bleiben über *Extras* erreichbar. Sie sind
+  Stammdaten eines anderen Laufs, keine Regeln – beide um denselben
+  Platz konkurrieren zu lassen war ein Schnittfehler.
+- Der Grundsatz „Tests über das ViewModel, nicht über XAML" bekommt hier
+  eine **begründete Ausnahme**. Die acht Masken werden zur Laufzeit aus
+  `Regeltypen.vb` GEBAUT. Damit wandert eine Fehlerklasse ins Fenster, die
+  das ViewModel gar nicht sehen kann: ein `StaticResource`-Schlüssel, den
+  es nicht gibt, oder eine Feldart, für die der Erbauer kein
+  Steuerelement kennt. Beides ist kein Compilerfehler. `RegelnFensterTests`
+  baut deshalb auf einem eigenen STA-Thread das Fenster samt aller acht
+  Masken auf und legt einmal eine Regel über die Steuerelemente an. Das
+  Testprojekt bleibt für alles übrige headless – nur dieser eine Thread
+  kennt WPF. (Live belegt: `schrift-mono` stand in der Vorlage, aber nicht
+  in `Tokens.xaml`; kein anderer Test hätte das gefunden.)
+
 ---
 
 ## Stufe G — Stundenplan-Dashboard, Im-/Export, Startseite, Freigabe
