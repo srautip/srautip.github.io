@@ -256,13 +256,90 @@ Drei Dinge, die Zeit gekostet haben:
   Rufzeichen. `plausibleCallSign()` verwirft das; mit Müll anreichern ist
   schlechter als das Feld leer zu lassen
 
+## Kartenmarker: Farbe = Typ, Durchmesser = Länge
+
+Die Palette ist **errechnet, nicht ausgesucht** — mit dem Validator der
+dataviz-Skill über den OKLCH-Farbtonkreis gesucht.
+
+**Warum nicht die Referenzpalette:** Marker auf einer Karte sind eine
+*All-Pairs*-Form — alle Farben liegen gleichzeitig nebeneinander, „benachbart"
+gibt es nicht. Unter `--pairs all` fällt die 8er-Referenzordnung durch
+(schlechtestes Paar CVD ΔE 3,2) und ist dort auf drei Slots gedeckelt. Eine
+eigene Suche über den Farbtonkreis liefert **sechs** Farben, die das *strenge*
+Gate halten.
+
+| Kategorie | Hex | ITU-Typcode |
+|---|---|---|
+| Frachtschiff | `#2a78d6` | 70–79 |
+| Tanker | `#ab2000` | 80–89 |
+| Passagierschiff | `#77a400` | 60–69 |
+| Fischerei | `#007a61` | 30 |
+| Schlepper & Arbeitsschiffe | `#8c2c95` | 31–35, 50–59 |
+| Sport & Segel | `#ca7197` | 36, 37 |
+| Sonstige / unbekannt | `#6b6b68` | Rest — neutral, kein Slot |
+
+Gemessen gegen **beide** dominanten Kachelfarben (Land `#f2efe9`, Wasser
+`#aad3df`): schlechtestes Paar CVD ΔE 8,8 · normal ΔE 19,0 — alle Prüfungen
+bestanden. **Sechs ist das gemessene Maximum**, eine siebte Farbe hält die
+Schwellen nicht mehr. Wer Kategorien ergänzen will, muss also eine andere
+zusammenlegen — nicht einfach eine Farbe dazuerfinden.
+
+Der Kontrast-WARN (zwei bzw. drei Farben unter 3:1 gegen die Kacheln) ist
+durch „relief" gedeckt: Der Typ steht im Klartext in der Tabelle und im Popup,
+und jeder Marker trägt einen weißen Ring, der ihn von der Kachel und von
+überlappenden Markern trennt.
+
+**Größe** über die Länge über alles, Quelle in dieser Reihenfolge: Inland-ERI,
+`Dimension` A+B, Digitraffic, Wikidata.
+
+| Stufe | Länge | Durchmesser |
+|---|---|---|
+| S | < 50 m | 8 px |
+| M | 50–100 m | 11 px |
+| L | 100–200 m | 15 px |
+| XL | ≥ 200 m | 20 px |
+| ? | unbekannt | 8 px, **hohl** |
+
+Die hohle Darstellung ist wichtig: Ein Schiff ohne Maßangabe darf nicht wie
+ein kleines Boot aussehen. Im Livebetrieb ist das der Normalfall — bis die
+erste `ShipStaticData` eintrifft (Class A alle sechs Minuten) sind alle
+Schiffe grau und hohl. Genau dafür gibt es den Statik-Cache.
+
+**Form** trennt die Entitätsklassen, ohne eine Farbe zu verbrauchen: Kreis =
+Schiff, Raute = Seezeichen, Quadrat = Landstation.
+
+Drei Punkte, die aus dem Anti-Pattern-Katalog der Skill kamen:
+- **Klickziel:** Ein 8-px-Punkt ist ein mieses Ziel. Der Marker sitzt deshalb
+  zentriert in einer transparenten **24-px-Box** (`MARKER_HIT_PX`) — sichtbare
+  Größe und Trefferfläche sind entkoppelt.
+- **Legende ist Pflicht** bei ≥ 2 Kategorien. Sie ist einklappbar, weil sie
+  aufgeklappt rund zwei Drittel der 420 px hohen Karte einnimmt und genau die
+  Marker verdeckt, die sie erklärt. Zustand in `aisstream_legend_open`.
+- **Farbe folgt der Entität, nie dem Rang** — die Kategorie hängt am
+  Schiffstyp, nicht an der Sortierreihenfolge.
+
+Bestätigt Wikidata einen Typ, schlägt der den ITU-Code (`typeCategory()`) —
+ein „Frachtschiff" laut Code, das laut Register ein Tanker ist, wird rot.
+
+### Ladereihenfolge — schon zweimal reingefallen
+
+`addMapLegend()` stand zuerst im Karten-Init-Block, also **vor** der
+`var`-Initialisierung von `TYPE_COLORS`. Ergebnis: `TYPE_COLORS.forEach` wirft,
+die IIFE bricht ab, **keine** Event-Listener werden mehr registriert — die
+ganze Seite reagiert auf nichts, ohne sichtbare Fehlermeldung. Derselbe
+Fehlertyp wie bei `loadStaticCache()`.
+
+**Merke:** In dieser Datei sind Funktionsdeklarationen gehoistet, `var`-Werte
+nicht. Alles, was auf die Konstanten weiter unten zugreift, gehört in den
+Verdrahtungsblock am Ende der IIFE, nicht in den Init oben.
+
 ## Was in `localStorage` liegt
 
 Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
 
 | Schlüssel | Inhalt | TTL |
 |---|---|---|
-| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich` | Einstellungen | unbegrenzt |
+| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open` | Einstellungen | unbegrenzt |
 | `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss |
 | `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d |
 
@@ -390,6 +467,9 @@ verifiziert:
   ETA), Entfernung/Peilung zur Kartenmitte sowie Empfangsstatistik
   (Nachrichten gesamt und je Typ, erste/letzte Sichtung, Trackpunkte,
   zurückgelegte Strecke, Ø Geschwindigkeit)
+- **Kartenmarker kodieren Typ und Größe** (siehe eigenen Abschnitt oben):
+  sechs validierte Kategoriefarben, vier Größenstufen S/M/L/XL am Durchmesser,
+  Form trennt Schiff / Seezeichen / Landstation, einklappbare Legende
 - **MMSI-Dekodierung offline** (`decodeMmsi()`): Stationsart nach ITU-R M.585
   (Schiff / Küstenfunkstelle / Gruppenruf / SAR-Luftfahrzeug / Seezeichen /
   Beiboot / AIS-SART / MOB / EPIRB / Handfunkgerät) plus MID → Flaggenstaat

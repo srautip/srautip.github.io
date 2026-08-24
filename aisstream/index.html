@@ -347,6 +347,87 @@
     margin-right: 0.35rem;
     vertical-align: -1px;
   }
+  /* --- Kartenmarker & Legende ---------------------------------------- */
+  .ship-hit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ship-mark {
+    border-radius: 50%;
+    box-sizing: border-box;
+    /* Weisser Ring trennt den Marker von der Kachel darunter und von
+       ueberlappenden Markern - die Fuellfarben allein liegen teils unter
+       3:1 gegen Land- und Wasserflaechen. */
+    border: 1.5px solid #ffffff;
+    box-shadow: 0 0 0 0.5px rgba(11, 11, 11, 0.45);
+  }
+  .ship-mark.aton { border-radius: 2px; transform: rotate(45deg); }
+  .ship-mark.base { border-radius: 2px; }
+  .ship-mark.unknown-size { background: #ffffff !important; }
+  .map-legend {
+    background: rgba(255, 255, 255, 0.94);
+    border-radius: 6px;
+    padding: 0.5rem 0.6rem;
+    font-size: 0.7rem;
+    line-height: 1.35;
+    color: #0b0b0b;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+    max-width: 200px;
+  }
+  .map-legend b {
+    display: block;
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #52514e;
+    font-weight: 600;
+    margin: 0 0 0.2rem;
+  }
+  .map-legend b + b, .map-legend .sep { margin-top: 0.45rem; }
+  .map-legend .row { display: flex; align-items: center; gap: 0.35rem; }
+  .map-legend .sw {
+    flex: 0 0 auto;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    border: 1.5px solid #fff;
+    box-shadow: 0 0 0 0.5px rgba(11, 11, 11, 0.45);
+  }
+  .map-legend .legend-head {
+    all: unset;
+    display: block;
+    cursor: pointer;
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+    color: #52514e;
+  }
+  .map-legend .legend-body { margin-top: 0.35rem; }
+  .map-legend .chev { display: inline-block; width: 0.7em; }
+  .map-legend .note { color: #52514e; margin-top: 0.25rem; }
+  .map-legend .sw.diamond { border-radius: 2px; transform: rotate(45deg); }
+  .map-legend .sw.square { border-radius: 2px; }
+  .map-legend .sizes { display: flex; align-items: flex-end; gap: 0.4rem; margin-top: 0.15rem; }
+  .map-legend .sizes span {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    color: #52514e; font-size: 0.62rem;
+  }
+  .map-legend .sizes i {
+    background: #6b6b68;
+    border-radius: 50%;
+    border: 1.5px solid #fff;
+    box-shadow: 0 0 0 0.5px rgba(11, 11, 11, 0.45);
+    display: block;
+  }
+  .legend-toggle {
+    position: absolute;
+    right: 10px; bottom: 10px;
+    z-index: 500;
+    width: auto; flex: none;
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+  }
 </style>
 </head>
 <body>
@@ -824,13 +905,170 @@
     return Array.prototype.map.call(boxes, function (b) { return b.value; });
   }
 
-  function shipIcon() {
+  /* --- Markerkodierung: Farbe = Typ, Durchmesser = Größe -------------- */
+
+  // Six categorical hues, searched over the OKLCH hue circle and validated
+  // all-pairs (every marker is on screen at once, so adjacency-only checks
+  // do not apply here). Worst pair: CVD ΔE 8.8, normal-vision ΔE 19.0 —
+  // clears the strict gate against both the OSM land (#f2efe9) and water
+  // (#aad3df) surfaces. Six is the measured maximum; a seventh hue cannot
+  // hold the floors. Anything outside these six folds into neutral grey.
+  var TYPE_COLORS = [
+    { key: "cargo", label: "Frachtschiff", color: "#2a78d6" },
+    { key: "tanker", label: "Tanker", color: "#ab2000" },
+    { key: "passenger", label: "Passagierschiff", color: "#77a400" },
+    { key: "fishing", label: "Fischerei", color: "#007a61" },
+    { key: "working", label: "Schlepper & Arbeitsschiffe", color: "#8c2c95" },
+    { key: "leisure", label: "Sport & Segel", color: "#ca7197" }
+  ];
+  var TYPE_COLOR_MAP = (function () {
+    var m = {};
+    TYPE_COLORS.forEach(function (t) { m[t.key] = t.color; });
+    return m;
+  })();
+  var NEUTRAL_COLOR = "#6b6b68";
+  var MARKER_HIT_PX = 24;
+
+  // Diameters in px; the smallest is 8 so a marker stays clickable.
+  var SIZE_STEPS = [
+    { key: "S", label: "< 50 m", max: 50, px: 8 },
+    { key: "M", label: "50–100 m", max: 100, px: 11 },
+    { key: "L", label: "100–200 m", max: 200, px: 15 },
+    { key: "XL", label: "≥ 200 m", max: Infinity, px: 20 }
+  ];
+
+  function typeCategory(entry) {
+    if (entry.station === "Seezeichen" || entry.station === "Landstation") return null;
+    var code = Number(entry.typeCode) || 0;
+    // A registry type beats the ITU code: it separates a container ship from
+    // a bulker, and a cruise ship from a cargo vessel.
+    var known = entry.enrich && entry.enrich.typeLabel;
+    if (known) {
+      if (/tanker/i.test(known)) return "tanker";
+      if (/container|massengut|bulk|fracht|cargo|schwergut|mehrzweck|roro|ro-ro|stückgut/i.test(known)) return "cargo";
+      if (/kreuzfahrt|fähre|ferry|passagier/i.test(known)) return "passenger";
+      if (/fisch/i.test(known)) return "fishing";
+      if (/schlepper|tug|bagger|lotsen|rettung|polizei|arbeits/i.test(known)) return "working";
+      if (/yacht|segel|sport/i.test(known)) return "leisure";
+    }
+    if (code === 30) return "fishing";
+    if (code === 36 || code === 37) return "leisure";
+    if ((code >= 31 && code <= 35) || (code >= 50 && code <= 59)) return "working";
+    if (code >= 60 && code <= 69) return "passenger";
+    if (code >= 70 && code <= 79) return "cargo";
+    if (code >= 80 && code <= 89) return "tanker";
+    return null;
+  }
+
+  // Longest hull figure we have, preferring the more precise inland report.
+  function shipLengthMeters(entry) {
+    if (entry.inland && entry.inland.eriLength) return entry.inland.eriLength;
+    if (entry.dim) {
+      var l = (Number(entry.dim.A) || 0) + (Number(entry.dim.B) || 0);
+      if (l) return l;
+    }
+    if (entry.enrich) {
+      if (entry.enrich.dt && entry.enrich.dt.length) return entry.enrich.dt.length;
+      if (entry.enrich.loa) return entry.enrich.loa;
+    }
+    return null;
+  }
+
+  function sizeStep(entry) {
+    var length = shipLengthMeters(entry);
+    if (!length) return null;
+    for (var i = 0; i < SIZE_STEPS.length; i++) {
+      if (length < SIZE_STEPS[i].max) return SIZE_STEPS[i];
+    }
+    return SIZE_STEPS[SIZE_STEPS.length - 1];
+  }
+
+  // Encodes the marker in one string so we only rebuild the icon when the
+  // encoding actually changed, not on every position update.
+  function iconKey(entry) {
+    var step = sizeStep(entry);
+    return [typeCategory(entry) || "-", step ? step.key : "?",
+      entry.station || "ship"].join("|");
+  }
+
+  function shipIcon(entry) {
+    var category = typeCategory(entry);
+    var color = category ? TYPE_COLOR_MAP[category] : NEUTRAL_COLOR;
+    var step = sizeStep(entry);
+    // An unknown hull length must not read as "small": it gets the smallest
+    // dot but hollow, so absent data looks different from a small boat.
+    var px = step ? step.px : SIZE_STEPS[0].px;
+    var shape = entry.station === "Seezeichen" ? " aton"
+      : entry.station === "Landstation" ? " base" : "";
+    var hollow = step ? "" : " unknown-size";
+    // The visible dot can be as small as 8px, which is a punishing click
+    // target. The mark sits centred inside a transparent 24px box so the hit
+    // area stays comfortable without changing what is drawn.
+    var box = Math.max(px, MARKER_HIT_PX);
     return L.divIcon({
       className: "",
-      html: '<div style="width:9px;height:9px;border-radius:50%;background:#3fa9ff;border:1px solid #06131f;"></div>',
-      iconSize: [9, 9],
-      iconAnchor: [4, 4]
+      html: '<div class="ship-hit" style="width:' + box + "px;height:" + box + 'px;">' +
+        '<div class="ship-mark' + shape + hollow + '" style="width:' + px + "px;height:" + px +
+        "px;background:" + color + ";border-color:" + (step ? "#ffffff" : color) + ';"></div></div>',
+      iconSize: [box, box],
+      iconAnchor: [box / 2, box / 2]
     });
+  }
+
+  function refreshMarkerIcon(entry) {
+    if (!entry.marker) return;
+    var key = iconKey(entry);
+    if (key === entry.iconKey) return;
+    entry.iconKey = key;
+    entry.marker.setIcon(shipIcon(entry));
+  }
+
+  // Collapsible: the full key is roughly two thirds the height of a 420px
+  // map, so leaving it permanently open hides the very marks it explains.
+  function addMapLegend() {
+    if (!mapAvailable) return;
+    var legend = L.control({ position: "bottomleft" });
+    legend.onAdd = function () {
+      var div = L.DomUtil.create("div", "map-legend");
+      var body = "<b>Schiffstyp</b>";
+      TYPE_COLORS.forEach(function (t) {
+        body += '<div class="row"><span class="sw" style="background:' + t.color + '"></span>' +
+          esc(t.label) + "</div>";
+      });
+      body += '<div class="row"><span class="sw" style="background:' + NEUTRAL_COLOR +
+        '"></span>Sonstige / unbekannt</div>';
+      body += '<b class="sep">Länge</b><div class="sizes">';
+      SIZE_STEPS.forEach(function (st) {
+        body += '<span><i style="width:' + st.px + "px;height:" + st.px + 'px"></i>' + st.key + "</span>";
+      });
+      body += '<span><i class="unknown-size" style="width:8px;height:8px;border-color:' +
+        NEUTRAL_COLOR + '"></i>?</span></div>';
+      body += '<div class="note">S &lt; 50 m · M 50–100 · L 100–200 · XL ≥ 200 · ? unbekannt</div>';
+      body += '<b class="sep">Form</b>' +
+        '<div class="row"><span class="sw" style="background:' + NEUTRAL_COLOR + '"></span>Schiff</div>' +
+        '<div class="row"><span class="sw diamond" style="background:' + NEUTRAL_COLOR + '"></span>Seezeichen</div>' +
+        '<div class="row"><span class="sw square" style="background:' + NEUTRAL_COLOR + '"></span>Landstation</div>';
+
+      div.innerHTML =
+        '<button type="button" class="legend-head" aria-expanded="true">' +
+        '<span class="chev">▾</span> Legende</button><div class="legend-body">' + body + "</div>";
+
+      var head = div.querySelector(".legend-head");
+      var bodyEl = div.querySelector(".legend-body");
+      var setOpen = function (open) {
+        bodyEl.style.display = open ? "block" : "none";
+        head.setAttribute("aria-expanded", open ? "true" : "false");
+        div.querySelector(".chev").textContent = open ? "▾" : "▸";
+        try { localStorage.setItem("aisstream_legend_open", open ? "1" : "0"); } catch (e) {}
+      };
+      setOpen(localStorage.getItem("aisstream_legend_open") !== "0");
+      head.addEventListener("click", function () {
+        setOpen(head.getAttribute("aria-expanded") !== "true");
+      });
+      L.DomEvent.disableClickPropagation(div);
+      return div;
+    };
+    legend.addTo(map);
   }
 
   // AIS ship type codes (ITU-R M.1371), collapsed to broad categories.
@@ -1462,9 +1700,11 @@
       if (entry.marker) {
         entry.marker.setLatLng([lat, lon]);
       } else {
-        entry.marker = L.marker([lat, lon], { icon: shipIcon() }).addTo(map);
+        entry.marker = L.marker([lat, lon], { icon: shipIcon(entry) }).addTo(map);
+        entry.iconKey = iconKey(entry);
         entry.marker.on("click", function () { openDetail(entry.mmsi); });
       }
+      refreshMarkerIcon(entry);
       entry.marker.bindPopup(popupHtml(entry));
     }
     if (selectedMmsi === entry.mmsi && trackLayer) drawTrack(entry);
@@ -1675,6 +1915,7 @@
       entry.fixType = msg.FixType != null ? msg.FixType : (msg.Fixtype != null ? msg.Fixtype : entry.fixType);
       entry.staticFromCache = null;
       rememberStatic(entry);
+      refreshMarkerIcon(entry);
       if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
       refreshVisibleShips();
     } else if (type === "StaticDataReport" && msg) {
@@ -1698,6 +1939,7 @@
       entry.serial = partB.SerialNumber != null ? String(partB.SerialNumber) : entry.serial;
       entry.staticFromCache = null;
       rememberStatic(entry);
+      refreshMarkerIcon(entry);
       if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
       refreshVisibleShips();
     } else if (type === "AidsToNavigationReport" && msg) {
@@ -1755,12 +1997,14 @@
       if (stat.eriLength && stat.eriBeam) entry.size = stat.eriLength + "×" + stat.eriBeam;
       if (stat.eriDraught) entry.draught = stat.eriDraught;
       rememberStatic(entry);
+      refreshMarkerIcon(entry);
       if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
     } else if (dac === 200 && fi === 55) {
       var persons = decodeInlandPersons(bits);
       if (!persons) return;
       entry.persons = Object.assign({}, entry.persons, persons);
       entry.personsAt = Date.now();
+      refreshMarkerIcon(entry);
       if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
     }
   }
@@ -1961,6 +2205,7 @@
       entry.typeDetail = entry.typeDetail || shipTypeDetail(dt.typeCode);
     }
     rememberStatic(entry);
+    refreshMarkerIcon(entry);
     if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
   }
 
@@ -2669,6 +2914,8 @@
     drawTrack(entry);
     map.fitBounds(trackLayer.getBounds().pad(0.2));
   });
+
+  addMapLegend();
 
   snapshotBtn.addEventListener("click", loadSnapshot);
   document.getElementById("clearCacheBtn").addEventListener("click", clearAllCaches);
