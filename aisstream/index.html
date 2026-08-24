@@ -439,6 +439,19 @@
       Binnenschiffe und kleine Boote sind praktisch nie erfasst.
     </p>
 
+    <h2 style="margin-top:1.2rem">Zwischenspeicher</h2>
+    <div class="stats" style="margin:0.4rem 0 0.6rem">
+      <div>Schiffsstatik<br /><b id="staticCacheCount">0</b></div>
+      <div>Registerdaten<br /><b id="enrichCacheCount">0</b></div>
+    </div>
+    <button type="button" id="clearCacheBtn">Zwischenspeicher leeren</button>
+    <p class="hint" style="margin-top:0.35rem">
+      Name, Rufzeichen, IMO, Typ und Maße werden je MMSI lokal behalten, damit
+      Schiffe nach einem Neuladen sofort benannt sind. Positionen, Ziel, ETA und
+      Tiefgang werden <strong>nicht</strong> gespeichert &ndash; die ändern sich
+      mit jeder Reise und wären als „aktuell“ irreführend.
+    </p>
+
     <div class="stats">
       <div>Nachrichten<br /><b id="msgCount">0</b></div>
       <div>Schiffe sichtbar<br /><b id="shipCount">0</b></div>
@@ -731,6 +744,8 @@
   var mmsiFilterInput = document.getElementById("mmsiFilter");
   var snapshotBtn = document.getElementById("snapshotBtn");
   var autoEnrichInput = document.getElementById("autoEnrich");
+  var staticCacheCountEl = document.getElementById("staticCacheCount");
+  var enrichCacheCountEl = document.getElementById("enrichCacheCount");
   var searchInput = document.getElementById("shipSearch");
   var searchHintEl = document.getElementById("searchHint");
   var knownCountEl = document.getElementById("knownCount");
@@ -746,6 +761,8 @@
 
   var storedMmsiFilter = localStorage.getItem("aisstream_mmsi_filter");
   if (storedMmsiFilter) mmsiFilterInput.value = storedMmsiFilter;
+
+  if (localStorage.getItem("aisstream_auto_enrich") === "0") autoEnrichInput.checked = false;
 
   // Server URLs shipped as the default in a previous version - if that's
   // all that's stored, drop it instead of shadowing a corrected default.
@@ -1264,6 +1281,146 @@
   // Every MMSI gets one long-lived record that accumulates whatever the
   // various message types reveal about it, plus its own message statistics
   // and position history.
+  /* --- Zwischenspeicher für Schiffsstatik ----------------------------- */
+
+  // Only genuinely static attributes belong here: identity and hull. Voyage
+  // fields (destination, ETA, draught, cargo, loaded state) are deliberately
+  // excluded - a three-week-old destination shown as current would mislead,
+  // and the draught changes with every loading.
+  var STATIC_CACHE_KEY = "aisstream_static";
+  var STATIC_TTL = 60 * 24 * 3600 * 1000;
+  var STATIC_MAX = 2000;
+  var STATIC_SAVE_DEBOUNCE = 3000;
+  var STATIC_FIELDS = ["name", "callSign", "imo", "typeCode", "typeLabel",
+    "typeDetail", "size", "aisClass", "vendor", "serial", "station"];
+  var STATIC_INLAND_FIELDS = ["eni", "eriCode", "eriLabel", "eriLength", "eriBeam"];
+
+  var staticCache = {};
+  var staticDirty = false;
+  var staticSaveTimer = null;
+
+  function loadStaticCache() {
+    try {
+      var raw = localStorage.getItem(STATIC_CACHE_KEY);
+      if (!raw) return;
+      var parsed = JSON.parse(raw);
+      var cutoff = Date.now() - STATIC_TTL;
+      Object.keys(parsed).forEach(function (mmsi) {
+        if (parsed[mmsi] && parsed[mmsi].at > cutoff) staticCache[mmsi] = parsed[mmsi];
+      });
+    } catch (e) {
+      staticCache = {};
+    }
+  }
+
+  function saveStaticCache() {
+    staticSaveTimer = null;
+    if (!staticDirty) return;
+    staticDirty = false;
+    var keys = Object.keys(staticCache);
+    // Trim oldest-first so a long session cannot grow the entry unbounded.
+    if (keys.length > STATIC_MAX) {
+      keys.sort(function (a, b) { return staticCache[a].at - staticCache[b].at; });
+      keys.slice(0, keys.length - STATIC_MAX).forEach(function (k) { delete staticCache[k]; });
+    }
+    try {
+      localStorage.setItem(STATIC_CACHE_KEY, JSON.stringify(staticCache));
+    } catch (e) {
+      // Out of quota: drop the oldest half and try once more, then give up.
+      var remaining = Object.keys(staticCache);
+      remaining.sort(function (a, b) { return staticCache[a].at - staticCache[b].at; });
+      remaining.slice(0, Math.ceil(remaining.length / 2)).forEach(function (k) { delete staticCache[k]; });
+      try { localStorage.setItem(STATIC_CACHE_KEY, JSON.stringify(staticCache)); } catch (e2) {}
+    }
+    // The trim above may have dropped entries, so the counter is stale now.
+    updateCacheCounts();
+  }
+
+  function scheduleStaticSave() {
+    staticDirty = true;
+    if (staticSaveTimer) return;
+    staticSaveTimer = setTimeout(saveStaticCache, STATIC_SAVE_DEBOUNCE);
+  }
+
+  // Called after any branch that learned something static about a ship.
+  function rememberStatic(entry) {
+    var record = { at: Date.now() };
+    var any = false;
+    STATIC_FIELDS.forEach(function (f) {
+      if (entry[f] != null && entry[f] !== "") { record[f] = entry[f]; any = true; }
+    });
+    if (entry.dim) { record.dim = entry.dim; any = true; }
+    if (entry.inland) {
+      var inland = {};
+      STATIC_INLAND_FIELDS.forEach(function (f) {
+        if (entry.inland[f] != null) inland[f] = entry.inland[f];
+      });
+      if (Object.keys(inland).length) { record.inland = inland; any = true; }
+    }
+    if (!any) return;
+    staticCache[entry.mmsi] = record;
+    scheduleStaticSave();
+  }
+
+  // Seeds a freshly created record from the cache. Positions are never
+  // cached, so a seeded ship stays invisible until a real report arrives.
+  function applyStaticCache(entry) {
+    var record = staticCache[entry.mmsi];
+    if (!record) return;
+    STATIC_FIELDS.forEach(function (f) {
+      if (record[f] != null) entry[f] = record[f];
+    });
+    if (record.dim) entry.dim = record.dim;
+    if (record.inland) entry.inland = Object.assign({}, record.inland);
+    entry.staticFromCache = record.at;
+  }
+
+  function countEnrichCacheEntries() {
+    var n = 0;
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        if (localStorage.key(i).indexOf("aisstream_enrich_") === 0) n++;
+      }
+    } catch (e) {}
+    return n;
+  }
+
+  function updateCacheCounts() {
+    if (!staticCacheCountEl) return;
+    staticCacheCountEl.textContent = Object.keys(staticCache).length;
+    enrichCacheCountEl.textContent = countEnrichCacheEntries();
+  }
+
+  // Clears what persists, not what is on screen. Wiping the names of ships
+  // the user is currently looking at would be a surprising side effect, and
+  // anything still in the session was legitimately received.
+  function clearAllCaches() {
+    cacheGeneration++;
+    clearStaticCache();
+    try {
+      var keys = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k.indexOf("aisstream_enrich_") === 0) keys.push(k);
+      }
+      keys.forEach(function (k) { localStorage.removeItem(k); });
+    } catch (e) {}
+    updateCacheCounts();
+    log("Zwischenspeicher geleert - die aktuelle Sitzung behält ihre Daten bis zum Neuladen.");
+  }
+
+  function clearStaticCache() {
+    staticCache = {};
+    staticDirty = false;
+    if (staticSaveTimer) { clearTimeout(staticSaveTimer); staticSaveTimer = null; }
+    try { localStorage.removeItem(STATIC_CACHE_KEY); } catch (e) {}
+  }
+
+  // Muss nach den var-Initialisierungen oben laufen: ein frueherer Aufruf
+  // lief gegen ein noch undefiniertes staticCache und wurde vom Initializer
+  // wieder ueberschrieben.
+  loadStaticCache();
+
   function getShip(mmsi) {
     var entry = ships.get(mmsi);
     if (!entry) {
@@ -1276,6 +1433,7 @@
         raw: {},
         firstSeen: Date.now()
       };
+      applyStaticCache(entry);
       ships.set(mmsi, entry);
     }
     return entry;
@@ -1394,6 +1552,7 @@
     });
     shipCountEl.textContent = shown.length;
     knownCountEl.textContent = ships.size;
+    updateCacheCounts();
     searchHintEl.textContent = needle
       ? shown.length + " Treffer, " + hiddenBySearch + " ausgeblendet"
       : ships.size + " MMSIs bekannt";
@@ -1514,6 +1673,8 @@
       entry.dim = msg.Dimension || entry.dim;
       entry.size = shipSize(msg.Dimension) || entry.size;
       entry.fixType = msg.FixType != null ? msg.FixType : (msg.Fixtype != null ? msg.Fixtype : entry.fixType);
+      entry.staticFromCache = null;
+      rememberStatic(entry);
       if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
       refreshVisibleShips();
     } else if (type === "StaticDataReport" && msg) {
@@ -1535,6 +1696,8 @@
       }
       entry.vendor = cleanText(partB.VendorIDName) || entry.vendor;
       entry.serial = partB.SerialNumber != null ? String(partB.SerialNumber) : entry.serial;
+      entry.staticFromCache = null;
+      rememberStatic(entry);
       if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
       refreshVisibleShips();
     } else if (type === "AidsToNavigationReport" && msg) {
@@ -1547,6 +1710,7 @@
       entry.dim = msg.Dimension || entry.dim;
       entry.size = shipSize(msg.Dimension) || entry.size;
       entry.fixType = msg.Fixtype != null ? msg.Fixtype : (msg.FixType != null ? msg.FixType : entry.fixType);
+      rememberStatic(entry);
       var atonLat = meta.latitude != null ? meta.latitude : msg.Latitude;
       var atonLon = meta.longitude != null ? meta.longitude : msg.Longitude;
       if (atonLat != null && atonLon != null) setPosition(entry, atonLat, atonLon, meta.time_utc);
@@ -1590,6 +1754,7 @@
       // hull, centimetres for the draught.
       if (stat.eriLength && stat.eriBeam) entry.size = stat.eriLength + "×" + stat.eriBeam;
       if (stat.eriDraught) entry.draught = stat.eriDraught;
+      rememberStatic(entry);
       if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
     } else if (dac === 200 && fi === 55) {
       var persons = decodeInlandPersons(bits);
@@ -1614,6 +1779,9 @@
 
   var enrichInFlight = {};
   var enrichQueue = Promise.resolve();
+  // Bumped when the caches are cleared, so a lookup that was already in
+  // flight cannot write its result back into the freshly emptied cache.
+  var cacheGeneration = 0;
 
   // Both APIs are public goods; serialise lookups with a small gap rather
   // than firing one request per ship in the table.
@@ -1792,6 +1960,7 @@
       entry.typeLabel = entry.typeLabel || shipTypeLabel(dt.typeCode);
       entry.typeDetail = entry.typeDetail || shipTypeDetail(dt.typeCode);
     }
+    rememberStatic(entry);
     if (entry.marker) entry.marker.bindPopup(popupHtml(entry));
   }
 
@@ -1816,6 +1985,7 @@
     entry.enrichError = null;
     if (selectedMmsi === mmsi) renderDetail(entry);
 
+    var generation = cacheGeneration;
     var job = throttled(function () {
       return fetchDigitraffic(mmsi).catch(function (e) {
         entry.enrichError = e.message;
@@ -1846,7 +2016,7 @@
     }).then(function (data) {
       applyEnrichment(entry, data);
       entry.enrichState = data ? "done" : "empty";
-      enrichCacheSet(mmsi, data, !!data);
+      if (generation === cacheGeneration) enrichCacheSet(mmsi, data, !!data);
       delete enrichInFlight[mmsi];
       refreshVisibleShips();
       if (selectedMmsi === mmsi) renderDetail(entry);
@@ -1897,6 +2067,7 @@
     if (props.nav_status != null && entry.navStatus == null) entry.navStatus = props.nav_status;
     if (props.kind === "aton") entry.station = entry.station || "Seezeichen";
     if (props.kind === "base") entry.station = entry.station || "Landstation";
+    rememberStatic(entry);
     entry.snapshotSource = props.source || props.station || "openwaters";
     entry.snapshotSeen = props.seen;
     // The snapshot carries its own timestamp; using it (rather than "now")
@@ -2190,6 +2361,8 @@
       ]) +
       section("Empfang", [
         ["Zuletzt gesehen", relativeTime(entry.updatedAt)],
+        ["Statik aus Zwischenspeicher", entry.staticFromCache
+          ? "ja, " + relativeTime(entry.staticFromCache) + " gespeichert" : null],
         ["openwaters-Quelle", entry.snapshotSource],
         ["Zeitstempel (UTC)", entry.time],
         ["Erstmals gesehen", relativeTime(entry.firstSeen)],
@@ -2498,6 +2671,11 @@
   });
 
   snapshotBtn.addEventListener("click", loadSnapshot);
+  document.getElementById("clearCacheBtn").addEventListener("click", clearAllCaches);
+  autoEnrichInput.addEventListener("change", function () {
+    localStorage.setItem("aisstream_auto_enrich", autoEnrichInput.checked ? "1" : "0");
+  });
+  updateCacheCounts();
 
   document.getElementById("detailLookup").addEventListener("click", function () {
     if (selectedMmsi) lookupMmsi(selectedMmsi);
@@ -2531,6 +2709,13 @@
 
   document.addEventListener("keydown", function (evt) {
     if (evt.key === "Escape" && selectedMmsi) closeDetail();
+  });
+
+  // pagehide fires on tab close and on mobile backgrounding, where a
+  // pending debounced save would otherwise be lost.
+  window.addEventListener("pagehide", saveStaticCache);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") saveStaticCache();
   });
 
   // Keeps the "zuletzt gesehen" / stale badge honest while nothing arrives.

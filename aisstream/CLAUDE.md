@@ -256,6 +256,65 @@ Drei Dinge, die Zeit gekostet haben:
   Rufzeichen. `plausibleCallSign()` verwirft das; mit Müll anreichern ist
   schlechter als das Feld leer zu lassen
 
+## Was in `localStorage` liegt
+
+Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
+
+| Schlüssel | Inhalt | TTL |
+|---|---|---|
+| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich` | Einstellungen | unbegrenzt |
+| `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss |
+| `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d |
+
+### Schiffsstatik-Cache (`aisstream_static`)
+
+Zweck: Nach einem Neuladen sind Schiffe sofort benannt, statt bis zur
+nächsten `ShipStaticData`-Nachricht namenlos in der Tabelle zu stehen — die
+kommt bei Class A nur alle sechs Minuten, bei Class B noch seltener.
+
+**Gespeichert wird nur, was wirklich statisch ist:** `name`, `callSign`,
+`imo`, `typeCode`, `typeLabel`, `typeDetail`, `size`, `dim`, `aisClass`,
+`vendor`, `serial`, `station` und die statischen Inland-Felder (`eni`,
+`eriCode`, `eriLabel`, `eriLength`, `eriBeam`).
+
+**Bewusst nicht gespeichert:** Positionen, Track, `destination`, `eta`,
+`draught`, `loaded`, `blueCones`. Das sind Reisedaten — ein drei Wochen
+altes Ziel als „aktuell" anzuzeigen wäre irreführend, und der Tiefgang
+ändert sich mit jeder Beladung. Wer hier Felder ergänzt: Diese Grenze
+bitte halten.
+
+Mechanik:
+- Eine **einzelne** Map statt eines Schlüssels pro MMSI — ein Lesevorgang
+  beim Start, und das Kontingent lässt sich in einem Rutsch trimmen
+- Schreiben ist um 3 s **debounced**, zusätzlich hängt ein Sichern an
+  `pagehide` und `visibilitychange` — sonst geht der letzte Stand beim
+  Schließen des Tabs verloren
+- Cap `STATIC_MAX` = 2000 MMSIs, ältester Eintrag fliegt zuerst. Gemessen:
+  2000 Einträge sind rund **406 KB**, passt bequem in das ~5-MB-Budget
+- Bei `QuotaExceededError` wird die ältere Hälfte verworfen und **einmal**
+  neu versucht, danach gibt der Cache auf, statt die App zu brechen
+- Ein aus dem Cache befülltes Schiff bekommt `staticFromCache`; die
+  Detailansicht weist das als „Statik aus Zwischenspeicher" aus, und die
+  erste echte Statiknachricht setzt das Flag wieder zurück
+
+### Zwei Fallen, die beim Bauen zugeschnappt sind
+
+- **Ladereihenfolge:** `loadStaticCache()` stand zunächst weit oben bei den
+  anderen `localStorage`-Zugriffen — also **vor** `var staticCache = {}`.
+  Der Zugriff auf das noch undefinierte Objekt landete im `catch`, und der
+  Initializer hat kurz darauf sowieso alles überschrieben. Ergebnis: Cache
+  wurde brav geschrieben und nie angewandt, völlig lautlos. Der Aufruf steht
+  jetzt direkt vor `getShip()`, nach allen `var`-Initialisierungen.
+- **Race beim Leeren:** Eine noch laufende Registerabfrage schrieb nach dem
+  Klick auf „Zwischenspeicher leeren" ihr Ergebnis zurück — der Zähler
+  sprang auf 1. Deshalb gibt es `cacheGeneration`: `enrichShip()` merkt sich
+  den Stand beim Start und schreibt nur, wenn er unverändert ist.
+
+„Zwischenspeicher leeren" räumt **nur den Speicher**, nicht die laufende
+Sitzung. Die Namen der Schiffe, die man gerade ansieht, verschwinden zu
+lassen wäre ein überraschender Nebeneffekt; alles im Speicher wurde
+legitim empfangen. Der Log sagt das auch so.
+
 ## Protokoll-Fallstricke (bereits gelöst, aber gut zu wissen)
 
 Alle über mehrere Debugging-Runden mit dem User empirisch/per Doku
@@ -400,7 +459,7 @@ langlebigen Datensatz, der über alle Nachrichtentypen hinweg angereichert wird:
   persons:{crew,passengers,personnel}, personsAt,
   enrich:{ sources:[...], dt:{<Digitraffic>}, <Wikidata-Felder> },
   enrichState:'loading'|'done'|'empty'|'error', enrichError,
-  snapshotSource, snapshotSeen,
+  snapshotSource, snapshotSeen, staticFromCache,
   firstSeen, updatedAt, marker }
 ```
 
@@ -545,10 +604,9 @@ alle Tests waren Wegwerf-Skripte im Scratchpad der jeweiligen Session.
   Live-Tests möglich sind (HTTPS-Relay + ws-Brücke), wäre ein kleines
   eingechecktes `test/`-Verzeichnis statt Wegwerf-Skripten allmählich
   lohnend — bisher wird jede Session neu aufgesetzt
-- Schiffsdaten sind rein flüchtig: Reload verwirft alle gesammelten MMSIs
-  samt Track. Eine Persistenz in `localStorage`/IndexedDB wäre der nächste
-  logische Schritt, ebenso ein Deeplink `?mmsi=…`, der die Detailansicht
-  direkt öffnet
+- Die **Statik** überlebt einen Reload inzwischen (siehe eigenen Abschnitt),
+  Positionen und Tracks weiterhin nicht — das ist Absicht. Ein Deeplink
+  `?mmsi=…`, der die Detailansicht direkt öffnet, fehlt noch
 - `MAX_TRACK_POINTS` (300) und die Ship-Map wachsen unbegrenzt über die
   Sitzung; bei sehr langen Läufen wäre ein Aufräumen alter MMSIs
   (`STALE_AFTER_MS` wird bisher nur für das Badge genutzt) sinnvoll
