@@ -407,9 +407,29 @@
   }
 
   function handleMessage(evt) {
+    // The server may send text or binary WebSocket frames; binary frames
+    // arrive as a Blob (or ArrayBuffer) rather than a ready-to-parse string.
+    if (typeof evt.data === "string") {
+      processMessageText(evt.data);
+    } else if (evt.data instanceof Blob) {
+      evt.data.text().then(processMessageText).catch(function (e) {
+        log("Konnte Binär-Nachricht (Blob) nicht lesen: " + e.message);
+      });
+    } else if (evt.data instanceof ArrayBuffer) {
+      try {
+        processMessageText(new TextDecoder("utf-8").decode(evt.data));
+      } catch (e) {
+        log("Konnte Binär-Nachricht (ArrayBuffer) nicht lesen: " + e.message);
+      }
+    } else {
+      log("Unbekanntes Nachrichtenformat empfangen (" + Object.prototype.toString.call(evt.data) + ").");
+    }
+  }
+
+  function processMessageText(dataText) {
     var payload;
     try {
-      payload = JSON.parse(evt.data);
+      payload = JSON.parse(dataText);
     } catch (e) {
       log("Konnte Nachricht nicht parsen: " + e.message);
       return;
@@ -425,7 +445,7 @@
     var meta = payload.MetaData || {};
     var mmsi = meta.MMSI;
     if (mmsi == null) {
-      log("Unerwartete Nachricht ohne MMSI: " + evt.data.slice(0, 200));
+      log("Unerwartete Nachricht ohne MMSI: " + dataText.slice(0, 200));
       return;
     }
 
