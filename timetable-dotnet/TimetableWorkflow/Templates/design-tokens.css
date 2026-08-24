@@ -1,0 +1,171 @@
+/* ============================================================
+   DESIGNSYSTEM - EINZIGE QUELLE DER TOKEN-WERTE
+   ============================================================
+
+   Diese Datei ist die Quelle. Beide Viewer-Vorlagen tragen eine
+   ZEICHENGLEICHE Kopie des Blocks unten zwischen den Markern
+
+       == DESIGN-TOKENS ==  ...  == ENDE DESIGN-TOKENS ==
+
+   und `TimetableGui/Design/Tokens.xaml` spiegelt den Kanon.
+   `TimetableWorkflow.Tests/DesignTokenTests.vb` und
+   `TimetableGui.Tests/DesignKanonTests.vb` halten die Kopien fest;
+   weicht eine ab, druckt der Test den kopierbaren Soll-Block.
+
+   WARUM KOPIE UND NICHT INJEKTION: die erzeugten Seiten muessen per
+   Doppelklick ohne Server funktionieren (arc42 8.10/8.14). Eine
+   Injektion zur Generierungszeit haette die Rohvorlage unstyled
+   gelassen, ueber String.Replace einen still scheiternden Platzhalter
+   eingefuehrt - und der dann noetige Fallback-:root waere selbst
+   wieder eine Drift-Quelle gewesen. Damit ist die Injektion
+   ueberfluessig: der Block steht ja bereits richtig in der Vorlage.
+   Es ist dasselbe Muster wie bei den JS-Formelkopien des VB-Kerns
+   (arc42 8.2): bewusste, maschinell geprueft zeichengleiche
+   Duplikation.
+
+   KANON: was in BEIDEN Welten sichtbar ist, wird zwischen CSS und
+   XAML auf Wertgleichheit geprueft. Gefiltert wird ueber die
+   Praefixe --farbe-, --kat-, --schrift-, --radius- (eine
+   Positivliste waere selbst wieder ein Objekt, das driften kann).
+   Alles andere - Masse in rem, Schatten, Dichte - ist nur Web.
+   `0.8125rem` und `FontSize="13"` sind KEINE identischen Werte; so
+   zu tun wuerde einen Waechter erzeugen, der Unsinn assertiert.
+   ============================================================ */
+
+/* == DESIGN-TOKENS: erzeugt aus Templates/design-tokens.css.
+      NICHT VON HAND AENDERN - DesignTokenTests haelt die Kopien
+      zeichengleich zur Quelle. == */
+:root {
+  color-scheme: light;
+
+  /* --- Neutrale, als ROLLEN statt als Rampe. Leichter Kaltstich in
+         Richtung des Akzents: reines Grau neben blauem Akzent liest
+         sich schmutzig. Acht Rollen ersetzen die rund zwanzig
+         Einzelwerte des Bestands - #ccc, #bbb, #ddd, #999 und #eee
+         heissen dort alle "ein Rahmen".
+         Die zugrundeliegende Zehnerrampe ist bewusst NICHT als Token
+         abgelegt: sie ist die Herleitung, nicht die Schnittstelle.
+         Als Token waere sie eine zweite Wahrheit neben den Rollen
+         (jeder Wert stuende zweimal da) und haette tote Stufen. --- */
+  --farbe-flaeche:#ffffff;
+  --farbe-flaeche-2:#fafbfc;
+  --farbe-flaeche-3:#f2f4f7;
+  --farbe-linie:#e6e9ee;
+  --farbe-linie-stark:#d5dae1;
+  --farbe-text:#1a1f26;
+  --farbe-text-2:#626b76;
+  --farbe-text-3:#8a929d;
+
+  /* --- Status: gesaettigt, kleinflaechig, IMMER mit Symbol.
+         Ein Triplett je Zustand macht die heutigen zwei Gelbtoene
+         (#a16207 fuer den Text, #ca8a04 fuer Balken und Kartenkante)
+         und die zwei Neutralgraus (#94a3b8/#9ca3af) strukturell
+         unmoeglich. Die Symbole bleiben Text - die Doppelkodierung
+         ist laut klassenbildung-konzept.md:419 Pflicht. --- */
+  --farbe-ok-text:#0f7938;    --farbe-ok-rand:#86c9a4;    --farbe-ok-flaeche:#e9f6ef;
+  --farbe-warn-text:#8a5a00;  --farbe-warn-rand:#ddb45f;  --farbe-warn-flaeche:#fdf3e4;
+  --farbe-krit-text:#b3261e;  --farbe-krit-rand:#eaa6a1;  --farbe-krit-flaeche:#fcecea;
+  /* "frei" hat bewusst KEINE eigene Flaeche: sie waere wertgleich mit
+     --farbe-flaeche-3 und damit eine zweite Wahrheit fuer denselben Ton. */
+  --farbe-frei-text:#626b76;  --farbe-frei-rand:#d5dae1;
+
+  --farbe-akzent:#0f6cbd;
+  --farbe-akzent-hover:#115ea3;
+  --farbe-akzent-flaeche:#eff6fc;
+  --farbe-diff:#a8480b;
+  /* Vergleichsauswahl ist NICHT dasselbe wie aktive Auswahl - beide
+     koennen gleichzeitig sichtbar sein (eine Loesung gewaehlt, eine
+     zum Vergleich). Deshalb eine eigene Rolle statt eines Farbtons
+     der Akzentfamilie. */
+  --farbe-vergleich-flaeche:#fdf1e3;
+
+  /* --- Kategoriale Palette: 16 Gruppenfarben.
+         Basis hsl(H 38% 46%) in gleichmaessigen 22,5-Grad-Schritten,
+         danach 10 % eines Ockers hsl(35 38% 46%) beigemischt. Der
+         Anker hat DIESELBE Saettigung und Helligkeit - die Mischung
+         verschiebt deshalb nur den Ton und daempft die kalten Toene,
+         ohne die Helligkeit anzutasten.
+
+         Die feste, niedrige Saettigung ist die tragende Zusage:
+         eine GESAETTIGTE Farbe im Bild ist immer Status, nie
+         Identitaet (klassenbildung-ui-konzept.md:35 nennt die
+         Trennung "strikt" und fordert entsaettigte Toene). Eine
+         reine Ton-Trennung waere bei 16 Kategorien unmoeglich - die
+         drei Ampelbaender belegen ein Sechstel des Kreises; die
+         Trennung MUSS auf Saettigung plus Pflicht-Kuerzel ruhen.
+
+         Reihenfolge handsortiert: benachbarte Indizes liegen
+         mindestens 45 Grad auseinander, denn genau die treffen im
+         Board aufeinander. Rot steht bewusst auf Platz 16.
+
+         Heute verletzt der Bestand die eigene Regel: #15803d ist
+         gleichzeitig Ampel-Gruen und Gruppenfarbe 11, #c2410c
+         gleichzeitig Diff-Marker und Gruppenfarbe 16. --- */
+  --kat-1:#528099;  --kat-2:#529e7b;  --kat-3:#984e99;  --kat-4:#a28b49;
+  --kat-5:#529e99;  --kat-6:#a24e85;  --kat-7:#7a9e49;  --kat-8:#5c4e99;
+  --kat-9:#a26c49;  --kat-10:#529e5d; --kat-11:#7a4e99; --kat-12:#989e49;
+  --kat-13:#526299; --kat-14:#a24e67; --kat-15:#5c9e49; --kat-16:#a24e49;
+
+  /* --- Typografie: fuenf Rollen statt vierzehn gewachsener Werte.
+         Keine Webschrift - die Viewer laufen per Doppelklick ohne
+         Netz, ein CDN scheidet aus (viewer-ausbau-plan.md
+         "Leitplanken"). Hierarchie kommt aus Groesse, Gewicht und
+         Flaeche. Zeilenhoehen sind heute NIRGENDS deklariert. --- */
+  --schrift-stapel:-apple-system,"Segoe UI",Roboto,sans-serif;
+  --schrift-mono:ui-monospace,Consolas,monospace;
+  --t-titel:1.25rem;
+  --t-kopf:0.9375rem;
+  --t-basis:0.8125rem;
+  --t-klein:0.75rem;
+  --t-mikro:0.6875rem;
+  --lh-eng:1.2;
+  --lh-basis:1.4;
+
+  /* --- Mass: 4-px-Raster. Heute liegen die Werte auf jedem
+         0,05-rem-Schritt zwischen 0,1 und 0,6 - kein Raster. --- */
+  --mass-05:2px; --mass-1:4px; --mass-2:8px; --mass-3:12px;
+  --mass-4:16px; --mass-5:20px; --mass-6:24px;
+
+  /* --- Radius nach Rolle: Marke, Steuerelement, Flaeche. --- */
+  --radius-s:2px; --radius-m:4px; --radius-l:8px;
+
+  /* --- Elevation: EIN Rezept fuer schwebende Flaechen. Popover und
+         Aufklappmenue teilen sich heute die Rolle, aber nicht das
+         Rezept - zwei Raender, zwei Radien, zwei Schatten. --- */
+  --schatten-1:0 2px 8px rgba(16,24,40,.10), 0 0 1px rgba(16,24,40,.16);
+
+  /* --- Zustand. Der Fokusring ist neu: es gibt heute keine einzige
+         :focus-Regel, obwohl klassenbildung-ui-konzept.md:203
+         Tastaturbedienung ausdruecklich zusagt. --- */
+  --zustand-hover:rgba(16,24,40,.045);
+  --fokus-ring:2px solid var(--farbe-akzent);
+  --uebergang:120ms ease;
+
+  /* --- Dichte. --dichte-zeile meint die GESAMTHOEHE der Zeile, nicht
+         ihre Inhaltshoehe - die Zeilenelemente setzen dafuer
+         box-sizing:border-box. Ohne das kaemen Polsterung und Rahmen
+         obendrauf, und "22 px" ergaeben 28 (live gemessen).
+         Stufe "kompakt" entspricht der heutigen Kartenhoehe von 24 px. Kompakt kostet also nichts; komfortabel ist der
+         Zugewinn fuer kleinere Anzeigen. --- */
+  --dichte-zeile:24px;
+  --dichte-pad-y:2px;
+  --dichte-pad-x:6px;
+  --dichte-gap:4px;
+}
+
+:root[data-dichte="komfortabel"] {
+  --dichte-zeile:32px;
+  --dichte-pad-y:5px;
+  --dichte-pad-x:9px;
+  --dichte-gap:6px;
+}
+
+/* Bewegung abschalten, wenn das System es verlangt. Bewusst ueber den
+   Token und nicht ueber `* { transition: none !important }`: jeder
+   Uebergang liest --uebergang, also genuegt EINE Zuweisung - kein
+   Spezifitaetskampf, kein !important. Das ist der Nutzen des
+   Token-Satzes an einer Stelle, an der man ihn sofort sieht. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --uebergang:0s; }
+}
+/* == ENDE DESIGN-TOKENS == */

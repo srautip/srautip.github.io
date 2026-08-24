@@ -1,0 +1,6088 @@
+{
+  "schule": "bw-grundschule-beispiel",
+  "schueler_anzahl": 100,
+  "klassen_anzahl": 4,
+  "min_groesse": 22,
+  "max_groesse": 26,
+  "klassen_labels": [
+    "1a",
+    "1b",
+    "1c",
+    "1d"
+  ],
+  "gruppen": [
+    {
+      "id": "G_zwillinge",
+      "kuerzel": "ZWI",
+      "typ": "buendelung",
+      "modus": "hard",
+      "prio": 3,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S031",
+        "S062"
+      ]
+    },
+    {
+      "id": "G_kita_sonnenblume_1",
+      "kuerzel": "K1",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S007",
+        "S084",
+        "S012",
+        "S053"
+      ]
+    },
+    {
+      "id": "G_kita_regenbogen_2",
+      "kuerzel": "K2",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S057",
+        "S003"
+      ]
+    },
+    {
+      "id": "G_kita_pusteblume_3",
+      "kuerzel": "K3",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S023",
+        "S065"
+      ]
+    },
+    {
+      "id": "G_kita_wirbelwind_4",
+      "kuerzel": "K4",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S013",
+        "S040",
+        "S074"
+      ]
+    },
+    {
+      "id": "G_kita_loewenzahn_5",
+      "kuerzel": "K5",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S002",
+        "S066",
+        "S020"
+      ]
+    },
+    {
+      "id": "G_kita_villakunterbunt_6",
+      "kuerzel": "K6",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S097",
+        "S092",
+        "S067"
+      ]
+    },
+    {
+      "id": "G_kita_sonnenblume_7",
+      "kuerzel": "K7",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S047",
+        "S014"
+      ]
+    },
+    {
+      "id": "G_kita_regenbogen_8",
+      "kuerzel": "K8",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S044",
+        "S098",
+        "S079"
+      ]
+    },
+    {
+      "id": "G_kita_pusteblume_9",
+      "kuerzel": "K9",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S085",
+        "S043"
+      ]
+    },
+    {
+      "id": "G_kita_wirbelwind_10",
+      "kuerzel": "K10",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S050",
+        "S037"
+      ]
+    },
+    {
+      "id": "G_kita_loewenzahn_11",
+      "kuerzel": "K11",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S018",
+        "S080",
+        "S093",
+        "S045"
+      ]
+    },
+    {
+      "id": "G_kita_villakunterbunt_12",
+      "kuerzel": "K12",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S001",
+        "S058"
+      ]
+    },
+    {
+      "id": "G_nordstadt",
+      "kuerzel": "NOR",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 1,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S068",
+        "S077",
+        "S054",
+        "S025",
+        "S076",
+        "S039",
+        "S055"
+      ]
+    },
+    {
+      "id": "G_sozialverhalten",
+      "kuerzel": "SOZ",
+      "typ": "verteilung",
+      "modus": "soft",
+      "prio": 3,
+      "max_pro_klasse": 1,
+      "mitglieder": [
+        "S011",
+        "S070",
+        "S091",
+        "S094",
+        "S004"
+      ]
+    },
+    {
+      "id": "G_schulbegleitung",
+      "kuerzel": "SCH",
+      "typ": "buendelung",
+      "modus": "soft",
+      "prio": 2,
+      "max_pro_klasse": null,
+      "mitglieder": [
+        "S006",
+        "S096"
+      ]
+    }
+  ],
+  "balance": [
+    {
+      "regel_id": "geschlecht=w",
+      "ziel": 12,
+      "toleranz": 2,
+      "modus": "soft",
+      "prio": 2,
+      "treffer": [
+        "S001",
+        "S003",
+        "S004",
+        "S005",
+        "S006",
+        "S007",
+        "S012",
+        "S014",
+        "S015",
+        "S017",
+        "S018",
+        "S020",
+        "S021",
+        "S023",
+        "S025",
+        "S026",
+        "S028",
+        "S029",
+        "S030",
+        "S032",
+        "S036",
+        "S039",
+        "S044",
+        "S052",
+        "S054",
+        "S055",
+        "S058",
+        "S059",
+        "S063",
+        "S065",
+        "S068",
+        "S069",
+        "S070",
+        "S072",
+        "S076",
+        "S078",
+        "S080",
+        "S082",
+        "S083",
+        "S085",
+        "S087",
+        "S089",
+        "S090",
+        "S091",
+        "S094",
+        "S095",
+        "S096",
+        "S098"
+      ]
+    },
+    {
+      "regel_id": "sprachfoerderung=ja",
+      "ziel": 4,
+      "toleranz": 1,
+      "modus": "soft",
+      "prio": 2,
+      "treffer": [
+        "S006",
+        "S009",
+        "S011",
+        "S016",
+        "S025",
+        "S038",
+        "S047",
+        "S049",
+        "S059",
+        "S069",
+        "S071",
+        "S074",
+        "S080",
+        "S081",
+        "S091",
+        "S094"
+      ]
+    },
+    {
+      "regel_id": "kann_kind=ja",
+      "ziel": 2,
+      "toleranz": 1,
+      "modus": "soft",
+      "prio": 1,
+      "treffer": [
+        "S014",
+        "S017",
+        "S035",
+        "S042",
+        "S044",
+        "S055",
+        "S057",
+        "S068",
+        "S100"
+      ]
+    }
+  ],
+  "wuensche": [
+    {
+      "index": 0,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[0]:S098\u002BS069",
+      "kinder": [
+        "S098",
+        "S069"
+      ]
+    },
+    {
+      "index": 1,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[1]:S099\u002BS017",
+      "kinder": [
+        "S099",
+        "S017"
+      ]
+    },
+    {
+      "index": 2,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[2]:S017\u002BS085",
+      "kinder": [
+        "S017",
+        "S085"
+      ]
+    },
+    {
+      "index": 3,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[3]:S061\u002BS071",
+      "kinder": [
+        "S061",
+        "S071"
+      ]
+    },
+    {
+      "index": 4,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[4]:S022\u002BS034",
+      "kinder": [
+        "S022",
+        "S034"
+      ]
+    },
+    {
+      "index": 5,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[5]:S068\u002BS078",
+      "kinder": [
+        "S068",
+        "S078"
+      ]
+    },
+    {
+      "index": 6,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[6]:S055\u002BS028",
+      "kinder": [
+        "S055",
+        "S028"
+      ]
+    },
+    {
+      "index": 7,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[7]:S070\u002BS097",
+      "kinder": [
+        "S070",
+        "S097"
+      ]
+    },
+    {
+      "index": 8,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[8]:S094\u002BS089",
+      "kinder": [
+        "S094",
+        "S089"
+      ]
+    },
+    {
+      "index": 9,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[9]:S026\u002BS092",
+      "kinder": [
+        "S026",
+        "S092"
+      ]
+    },
+    {
+      "index": 10,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[10]:S040\u002BS052",
+      "kinder": [
+        "S040",
+        "S052"
+      ]
+    },
+    {
+      "index": 11,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[11]:S086\u002BS084",
+      "kinder": [
+        "S086",
+        "S084"
+      ]
+    },
+    {
+      "index": 12,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[12]:S048\u002BS057",
+      "kinder": [
+        "S048",
+        "S057"
+      ]
+    },
+    {
+      "index": 13,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[13]:S067\u002BS058",
+      "kinder": [
+        "S067",
+        "S058"
+      ]
+    },
+    {
+      "index": 14,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[14]:S016\u002BS032",
+      "kinder": [
+        "S016",
+        "S032"
+      ]
+    },
+    {
+      "index": 15,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[15]:S029\u002BS009",
+      "kinder": [
+        "S029",
+        "S009"
+      ]
+    },
+    {
+      "index": 16,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[16]:S044\u002BS003",
+      "kinder": [
+        "S044",
+        "S003"
+      ]
+    },
+    {
+      "index": 17,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[17]:S076\u002BS071",
+      "kinder": [
+        "S076",
+        "S071"
+      ]
+    },
+    {
+      "index": 18,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[18]:S030\u002BS076",
+      "kinder": [
+        "S030",
+        "S076"
+      ]
+    },
+    {
+      "index": 19,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[19]:S029\u002BS001",
+      "kinder": [
+        "S029",
+        "S001"
+      ]
+    },
+    {
+      "index": 20,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[20]:S010\u002BS091",
+      "kinder": [
+        "S010",
+        "S091"
+      ]
+    },
+    {
+      "index": 21,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[21]:S081\u002BS008",
+      "kinder": [
+        "S081",
+        "S008"
+      ]
+    },
+    {
+      "index": 22,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[22]:S030\u002BS009",
+      "kinder": [
+        "S030",
+        "S009"
+      ]
+    },
+    {
+      "index": 23,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[23]:S005\u002BS043",
+      "kinder": [
+        "S005",
+        "S043"
+      ]
+    },
+    {
+      "index": 24,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[24]:S010\u002BS066",
+      "kinder": [
+        "S010",
+        "S066"
+      ]
+    },
+    {
+      "index": 25,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[25]:S031\u002BS036",
+      "kinder": [
+        "S031",
+        "S036"
+      ]
+    },
+    {
+      "index": 26,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[26]:S086\u002BS063",
+      "kinder": [
+        "S086",
+        "S063"
+      ]
+    },
+    {
+      "index": 27,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[27]:S028\u002BS070",
+      "kinder": [
+        "S028",
+        "S070"
+      ]
+    },
+    {
+      "index": 28,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[28]:S017\u002BS093",
+      "kinder": [
+        "S017",
+        "S093"
+      ]
+    },
+    {
+      "index": 29,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[29]:S074\u002BS061",
+      "kinder": [
+        "S074",
+        "S061"
+      ]
+    },
+    {
+      "index": 30,
+      "typ": "zusammen",
+      "modus": "soft",
+      "prio": 1,
+      "regel_id": "wunsch[30]:S032\u002BS061",
+      "kinder": [
+        "S032",
+        "S061"
+      ]
+    },
+    {
+      "index": 31,
+      "typ": "getrennt",
+      "modus": "soft",
+      "prio": 2,
+      "regel_id": "wunsch[31]:S053\u002BS025",
+      "kinder": [
+        "S053",
+        "S025"
+      ]
+    },
+    {
+      "index": 32,
+      "typ": "getrennt",
+      "modus": "soft",
+      "prio": 2,
+      "regel_id": "wunsch[32]:S013\u002BS085",
+      "kinder": [
+        "S013",
+        "S085"
+      ]
+    },
+    {
+      "index": 33,
+      "typ": "getrennt",
+      "modus": "soft",
+      "prio": 2,
+      "regel_id": "wunsch[33]:S056\u002BS046",
+      "kinder": [
+        "S056",
+        "S046"
+      ]
+    }
+  ],
+  "fixierungen": [
+    {
+      "kind": "S030",
+      "klasse": 1,
+      "nicht_klasse": null
+    }
+  ],
+  "parameter": {
+    "zeitlimit_s": 20,
+    "epsilon": 0.05,
+    "min_distanz": 8
+  },
+  "konsens_kern": [
+    "S001",
+    "S002",
+    "S003",
+    "S009",
+    "S010",
+    "S020",
+    "S025",
+    "S026",
+    "S028",
+    "S029",
+    "S030",
+    "S044",
+    "S048",
+    "S055",
+    "S057",
+    "S058",
+    "S066",
+    "S067",
+    "S069",
+    "S070",
+    "S079",
+    "S091",
+    "S092",
+    "S097",
+    "S098"
+  ],
+  "varianten": [
+    {
+      "index": 1,
+      "status": "Feasible",
+      "objective": 1002,
+      "diff_zu_v1": 0,
+      "zuordnung": {
+        "S001": 2,
+        "S002": 3,
+        "S003": 1,
+        "S004": 3,
+        "S005": 3,
+        "S006": 3,
+        "S007": 1,
+        "S008": 4,
+        "S009": 2,
+        "S010": 3,
+        "S011": 1,
+        "S012": 1,
+        "S013": 1,
+        "S014": 3,
+        "S015": 4,
+        "S016": 1,
+        "S017": 3,
+        "S018": 3,
+        "S019": 4,
+        "S020": 3,
+        "S021": 4,
+        "S022": 3,
+        "S023": 4,
+        "S024": 4,
+        "S025": 2,
+        "S026": 2,
+        "S027": 4,
+        "S028": 2,
+        "S029": 2,
+        "S030": 1,
+        "S031": 2,
+        "S032": 1,
+        "S033": 2,
+        "S034": 3,
+        "S035": 4,
+        "S036": 2,
+        "S037": 2,
+        "S038": 2,
+        "S039": 2,
+        "S040": 1,
+        "S041": 4,
+        "S042": 2,
+        "S043": 3,
+        "S044": 1,
+        "S045": 3,
+        "S046": 3,
+        "S047": 3,
+        "S048": 1,
+        "S049": 4,
+        "S050": 2,
+        "S051": 2,
+        "S052": 1,
+        "S053": 1,
+        "S054": 2,
+        "S055": 2,
+        "S056": 4,
+        "S057": 1,
+        "S058": 2,
+        "S059": 4,
+        "S060": 4,
+        "S061": 1,
+        "S062": 2,
+        "S063": 1,
+        "S064": 3,
+        "S065": 4,
+        "S066": 3,
+        "S067": 2,
+        "S068": 1,
+        "S069": 1,
+        "S070": 2,
+        "S071": 1,
+        "S072": 2,
+        "S073": 4,
+        "S074": 1,
+        "S075": 3,
+        "S076": 1,
+        "S077": 2,
+        "S078": 1,
+        "S079": 1,
+        "S080": 3,
+        "S081": 4,
+        "S082": 4,
+        "S083": 4,
+        "S084": 1,
+        "S085": 3,
+        "S086": 1,
+        "S087": 4,
+        "S088": 2,
+        "S089": 4,
+        "S090": 3,
+        "S091": 3,
+        "S092": 2,
+        "S093": 3,
+        "S094": 4,
+        "S095": 4,
+        "S096": 3,
+        "S097": 2,
+        "S098": 1,
+        "S099": 3,
+        "S100": 3
+      },
+      "balance_kennzahlen": [
+        {
+          "regel_id": "geschlecht=w",
+          "ziel": 12,
+          "toleranz": 2,
+          "counts": [
+            13,
+            12,
+            12,
+            11
+          ]
+        },
+        {
+          "regel_id": "sprachfoerderung=ja",
+          "ziel": 4,
+          "toleranz": 1,
+          "counts": [
+            5,
+            3,
+            4,
+            4
+          ]
+        },
+        {
+          "regel_id": "kann_kind=ja",
+          "ziel": 2,
+          "toleranz": 1,
+          "counts": [
+            3,
+            2,
+            3,
+            1
+          ]
+        }
+      ],
+      "verletzungen": [
+        {
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_regenbogen_2",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_pusteblume_3",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_wirbelwind_4",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_loewenzahn_5",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_villakunterbunt_6",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_sonnenblume_7",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_regenbogen_8",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_pusteblume_9",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_wirbelwind_10",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_villakunterbunt_12",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "prio": 1,
+          "mass": 1
+        },
+        {
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "prio": 3,
+          "mass": 1
+        },
+        {
+          "regel_id": "G_schulbegleitung",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[0]:S098\u002BS069",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[1]:S099\u002BS017",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[2]:S017\u002BS085",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[3]:S061\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[4]:S022\u002BS034",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[5]:S068\u002BS078",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[6]:S055\u002BS028",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[7]:S070\u002BS097",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[8]:S094\u002BS089",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[9]:S026\u002BS092",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[10]:S040\u002BS052",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[11]:S086\u002BS084",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[12]:S048\u002BS057",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[13]:S067\u002BS058",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[14]:S016\u002BS032",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[15]:S029\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[16]:S044\u002BS003",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[17]:S076\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[18]:S030\u002BS076",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[19]:S029\u002BS001",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[20]:S010\u002BS091",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[21]:S081\u002BS008",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[22]:S030\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 1
+        },
+        {
+          "regel_id": "wunsch[23]:S005\u002BS043",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[24]:S010\u002BS066",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[25]:S031\u002BS036",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[26]:S086\u002BS063",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[27]:S028\u002BS070",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[28]:S017\u002BS093",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[29]:S074\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[30]:S032\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[31]:S053\u002BS025",
+          "regel_typ": "wunsch_getrennt",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[32]:S013\u002BS085",
+          "regel_typ": "wunsch_getrennt",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[33]:S056\u002BS046",
+          "regel_typ": "wunsch_getrennt",
+          "prio": 2,
+          "mass": 0
+        }
+      ],
+      "chips": [
+        {
+          "kind": "S031",
+          "regel_id": "G_zwillinge",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_zwillinge: alle in 1b"
+        },
+        {
+          "kind": "S062",
+          "regel_id": "G_zwillinge",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_zwillinge: alle in 1b"
+        },
+        {
+          "kind": "S007",
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_1: alle in 1a"
+        },
+        {
+          "kind": "S084",
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_1: alle in 1a"
+        },
+        {
+          "kind": "S012",
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_1: alle in 1a"
+        },
+        {
+          "kind": "S053",
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_1: alle in 1a"
+        },
+        {
+          "kind": "S057",
+          "regel_id": "G_kita_regenbogen_2",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_2: alle in 1a"
+        },
+        {
+          "kind": "S003",
+          "regel_id": "G_kita_regenbogen_2",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_2: alle in 1a"
+        },
+        {
+          "kind": "S023",
+          "regel_id": "G_kita_pusteblume_3",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_pusteblume_3: alle in 1d"
+        },
+        {
+          "kind": "S065",
+          "regel_id": "G_kita_pusteblume_3",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_pusteblume_3: alle in 1d"
+        },
+        {
+          "kind": "S013",
+          "regel_id": "G_kita_wirbelwind_4",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_4: alle in 1a"
+        },
+        {
+          "kind": "S040",
+          "regel_id": "G_kita_wirbelwind_4",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_4: alle in 1a"
+        },
+        {
+          "kind": "S074",
+          "regel_id": "G_kita_wirbelwind_4",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_4: alle in 1a"
+        },
+        {
+          "kind": "S002",
+          "regel_id": "G_kita_loewenzahn_5",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_5: alle in 1c"
+        },
+        {
+          "kind": "S066",
+          "regel_id": "G_kita_loewenzahn_5",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_5: alle in 1c"
+        },
+        {
+          "kind": "S020",
+          "regel_id": "G_kita_loewenzahn_5",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_5: alle in 1c"
+        },
+        {
+          "kind": "S097",
+          "regel_id": "G_kita_villakunterbunt_6",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_6: alle in 1b"
+        },
+        {
+          "kind": "S092",
+          "regel_id": "G_kita_villakunterbunt_6",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_6: alle in 1b"
+        },
+        {
+          "kind": "S067",
+          "regel_id": "G_kita_villakunterbunt_6",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_6: alle in 1b"
+        },
+        {
+          "kind": "S047",
+          "regel_id": "G_kita_sonnenblume_7",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_7: alle in 1c"
+        },
+        {
+          "kind": "S014",
+          "regel_id": "G_kita_sonnenblume_7",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_7: alle in 1c"
+        },
+        {
+          "kind": "S044",
+          "regel_id": "G_kita_regenbogen_8",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_8: alle in 1a"
+        },
+        {
+          "kind": "S098",
+          "regel_id": "G_kita_regenbogen_8",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_8: alle in 1a"
+        },
+        {
+          "kind": "S079",
+          "regel_id": "G_kita_regenbogen_8",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_8: alle in 1a"
+        },
+        {
+          "kind": "S085",
+          "regel_id": "G_kita_pusteblume_9",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_pusteblume_9: alle in 1c"
+        },
+        {
+          "kind": "S043",
+          "regel_id": "G_kita_pusteblume_9",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_pusteblume_9: alle in 1c"
+        },
+        {
+          "kind": "S050",
+          "regel_id": "G_kita_wirbelwind_10",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_10: alle in 1b"
+        },
+        {
+          "kind": "S037",
+          "regel_id": "G_kita_wirbelwind_10",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_10: alle in 1b"
+        },
+        {
+          "kind": "S018",
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_11: alle in 1c"
+        },
+        {
+          "kind": "S080",
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_11: alle in 1c"
+        },
+        {
+          "kind": "S093",
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_11: alle in 1c"
+        },
+        {
+          "kind": "S045",
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_11: alle in 1c"
+        },
+        {
+          "kind": "S001",
+          "regel_id": "G_kita_villakunterbunt_12",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_12: alle in 1b"
+        },
+        {
+          "kind": "S058",
+          "regel_id": "G_kita_villakunterbunt_12",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_12: alle in 1b"
+        },
+        {
+          "kind": "S068",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S077",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S054",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S025",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S076",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S039",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S055",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S011",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "gelb",
+          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
+        },
+        {
+          "kind": "S070",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "gelb",
+          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
+        },
+        {
+          "kind": "S091",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "rot",
+          "text": "Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"
+        },
+        {
+          "kind": "S094",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "gelb",
+          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
+        },
+        {
+          "kind": "S004",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "rot",
+          "text": "Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"
+        },
+        {
+          "kind": "S006",
+          "regel_id": "G_schulbegleitung",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_schulbegleitung: alle in 1c"
+        },
+        {
+          "kind": "S096",
+          "regel_id": "G_schulbegleitung",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_schulbegleitung: alle in 1c"
+        },
+        {
+          "kind": "S001",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S003",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S004",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S005",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S006",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S007",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S012",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S014",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S015",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S018",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S020",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S021",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S023",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S025",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S026",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S028",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S029",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S030",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S032",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S036",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S039",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S044",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S052",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S054",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S055",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S058",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S059",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S063",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S065",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S068",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S069",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S070",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S072",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S076",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S078",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S080",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S082",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S083",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S085",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S087",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S089",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S090",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S091",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S094",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S095",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 11 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S096",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S098",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S006",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S009",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S011",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S016",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S025",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S038",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S047",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S049",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S059",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S069",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S071",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S074",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S080",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S081",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S091",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S094",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S014",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S035",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 1 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S042",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S044",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S055",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S057",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S068",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S100",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S098",
+          "regel_id": "wunsch[0]:S098\u002BS069",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S069: erfuellt"
+        },
+        {
+          "kind": "S069",
+          "regel_id": "wunsch[0]:S098\u002BS069",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S098: erfuellt"
+        },
+        {
+          "kind": "S099",
+          "regel_id": "wunsch[1]:S099\u002BS017",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S017: erfuellt"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "wunsch[1]:S099\u002BS017",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S099: erfuellt"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "wunsch[2]:S017\u002BS085",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S085: erfuellt"
+        },
+        {
+          "kind": "S085",
+          "regel_id": "wunsch[2]:S017\u002BS085",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S017: erfuellt"
+        },
+        {
+          "kind": "S061",
+          "regel_id": "wunsch[3]:S061\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S071: erfuellt"
+        },
+        {
+          "kind": "S071",
+          "regel_id": "wunsch[3]:S061\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S061: erfuellt"
+        },
+        {
+          "kind": "S022",
+          "regel_id": "wunsch[4]:S022\u002BS034",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S034: erfuellt"
+        },
+        {
+          "kind": "S034",
+          "regel_id": "wunsch[4]:S022\u002BS034",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S022: erfuellt"
+        },
+        {
+          "kind": "S068",
+          "regel_id": "wunsch[5]:S068\u002BS078",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S078: erfuellt"
+        },
+        {
+          "kind": "S078",
+          "regel_id": "wunsch[5]:S068\u002BS078",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S068: erfuellt"
+        },
+        {
+          "kind": "S055",
+          "regel_id": "wunsch[6]:S055\u002BS028",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S028: erfuellt"
+        },
+        {
+          "kind": "S028",
+          "regel_id": "wunsch[6]:S055\u002BS028",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S055: erfuellt"
+        },
+        {
+          "kind": "S070",
+          "regel_id": "wunsch[7]:S070\u002BS097",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S097: erfuellt"
+        },
+        {
+          "kind": "S097",
+          "regel_id": "wunsch[7]:S070\u002BS097",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S070: erfuellt"
+        },
+        {
+          "kind": "S094",
+          "regel_id": "wunsch[8]:S094\u002BS089",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S089: erfuellt"
+        },
+        {
+          "kind": "S089",
+          "regel_id": "wunsch[8]:S094\u002BS089",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S094: erfuellt"
+        },
+        {
+          "kind": "S026",
+          "regel_id": "wunsch[9]:S026\u002BS092",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S092: erfuellt"
+        },
+        {
+          "kind": "S092",
+          "regel_id": "wunsch[9]:S026\u002BS092",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S026: erfuellt"
+        },
+        {
+          "kind": "S040",
+          "regel_id": "wunsch[10]:S040\u002BS052",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S052: erfuellt"
+        },
+        {
+          "kind": "S052",
+          "regel_id": "wunsch[10]:S040\u002BS052",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S040: erfuellt"
+        },
+        {
+          "kind": "S086",
+          "regel_id": "wunsch[11]:S086\u002BS084",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S084: erfuellt"
+        },
+        {
+          "kind": "S084",
+          "regel_id": "wunsch[11]:S086\u002BS084",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S086: erfuellt"
+        },
+        {
+          "kind": "S048",
+          "regel_id": "wunsch[12]:S048\u002BS057",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S057: erfuellt"
+        },
+        {
+          "kind": "S057",
+          "regel_id": "wunsch[12]:S048\u002BS057",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S048: erfuellt"
+        },
+        {
+          "kind": "S067",
+          "regel_id": "wunsch[13]:S067\u002BS058",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S058: erfuellt"
+        },
+        {
+          "kind": "S058",
+          "regel_id": "wunsch[13]:S067\u002BS058",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S067: erfuellt"
+        },
+        {
+          "kind": "S016",
+          "regel_id": "wunsch[14]:S016\u002BS032",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S032: erfuellt"
+        },
+        {
+          "kind": "S032",
+          "regel_id": "wunsch[14]:S016\u002BS032",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S016: erfuellt"
+        },
+        {
+          "kind": "S029",
+          "regel_id": "wunsch[15]:S029\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S009: erfuellt"
+        },
+        {
+          "kind": "S009",
+          "regel_id": "wunsch[15]:S029\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S029: erfuellt"
+        },
+        {
+          "kind": "S044",
+          "regel_id": "wunsch[16]:S044\u002BS003",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S003: erfuellt"
+        },
+        {
+          "kind": "S003",
+          "regel_id": "wunsch[16]:S044\u002BS003",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S044: erfuellt"
+        },
+        {
+          "kind": "S076",
+          "regel_id": "wunsch[17]:S076\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S071: erfuellt"
+        },
+        {
+          "kind": "S071",
+          "regel_id": "wunsch[17]:S076\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S076: erfuellt"
+        },
+        {
+          "kind": "S030",
+          "regel_id": "wunsch[18]:S030\u002BS076",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S076: erfuellt"
+        },
+        {
+          "kind": "S076",
+          "regel_id": "wunsch[18]:S030\u002BS076",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S030: erfuellt"
+        },
+        {
+          "kind": "S029",
+          "regel_id": "wunsch[19]:S029\u002BS001",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S001: erfuellt"
+        },
+        {
+          "kind": "S001",
+          "regel_id": "wunsch[19]:S029\u002BS001",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S029: erfuellt"
+        },
+        {
+          "kind": "S010",
+          "regel_id": "wunsch[20]:S010\u002BS091",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S091: erfuellt"
+        },
+        {
+          "kind": "S091",
+          "regel_id": "wunsch[20]:S010\u002BS091",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S010: erfuellt"
+        },
+        {
+          "kind": "S081",
+          "regel_id": "wunsch[21]:S081\u002BS008",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S008: erfuellt"
+        },
+        {
+          "kind": "S008",
+          "regel_id": "wunsch[21]:S081\u002BS008",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S081: erfuellt"
+        },
+        {
+          "kind": "S030",
+          "regel_id": "wunsch[22]:S030\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "status": "rot",
+          "text": "Wunsch zusammen mit S009: nicht erfuellt"
+        },
+        {
+          "kind": "S009",
+          "regel_id": "wunsch[22]:S030\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "status": "rot",
+          "text": "Wunsch zusammen mit S030: nicht erfuellt"
+        },
+        {
+          "kind": "S005",
+          "regel_id": "wunsch[23]:S005\u002BS043",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S043: erfuellt"
+        },
+        {
+          "kind": "S043",
+          "regel_id": "wunsch[23]:S005\u002BS043",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S005: erfuellt"
+        },
+        {
+          "kind": "S010",
+          "regel_id": "wunsch[24]:S010\u002BS066",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S066: erfuellt"
+        },
+        {
+          "kind": "S066",
+          "regel_id": "wunsch[24]:S010\u002BS066",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S010: erfuellt"
+        },
+        {
+          "kind": "S031",
+          "regel_id": "wunsch[25]:S031\u002BS036",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S036: erfuellt"
+        },
+        {
+          "kind": "S036",
+          "regel_id": "wunsch[25]:S031\u002BS036",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S031: erfuellt"
+        },
+        {
+          "kind": "S086",
+          "regel_id": "wunsch[26]:S086\u002BS063",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S063: erfuellt"
+        },
+        {
+          "kind": "S063",
+          "regel_id": "wunsch[26]:S086\u002BS063",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S086: erfuellt"
+        },
+        {
+          "kind": "S028",
+          "regel_id": "wunsch[27]:S028\u002BS070",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S070: erfuellt"
+        },
+        {
+          "kind": "S070",
+          "regel_id": "wunsch[27]:S028\u002BS070",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S028: erfuellt"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "wunsch[28]:S017\u002BS093",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S093: erfuellt"
+        },
+        {
+          "kind": "S093",
+          "regel_id": "wunsch[28]:S017\u002BS093",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S017: erfuellt"
+        },
+        {
+          "kind": "S074",
+          "regel_id": "wunsch[29]:S074\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S061: erfuellt"
+        },
+        {
+          "kind": "S061",
+          "regel_id": "wunsch[29]:S074\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S074: erfuellt"
+        },
+        {
+          "kind": "S032",
+          "regel_id": "wunsch[30]:S032\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S061: erfuellt"
+        },
+        {
+          "kind": "S061",
+          "regel_id": "wunsch[30]:S032\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S032: erfuellt"
+        },
+        {
+          "kind": "S053",
+          "regel_id": "wunsch[31]:S053\u002BS025",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S025: erfuellt"
+        },
+        {
+          "kind": "S025",
+          "regel_id": "wunsch[31]:S053\u002BS025",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S053: erfuellt"
+        },
+        {
+          "kind": "S013",
+          "regel_id": "wunsch[32]:S013\u002BS085",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S085: erfuellt"
+        },
+        {
+          "kind": "S085",
+          "regel_id": "wunsch[32]:S013\u002BS085",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S013: erfuellt"
+        },
+        {
+          "kind": "S056",
+          "regel_id": "wunsch[33]:S056\u002BS046",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S046: erfuellt"
+        },
+        {
+          "kind": "S046",
+          "regel_id": "wunsch[33]:S056\u002BS046",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S056: erfuellt"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "status": "Feasible",
+      "objective": 1002,
+      "diff_zu_v1": 43,
+      "zuordnung": {
+        "S001": 2,
+        "S002": 3,
+        "S003": 1,
+        "S004": 4,
+        "S005": 3,
+        "S006": 2,
+        "S007": 4,
+        "S008": 3,
+        "S009": 2,
+        "S010": 3,
+        "S011": 4,
+        "S012": 4,
+        "S013": 1,
+        "S014": 4,
+        "S015": 4,
+        "S016": 1,
+        "S017": 3,
+        "S018": 3,
+        "S019": 3,
+        "S020": 3,
+        "S021": 2,
+        "S022": 2,
+        "S023": 4,
+        "S024": 2,
+        "S025": 2,
+        "S026": 2,
+        "S027": 1,
+        "S028": 2,
+        "S029": 2,
+        "S030": 1,
+        "S031": 3,
+        "S032": 1,
+        "S033": 4,
+        "S034": 2,
+        "S035": 4,
+        "S036": 3,
+        "S037": 2,
+        "S038": 2,
+        "S039": 2,
+        "S040": 1,
+        "S041": 2,
+        "S042": 3,
+        "S043": 3,
+        "S044": 1,
+        "S045": 3,
+        "S046": 4,
+        "S047": 4,
+        "S048": 1,
+        "S049": 4,
+        "S050": 2,
+        "S051": 1,
+        "S052": 1,
+        "S053": 4,
+        "S054": 1,
+        "S055": 2,
+        "S056": 3,
+        "S057": 1,
+        "S058": 2,
+        "S059": 3,
+        "S060": 4,
+        "S061": 1,
+        "S062": 3,
+        "S063": 4,
+        "S064": 2,
+        "S065": 4,
+        "S066": 3,
+        "S067": 2,
+        "S068": 1,
+        "S069": 1,
+        "S070": 2,
+        "S071": 1,
+        "S072": 4,
+        "S073": 1,
+        "S074": 1,
+        "S075": 4,
+        "S076": 1,
+        "S077": 1,
+        "S078": 1,
+        "S079": 1,
+        "S080": 3,
+        "S081": 3,
+        "S082": 4,
+        "S083": 3,
+        "S084": 4,
+        "S085": 3,
+        "S086": 4,
+        "S087": 4,
+        "S088": 4,
+        "S089": 1,
+        "S090": 4,
+        "S091": 3,
+        "S092": 2,
+        "S093": 3,
+        "S094": 1,
+        "S095": 2,
+        "S096": 2,
+        "S097": 2,
+        "S098": 1,
+        "S099": 3,
+        "S100": 4
+      },
+      "balance_kennzahlen": [
+        {
+          "regel_id": "geschlecht=w",
+          "ziel": 12,
+          "toleranz": 2,
+          "counts": [
+            13,
+            13,
+            10,
+            12
+          ]
+        },
+        {
+          "regel_id": "sprachfoerderung=ja",
+          "ziel": 4,
+          "toleranz": 1,
+          "counts": [
+            5,
+            4,
+            4,
+            3
+          ]
+        },
+        {
+          "regel_id": "kann_kind=ja",
+          "ziel": 2,
+          "toleranz": 1,
+          "counts": [
+            3,
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "verletzungen": [
+        {
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_regenbogen_2",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_pusteblume_3",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_wirbelwind_4",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_loewenzahn_5",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_villakunterbunt_6",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_sonnenblume_7",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_regenbogen_8",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_pusteblume_9",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_wirbelwind_10",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_villakunterbunt_12",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "prio": 1,
+          "mass": 1
+        },
+        {
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "prio": 3,
+          "mass": 1
+        },
+        {
+          "regel_id": "G_schulbegleitung",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[0]:S098\u002BS069",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[1]:S099\u002BS017",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[2]:S017\u002BS085",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[3]:S061\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[4]:S022\u002BS034",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[5]:S068\u002BS078",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[6]:S055\u002BS028",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[7]:S070\u002BS097",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[8]:S094\u002BS089",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[9]:S026\u002BS092",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[10]:S040\u002BS052",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[11]:S086\u002BS084",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[12]:S048\u002BS057",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[13]:S067\u002BS058",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[14]:S016\u002BS032",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[15]:S029\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[16]:S044\u002BS003",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[17]:S076\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[18]:S030\u002BS076",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[19]:S029\u002BS001",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[20]:S010\u002BS091",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[21]:S081\u002BS008",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[22]:S030\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 1
+        },
+        {
+          "regel_id": "wunsch[23]:S005\u002BS043",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[24]:S010\u002BS066",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[25]:S031\u002BS036",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[26]:S086\u002BS063",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[27]:S028\u002BS070",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[28]:S017\u002BS093",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[29]:S074\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[30]:S032\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[31]:S053\u002BS025",
+          "regel_typ": "wunsch_getrennt",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[32]:S013\u002BS085",
+          "regel_typ": "wunsch_getrennt",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[33]:S056\u002BS046",
+          "regel_typ": "wunsch_getrennt",
+          "prio": 2,
+          "mass": 0
+        }
+      ],
+      "chips": [
+        {
+          "kind": "S031",
+          "regel_id": "G_zwillinge",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_zwillinge: alle in 1c"
+        },
+        {
+          "kind": "S062",
+          "regel_id": "G_zwillinge",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_zwillinge: alle in 1c"
+        },
+        {
+          "kind": "S007",
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_1: alle in 1d"
+        },
+        {
+          "kind": "S084",
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_1: alle in 1d"
+        },
+        {
+          "kind": "S012",
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_1: alle in 1d"
+        },
+        {
+          "kind": "S053",
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_1: alle in 1d"
+        },
+        {
+          "kind": "S057",
+          "regel_id": "G_kita_regenbogen_2",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_2: alle in 1a"
+        },
+        {
+          "kind": "S003",
+          "regel_id": "G_kita_regenbogen_2",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_2: alle in 1a"
+        },
+        {
+          "kind": "S023",
+          "regel_id": "G_kita_pusteblume_3",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_pusteblume_3: alle in 1d"
+        },
+        {
+          "kind": "S065",
+          "regel_id": "G_kita_pusteblume_3",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_pusteblume_3: alle in 1d"
+        },
+        {
+          "kind": "S013",
+          "regel_id": "G_kita_wirbelwind_4",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_4: alle in 1a"
+        },
+        {
+          "kind": "S040",
+          "regel_id": "G_kita_wirbelwind_4",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_4: alle in 1a"
+        },
+        {
+          "kind": "S074",
+          "regel_id": "G_kita_wirbelwind_4",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_4: alle in 1a"
+        },
+        {
+          "kind": "S002",
+          "regel_id": "G_kita_loewenzahn_5",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_5: alle in 1c"
+        },
+        {
+          "kind": "S066",
+          "regel_id": "G_kita_loewenzahn_5",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_5: alle in 1c"
+        },
+        {
+          "kind": "S020",
+          "regel_id": "G_kita_loewenzahn_5",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_5: alle in 1c"
+        },
+        {
+          "kind": "S097",
+          "regel_id": "G_kita_villakunterbunt_6",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_6: alle in 1b"
+        },
+        {
+          "kind": "S092",
+          "regel_id": "G_kita_villakunterbunt_6",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_6: alle in 1b"
+        },
+        {
+          "kind": "S067",
+          "regel_id": "G_kita_villakunterbunt_6",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_6: alle in 1b"
+        },
+        {
+          "kind": "S047",
+          "regel_id": "G_kita_sonnenblume_7",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_7: alle in 1d"
+        },
+        {
+          "kind": "S014",
+          "regel_id": "G_kita_sonnenblume_7",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_7: alle in 1d"
+        },
+        {
+          "kind": "S044",
+          "regel_id": "G_kita_regenbogen_8",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_8: alle in 1a"
+        },
+        {
+          "kind": "S098",
+          "regel_id": "G_kita_regenbogen_8",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_8: alle in 1a"
+        },
+        {
+          "kind": "S079",
+          "regel_id": "G_kita_regenbogen_8",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_8: alle in 1a"
+        },
+        {
+          "kind": "S085",
+          "regel_id": "G_kita_pusteblume_9",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_pusteblume_9: alle in 1c"
+        },
+        {
+          "kind": "S043",
+          "regel_id": "G_kita_pusteblume_9",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_pusteblume_9: alle in 1c"
+        },
+        {
+          "kind": "S050",
+          "regel_id": "G_kita_wirbelwind_10",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_10: alle in 1b"
+        },
+        {
+          "kind": "S037",
+          "regel_id": "G_kita_wirbelwind_10",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_10: alle in 1b"
+        },
+        {
+          "kind": "S018",
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_11: alle in 1c"
+        },
+        {
+          "kind": "S080",
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_11: alle in 1c"
+        },
+        {
+          "kind": "S093",
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_11: alle in 1c"
+        },
+        {
+          "kind": "S045",
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_11: alle in 1c"
+        },
+        {
+          "kind": "S001",
+          "regel_id": "G_kita_villakunterbunt_12",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_12: alle in 1b"
+        },
+        {
+          "kind": "S058",
+          "regel_id": "G_kita_villakunterbunt_12",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_12: alle in 1b"
+        },
+        {
+          "kind": "S068",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S077",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S054",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S025",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S076",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S039",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S055",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S011",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "rot",
+          "text": "Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"
+        },
+        {
+          "kind": "S070",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "gelb",
+          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
+        },
+        {
+          "kind": "S091",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "gelb",
+          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
+        },
+        {
+          "kind": "S094",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "gelb",
+          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
+        },
+        {
+          "kind": "S004",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "rot",
+          "text": "Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"
+        },
+        {
+          "kind": "S006",
+          "regel_id": "G_schulbegleitung",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_schulbegleitung: alle in 1b"
+        },
+        {
+          "kind": "S096",
+          "regel_id": "G_schulbegleitung",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_schulbegleitung: alle in 1b"
+        },
+        {
+          "kind": "S001",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S003",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S004",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S005",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S006",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S007",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S012",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S014",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S015",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S018",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S020",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S021",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S023",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S025",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S026",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S028",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S029",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S030",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S032",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S036",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S039",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S044",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S052",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S054",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S055",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S058",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S059",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S063",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S065",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S068",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S069",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S070",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S072",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S076",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S078",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S080",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S082",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S083",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S085",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S087",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S089",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S090",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S091",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S094",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S095",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S096",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S098",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 13 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S006",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S009",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S011",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S016",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S025",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S038",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S047",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S049",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S059",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S069",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S071",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S074",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S080",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S081",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S091",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S094",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S014",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S035",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S042",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S044",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S055",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 1 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S057",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S068",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S100",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S098",
+          "regel_id": "wunsch[0]:S098\u002BS069",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S069: erfuellt"
+        },
+        {
+          "kind": "S069",
+          "regel_id": "wunsch[0]:S098\u002BS069",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S098: erfuellt"
+        },
+        {
+          "kind": "S099",
+          "regel_id": "wunsch[1]:S099\u002BS017",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S017: erfuellt"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "wunsch[1]:S099\u002BS017",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S099: erfuellt"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "wunsch[2]:S017\u002BS085",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S085: erfuellt"
+        },
+        {
+          "kind": "S085",
+          "regel_id": "wunsch[2]:S017\u002BS085",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S017: erfuellt"
+        },
+        {
+          "kind": "S061",
+          "regel_id": "wunsch[3]:S061\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S071: erfuellt"
+        },
+        {
+          "kind": "S071",
+          "regel_id": "wunsch[3]:S061\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S061: erfuellt"
+        },
+        {
+          "kind": "S022",
+          "regel_id": "wunsch[4]:S022\u002BS034",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S034: erfuellt"
+        },
+        {
+          "kind": "S034",
+          "regel_id": "wunsch[4]:S022\u002BS034",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S022: erfuellt"
+        },
+        {
+          "kind": "S068",
+          "regel_id": "wunsch[5]:S068\u002BS078",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S078: erfuellt"
+        },
+        {
+          "kind": "S078",
+          "regel_id": "wunsch[5]:S068\u002BS078",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S068: erfuellt"
+        },
+        {
+          "kind": "S055",
+          "regel_id": "wunsch[6]:S055\u002BS028",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S028: erfuellt"
+        },
+        {
+          "kind": "S028",
+          "regel_id": "wunsch[6]:S055\u002BS028",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S055: erfuellt"
+        },
+        {
+          "kind": "S070",
+          "regel_id": "wunsch[7]:S070\u002BS097",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S097: erfuellt"
+        },
+        {
+          "kind": "S097",
+          "regel_id": "wunsch[7]:S070\u002BS097",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S070: erfuellt"
+        },
+        {
+          "kind": "S094",
+          "regel_id": "wunsch[8]:S094\u002BS089",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S089: erfuellt"
+        },
+        {
+          "kind": "S089",
+          "regel_id": "wunsch[8]:S094\u002BS089",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S094: erfuellt"
+        },
+        {
+          "kind": "S026",
+          "regel_id": "wunsch[9]:S026\u002BS092",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S092: erfuellt"
+        },
+        {
+          "kind": "S092",
+          "regel_id": "wunsch[9]:S026\u002BS092",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S026: erfuellt"
+        },
+        {
+          "kind": "S040",
+          "regel_id": "wunsch[10]:S040\u002BS052",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S052: erfuellt"
+        },
+        {
+          "kind": "S052",
+          "regel_id": "wunsch[10]:S040\u002BS052",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S040: erfuellt"
+        },
+        {
+          "kind": "S086",
+          "regel_id": "wunsch[11]:S086\u002BS084",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S084: erfuellt"
+        },
+        {
+          "kind": "S084",
+          "regel_id": "wunsch[11]:S086\u002BS084",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S086: erfuellt"
+        },
+        {
+          "kind": "S048",
+          "regel_id": "wunsch[12]:S048\u002BS057",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S057: erfuellt"
+        },
+        {
+          "kind": "S057",
+          "regel_id": "wunsch[12]:S048\u002BS057",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S048: erfuellt"
+        },
+        {
+          "kind": "S067",
+          "regel_id": "wunsch[13]:S067\u002BS058",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S058: erfuellt"
+        },
+        {
+          "kind": "S058",
+          "regel_id": "wunsch[13]:S067\u002BS058",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S067: erfuellt"
+        },
+        {
+          "kind": "S016",
+          "regel_id": "wunsch[14]:S016\u002BS032",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S032: erfuellt"
+        },
+        {
+          "kind": "S032",
+          "regel_id": "wunsch[14]:S016\u002BS032",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S016: erfuellt"
+        },
+        {
+          "kind": "S029",
+          "regel_id": "wunsch[15]:S029\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S009: erfuellt"
+        },
+        {
+          "kind": "S009",
+          "regel_id": "wunsch[15]:S029\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S029: erfuellt"
+        },
+        {
+          "kind": "S044",
+          "regel_id": "wunsch[16]:S044\u002BS003",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S003: erfuellt"
+        },
+        {
+          "kind": "S003",
+          "regel_id": "wunsch[16]:S044\u002BS003",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S044: erfuellt"
+        },
+        {
+          "kind": "S076",
+          "regel_id": "wunsch[17]:S076\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S071: erfuellt"
+        },
+        {
+          "kind": "S071",
+          "regel_id": "wunsch[17]:S076\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S076: erfuellt"
+        },
+        {
+          "kind": "S030",
+          "regel_id": "wunsch[18]:S030\u002BS076",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S076: erfuellt"
+        },
+        {
+          "kind": "S076",
+          "regel_id": "wunsch[18]:S030\u002BS076",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S030: erfuellt"
+        },
+        {
+          "kind": "S029",
+          "regel_id": "wunsch[19]:S029\u002BS001",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S001: erfuellt"
+        },
+        {
+          "kind": "S001",
+          "regel_id": "wunsch[19]:S029\u002BS001",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S029: erfuellt"
+        },
+        {
+          "kind": "S010",
+          "regel_id": "wunsch[20]:S010\u002BS091",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S091: erfuellt"
+        },
+        {
+          "kind": "S091",
+          "regel_id": "wunsch[20]:S010\u002BS091",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S010: erfuellt"
+        },
+        {
+          "kind": "S081",
+          "regel_id": "wunsch[21]:S081\u002BS008",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S008: erfuellt"
+        },
+        {
+          "kind": "S008",
+          "regel_id": "wunsch[21]:S081\u002BS008",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S081: erfuellt"
+        },
+        {
+          "kind": "S030",
+          "regel_id": "wunsch[22]:S030\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "status": "rot",
+          "text": "Wunsch zusammen mit S009: nicht erfuellt"
+        },
+        {
+          "kind": "S009",
+          "regel_id": "wunsch[22]:S030\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "status": "rot",
+          "text": "Wunsch zusammen mit S030: nicht erfuellt"
+        },
+        {
+          "kind": "S005",
+          "regel_id": "wunsch[23]:S005\u002BS043",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S043: erfuellt"
+        },
+        {
+          "kind": "S043",
+          "regel_id": "wunsch[23]:S005\u002BS043",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S005: erfuellt"
+        },
+        {
+          "kind": "S010",
+          "regel_id": "wunsch[24]:S010\u002BS066",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S066: erfuellt"
+        },
+        {
+          "kind": "S066",
+          "regel_id": "wunsch[24]:S010\u002BS066",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S010: erfuellt"
+        },
+        {
+          "kind": "S031",
+          "regel_id": "wunsch[25]:S031\u002BS036",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S036: erfuellt"
+        },
+        {
+          "kind": "S036",
+          "regel_id": "wunsch[25]:S031\u002BS036",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S031: erfuellt"
+        },
+        {
+          "kind": "S086",
+          "regel_id": "wunsch[26]:S086\u002BS063",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S063: erfuellt"
+        },
+        {
+          "kind": "S063",
+          "regel_id": "wunsch[26]:S086\u002BS063",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S086: erfuellt"
+        },
+        {
+          "kind": "S028",
+          "regel_id": "wunsch[27]:S028\u002BS070",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S070: erfuellt"
+        },
+        {
+          "kind": "S070",
+          "regel_id": "wunsch[27]:S028\u002BS070",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S028: erfuellt"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "wunsch[28]:S017\u002BS093",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S093: erfuellt"
+        },
+        {
+          "kind": "S093",
+          "regel_id": "wunsch[28]:S017\u002BS093",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S017: erfuellt"
+        },
+        {
+          "kind": "S074",
+          "regel_id": "wunsch[29]:S074\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S061: erfuellt"
+        },
+        {
+          "kind": "S061",
+          "regel_id": "wunsch[29]:S074\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S074: erfuellt"
+        },
+        {
+          "kind": "S032",
+          "regel_id": "wunsch[30]:S032\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S061: erfuellt"
+        },
+        {
+          "kind": "S061",
+          "regel_id": "wunsch[30]:S032\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S032: erfuellt"
+        },
+        {
+          "kind": "S053",
+          "regel_id": "wunsch[31]:S053\u002BS025",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S025: erfuellt"
+        },
+        {
+          "kind": "S025",
+          "regel_id": "wunsch[31]:S053\u002BS025",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S053: erfuellt"
+        },
+        {
+          "kind": "S013",
+          "regel_id": "wunsch[32]:S013\u002BS085",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S085: erfuellt"
+        },
+        {
+          "kind": "S085",
+          "regel_id": "wunsch[32]:S013\u002BS085",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S013: erfuellt"
+        },
+        {
+          "kind": "S056",
+          "regel_id": "wunsch[33]:S056\u002BS046",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S046: erfuellt"
+        },
+        {
+          "kind": "S046",
+          "regel_id": "wunsch[33]:S056\u002BS046",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S056: erfuellt"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "status": "Feasible",
+      "objective": 1003,
+      "diff_zu_v1": 65,
+      "zuordnung": {
+        "S001": 2,
+        "S002": 3,
+        "S003": 1,
+        "S004": 3,
+        "S005": 2,
+        "S006": 3,
+        "S007": 4,
+        "S008": 4,
+        "S009": 2,
+        "S010": 3,
+        "S011": 1,
+        "S012": 4,
+        "S013": 4,
+        "S014": 2,
+        "S015": 3,
+        "S016": 4,
+        "S017": 2,
+        "S018": 2,
+        "S019": 3,
+        "S020": 3,
+        "S021": 1,
+        "S022": 4,
+        "S023": 1,
+        "S024": 1,
+        "S025": 2,
+        "S026": 2,
+        "S027": 3,
+        "S028": 2,
+        "S029": 2,
+        "S030": 1,
+        "S031": 1,
+        "S032": 4,
+        "S033": 1,
+        "S034": 4,
+        "S035": 3,
+        "S036": 1,
+        "S037": 1,
+        "S038": 1,
+        "S039": 4,
+        "S040": 4,
+        "S041": 3,
+        "S042": 3,
+        "S043": 2,
+        "S044": 1,
+        "S045": 2,
+        "S046": 1,
+        "S047": 2,
+        "S048": 1,
+        "S049": 3,
+        "S050": 1,
+        "S051": 4,
+        "S052": 4,
+        "S053": 4,
+        "S054": 4,
+        "S055": 2,
+        "S056": 3,
+        "S057": 1,
+        "S058": 2,
+        "S059": 3,
+        "S060": 1,
+        "S061": 4,
+        "S062": 1,
+        "S063": 4,
+        "S064": 1,
+        "S065": 1,
+        "S066": 3,
+        "S067": 2,
+        "S068": 4,
+        "S069": 1,
+        "S070": 2,
+        "S071": 4,
+        "S072": 3,
+        "S073": 3,
+        "S074": 4,
+        "S075": 3,
+        "S076": 4,
+        "S077": 2,
+        "S078": 4,
+        "S079": 1,
+        "S080": 2,
+        "S081": 4,
+        "S082": 3,
+        "S083": 3,
+        "S084": 4,
+        "S085": 2,
+        "S086": 4,
+        "S087": 3,
+        "S088": 3,
+        "S089": 4,
+        "S090": 1,
+        "S091": 3,
+        "S092": 2,
+        "S093": 2,
+        "S094": 4,
+        "S095": 3,
+        "S096": 3,
+        "S097": 2,
+        "S098": 1,
+        "S099": 2,
+        "S100": 1
+      },
+      "balance_kennzahlen": [
+        {
+          "regel_id": "geschlecht=w",
+          "ziel": 12,
+          "toleranz": 2,
+          "counts": [
+            10,
+            14,
+            12,
+            12
+          ]
+        },
+        {
+          "regel_id": "sprachfoerderung=ja",
+          "ziel": 4,
+          "toleranz": 1,
+          "counts": [
+            3,
+            4,
+            4,
+            5
+          ]
+        },
+        {
+          "regel_id": "kann_kind=ja",
+          "ziel": 2,
+          "toleranz": 1,
+          "counts": [
+            3,
+            3,
+            2,
+            1
+          ]
+        }
+      ],
+      "verletzungen": [
+        {
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_regenbogen_2",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_pusteblume_3",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_wirbelwind_4",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_loewenzahn_5",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_villakunterbunt_6",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_sonnenblume_7",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_regenbogen_8",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_pusteblume_9",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_wirbelwind_10",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_kita_villakunterbunt_12",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "prio": 1,
+          "mass": 1
+        },
+        {
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "prio": 3,
+          "mass": 1
+        },
+        {
+          "regel_id": "G_schulbegleitung",
+          "regel_typ": "buendelung",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[0]:S098\u002BS069",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[1]:S099\u002BS017",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[2]:S017\u002BS085",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[3]:S061\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[4]:S022\u002BS034",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[5]:S068\u002BS078",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[6]:S055\u002BS028",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[7]:S070\u002BS097",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[8]:S094\u002BS089",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[9]:S026\u002BS092",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[10]:S040\u002BS052",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[11]:S086\u002BS084",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[12]:S048\u002BS057",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[13]:S067\u002BS058",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[14]:S016\u002BS032",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[15]:S029\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[16]:S044\u002BS003",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[17]:S076\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[18]:S030\u002BS076",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 1
+        },
+        {
+          "regel_id": "wunsch[19]:S029\u002BS001",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[20]:S010\u002BS091",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[21]:S081\u002BS008",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[22]:S030\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 1
+        },
+        {
+          "regel_id": "wunsch[23]:S005\u002BS043",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[24]:S010\u002BS066",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[25]:S031\u002BS036",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[26]:S086\u002BS063",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[27]:S028\u002BS070",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[28]:S017\u002BS093",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[29]:S074\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[30]:S032\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "prio": 1,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[31]:S053\u002BS025",
+          "regel_typ": "wunsch_getrennt",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[32]:S013\u002BS085",
+          "regel_typ": "wunsch_getrennt",
+          "prio": 2,
+          "mass": 0
+        },
+        {
+          "regel_id": "wunsch[33]:S056\u002BS046",
+          "regel_typ": "wunsch_getrennt",
+          "prio": 2,
+          "mass": 0
+        }
+      ],
+      "chips": [
+        {
+          "kind": "S031",
+          "regel_id": "G_zwillinge",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_zwillinge: alle in 1a"
+        },
+        {
+          "kind": "S062",
+          "regel_id": "G_zwillinge",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_zwillinge: alle in 1a"
+        },
+        {
+          "kind": "S007",
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_1: alle in 1d"
+        },
+        {
+          "kind": "S084",
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_1: alle in 1d"
+        },
+        {
+          "kind": "S012",
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_1: alle in 1d"
+        },
+        {
+          "kind": "S053",
+          "regel_id": "G_kita_sonnenblume_1",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_1: alle in 1d"
+        },
+        {
+          "kind": "S057",
+          "regel_id": "G_kita_regenbogen_2",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_2: alle in 1a"
+        },
+        {
+          "kind": "S003",
+          "regel_id": "G_kita_regenbogen_2",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_2: alle in 1a"
+        },
+        {
+          "kind": "S023",
+          "regel_id": "G_kita_pusteblume_3",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_pusteblume_3: alle in 1a"
+        },
+        {
+          "kind": "S065",
+          "regel_id": "G_kita_pusteblume_3",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_pusteblume_3: alle in 1a"
+        },
+        {
+          "kind": "S013",
+          "regel_id": "G_kita_wirbelwind_4",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_4: alle in 1d"
+        },
+        {
+          "kind": "S040",
+          "regel_id": "G_kita_wirbelwind_4",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_4: alle in 1d"
+        },
+        {
+          "kind": "S074",
+          "regel_id": "G_kita_wirbelwind_4",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_4: alle in 1d"
+        },
+        {
+          "kind": "S002",
+          "regel_id": "G_kita_loewenzahn_5",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_5: alle in 1c"
+        },
+        {
+          "kind": "S066",
+          "regel_id": "G_kita_loewenzahn_5",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_5: alle in 1c"
+        },
+        {
+          "kind": "S020",
+          "regel_id": "G_kita_loewenzahn_5",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_5: alle in 1c"
+        },
+        {
+          "kind": "S097",
+          "regel_id": "G_kita_villakunterbunt_6",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_6: alle in 1b"
+        },
+        {
+          "kind": "S092",
+          "regel_id": "G_kita_villakunterbunt_6",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_6: alle in 1b"
+        },
+        {
+          "kind": "S067",
+          "regel_id": "G_kita_villakunterbunt_6",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_6: alle in 1b"
+        },
+        {
+          "kind": "S047",
+          "regel_id": "G_kita_sonnenblume_7",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_7: alle in 1b"
+        },
+        {
+          "kind": "S014",
+          "regel_id": "G_kita_sonnenblume_7",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_sonnenblume_7: alle in 1b"
+        },
+        {
+          "kind": "S044",
+          "regel_id": "G_kita_regenbogen_8",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_8: alle in 1a"
+        },
+        {
+          "kind": "S098",
+          "regel_id": "G_kita_regenbogen_8",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_8: alle in 1a"
+        },
+        {
+          "kind": "S079",
+          "regel_id": "G_kita_regenbogen_8",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_regenbogen_8: alle in 1a"
+        },
+        {
+          "kind": "S085",
+          "regel_id": "G_kita_pusteblume_9",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_pusteblume_9: alle in 1b"
+        },
+        {
+          "kind": "S043",
+          "regel_id": "G_kita_pusteblume_9",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_pusteblume_9: alle in 1b"
+        },
+        {
+          "kind": "S050",
+          "regel_id": "G_kita_wirbelwind_10",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_10: alle in 1a"
+        },
+        {
+          "kind": "S037",
+          "regel_id": "G_kita_wirbelwind_10",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_wirbelwind_10: alle in 1a"
+        },
+        {
+          "kind": "S018",
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_11: alle in 1b"
+        },
+        {
+          "kind": "S080",
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_11: alle in 1b"
+        },
+        {
+          "kind": "S093",
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_11: alle in 1b"
+        },
+        {
+          "kind": "S045",
+          "regel_id": "G_kita_loewenzahn_11",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_loewenzahn_11: alle in 1b"
+        },
+        {
+          "kind": "S001",
+          "regel_id": "G_kita_villakunterbunt_12",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_12: alle in 1b"
+        },
+        {
+          "kind": "S058",
+          "regel_id": "G_kita_villakunterbunt_12",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_kita_villakunterbunt_12: alle in 1b"
+        },
+        {
+          "kind": "S068",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S077",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S054",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S025",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S076",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S039",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S055",
+          "regel_id": "G_nordstadt",
+          "regel_typ": "buendelung",
+          "status": "rot",
+          "text": "Buendelung G_nordstadt: auf 2 Klassen verteilt"
+        },
+        {
+          "kind": "S011",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "gelb",
+          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
+        },
+        {
+          "kind": "S070",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "gelb",
+          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
+        },
+        {
+          "kind": "S091",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "rot",
+          "text": "Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"
+        },
+        {
+          "kind": "S094",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "gelb",
+          "text": "Verteilung G_sozialverhalten: 1/1 in dieser Klasse - Kappe voll"
+        },
+        {
+          "kind": "S004",
+          "regel_id": "G_sozialverhalten",
+          "regel_typ": "verteilung",
+          "status": "rot",
+          "text": "Verteilung G_sozialverhalten: 2/1 in dieser Klasse - Kappe ueberschritten"
+        },
+        {
+          "kind": "S006",
+          "regel_id": "G_schulbegleitung",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_schulbegleitung: alle in 1c"
+        },
+        {
+          "kind": "S096",
+          "regel_id": "G_schulbegleitung",
+          "regel_typ": "buendelung",
+          "status": "gruen",
+          "text": "Buendelung G_schulbegleitung: alle in 1c"
+        },
+        {
+          "kind": "S001",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S003",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S004",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S005",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S006",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S007",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S012",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S014",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S015",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S018",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S020",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S021",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S023",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S025",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S026",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S028",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S029",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S030",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S032",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S036",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S039",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S044",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S052",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S054",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S055",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S058",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S059",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S063",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S065",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S068",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S069",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S070",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S072",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S076",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S078",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S080",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S082",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S083",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S085",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 14 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S087",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S089",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S090",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S091",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S094",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S095",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S096",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance geschlecht=w: 12 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S098",
+          "regel_id": "geschlecht=w",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance geschlecht=w: 10 in dieser Klasse (Ziel 12 \u002B/- 2)"
+        },
+        {
+          "kind": "S006",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S009",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S011",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S016",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S025",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S038",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S047",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S049",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S059",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S069",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 3 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S071",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S074",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S080",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S081",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S091",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance sprachfoerderung=ja: 4 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S094",
+          "regel_id": "sprachfoerderung=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance sprachfoerderung=ja: 5 in dieser Klasse (Ziel 4 \u002B/- 1)"
+        },
+        {
+          "kind": "S014",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S035",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S042",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gruen",
+          "text": "Balance kann_kind=ja: 2 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S044",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S055",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S057",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S068",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 1 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S100",
+          "regel_id": "kann_kind=ja",
+          "regel_typ": "balance",
+          "status": "gelb",
+          "text": "Balance kann_kind=ja: 3 in dieser Klasse (Ziel 2 \u002B/- 1)"
+        },
+        {
+          "kind": "S098",
+          "regel_id": "wunsch[0]:S098\u002BS069",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S069: erfuellt"
+        },
+        {
+          "kind": "S069",
+          "regel_id": "wunsch[0]:S098\u002BS069",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S098: erfuellt"
+        },
+        {
+          "kind": "S099",
+          "regel_id": "wunsch[1]:S099\u002BS017",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S017: erfuellt"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "wunsch[1]:S099\u002BS017",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S099: erfuellt"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "wunsch[2]:S017\u002BS085",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S085: erfuellt"
+        },
+        {
+          "kind": "S085",
+          "regel_id": "wunsch[2]:S017\u002BS085",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S017: erfuellt"
+        },
+        {
+          "kind": "S061",
+          "regel_id": "wunsch[3]:S061\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S071: erfuellt"
+        },
+        {
+          "kind": "S071",
+          "regel_id": "wunsch[3]:S061\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S061: erfuellt"
+        },
+        {
+          "kind": "S022",
+          "regel_id": "wunsch[4]:S022\u002BS034",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S034: erfuellt"
+        },
+        {
+          "kind": "S034",
+          "regel_id": "wunsch[4]:S022\u002BS034",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S022: erfuellt"
+        },
+        {
+          "kind": "S068",
+          "regel_id": "wunsch[5]:S068\u002BS078",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S078: erfuellt"
+        },
+        {
+          "kind": "S078",
+          "regel_id": "wunsch[5]:S068\u002BS078",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S068: erfuellt"
+        },
+        {
+          "kind": "S055",
+          "regel_id": "wunsch[6]:S055\u002BS028",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S028: erfuellt"
+        },
+        {
+          "kind": "S028",
+          "regel_id": "wunsch[6]:S055\u002BS028",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S055: erfuellt"
+        },
+        {
+          "kind": "S070",
+          "regel_id": "wunsch[7]:S070\u002BS097",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S097: erfuellt"
+        },
+        {
+          "kind": "S097",
+          "regel_id": "wunsch[7]:S070\u002BS097",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S070: erfuellt"
+        },
+        {
+          "kind": "S094",
+          "regel_id": "wunsch[8]:S094\u002BS089",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S089: erfuellt"
+        },
+        {
+          "kind": "S089",
+          "regel_id": "wunsch[8]:S094\u002BS089",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S094: erfuellt"
+        },
+        {
+          "kind": "S026",
+          "regel_id": "wunsch[9]:S026\u002BS092",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S092: erfuellt"
+        },
+        {
+          "kind": "S092",
+          "regel_id": "wunsch[9]:S026\u002BS092",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S026: erfuellt"
+        },
+        {
+          "kind": "S040",
+          "regel_id": "wunsch[10]:S040\u002BS052",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S052: erfuellt"
+        },
+        {
+          "kind": "S052",
+          "regel_id": "wunsch[10]:S040\u002BS052",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S040: erfuellt"
+        },
+        {
+          "kind": "S086",
+          "regel_id": "wunsch[11]:S086\u002BS084",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S084: erfuellt"
+        },
+        {
+          "kind": "S084",
+          "regel_id": "wunsch[11]:S086\u002BS084",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S086: erfuellt"
+        },
+        {
+          "kind": "S048",
+          "regel_id": "wunsch[12]:S048\u002BS057",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S057: erfuellt"
+        },
+        {
+          "kind": "S057",
+          "regel_id": "wunsch[12]:S048\u002BS057",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S048: erfuellt"
+        },
+        {
+          "kind": "S067",
+          "regel_id": "wunsch[13]:S067\u002BS058",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S058: erfuellt"
+        },
+        {
+          "kind": "S058",
+          "regel_id": "wunsch[13]:S067\u002BS058",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S067: erfuellt"
+        },
+        {
+          "kind": "S016",
+          "regel_id": "wunsch[14]:S016\u002BS032",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S032: erfuellt"
+        },
+        {
+          "kind": "S032",
+          "regel_id": "wunsch[14]:S016\u002BS032",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S016: erfuellt"
+        },
+        {
+          "kind": "S029",
+          "regel_id": "wunsch[15]:S029\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S009: erfuellt"
+        },
+        {
+          "kind": "S009",
+          "regel_id": "wunsch[15]:S029\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S029: erfuellt"
+        },
+        {
+          "kind": "S044",
+          "regel_id": "wunsch[16]:S044\u002BS003",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S003: erfuellt"
+        },
+        {
+          "kind": "S003",
+          "regel_id": "wunsch[16]:S044\u002BS003",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S044: erfuellt"
+        },
+        {
+          "kind": "S076",
+          "regel_id": "wunsch[17]:S076\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S071: erfuellt"
+        },
+        {
+          "kind": "S071",
+          "regel_id": "wunsch[17]:S076\u002BS071",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S076: erfuellt"
+        },
+        {
+          "kind": "S030",
+          "regel_id": "wunsch[18]:S030\u002BS076",
+          "regel_typ": "wunsch_zusammen",
+          "status": "rot",
+          "text": "Wunsch zusammen mit S076: nicht erfuellt"
+        },
+        {
+          "kind": "S076",
+          "regel_id": "wunsch[18]:S030\u002BS076",
+          "regel_typ": "wunsch_zusammen",
+          "status": "rot",
+          "text": "Wunsch zusammen mit S030: nicht erfuellt"
+        },
+        {
+          "kind": "S029",
+          "regel_id": "wunsch[19]:S029\u002BS001",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S001: erfuellt"
+        },
+        {
+          "kind": "S001",
+          "regel_id": "wunsch[19]:S029\u002BS001",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S029: erfuellt"
+        },
+        {
+          "kind": "S010",
+          "regel_id": "wunsch[20]:S010\u002BS091",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S091: erfuellt"
+        },
+        {
+          "kind": "S091",
+          "regel_id": "wunsch[20]:S010\u002BS091",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S010: erfuellt"
+        },
+        {
+          "kind": "S081",
+          "regel_id": "wunsch[21]:S081\u002BS008",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S008: erfuellt"
+        },
+        {
+          "kind": "S008",
+          "regel_id": "wunsch[21]:S081\u002BS008",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S081: erfuellt"
+        },
+        {
+          "kind": "S030",
+          "regel_id": "wunsch[22]:S030\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "status": "rot",
+          "text": "Wunsch zusammen mit S009: nicht erfuellt"
+        },
+        {
+          "kind": "S009",
+          "regel_id": "wunsch[22]:S030\u002BS009",
+          "regel_typ": "wunsch_zusammen",
+          "status": "rot",
+          "text": "Wunsch zusammen mit S030: nicht erfuellt"
+        },
+        {
+          "kind": "S005",
+          "regel_id": "wunsch[23]:S005\u002BS043",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S043: erfuellt"
+        },
+        {
+          "kind": "S043",
+          "regel_id": "wunsch[23]:S005\u002BS043",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S005: erfuellt"
+        },
+        {
+          "kind": "S010",
+          "regel_id": "wunsch[24]:S010\u002BS066",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S066: erfuellt"
+        },
+        {
+          "kind": "S066",
+          "regel_id": "wunsch[24]:S010\u002BS066",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S010: erfuellt"
+        },
+        {
+          "kind": "S031",
+          "regel_id": "wunsch[25]:S031\u002BS036",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S036: erfuellt"
+        },
+        {
+          "kind": "S036",
+          "regel_id": "wunsch[25]:S031\u002BS036",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S031: erfuellt"
+        },
+        {
+          "kind": "S086",
+          "regel_id": "wunsch[26]:S086\u002BS063",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S063: erfuellt"
+        },
+        {
+          "kind": "S063",
+          "regel_id": "wunsch[26]:S086\u002BS063",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S086: erfuellt"
+        },
+        {
+          "kind": "S028",
+          "regel_id": "wunsch[27]:S028\u002BS070",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S070: erfuellt"
+        },
+        {
+          "kind": "S070",
+          "regel_id": "wunsch[27]:S028\u002BS070",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S028: erfuellt"
+        },
+        {
+          "kind": "S017",
+          "regel_id": "wunsch[28]:S017\u002BS093",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S093: erfuellt"
+        },
+        {
+          "kind": "S093",
+          "regel_id": "wunsch[28]:S017\u002BS093",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S017: erfuellt"
+        },
+        {
+          "kind": "S074",
+          "regel_id": "wunsch[29]:S074\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S061: erfuellt"
+        },
+        {
+          "kind": "S061",
+          "regel_id": "wunsch[29]:S074\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S074: erfuellt"
+        },
+        {
+          "kind": "S032",
+          "regel_id": "wunsch[30]:S032\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S061: erfuellt"
+        },
+        {
+          "kind": "S061",
+          "regel_id": "wunsch[30]:S032\u002BS061",
+          "regel_typ": "wunsch_zusammen",
+          "status": "gruen",
+          "text": "Wunsch zusammen mit S032: erfuellt"
+        },
+        {
+          "kind": "S053",
+          "regel_id": "wunsch[31]:S053\u002BS025",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S025: erfuellt"
+        },
+        {
+          "kind": "S025",
+          "regel_id": "wunsch[31]:S053\u002BS025",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S053: erfuellt"
+        },
+        {
+          "kind": "S013",
+          "regel_id": "wunsch[32]:S013\u002BS085",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S085: erfuellt"
+        },
+        {
+          "kind": "S085",
+          "regel_id": "wunsch[32]:S013\u002BS085",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S013: erfuellt"
+        },
+        {
+          "kind": "S056",
+          "regel_id": "wunsch[33]:S056\u002BS046",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S046: erfuellt"
+        },
+        {
+          "kind": "S046",
+          "regel_id": "wunsch[33]:S056\u002BS046",
+          "regel_typ": "wunsch_getrennt",
+          "status": "gruen",
+          "text": "Wunsch getrennt von S056: erfuellt"
+        }
+      ]
+    }
+  ]
+}

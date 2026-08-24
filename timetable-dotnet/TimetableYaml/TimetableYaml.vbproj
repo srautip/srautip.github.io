@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>TimetableYaml</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TimetableCore\TimetableCore.vbproj" />
+  </ItemGroup>
+
+  <!-- Wie SchoolTestRunner/RobustnessRunner: der RootNamespace liegt nicht
+       lexikalisch unter "TimetableCore", deshalb der projektweite
+       Global-Import statt eines Imports je Datei. -->
+  <ItemGroup>
+    <Import Include="TimetableCore" />
+  </ItemGroup>
+
+  <!-- YamlDotNet lebt bewusst NUR hier und nicht in TimetableCore, damit
+       dessen Abhaengigkeitsoberflaeche minimal bleibt (arc42 5.1). -->
+  <ItemGroup>
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
+  </ItemGroup>
+
+</Project>

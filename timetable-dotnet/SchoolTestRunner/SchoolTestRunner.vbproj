@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>SchoolTestRunner</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Seit dem GUI-Unterbau (Stufe A) ist dieses Projekt nur noch die
+       CLI-Huelle: Argument-Parsing (Program.vb) plus die Datei- und
+       Konsolenschicht um die Pipeline. YAML-Persistenz liegt in
+       TimetableYaml, Viewer-Erzeugung und Scaffold in TimetableWorkflow -
+       beides Bibliotheken, damit die Phase-3-GUI sie referenzieren kann,
+       ohne von einem Exe-Projekt abzuhaengen. -->
+  <ItemGroup>
+    <ProjectReference Include="..\TimetableCore\TimetableCore.vbproj" />
+    <ProjectReference Include="..\TimetableYaml\TimetableYaml.vbproj" />
+    <ProjectReference Include="..\TimetableWorkflow\TimetableWorkflow.vbproj" />
+  </ItemGroup>
+
+  <!-- TimetableCore.Tests's RootNamespace ("TimetableCore.Tests") is
+       lexically nested under "TimetableCore", so its files can reference
+       JsonHelpers etc. unqualified without an explicit Imports statement.
+       SchoolTestRunner's RootNamespace isn't nested that way, so it needs
+       this supplied as a project-level global import instead - same
+       reasoning as RobustnessRunner.vbproj. -->
+  <ItemGroup>
+    <Import Include="TimetableCore" />
+    <Import Include="TimetableYaml" />
+    <Import Include="TimetableWorkflow" />
+  </ItemGroup>
+
+</Project>

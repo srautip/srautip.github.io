@@ -1,0 +1,2204 @@
+# Zusaetzliche, handverfasste Regeln der 2. Solver-Stufe (siehe tests/README.md).
+# Automatisch aus gen_bw_gms.py miterzeugt (nicht committetes Wegwerf-Skript) -
+# ein room_requirement pro Fach MIT Raumbedarf, inkl. aller sektionierten
+# Technik-/AES-Kursvarianten. Alle priority: should (Raumknappheit darf den
+# Plan hoechstens verschlechtern, nie unloesbar machen).
+- type: room_requirement
+  subject: Sport
+  allowed_rooms:
+  - Sporthalle1
+  - Sporthalle2
+  - Sporthalle3
+  priority: should
+  reason: Sporthalle noetig
+- type: room_requirement
+  subject: Sport-Profil
+  allowed_rooms:
+  - Sporthalle1
+  - Sporthalle2
+  - Sporthalle3
+  priority: should
+  reason: Sporthalle noetig
+- type: room_requirement
+  subject: Physik
+  allowed_rooms:
+  - NaWi1
+  - NaWi2
+  - NaWi3
+  priority: should
+  reason: naturwissenschaftlicher Fachraum noetig
+- type: room_requirement
+  subject: Chemie
+  allowed_rooms:
+  - NaWi1
+  - NaWi2
+  - NaWi3
+  priority: should
+  reason: naturwissenschaftlicher Fachraum noetig
+- type: room_requirement
+  subject: BNT
+  allowed_rooms:
+  - NaWi1
+  - NaWi2
+  - NaWi3
+  priority: should
+  reason: BNT vereint Bio/Physik/Chemie/Technik
+- type: room_requirement
+  subject: Biologie
+  allowed_rooms:
+  - Bio1
+  - Bio2
+  priority: should
+  reason: eigener Biologie-Fachraum
+- type: room_requirement
+  subject: Musik
+  allowed_rooms:
+  - Musikraum1
+  - Musikraum2
+  priority: should
+  reason: Musikraum noetig
+- type: room_requirement
+  subject: Musik-Profil
+  allowed_rooms:
+  - Musikraum1
+  - Musikraum2
+  priority: should
+  reason: Musikraum noetig
+- type: room_requirement
+  subject: Kunst
+  allowed_rooms:
+  - Kunstraum1
+  - Kunstraum2
+  priority: should
+  reason: Kunstraum noetig
+- type: room_requirement
+  subject: BK-Profil
+  allowed_rooms:
+  - Kunstraum1
+  - Kunstraum2
+  priority: should
+  reason: Kunstraum (Bildende Kunst) noetig
+- type: room_requirement
+  subject: Technik-1
+  allowed_rooms: &id001
+  - Technikraum1
+  - Technikraum2
+  priority: should
+  reason: Technik-/Werkraum noetig
+- type: room_requirement
+  subject: Technik-2
+  allowed_rooms: *id001
+  priority: should
+  reason: Technik-/Werkraum noetig
+- type: room_requirement
+  subject: AES
+  allowed_rooms:
+  - AESraum1
+  - AESraum2
+  priority: should
+  reason: AES-Raum inkl. Lehrkueche noetig
+- type: room_requirement
+  subject: NwT
+  allowed_rooms:
+  - NaWi1
+  - NaWi2
+  - NaWi3
+  - Technikraum1
+  - Technikraum2
+  priority: should
+  reason: NwT vereint Naturwissenschaft und Technik
+- type: room_requirement
+  subject: IMP
+  allowed_rooms:
+  - Computerraum1
+  - Computerraum2
+  priority: should
+  reason: Informatik-/Computerraum noetig
+# Code-Review-Umsetzung P1: kompaktes Dichte-Kriterium statt der
+# frueheren Batterie aus 720 occupied_slot-Kann-Regeln (24 Klassen x 5
+# Tage x Std. 1-6, eine Regel pro Slot). Ein occupied_window-Objekt je
+# Klasse deckt dasselbe Fenster ab; als "should" zaehlt jeder unbelegte
+# Fenster-Slot als Dichte-Defizit in der Rest-Zielfunktion
+# (quality_weights.occupied_density, hier 100 = das fruehere
+# Kann-Gewicht der Batterie) statt einer eigenen Kann-BoolVar pro Slot.
+# Messvergleich beider Varianten: siehe config.yaml.
+- type: occupied_window
+  scope: class
+  entity: 5a
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 5b
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 5c
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 5d
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 6a
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 6b
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 6c
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 6d
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 7a
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 7b
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 7c
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 7d
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 8a
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 8b
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 8c
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 8d
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 9a
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 9b
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 9c
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 9d
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 10a
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 10b
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 10c
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: occupied_window
+  scope: class
+  entity: 10d
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "durchgaengige Vormittagsbelegung (Std. 1-6)"
+- type: forbidden_slot
+  scope: class
+  entity: 5a
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 5a
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 5b
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 5b
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 5c
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 5c
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 5d
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 5d
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6a
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6a
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6b
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6b
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6c
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6c
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6d
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 6d
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7a
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7a
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7b
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7b
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7c
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7c
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7d
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 7d
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8a
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8a
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8b
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8b
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8c
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8c
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8d
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 8d
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9a
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9a
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9b
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9b
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9c
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9c
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9d
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 9d
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10a
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10a
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10b
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10b
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10c
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10c
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10d
+  day: Fr
+  period: 7
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+- type: forbidden_slot
+  scope: class
+  entity: 10d
+  day: Fr
+  period: 8
+  priority: must
+  reason: Freitagnachmittag bleibt frei
+
+# Rhythmisierung (subject_period_window, should): Kernfaecher (Deutsch/
+# Mathematik/Englisch, in 7-10 die Niveaukurse) bevorzugt in den
+# Vormittagsblock (Stunde 1-6). Bewusst 'should' - eine Praeferenz, die
+# gegen Lehrer-Springstunden/Dichte abwaegbar bleibt; Gewicht siehe
+# quality_weights.subject_window in config.yaml. Paare klassengenau aus
+# den realen Sessions abgeleitet (Niveaukurse laufen als parallel_group,
+# jede Klasse erhaelt fuer ihre eigenen Kurs-Sessions dieselbe Regel).
+- type: subject_period_window
+  class: 5a
+  subject: Deutsch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 5a
+  subject: Englisch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 5a
+  subject: Mathematik
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 5b
+  subject: Deutsch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 5b
+  subject: Englisch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 5b
+  subject: Mathematik
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 5c
+  subject: Deutsch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 5c
+  subject: Englisch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 5c
+  subject: Mathematik
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 5d
+  subject: Deutsch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 5d
+  subject: Englisch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 5d
+  subject: Mathematik
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 6a
+  subject: Deutsch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 6a
+  subject: Englisch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 6a
+  subject: Mathematik
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 6b
+  subject: Deutsch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 6b
+  subject: Englisch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 6b
+  subject: Mathematik
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 6c
+  subject: Deutsch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 6c
+  subject: Englisch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 6c
+  subject: Mathematik
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 6d
+  subject: Deutsch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 6d
+  subject: Englisch
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 6d
+  subject: Mathematik
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7a
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7a
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7a
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7a
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7a
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7a
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7a
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7a
+  subject: Englisch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7a
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7a
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7a
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7a
+  subject: Mathematik-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7b
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7b
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7b
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7b
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7b
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7b
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7b
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7b
+  subject: Englisch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7b
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7b
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7b
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7b
+  subject: Mathematik-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7c
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7c
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7c
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7c
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7c
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7c
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7c
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7c
+  subject: Englisch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7c
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7c
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7c
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7c
+  subject: Mathematik-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7d
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7d
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7d
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7d
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7d
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7d
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7d
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7d
+  subject: Englisch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7d
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7d
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7d
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 7d
+  subject: Mathematik-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8a
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8a
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8a
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8a
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8a
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8a
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8a
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8a
+  subject: Englisch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8a
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8a
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8a
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8a
+  subject: Mathematik-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8b
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8b
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8b
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8b
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8b
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8b
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8b
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8b
+  subject: Englisch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8b
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8b
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8b
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8b
+  subject: Mathematik-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8c
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8c
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8c
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8c
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8c
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8c
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8c
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8c
+  subject: Englisch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8c
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8c
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8c
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8c
+  subject: Mathematik-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8d
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8d
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8d
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8d
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8d
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8d
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8d
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8d
+  subject: Englisch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8d
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8d
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8d
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 8d
+  subject: Mathematik-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9a
+  subject: Deutsch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9a
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9a
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9a
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9a
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9a
+  subject: Englisch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9a
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9a
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9a
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9a
+  subject: Mathematik-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9a
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9a
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9a
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9b
+  subject: Deutsch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9b
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9b
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9b
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9b
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9b
+  subject: Englisch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9b
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9b
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9b
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9b
+  subject: Mathematik-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9b
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9b
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9b
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9c
+  subject: Deutsch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9c
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9c
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9c
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9c
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9c
+  subject: Englisch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9c
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9c
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9c
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9c
+  subject: Mathematik-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9c
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9c
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9c
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9d
+  subject: Deutsch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9d
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9d
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9d
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9d
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9d
+  subject: Englisch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9d
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9d
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9d
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9d
+  subject: Mathematik-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9d
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9d
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 9d
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10a
+  subject: Deutsch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10a
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10a
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10a
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10a
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10a
+  subject: Englisch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10a
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10a
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10a
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10a
+  subject: Mathematik-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10a
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10a
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10a
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10b
+  subject: Deutsch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10b
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10b
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10b
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10b
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10b
+  subject: Englisch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10b
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10b
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10b
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10b
+  subject: Mathematik-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10b
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10b
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10b
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10c
+  subject: Deutsch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10c
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10c
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10c
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10c
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10c
+  subject: Englisch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10c
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10c
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10c
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10c
+  subject: Mathematik-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10c
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10c
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10c
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10d
+  subject: Deutsch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10d
+  subject: Deutsch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10d
+  subject: Deutsch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10d
+  subject: Deutsch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10d
+  subject: Deutsch-G-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Deutsch-G-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10d
+  subject: Englisch-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10d
+  subject: Englisch-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10d
+  subject: Englisch-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10d
+  subject: Englisch-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Englisch-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10d
+  subject: Mathematik-A-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-A-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10d
+  subject: Mathematik-E-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-1 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10d
+  subject: Mathematik-E-2
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-E-2 bevorzugt im Vormittagsblock (Rhythmisierung)"
+- type: subject_period_window
+  class: 10d
+  subject: Mathematik-G-1
+  from_period: 1
+  to_period: 6
+  priority: should
+  reason: "Kernfach Mathematik-G-1 bevorzugt im Vormittagsblock (Rhythmisierung)"

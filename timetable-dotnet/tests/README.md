@@ -1,0 +1,975 @@
+# Code-freie Schul-Testfälle
+
+Dieses Verzeichnis enthält Testfälle für den `TimetableCore`-Kern, die
+**ohne VB.NET-Code** angelegt und gepflegt werden können - direkt in der
+GitHub-Weboberfläche editierbar (YAML-Dateien). Jede Schule bekommt ein
+eigenes Unterverzeichnis:
+
+```
+tests/
+  README.md                        (diese Datei)
+  <schule>/
+    input/
+      stammdaten.yaml               (Pflicht) - Klassenstufen/Klassen/Räume/
+                                     Lehrkräfte/Fächer/Fach-Lehrer-Zuordnung
+      constraints.yaml               (optional) - zusätzliche, handverfasste
+                                     Stundenplan-Regeln der 2. Solver-Stufe
+      config.yaml                    (optional) - Solve-Parameter
+    output/
+      lehrerzuteilung.md             (generiert) - wer unterrichtet was,
+                                     Klassenlehrer je Klasse
+      stundenplan.md                  (generiert) - fertiger Stundenplan
+      stundenplan.json                (generiert) - ALLE von Solver.SolveTop
+                                     gefundenen Loesungen als JSON (Phase 2.21)
+      stundentafel.html               (generiert) - interaktive "Stundentafel"-
+                                     Gesamtuebersicht (Phase 2.21), siehe unten
+```
+
+`output/` wird bei jedem Lauf **komplett neu geschrieben** - nicht von Hand
+bearbeiten. Der Sinn eines committeten `output/`-Stands ist, Änderungen an
+`input/` per Pull-Request-Diff sichtbar zu machen (z.B. "diese
+Stammdaten-Änderung ändert den Stundenplan von Klasse 4b so").
+
+## Architektur-Hintergrund (kurz)
+
+Die Pipeline hat zwei Stufen (siehe `docs/arc42-architecture.md` Abschnitt
+8.6/8.7 für Details):
+
+1. **Stammdaten → Lehrereinsatzplanung** (automatisch): aus
+   `stammdaten.yaml` leitet `Lehrereinsatzplanung.SolveLehrereinsatz`
+   selbst ab, WER WAS unterrichtet (Deputat-Korridor, Klassenlehrer-
+   Bündelung, Kontinuität, Fachfremd-Vermeidung, ... - siehe
+   `docs/phase2-15-lehrereinsatzplanung.md`).
+2. **Constraints → Solver.SolveTop** (automatisch + optional handverfasst):
+   das Ergebnis von Stufe 1 wird deterministisch in
+   `teacher_subject_assignment`/`weekly_hours`/`consecutive_required`/
+   `no_overlap`-Regeln übersetzt. `constraints.yaml` ergänzt NUR
+   handverfasste Regeln, die Stufe 1 nicht abdeckt - `teacher_availability`,
+   `forbidden_slot`, `required_slot` (Fach-Slot erzwingen/bevorzugen),
+   `occupied_slot` (fach-unabhängig: irgendeine Stunde der Klasse/Lehrkraft
+   soll diesen Slot belegen - z.B. für eine durchgängige zeitliche Belegung
+   ohne Fachbezug), `room_requirement` (Raumbindung ist bislang NICHT aus
+   den Stammdaten ableitbar, siehe `Raum`-Kopfkommentar in
+   `TimetableCore/Stammdaten.vb`), und ad-hoc `consecutive_required`. Volle
+   Feldreferenz für alle Constraint-Typen: `docs/json-constraints-reference.md`.
+   **Nicht** hier hineinschreiben: `teacher_subject_assignment`/
+   `weekly_hours.hours_per_week` - die kommen ausschließlich aus Stufe 1.
+
+## `stammdaten.yaml`
+
+Beschreibt die feste Grundausstattung der Schule: Klassenstufen, Klassen,
+Räume, Lehrkräfte, Fächer je Klassenstufe und wer welches Fach
+unterrichten darf. Beispiel:
+
+```yaml
+schul_name: Beispiel-Grundschule
+bundesland: BW
+schulart: Grundschule
+tage: [Mo, Di, Mi, Do, Fr]
+periods_per_day: 6
+klassenstufen:
+  - {nummer: 1, bezeichnung: "Klasse 1"}
+klassen:
+  - {name: 1a, klassenstufe: 1, schuelerzahl: 22, erlaubt_klassenlehrer_tandem: false}
+faecher:
+  - name: Deutsch
+    block_length: 2
+    unbeliebt: false
+    klassenstufen:
+      - {klassenstufe: 1, wochenstunden_soll: 6, max_pro_tag: 2}
+raeume:
+  - {name: Turnhalle1, typ: Turnhalle}
+lehrkraefte:
+  - name: Klassenlehrer-1
+    deputat_sollstunden: 28
+    anrechnungsstunden: 2
+    springer_reserve_stunden: 0
+    verfuegbare_tage: [Mo, Di, Mi]
+    bevorzugte_klassenstufen: [1, 2]
+    klassenlehrer_faehig: true
+    max_klassen: 1
+    max_faecher: 3
+fach_lehrer_zuordnungen:
+  - {lehrer_name: Klassenlehrer-1, fach_name: Deutsch, fachfremd: false}
+```
+
+Ein leer gelassener Wert (`block_length:` ohne Text) bedeutet in YAML
+"nicht gesetzt" - identisch zu komplettem Weglassen des Feldes. Alle unten
+als "optional" markierten Felder dürfen weggelassen werden und wirken sich
+dann nicht auf die Planung aus.
+
+### Attribute auf oberster Ebene
+
+- `schul_name` - Name der Schule, rein informativ, taucht so in den
+  Reports auf.
+- `bundesland` - Bundesland-Kürzel (z.B. `BW`), rein informativ für die
+  Stammdaten selbst; für die `new`-CLI entscheidet es, welches Curriculum-
+  Template greift.
+- `schulart` - Schulart als Freitext (z.B. `Grundschule`), rein
+  informativ.
+- `tage` - Liste der Wochentage, an denen überhaupt Unterricht stattfindet
+  (z.B. `[Mo, Di, Mi, Do, Fr]`).
+- `periods_per_day` - Anzahl der Unterrichtsperioden (Stunden) pro Tag.
+- `klassenstufen` - Liste aller Klassenstufen der Schule (siehe unten).
+- `klassen` - Liste aller Klassen der Schule (siehe unten).
+- `faecher` - Liste aller Fächer der Schule (siehe unten).
+- `raeume` - Liste aller Räume der Schule (siehe unten), optional (eine
+  Schule ohne besondere Raumbindung braucht keine Räume).
+- `lehrkraefte` - Liste aller Lehrkräfte der Schule (siehe unten).
+- `fach_lehrer_zuordnungen` - Liste, welche Lehrkraft welches Fach
+  unterrichten darf (siehe unten).
+- `schueler` - optional, Liste aller Schüler der Schule (siehe unten) -
+  nur nötig, wenn `gruppen` genutzt wird.
+- `gruppen` - optional, Liste klassenunabhängiger Schülergruppen (siehe
+  unten), z.B. für Religion ev./kath./Ethik.
+- `feste_zuordnungen` - optional, Liste harter Lehrer-Klasse-Fach-
+  Pinnungen (siehe unten).
+
+### `klassenstufen[]`
+
+- `nummer` - Nummer der Klassenstufe (z.B. `1` für "Klasse 1").
+- `bezeichnung` - Anzeigename der Klassenstufe, rein informativ.
+
+### `klassen[]`
+
+- `name` - Name der Klasse (z.B. `1a`), muss eindeutig sein.
+- `klassenstufe` - zu welcher Klassenstufen-Nummer die Klasse gehört.
+- `schuelerzahl` - optional, Schülerzahl der Klasse, rein informativ.
+- `erlaubt_klassenlehrer_tandem` - optional, Default `false`. Wenn `true`,
+  dürfen für diese Klasse zwei Lehrkräfte gleichzeitig als Klassenlehrer
+  aktiv sein (Tandem) statt wie sonst üblich nur eine einzige.
+
+### `faecher[]`
+
+- `name` - Fachname (z.B. `Deutsch`), muss eindeutig sein und wird von
+  `fach_lehrer_zuordnungen` referenziert.
+- `block_length` - optional. Wenn gesetzt, müssen die Wochenstunden dieses
+  Fachs als zusammenhängender Block dieser Länge unterrichtet werden (z.B.
+  `2` für eine Doppelstunde).
+- `unbeliebt` - optional, Default `false`. Markiert ein im Kollegium
+  unbeliebtes Fach, dessen Zuweisungen möglichst gleichmäßig auf alle
+  dafür qualifizierten Lehrkräfte verteilt werden sollen.
+- `klassenstufen` - Liste, in welchen Klassenstufen das Fach mit welchem
+  Wochenstundenumfang geführt wird (siehe unten). Ein Fach ohne Eintrag
+  für eine Klassenstufe wird dort nicht unterrichtet.
+
+#### `faecher[].klassenstufen[]`
+
+- `klassenstufe` - für welche Klassenstufen-Nummer dieser Eintrag gilt.
+- `wochenstunden_soll` - wie viele Wochenstunden dieses Fach in dieser
+  Klassenstufe hat.
+- `max_pro_tag` - optional, Obergrenze, wie viele Stunden dieses Fachs an
+  einem einzigen Tag für dieselbe Klasse stattfinden dürfen.
+
+### `raeume[]`
+
+- `name` - Raumname (z.B. `Turnhalle1`), referenzierbar in
+  `room_requirement`-Regeln der `constraints.yaml`.
+- `typ` - optional, Freitext-Kategorie des Raums (z.B. `Turnhalle`,
+  `NaWi`), rein informativ/zur eigenen Orientierung.
+
+### `lehrkraefte[]`
+
+- `name` - Name der Lehrkraft, muss eindeutig sein.
+- `deputat_sollstunden` - vertragliches Wochendeputat in Stunden.
+- `anrechnungsstunden` - optional, Default `0`. Stunden, die für andere
+  Aufgaben (z.B. eine Funktionsstelle) vom Deputat abgezogen werden, bevor
+  der tatsächliche Unterrichts-Sollwert berechnet wird.
+- `springer_reserve_stunden` - optional, Default `0`. Wie
+  `anrechnungsstunden`, aber für bewusst freigehaltene Vertretungsreserve
+  - senkt ebenfalls den Unterrichts-Sollwert, ohne dass die
+  Nicht-Ausschöpfung als Problem gewertet wird.
+- `verfuegbare_tage` - optional, Default alle Schultage (Vollzeit). Liste
+  der Wochentage, an denen die Lehrkraft überhaupt im Haus ist (Teilzeit).
+- `bevorzugte_klassenstufen` - optional, Default leer (keine Präferenz).
+  Liste von Klassenstufen-Nummern, die die Lehrkraft bevorzugt
+  unterrichten möchte.
+- `klassenlehrer_faehig` - optional, Default `true`. Ob die Lehrkraft
+  grundsätzlich als Klassenlehrer:in einer Klasse infrage kommt.
+- `max_klassen` - optional, keine Grenze wenn weggelassen. Obergrenze, in
+  wie vielen unterschiedlichen Klassen diese Lehrkraft eingesetzt werden
+  soll.
+- `max_faecher` - optional, keine Grenze wenn weggelassen. Wie
+  `max_klassen`, aber für die Anzahl unterschiedlicher Fächer.
+
+### `fach_lehrer_zuordnungen[]`
+
+- `lehrer_name` - Name der Lehrkraft (muss in `lehrkraefte[]` existieren).
+- `fach_name` - Name des Fachs (muss in `faecher[]` existieren). Nur hier
+  gelistete (Lehrkraft, Fach)-Paare kommen für eine Zuweisung überhaupt in
+  Frage.
+- `fachfremd` - optional, Default `false`. Markiert diese Zuordnung als
+  fachfremden Einsatz - die Lehrkraft bleibt einsetzbar, eine tatsächliche
+  Zuweisung wird aber gegenüber einer regulär qualifizierten Lehrkraft
+  benachteiligt.
+
+### `schueler[]`
+
+- `id` - pseudonyme ID der/des Schülers (z.B. `S-1a-01`), muss eindeutig
+  sein. Bewusst kein Name-Feld (Datenschutz - fürs Scheduling wird kein
+  Klarname gebraucht).
+- `klasse` - Heimatklasse (muss in `klassen[]` existieren).
+
+### `gruppen[]`
+
+Eine klassenunabhängige Gruppe von Schülern - deckt z.B. Religion
+ev./kath./Ethik, Fördergruppen oder Aufsichtsgruppen ab (alle strukturell
+gleich: eine benannte Gruppe, eine Liste von Schüler-IDs).
+
+- `name` - Name der Gruppe (z.B. `Religion-ev-Kl1`), muss eindeutig sein.
+- `typ` - optional, Freitext-Kategorie zur eigenen Einordnung (z.B.
+  `Fachgruppe`, `Foerderung`, `Aufsicht`).
+- `mitglieder_schueler_ids` - Liste von Schüler-IDs (müssen in
+  `schueler[]` existieren).
+- `fach_name` - optional (Phase 2.20): welches Fach diese Gruppe
+  unterrichtet (muss in `faecher[]` existieren). Erst mit diesem Feld
+  gesetzt bekommt eine Gruppe eine Solver-Wirkung.
+- `klassenstufe` - optional (Phase 2.20): die Klassenstufe der Gruppe
+  (nötig, da eine Gruppe mehrere echte Klassen umspannen kann und daher
+  keine einzelne `Klasse.klassenstufe` hat).
+- `parallelverbund` - optional (Phase 2.20): Gruppen mit demselben Wert
+  bilden gemeinsam eine synchron zu planende Partition (z.B.
+  `Religion-Ethik-Kl1` für die drei Religion-ev-/Religion-kath-/
+  Ethik-Kl1-Gruppen) - sie werden über eine neue `parallel_group`-
+  Constraint (siehe `docs/json-constraints-reference.md` Abschnitt 5)
+  gezwungen, immer zur exakt selben Zeit stattzufinden.
+
+**Solver-Wirkung (Phase 2.20):** ist `fach_name`/`klassenstufe`/
+`parallelverbund` gesetzt, plant `Lehrereinsatzplanung.SolveLehrereinsatz`
+für diese Gruppe automatisch EINE Lehrkraft (statt einer pro echter
+Klasse), und `BuildAssignmentConstraints` emittiert eine `parallel_group`-
+Regel, die alle Gruppen desselben Parallelverbunds im Stundenplan
+synchronisiert - der gerenderte `output/stundenplan.md` zeigt sie dann als
+kombinierte Zelle (z.B. `Ethik / Religion-ev / Religion-kath`). Ohne diese
+drei Felder bleibt eine Gruppe weiterhin reine, wirkungslose Stammdatum
+(Phase-2.19-Verhalten). `StammdatenValidation` prüft dabei hart: alle
+Gruppen eines Parallelverbunds brauchen `fach_name` (paarweise
+verschieden), dieselbe `klassenstufe`, UND dasselbe `wochenstunden_soll`/
+`block_length` für diese Klassenstufe - sonst wäre das CP-SAT-Modell
+strukturell unlösbar. Details siehe
+`docs/phase2-20-parallelgruppen.md`.
+
+### `feste_zuordnungen[]`
+
+Optional - eine explizite, harte Vorgabe "diese Lehrkraft unterrichtet
+dieses Fach in dieser Klasse", zusätzlich zu den weichen Präferenzen
+(`bevorzugte_klassenstufen`). Additiv: ohne `feste_zuordnungen` verhält
+sich die Planung exakt wie bisher.
+
+- `lehrer_name` - Name der Lehrkraft (muss in `lehrkraefte[]` existieren
+  UND laut `fach_lehrer_zuordnungen` für `fach_name` qualifiziert sein).
+- `klasse_name` - Name einer Klasse (muss in `klassen[]` existieren) ODER
+  seit Phase 2.27 der Name einer aktiven Gruppe (muss in `gruppen[]`
+  existieren, dort `fach_name`/`klassenstufe` gesetzt haben - siehe
+  `gruppen[]` oben). Klassen und Gruppen teilen sich einen Namensraum,
+  welche Variante gemeint ist wird automatisch erkannt.
+- `fach_name` - Name des Fachs (muss für die Klassenstufe dieser Klasse
+  geführt werden; bei einer Gruppe muss `fach_name` exakt dem `fach_name`
+  der Gruppe selbst entsprechen - eine Gruppe führt strukturell immer
+  genau ein Fach).
+
+**Solver-Wirkung:** `Lehrereinsatzplanung.SolveLehrereinsatz` erzwingt für
+jeden Eintrag hart `assign(lehrer,klasse,fach)=1` - die bestehende "genau 1
+Lehrkraft pro Klasse/Fach"-Summe sorgt dabei automatisch dafür, dass kein
+anderer Kandidat für dieselbe (Klasse,Fach)-Kombination aktiv wird. Bei
+einer Gruppen-Pinnung gilt das für die eine Gruppen-Variable, die anschließend
+auf ALLE real von der Gruppe umspannten Klassen expandiert wird (dieselbe
+Lehrkraft erscheint dann in `lehrerzuteilung.md` für jede dieser Klassen).
+Anders als eine Präferenz kann eine feste Zuordnung NICHT durch die
+Zielfunktion "wegoptimiert" werden - ist die Lehrkraft dafür nicht
+qualifiziert oder teilzeit-tage-inkohärent, meldet
+`StammdatenValidation.ValidateStammdaten` das schon VOR dem Solve als
+Fehler statt eines schwer diagnostizierbaren Infeasible.
+
+Vor jedem Lauf prüft `StammdatenValidation.ValidateStammdaten` die Datei
+auf Konsistenz (unbekannte Klassenstufen-Referenzen, Fach ohne
+qualifizierte Lehrkraft, Deputat-Unsinn, Teilzeit-Tage-Kohärenz, unbekannte
+Schüler-/Gruppen-Referenzen, doppelte Schüler-IDs, feste Zuordnungen mit
+unbekannten Referenzen/fehlender Qualifikation/Teilzeit-Inkohärenz/
+widersprüchlicher Mehrfachzuordnung, ...) - Fehler werden mit Datei-/
+Objektbezug in `output/lehrerzuteilung.md` gemeldet.
+
+## `constraints.yaml`
+
+YAML-Liste von Constraint-Objekten, ein Mapping pro Regel - identisches
+Feldschema wie in `docs/json-constraints-reference.md`, nur in YAML statt
+JSON geschrieben:
+
+```yaml
+- type: teacher_availability
+  teacher: Religionslehrer-1
+  available_days: [Mo, Di, Mi, Do]
+  reason: Teilzeit, freitags nicht im Haus
+- type: room_requirement
+  class: 1a
+  subject: Sport
+  allowed_rooms: [Turnhalle1, Turnhalle2]
+- type: forbidden_slot
+  scope: class
+  entity: 1a
+  day: Fr
+  period: 6
+  priority: should
+```
+
+**Achtung bei Zahlen:** ein unquotierter Wert wie `period: 6` wird als
+Zahl interpretiert, ein in Anführungszeichen gesetzter Wert wie
+`period: "6"` ebenfalls (auf dieser Verarbeitungsstufe ist das nicht mehr
+unterscheidbar) - für dieses Constraint-Schema unproblematisch, da alle
+Zahlenfelder (`period`, `hours_per_week`, `max_per_day`, `block_length`)
+tatsächlich immer Zahlen sein sollen.
+
+Eine leere oder fehlende `constraints.yaml` ist gültig (keine
+zusätzlichen Regeln).
+
+## `config.yaml` (optional)
+
+```yaml
+deputat_toleranz_stunden: 2.0   # Default 2.0
+lehrereinsatz_time_limit_s: 30.0
+solve_time_limit_s: 30.0
+per_solve_time_limit_s: 30.0   # Optional, Default: faellt auf solve_time_limit_s zurueck - siehe unten
+seed: 42
+num_workers: 1   # Default: Anzahl CPU-Kerne - 1 (mindestens 1)
+max_solutions: 1   # Default 1 (Phase 2.21) - siehe unten
+stagnation_timeout_s: 45.0   # Optional, Default 45.0 - Phase 2.25, siehe unten
+diversify_seed: true   # Optional, Default true - Phase 2.25
+randomize_search: true   # Optional, Default true - Phase 2.25
+relative_gap_limit: null   # Optional, Default nicht gesetzt - Phase 2.25, siehe unten
+lexicographic: true   # Optional, Default TRUE (Nutzerentscheidung) - Code-Review-Umsetzung P2, siehe unten
+lex_tolerance: 0   # Optional, Default 0 - nur wirksam mit lexicographic: true
+lex_teacher_gaps_stage: false   # Optional, Default false - TeacherGaps-Stufe ist opt-in, siehe unten
+lex_occupied_density_stage: false   # Optional, Default false - Dichte-Stufe fuer occupied_window, siehe unten
+lex_subject_window_stage: false   # Optional, Default false - Fach-Fenster-Stufe fuer subject_period_window, siehe unten
+min_diversity: 0   # Optional, Default 0 - Code-Review-Umsetzung P3, siehe unten
+rehint_found_solutions: true   # Optional, Default true - Code-Review-Umsetzung P3, siehe unten
+later_iterations_gap_limit: null   # Optional, Default nicht gesetzt - Code-Review-Umsetzung P6, siehe unten
+max_assignments: 1   # Optional, Default 1 - Mehr-Zuteilungs-Modus, siehe unten
+assignment_tolerance: 0   # Optional, Default 0 - Band um das beste Lehrereinsatz-Objective
+assignment_min_diversity: 1   # Optional, Default 1 - Mindestdistanz zwischen Zuteilungen ((Klasse,Fach)-Einheiten mit anderer Lehrkraft)
+assignment_symmetry_breaking: null   # Optional, Default automatisch (aktiv bei max_assignments > 1) - Lex-Symmetriebrechung ueber Aequivalenzklassen
+stage1_time_limit_s: 60.0   # Optional, Default 60.0 - Budget je lexikografischer Stufe bzw. Kann-Warm-Start; bei grossen Szenarien erhoehen, wenn eine Stufe in 60s keine Loesung findet (Folge-Iterationen starten sonst ohne Warm-Start-Hint kalt)
+quality_weights:   # Optional, alle Unterfelder optional (Phase 2.24) - siehe unten
+  kann: 100.0
+  class_gaps: 100.0
+  teacher_gaps: 100.0
+  edge_period: 5.0
+  afternoon_day_count: 5.0
+  class_load_variance: 3.0
+  teacher_load_variance: 3.0
+  occupied_density: 5.0   # Optional, Default 5.0 - Code-Review-Umsetzung P1: Gewicht pro unbelegtem occupied_window-Slot
+  subject_window: 5.0   # Optional, Default 5.0 - Rhythmisierung: Gewicht pro Stunde ausserhalb ihres subject_period_window-Bereichs
+  include_class_gaps: true   # Optional, Default true - Code-Review-Umsetzung R3
+  include_occupied_density: true   # Optional, Default true - P1, strukturelles An/Aus des Dichte-Terms
+  include_subject_window: true   # Optional, Default true - strukturelles An/Aus des Fach-Fenster-Terms
+  include_teacher_gaps: true   # Optional, Default true - Phase 2.25-Nachtrag-2, siehe unten
+  include_edge_period: true   # Optional, Default true - siehe unten
+  include_afternoon_day_count: true   # Optional, Default true - siehe unten
+  include_class_load_variance: true   # Optional, Default true - siehe unten
+  include_teacher_load_variance: true   # Optional, Default true - siehe unten
+```
+
+Fehlt die Datei komplett, gelten diese Defaults unverändert. `solve_time_limit_s`
+begrenzt `Solver.SolveTop`s GESAMTBUDGET über alle Iterationen hinweg;
+`per_solve_time_limit_s` (optional, fehlt es, gilt derselbe Wert wie
+`solve_time_limit_s` - identisch zum bisherigen Verhalten) begrenzt
+zusätzlich jede EINZELNE Solve-Iteration innerhalb dieses Gesamtbudgets.
+
+**Für eine möglichst optimale EINZELNE Lösung** ist NICHT `max_solutions`
+der relevante Hebel - jede weitere Solve-Iteration optimiert ohnehin gegen
+dieselbe Zielfunktion und kann daher nur eine gleich gute, nie eine
+bessere Alternative finden. Entscheidend ist stattdessen ein ausreichend
+hohes `solve_time_limit_s`: nur mit genug Zeit kann CP-SAT den gefundenen
+Plan tatsächlich als `Optimal` BEWEISEN statt ihn nach Zeitablauf nur als
+`Feasible` zurückzugeben. Das tatsächlich erreichte Ergebnis steht im
+`CP-SAT-Status`-Feld der `**Status:**`-Zeile in `output/stundenplan.md` -
+bei `Feasible` erscheint dort zusätzlich ein Hinweis, `solve_time_limit_s`
+zu erhöhen.
+
+**`max_solutions`** (Default 1) steuert stattdessen, wie viele
+VERGLEICHBARE Alternativ-Lösungen berechnet und in `output/stundenplan.json`
++ `output/stundentafel.html` exportiert werden (siehe Abschnitt
+"Stundentafel-Visualisierung" unten) - der beste Kandidat bleibt weiterhin
+allein maßgeblich für `lehrerzuteilung.md`/`stundenplan.md`. Ein höherer
+Wert verlängert die Gesamtlaufzeit NICHT über `solve_time_limit_s` hinaus
+(`Solver.SolveTop` prüft das verbleibende Zeitbudget vor jeder weiteren
+Iteration) - er kann aber dazu führen, dass die ERSTE Lösung bereits das
+gesamte Budget aufbraucht (falls sie nicht schnell als `Optimal` bewiesen
+werden kann) und dadurch trotz höherem `max_solutions` nur eine einzige
+Lösung gefunden wird, bevor `solve_time_limit_s` abläuft - das ist kein
+Fehler, sondern zeigt lediglich, dass für weitere Alternativen zusätzlich
+Zeit benötigt wird. Zwei Hebel dafür: `solve_time_limit_s` selbst erhöhen
+(mehr Gesamtzeit für alle Iterationen zusammen), oder gezielter
+`per_solve_time_limit_s` NIEDRIGER als `solve_time_limit_s` setzen - das
+zwingt jede einzelne Iteration früher zum Abbruch (statt das gesamte
+Budget zu verbrauchen, bevor sie `Optimal` beweisen kann) und lässt so
+innerhalb desselben Gesamtbudgets mehrere Iterationen zu.
+
+**`stagnation_timeout_s`/`diversify_seed`/`randomize_search`/`relative_gap_limit`**
+(Phase 2.25, direkte Antwort auf die Beobachtung, dass `Solver.SolveTop`s
+`BestObjectiveBound` bei manchen Szenarien über lange Zeit unbewegt bleibt,
+obwohl noch Budget übrig ist): `stagnation_timeout_s` (Default 45.0s,
+**standardmäßig aktiv** - eine bewusste Ausnahme vom sonst üblichen
+"fehlt das Feld, bleibt das Verhalten unverändert"-Prinzip) bricht eine
+einzelne Solve-Iteration vorzeitig ab, sobald so lange keine neue
+Verbesserung mehr gefunden wurde - die dadurch gesparte Zeit steht der
+nächsten Iteration zur Verfügung, statt eine stehende Suche bis zum
+Zeitlimit weiterlaufen zu lassen (sichtbar an `IterationsRun`/
+`StagnationTriggeredCount`, siehe der entsprechende Hinweis in
+`stundenplan.md`, falls der Mechanismus tatsächlich gegriffen hat). Bei
+den üblichen kurzen `per_solve_time_limit_s`-Budgets greift dieser Cutoff
+in der Praxis nie (das Budget ist ohnehin kürzer) - relevant wird er erst
+bei großzügig konfigurierten Zeitbudgets. `diversify_seed`/
+`randomize_search` (beide Default `true`) lassen aufeinanderfolgende
+Iterationen unterschiedliche Teile des Suchraums erkunden (verschiedener
+effektiver Seed pro Iteration bzw. CP-SATs eigene `randomize_search`-
+Option) - beide bleiben für wiederholte Aufrufe mit demselben `seed`
+weiterhin vollständig deterministisch. `relative_gap_limit` bleibt bewusst
+NICHT standardmäßig aktiv (Default nicht gesetzt) - anders als die drei
+Felder oben ändert es, WANN CP-SAT eine Lösung als bewiesen optimal
+akzeptiert (eine Lücke bis zu diesem Prozentsatz wird toleriert statt
+weiter nach Beweis gesucht), eine stärkere Verhaltensänderung, die diese
+Phase nicht für jede Schule ungefragt erzwingt.
+
+**`lexicographic`/`lex_tolerance`/`lex_teacher_gaps_stage`**
+(Code-Review-Umsetzung P2, siehe `docs/code-review-cpsat-performance.md`):
+der lexikografische Modus ersetzt die eine große gewichtete Zielfunktion
+durch nacheinander einzeln optimierte Stufen - Kann-Verstöße, dann
+Klassen-Springstunden (ClassGaps). Das Optimum jeder Stufe wird als
+Constraint fixiert (`<= Optimum + lex_tolerance`), erst danach laufen
+die normalen Iterationen über die gewichtete REST-Zielfunktion
+(Lehrer-Springstunden, Randstunden, Nachmittags-Tage, Ausgewogenheit -
+soweit per `include_*` aktiv). Vorteil: jede Stufe ist klein genug, dass
+CP-SAT ihr Optimum in der Regel BEWEISEN kann (die Phase-2.25-Messungen
+zeigten 0,2s für Kann-only gegen 97-99% Restlücke beim Summenmodell) -
+alle gefundenen Alternativen sind dann garantiert stufen-optimal statt
+"irgendwo im Band einer nie geschlossenen Lücke".
+
+Dieser Modus ist seit der Review-Runde **standardmäßig aktiv**
+(explizite Nutzerentscheidung - wie bei `stagnation_timeout_s` eine
+bewusste Ausnahme vom "fehlt das Feld, bleibt das Verhalten
+unverändert"-Prinzip). Zu beachten: die STUFENREIHENFOLGE legt die
+Priorität Kann > ClassGaps fest - die `quality_weights` der gestuften
+Kriterien steuern nur noch das nachgelagerte Ranking, nicht mehr die
+Suche. Wer die Priorität frei über Gewichte tauschen will (z.B.
+Randstunden wichtiger als Springstunden), setzt `lexicographic: false`
+und erhält den früheren gewichteten Summenmodus unverändert.
+
+**`lex_teacher_gaps_stage`** (Default `false`, ebenfalls
+Nutzerentscheidung): Lehrer-Springstunden (TeacherGaps) sind
+standardmäßig KEINE eigene Stufe, sondern bleiben mit ihrem
+`quality_weights`-Gewicht Teil der Rest-Zielfunktion - so bleiben sie
+gegen Randstunden/Nachmittage/Ausgewogenheit abwägbar, statt die
+Klassenpläne dem hart fixierten Lehrerplan-Optimum unterzuordnen.
+`true` hängt TeacherGaps als dritte Stufe an (Kann > ClassGaps >
+TeacherGaps): sein Optimum wird dann VOR jeder Gewichtsabwägung
+fixiert - sinnvoll, wenn lückenlose Lehrerpläne für die Schule
+Vorrang vor allen Restkriterien haben. `lex_tolerance` (Default 0)
+weitet das Band je Stufe, z.B. `1` = "eine Springstunde mehr als das
+Optimum ist für zusätzliche Alternativen akzeptabel".
+
+**`lex_occupied_density_stage`** (Default `false`): macht die
+`occupied_window`-Dichte zur eigenen lexikografischen Stufe ZWISCHEN
+Kann und ClassGaps - sie bekommt ein dediziertes Budget
+(`stage1_time_limit_s`) und ihr Optimum wird als hartes Band fixiert.
+Hintergrund: der P1-Langvergleich am `bw-gms-beispiel` zeigte, dass die
+frühere `occupied_slot`-Batterie die Fensterabdeckung genau wegen
+dieses Stufen-Vorteils dominierte (ihre Kann-Stufe optimierte die
+Dichte mit eigenem Budget), nicht wegen ihrer Kodierung - diese Option
+gibt dem kompakten `occupied_window`-Kriterium denselben Vorteil. Mit
+aktiver Stufe steuert `occupied_density` nur noch das nachgelagerte
+Ranking, nicht mehr die Suche; ohne sie bleibt die Dichte gewichtet in
+der Rest-Zielfunktion abwägbar.
+
+**`max_assignments` / `assignment_tolerance` /
+`assignment_min_diversity` / `assignment_symmetry_breaking`
+(Mehr-Zuteilungs-Modus):** bei `max_assignments > 1` enumeriert Stufe 1
+mehrere NICHTSYMMETRISCHE Lehrer-Zuteilungen (SolveTop-Muster:
+No-Good- und Diversitäts-Cuts auf demselben Modell, Objective-Band
+`optimum + assignment_tolerance`), und jede Zuteilung bekommt einen
+eigenen Stufe-2-Lauf - `solve_time_limit_s` und `max_solutions` werden
+gleichmäßig aufgeteilt, die Lösungen aller Zuteilungen landen global
+nach Total sortiert im Export (Spalte "Zuteilung" im Viewer).
+Nichtsymmetrie: vorab werden Äquivalenzklassen austauschbarer
+Lehrkräfte berechnet (identische Qualifikationen, Deputate,
+Verfügbarkeiten, `feste_zuordnungen` und - auf einen Platzhalter
+normalisiert - Constraint-Erwähnungen); die automatisch aktive
+Lex-Symmetriebrechung lässt pro Symmetrie-Orbit nur den kanonischen
+Repräsentanten zu, reine Permutationen austauschbarer Lehrkräfte können
+also gar nicht erst als "Alternative" auftauchen. Die Klassen mit >= 2
+Mitgliedern erscheinen in `lehrerzuteilung.md` und im Viewer als
+"direkt tauschbar" (⇄ im Lehrerplan-Kopf samt Legende).
+
+**`lex_subject_window_stage`** (Default `false`): gleiches Muster für
+die Fach-Fenster-Verstöße von should-`subject_period_window`-Regeln
+(Rhythmisierung: "Kernfächer vormittags", "AGs Mo-Do nachmittags") -
+als eigene lexikografische Stufe NACH der Dichte-Stufe und VOR
+ClassGaps wird ihr Minimum als hartes Band fixiert, bevor die
+Gewichte zum Zug kommen. Ohne die Stufe bleiben die Verstöße mit
+`quality_weights.subject_window` in der Rest-Zielfunktion abwägbar.
+
+**`min_diversity`/`rehint_found_solutions`** (Code-Review-Umsetzung P3):
+Werkzeuge für "möglichst VERSCHIEDENE Alternativen statt
+Ein-Slot-Nachbarn". `min_diversity` (Default 0 = bisheriges Verhalten)
+verlangt, dass jede weitere Lösung mindestens so viele der bisher
+belegten (Klasse,Fach,Lehrer,Tag,Stunde)-Slots ANDERS belegt - ein
+echter Distanz-Cut gegen jede bereits gefundene Lösung, statt nur deren
+exakte Wiederholung zu verbieten. Sinnvolle Werte: grob 5-10% der
+Gesamt-Wochenstunden aller Klassen; zu hohe Werte erschöpfen den
+Suchraum bewusst früher (`SearchSpaceExhausted` = "keine ausreichend
+verschiedene Lösung existiert mehr"). `rehint_found_solutions: false`
+schaltet zusätzlich ab, dass jede Iteration auf die soeben gefundene
+Lösung "gehintet" wird - dieses Re-Hinting beschleunigt das Finden
+IRGENDEINER nächsten Lösung, zieht die Suche aber systematisch zum
+nächstgelegenen Nachbarn der Vorlösung; für Diversitäts-Läufe gehören
+beide Hebel zusammen (`min_diversity` > 0 und `rehint_found_solutions:
+false`).
+
+**`later_iterations_gap_limit`** (Code-Review-Umsetzung P6): setzt
+CP-SATs `relative_gap_limit` erst AB DER ZWEITEN Solve-Iteration - die
+erste Iteration darf weiterhin sorgfältig ein Optimum beweisen, während
+Folge-Iterationen (deren Zweck zusätzliche ALTERNATIVEN sind, nie ein
+besseres Optimum) eine Lösung innerhalb dieser relativen Lücke früher
+als final akzeptieren; so passen mehr Kandidaten ins selbe
+Gesamtbudget. Sinnvolle Werte ~0.05-0.2. Überstimmt ab Iteration 2 ein
+gesetztes `relative_gap_limit`; Default nicht gesetzt = unverändertes
+Verhalten.
+
+**Hinweis zur Objective-Skala (P6):** die gewichteten Zielfunktionen
+(Gesamtsumme bzw. Rest-Zielfunktion im lexikografischen Modus) werden
+intern GCD-normalisiert - haben z.B. alle aktiven Gewichte den
+gemeinsamen Teiler 100, rechnet der Solver mit den Koeffizienten /100.
+Das ändert weder Optimum noch Ranking, entlastet aber CP-SATs
+Optimalitätsbeweis bei großen Gewichten. Sichtbare Folge: die in
+`stundenplan.md`/`stundenplan.json` ausgewiesenen `objective_value`/
+`best_objective_bound` liegen dann auf der kleineren Skala, während
+`Quality.Total` unverändert die volle Gewichtsskala nutzt - die
+Optimalitäts-LÜCKE in Prozent ist von der Skalierung unabhängig und
+bleibt über Läufe vergleichbar.
+
+**`quality_weights`** (Phase 2.24, komplett optional - fehlt der Block
+oder ein einzelnes Unterfeld darin, gilt unverändert der jeweils oben
+gezeigte Default) gewichtet, wie stark jedes der 7 Bewertungskriterien in
+`Solver.SolveTop`s Zielfunktion UND in der angezeigten `Quality.Total`
+(`stundenplan.md`/`stundenplan.json`) einfließt - dieselben Werte steuern
+beides gleichzeitig, damit die Anzeige immer zu dem passt, wonach der
+Solver tatsächlich gesucht hat:
+
+| Feld | Bedeutet |
+|---|---|
+| `kann` | Verletzte "Kann"-Regeln (`priority: should`) - dominiert `edge_period`/`afternoon_day_count`/`*_load_variance` |
+| `class_gaps` / `teacher_gaps` | Springstunden (Lücken zwischen belegten Stunden an einem Tag) für Klassen bzw. Lehrkräfte - seit Phase 2.25-Nachtrag-2 mit `kann` gleichgewichtet (früher `class_gaps` bewusst höher als `kann`; Live-Experimente zeigten, dass nicht das Gewicht, sondern die CP-SAT-Kodierung von `teacher_gaps` die eigentliche Ursache für schlecht beweisbare Lösungsschranken war - siehe `docs/phase2-25-stagnation-heuristik.md`, Nachtrag 2) |
+| `edge_period` | Randstunden: 1. Stunde oder Nachmittag (Periode ≥ 7) |
+| `afternoon_day_count` | Anzahl unterschiedlicher Tage mit Nachmittagsunterricht pro Klasse (nicht die Stundenanzahl - 4 Nachmittagsstunden an 1 Tag zählen als 1, an 4 Tagen verteilt als 4) |
+| `class_load_variance` / `teacher_load_variance` | Ausgewogenheit der täglichen Stundenzahl (Lehrkräfte nur über ihre tatsächlichen Arbeitstage) |
+| `include_teacher_gaps` | `false` schaltet `teacher_gaps` STRUKTURELL aus der Zielfunktion aus (keine Hilfsvariablen im Modell, nicht nur Gewicht 0) - Sicherheitsventil für Schulen, bei denen selbst die gefixte Kodierung (Phase 2.25-Nachtrag-2) noch zu teuer ist. Default `true`. |
+| `include_edge_period` / `include_afternoon_day_count` / `include_class_load_variance` / `include_teacher_load_variance` | Gleiches strukturelles An/Aus-Muster wie `include_teacher_gaps` für die verbleibenden vier Sekundärkriterien - `false` entfernt das jeweilige Kriterium komplett aus `Solver.SolveTop`s CP-SAT-Modell (keine Hilfsvariablen, nicht nur Gewicht 0), z.B. für Schulen, bei denen nur Kann/`class_gaps`/`teacher_gaps` überhaupt eine Rolle spielen sollen. Beeinflusst NICHT `ScheduleQuality.Score`s unabhängig berechnete, immer angezeigte Werte in `stundenplan.md`/`stundenplan.json` (nur die SUCHE wird dafür blind, nicht die Anzeige). Jeweils Default `true`. |
+
+Nur explizit gesetzte Unterfelder überschreiben ihren Default - eine
+Schule kann also z.B. nur `edge_period` anpassen, ohne die übrigen 6
+Gewichte mit angeben zu müssen. Ein Wert von `0` schaltet ein Kriterium
+komplett ab (der Solver optimiert dann gar nicht mehr danach). Intern
+fließen die Gewichte im CP-SAT-Modell als GANZE Zahlen ein (gerundet) -
+für die reine Rangfolge zwischen Kriterien spielt das praktisch nie eine
+Rolle, aber die in `stundenplan.md`/`stundenplan.json` angezeigte
+`Quality.Total` selbst verwendet die exakten (nicht gerundeten) Werte.
+
+## CLI: Grundgerüst per Template erzeugen
+
+```bash
+cd timetable-dotnet   # Arbeitsverzeichnis wichtig - "tests/" wird relativ dazu aufgelöst
+dotnet run --project SchoolTestRunner -- new <schule> \
+  --schulart Grundschule --bundesland BW --klassenstufen 4 --lehrer 8 [--zuege 2]
+```
+
+- `--schulart`: `Grundschule` oder `Gemeinschaftsschule`.
+- `--bundesland`: aktuell nur `BW` recherchiert (siehe
+  `docs/phase2-15-lehrereinsatzplanung.md`) - jedes andere Bundesland
+  liefert eine klare Fehlermeldung statt erfundener Lehrplan-Zahlen.
+- `--klassenstufen`: wie viele Klassenstufen (von der niedrigsten
+  aufsteigend) erzeugt werden sollen - Grundschule max. 4, Gemeinschafts-
+  schule max. 6.
+- `--lehrer`: EXAKTE Anzahl der zu erzeugenden Klassenlehrer-Pool-
+  Einträge (Nutzerentscheidung Phase 2.18: keine automatische Korrektur).
+  Wird proportional zum tatsächlichen Fächer-Bedarf auf die Klassenlehrer-
+  Pool-Typen der Schulart verteilt (Grundschule: ein Pool-Typ;
+  Gemeinschaftsschule: drei, je Zwei-Fächer-Kombination) - muss mindestens
+  so groß sein wie die Anzahl Pool-Typen. Die stets benötigten
+  Fachlehrer-Spezialisten (Religion/Englisch bzw. NaWi/Sport/Musik-Kunst/
+  Religion) werden dafür automatisch bedarfsgerecht ergänzt, ohne eigenen
+  Parameter.
+- `--zuege` (optional, Default 2): Anzahl paralleler Klassen je
+  Klassenstufe (a, b, c, ...).
+
+Schreibt `tests/<schule>/input/stammdaten.yaml` + eine leere,
+kommentierte `constraints.yaml`. Bricht ab, falls `tests/<schule>/input/`
+bereits existiert (kein versehentliches Überschreiben).
+
+## CLI: Testfall ausführen
+
+```bash
+dotnet run --project SchoolTestRunner -- run <schule>
+dotnet run --project SchoolTestRunner -- run --all   # alle Schulen unter tests/
+```
+
+Durchläuft die komplette Pipeline und schreibt `output/lehrerzuteilung.md`
++ `output/stundenplan.md` + `output/stundenplan.json` +
+`output/stundentafel.html` - auch bei einem Abbruch in einer späten Stufe
+bleibt der bis dahin erreichte Fortschritt sichtbar (kein
+Alles-oder-Nichts; die beiden neuen Stundentafel-Dateien werden nur
+geschrieben, wenn `Solver.SolveTop` mindestens eine Lösung fand). Gibt pro
+Schule eine `PASS`/`FAIL`-Zeile aus und liefert Exitcode 0 nur, wenn ALLE
+Stufen (StammdatenValidation, Lehrereinsatzplanung, VerifyLehrereinsatz,
+Validation.ValidateEntities, Solver.SolveTop, VerifySchedule) sauber
+durchlaufen - Exitcode 1 sonst (nutzbar für eine spätere CI-Anbindung,
+ohne dass diese schon Teil dieses Tools ist).
+
+Der Stundenplan wird über `Solver.SolveTop` (nicht das einfachere
+`Solver.Solve`) erzeugt: dieselbe Qualitäts-Zielfunktion (Lücken,
+Randstunden, Tagesausgewogenheit - siehe `ScheduleQuality.vb`), die sonst
+erst nachträglich zum Sortieren mehrerer Kandidaten benutzt wird, fließt
+hier direkt ins CP-SAT-Modell ein - der Solver sucht von vornherein einen
+bzgl. dieser Kriterien möglichst guten statt nur irgendeinen zulässigen
+Plan. Standardmäßig wird nur EIN finaler Plan erzeugt (`max_solutions: 1`);
+ein höherer Wert in `config.yaml` exportiert zusätzliche, vergleichbare
+Alternativen (siehe Abschnitt "Stundentafel-Visualisierung" unten).
+
+## Klassenbildung (Stufe 0, `klassen <schule>`)
+
+`dotnet run --project SchoolTestRunner -- klassen <schule>` löst die
+**Klassenbildung** (docs/klassenbildung-konzept.md + -plan.md) aus
+`input/klassenbildung.yaml`: Schüler mit Pseudonym-IDs und
+Attribut-Tags, Klassenrahmen, Bündelungs-/Verteilungsgruppen
+(`modus: hard|soft`, `prio: 1..3`), Balance-Kriterien,
+Zusammen-/Getrennt-Wünsche und Fixierungen (`klasse` = F1,
+`nicht_klasse` = F2). Parameter über den `klassenbildung:`-Block der
+config.yaml (`zeitlimit_s`, `n_varianten`, `epsilon`, `min_distanz`,
+`symmetriebrechung`, `prio_gewichte`). Ergebnis:
+`output/klassenbildung.md` (je Variante Scorecard, Klassenlisten,
+Balance-Kennzahlen, Ampel-Zusammenfassung und Verletzungsreport, dazu
+der Konsens-Kern über alle Varianten) und `output/klassenbildung.json`
+(maschinenlesbar inkl. Ampel-Chips je Kind/Kriterium; seit U4
+zusätzlich ein Top-Level-Block `balance` mit `regel_id`/`ziel`/
+`toleranz`/`modus`/`prio` und den Treffer-IDs je Regel - die Grundlage
+der Live-Bewertung im Viewer) sowie
+`output/klassenbildung.html` - ein self-contained **Viewer** nach dem
+Stundentafel-Muster: Varianten-Übersicht (Zeilenklick wählt; Zielwert,
+Diff zu V1, Ampel-Zähler), Board-Ansicht mit Klassen-Spalten und
+Kinder-Karten (Ampel-Chips ✓/!/✗ je betroffenem Kriterium mit
+Klartext-Tooltip, Worst-of-Kartenrand, Konsens-Markierung ●),
+Balance-Kennzahlen im Spaltenkopf, "Vergleichen mit"-Diff zwischen
+Varianten und Filter "nur Diskussionsbedarf". Die Klassen tragen
+Anzeige-Namen (`klassen.stufe: 1` generiert 1a/1b/…, `klassen.labels`
+setzt sie explizit; ohne beides "Klasse N"), und eine **Gruppen-Tabelle**
+zeigt das Regelwerk samt Ist-Verteilung über die Klassen und
+Erfüllungsstatus in der aktiven Variante - Zeilenklick hebt die
+Mitglieder-Karten im Board hervor.
+
+**UI-Ausbau U1-U3** (docs/klassenbildung-ui-konzept.md): Gruppen sind
+erstklassige sichtbare Objekte - jede trägt eine stabile Gruppenfarbe
+und ein Kürzel (`gruppen[].kuerzel` optional, sonst aus der Id
+abgeleitet), Karten tragen **Gruppen-Badges** (Gruppenfarbe +
+Statuszeichen ✓/!/✗) und W+/W−-Wunsch-Badges, Bündelungsgruppen
+erscheinen als **farbige Stapel** in den Klassen-Spalten („[K3] … 2/4
+hier" macht zerrissene Bündel sofort sichtbar), Hover/Klick auf Badge
+oder Panel-Zeile hebt alle Mitglieder hervor (mehrere Gruppen
+gleichzeitig). Das **Gruppen-Panel** ist eine Seitenleiste nach
+Prio-Stufen (kritisch/wichtig/wenn möglich, verletzte zuerst) mit
+Verteilungs-Mini-Balken, Balance- und Wunsch-Block. Der
+**Fixierungs-Workflow**: Fortschrittsleiste („n von m fixiert",
+Konsens-/Unkritisch-Bulk-Buttons), Pin je Karte (F1),
+Karten-Popover mit „Nicht in …" (F2), „Gruppe fixieren" (F4) im
+Panel, „Klasse einfrieren" (F6) am Spaltenkopf; alle Pins sammeln
+sich in einem Export-Panel als fertiger `fixierungen:`-YAML-Block
+(bestehende YAML-Fixierungen inklusive, Herkunft je Pin als
+Kommentar) für den nächsten `klassen`-Lauf. Pins überleben Reloads
+per localStorage (nur Browser-Komfort). `render <schule>` baut
+den Viewer aus vorhandener klassenbildung.json neu (ohne Solve). Der
+Bewertungslauf zählt alle Regeln unabhängig vom Solver nach
+(Verifier-Prinzip) - eine Abweichung wäre ein FAIL. Die Klassenbildung
+ist eigenständig: Schulen ohne `klassenbildung.yaml` sind unberührt,
+`run` bleibt die Stundenplan-Pipeline.
+
+**UI-Ausbau U4 - Live-Bewertung + Drag & Drop**: Karten sind per
+Drag & Drop zwischen den Klassen-Spalten verschiebbar (außer per YAML
+fixierte Kinder). Jede Verschiebung erzeugt einen sichtbaren, lösbaren
+F1-Pin (Herkunft „verschoben", Karte gestrichelt markiert; 📌 löst und
+legt die Karte an ihren Varianten-Platz zurück) - der Arbeitsstand ist
+schlicht „Basis-Variante überlagert mit den Pins". Nach jeder
+Verschiebung läuft die **reine Bewertung im Browser** (bewusstes,
+kommentiertes JS-Duplikat des VB-Bewertungslaufs; die Ground Truth
+bleibt der nächste `klassen`-Lauf): Chips, Panel-Status, Mini-Balken,
+Ampel-Zähler und Kapazitätsbalken aktualisieren sofort, ein Warnbanner
+nennt verschlechterte Regeln im Klartext („damit: Verteilung
+G_sozialverhalten: 2/1 in dieser Klasse - Kappe überschritten") plus
+Korridor-Hinweis. Eine Kapazitätsverletzung blockiert den Drop nicht,
+färbt aber den Spaltenkopf rot - harte Grenzen entscheidet endgültig
+der Solver. Neu sind außerdem die **Härtungen F3/F5** (Wunsch bzw.
+weiche Gruppe „hart stellen", 🔓/🔒 im Karten-Popover, Panel und in
+der Wunschliste): reine Export-Direktiven, die im Fixierungen-Panel
+als `modus: hard`-Diff-Hinweis erscheinen und die Live-Bewertung
+bewusst nicht verändern. Ein Re-Solve direkt aus dem Viewer (U5) ist
+weiterhin offen - der Viewer bewertet, er optimiert nicht. Ältere
+klassenbildung.json ohne den `balance`-Block laufen im reinen
+Anzeige-Modus weiter (ohne Drag & Drop).
+
+## Stundentafel-Visualisierung (Phase 2.21)
+
+`output/stundenplan.json` enthält ALLE von `Solver.SolveTop` gefundenen
+Lösungen (nicht nur die beste) mit Status/Kann-Verstößen/Quality-Wert je
+Lösung, dazu die Klassenstufen-/Parallelklassen-Struktur der Schule
+(siehe Feldschema unten). `output/stundentafel.html` ist ein
+eigenständiger, wiederverwendbarer JavaScript-Viewer: die JSON-Daten sind
+inline eingebettet (kein `fetch()`, funktioniert deshalb auch bei
+direktem Öffnen per Doppelklick ohne lokalen Webserver); die
+Lösungsauswahl läuft über die sortierbare Lösungsübersicht (Zeilenklick,
+siehe unten - das frühere Lösungs-Dropdown ist ersetzt). Die Tabelle
+zeigt Wochentage in Spalten (unterteilt durch Klassenstufen) und
+Schulstunden in Zeilen (unterteilt durch die Parallelklassen a/b/c/...
+jeder Klassenstufe) - eine Gesamtübersicht über alle Klassen zugleich,
+statt der separaten Pro-Klasse-Raster aus `stundenplan.md`.
+
+**Viewer-Ausbau (siehe `docs/viewer-ausbau-plan.md`):** über dem
+Stundenplan zeigt der Viewer eine **sortierbare Lösungsübersicht** -
+eine Zeile pro Lösung mit dem vollen Qualitätsvektor (Muss/Kann,
+Fenster-Defizit, Fach-Fenster-Verstöße, Springstunden Klassen/Lehrer,
+Randstunden, Nachmittags-Tage, Varianzen, Total). Zeilenklick wählt die Lösung,
+Spaltenkopf sortiert; Kriterien, die per `include_*: false` strukturell
+aus der SUCHE ausgeschlossen waren, erscheinen gedämpft (Tooltip).
+Dazu kommen zwei Auswahl-Werkzeuge:
+
+- **Gewichte-Panel:** Zahlenfelder je Kriterium, initialisiert mit den
+  exportierten Schulgewichten; Änderungen berechnen `Total` je Lösung
+  live neu (identische Formel wie `ScheduleQuality.Score`, bewusst als
+  dokumentierte JS-Duplikation, damit der Viewer serverlos bleibt) und
+  sortieren die Übersicht um - abweichende Gewichte markieren die
+  Spalte als `Total*`. Die Regler ändern NUR das Ranking der bereits
+  gefundenen Lösungen, nie die Suche. "Schulgewichte zurücksetzen"
+  stellt den Ausgangszustand wieder her.
+- **Pareto-Filter:** blendet dominierte Lösungen gedämpft ab (statt sie
+  zu entfernen - der Tooltip nennt die dominierende Lösung) und zeigt
+  "n von m Lösungen Pareto-optimal". Dominanz wird gewichtsunabhängig
+  über den ECHTEN Vektor geprüft (inkl. Muss und der strukturell
+  abgeschalteten Kriterien): Lösung B dominiert A, wenn B in allen
+  Kriterien <= und in mindestens einem < ist. Unabhängig vom Filter
+  nennt die Lösungsbeschreibung im Kopf bei einer dominierten Lösung
+  die bessere Pareto-Lösung direkt ("Pareto: dominiert von Lösung X",
+  anklickbar zum Wechseln).
+
+- **Mehr-Zuteilungs-Modus im Viewer:** bei `max_assignments > 1` zeigt
+  die Übersicht eine sortierbare Spalte "Zuteilung" (aus welcher
+  Lehrer-Zuteilung stammt die Lösung), und die Lösungsbeschreibung
+  nennt sie mit. Unabhängig davon markiert der Lehrerstundenplan
+  **direkt tauschbare Lehrkräfte** (Äquivalenzklassen, siehe
+  `max_assignments` oben) mit ⇄ im Spaltenkopf samt Tooltip und einer
+  Legende über dem Raster - ein Tausch innerhalb einer Gruppe ändert
+  die Plan-Qualität nicht.
+
+- **Lösungs-Diff ("Vergleichen mit"):** eine zweite Auswahl legt eine
+  Vergleichslösung fest - im Klassen- UND Lehrerraster wird jede Zelle
+  markiert, deren Belegung sich unterscheidet (der Inhalt bleibt der der
+  gewählten Lösung, der Tooltip zeigt die Belegung der
+  Vergleichslösung), darüber steht die Slot-Distanz ("n unterschiedlich
+  belegte Slots" - dieselbe Größenordnung, die `min_diversity` beim
+  Enumerieren erzwingt). Die Vergleichszeile ist in der
+  Lösungsübersicht farblich markiert.
+
+Gewichte-Panel und Pareto-Filter erscheinen nur, wenn die eingebettete
+JSON den vollen Vektor + `quality_weights` enthält - ältere
+`stundenplan.json` bleiben öffenbar (Spalten zeigen dann `-`; der
+Lösungs-Diff funktioniert auch mit älteren Dateien). Nach reinen
+Template-Änderungen am
+Viewer lässt sich `stundentafel.html` ohne neuen Solver-Lauf aus der
+vorhandenen JSON neu bauen:
+`dotnet run --project SchoolTestRunner -- render <schule>`.
+
+**JSON-Feldschema** (Ausschnitt, snake_case):
+```jsonc
+{
+  "schul_name": "...", "tage": ["Mo", ...], "periods_per_day": 6,
+  "max_parallel_klassen": 2,   // groesste Parallelklassen-Anzahl je Klassenstufe
+  "klassenstufen": [
+    { "nummer": 1, "bezeichnung": "Klasse 1", "klassen": ["1a", "1b"] }
+    // "klassen" ist auf max_parallel_klassen Laenge gepolstert (null bei
+    // fehlender Parallelklasse an dieser Buchstaben-Position)
+  ],
+  "stop_reason": "MaxSolutionsReached",
+  "solutions": [
+    { "index": 0, "status": "Optimal", "kann_violation_count": 0,
+      "muss_violation_count": 0, "quality_total": 12.5,
+      "objective_value": 12.5, "best_objective_bound": 12.5, "gap_percent": 0.0,
+      "convergence": [ {"elapsed_s": 0.3, "objective_value": 45.0}, {"elapsed_s": 2.1, "objective_value": 12.5} ],
+      "classes": { "1a": { "Mo": { "1": null, "2": {"subject":"...","teacher":"...","room": null}, ... }, ... } } }
+  ]
+}
+```
+
+**Optimalitäts-Lücke + Konvergenz-Verlauf (Phase 2.22):** `objective_value`
+ist CP-SATs eigener (roher) Zielfunktionswert für diese Lösung,
+`best_objective_bound` die dazu bewiesene untere Schranke -
+`gap_percent = 100 * (objective_value - best_objective_bound) / objective_value`
+ist die maximal noch mögliche Verbesserung (bei `status: "Optimal"` immer
+0%, da dann bewiesen keine bessere Lösung existiert). `convergence` ist
+der Verlauf JEDER von CP-SAT gefundenen Verbesserung innerhalb DIESES
+einen Solve-Versuchs (Zeitpunkt + Objective) - ein deutlich früherer
+letzter Eintrag als das genutzte Zeitbudget zeigt an, dass mehr Zeit für
+DIESEN Versuch vermutlich wenig gebracht hätte; `output/stundenplan.md`
+und `stundentafel.html` (Diagramm unter der Lösungsauswahl) zeigen beides
+bereits aufbereitet an. Wichtig: die Lücke ist eine bewiesene OBERGRENZE,
+keine Vorhersage - die tatsächlich erreichbare Verbesserung kann kleiner
+sein.
+
+Details, Nutzerentscheidungen und Live-Verifikationsergebnisse siehe
+`docs/phase2-21-stundentafel-visualisierung.md`.
+
+## Veröffentlichung (frühere GitHub Page)
+
+> **Nicht mehr gepflegt (Nutzerentscheidung 23.08.2026).** Die
+> Kopien unter `stundentafel/*.html` werden nach einem Lauf nicht mehr
+> nachgezogen und zeigen einen eingefrorenen Altstand - insbesondere
+> das Erscheinungsbild VOR dem Designsystem-Umbau (arc42 8.16).
+> Vorschau-Kanal sind die Claude-Artifacts, siehe `CLAUDE.md`.
+> Die Dateien zu entfernen oder die Seite abzuschalten wäre ein
+> eigener, nach außen wirkender Schritt und steht dem Betreiber zu.
+>
+> Der folgende Abschnitt beschreibt den damaligen Weg und bleibt als
+> Anleitung stehen, falls die Seite wieder aufgenommen werden soll.
+
+
+Da `stundentafel.html` (siehe oben) komplett eigenständig ist (JSON-Daten
+inline eingebettet, kein `fetch()`, kein Build-Schritt), lässt sie sich
+1:1 als statische GitHub-Pages-Seite veröffentlichen. Dieses Repository
+ist ein `<benutzer>.github.io`-Repo - **alles im `main`-Branch wird direkt
+unter `https://srautip.github.io/` ausgeliefert**, unabhängig vom
+Feature-Branch, auf dem dieses `timetable-dotnet/`-Verzeichnis entwickelt
+wird.
+
+Beide Referenzbeispiele sind auf diese Weise veröffentlicht, im
+`stundentafel/`-Ordner an der Wurzel von `main` (NICHT unter
+`timetable-dotnet/` - GitHub Pages braucht die Datei am erwarteten
+öffentlichen Pfad, unabhängig von der internen Repo-Struktur):
+
+- **Übersichtsseite:** <https://srautip.github.io/stundentafel/> (`stundentafel/index.html`)
+- **BW-Grundschule:** <https://srautip.github.io/stundentafel/bw-grundschule-beispiel.html>
+- **BW-Gemeinschaftsschule:** <https://srautip.github.io/stundentafel/bw-gms-beispiel.html>
+
+**Wichtig - keine automatische Synchronisation:** ein `run`-Lauf hier im
+Feature-Branch aktualisiert NUR die lokale
+`tests/<schule>/output/stundentafel.html`. Die veröffentlichte Kopie auf
+`main` muss nach jeder gewünschten Aktualisierung manuell nachgezogen
+werden (ein Redeploy pro geändertem Beispiel, kein automatischer
+Workflow) - über einen isolierten `git worktree` für `main`, damit der
+aktuelle Feature-Branch-Arbeitsstand unangetastet bleibt:
+
+```bash
+git worktree add /tmp/main-worktree main
+cp timetable-dotnet/tests/<schule>/output/stundentafel.html \
+   /tmp/main-worktree/stundentafel/<schule>.html
+cd /tmp/main-worktree
+git add stundentafel/<schule>.html
+git commit -m "Update <schule> Stundentafel"
+git push origin main
+cd -
+git worktree remove /tmp/main-worktree
+```
+
+Nur die eine generierte `stundentafel.html`-Datei wird kopiert - kein
+anderer Site-Content wird dabei angefasst. Da GitHub Pages nur eine
+statische Momentaufnahme zeigt, kann die veröffentlichte Version
+zwischenzeitlich hinter dem aktuellen `output/`-Stand im Feature-Branch
+zurückliegen (z.B. nach einer neuen `config.yaml`-Kalibrierung wie in
+den Kurzaufträgen zu Phase 2.22/2.25) - bei Bedarf erneut nachziehen.
+
+## Referenzbeispiele
+
+Zwei tatsächlich per CLI erzeugte UND ausgeführte Testfälle als
+lauffähige Vorbilder zum Kopieren. Beide haben zusätzlich eine eigene
+`input/config.yaml` mit explizit gesetztem `solve_time_limit_s`/
+`per_solve_time_limit_s`/`max_solutions` (siehe Abschnitte oben, aktuelle
+Werte direkt in den beiden `config.yaml`-Dateien nachsehen - sie wurden im
+Lauf mehrerer Kurzaufträge testweise hochgesetzt, um die
+Optimalitäts-Lücke auf einem realen Szenario zu beobachten, siehe
+`docs/phase2-22-optimalitaetsluecke.md`) - ein direktes Vorbild dafür, wie
+man diese Felder für die eigene Schule anpasst. Ein kurzer,
+endnutzerorientierter Überblick über beide Beispiele steht außerdem in
+`docs/schooltestrunner-benutzerhandbuch.md`:
+
+- **`tests/bw-grundschule-beispiel/`** (4 Klassenstufen, 8 Klassen, 8
+  Klassenlehrer, BW-Grundschule):
+  ```bash
+  dotnet run --project SchoolTestRunner -- new bw-grundschule-beispiel \
+    --schulart Grundschule --bundesland BW --klassenstufen 4 --lehrer 8
+  dotnet run --project SchoolTestRunner -- run bw-grundschule-beispiel
+  ```
+  Seine `constraints.yaml` enthält zusätzlich handverfasste
+  `teacher_availability`-, `forbidden_slot`- (realistisches Zeitraster:
+  Klasse 1/2 nur vormittags, Klasse 3/4 nur dienstags nachmittags) und
+  einen `required_slot`-Regel (Chor donnerstags 6. Stunde für alle
+  Klassen gleichzeitig, Phase 2.23) sowie (Phase 2.19/2.20) einen
+  `schueler:`/`gruppen:`-Block in `stammdaten.yaml` für klassenstufen-
+  übergreifende Religion-ev-/Religion-kath-/Ethik- und Chor-Gruppen. 140
+  weitere `occupied_slot`-Kann-Regeln sorgen für eine durchgängige
+  zeitliche Belegung (Klasse 1/2 soll täglich Stunde 2-4 belegt sein,
+  Klasse 3/4 Stunde 2-5) - fach-unabhängig, im Gegensatz zum obigen
+  `required_slot`. Zusätzlich trägt dieses Beispiel die einzige
+  committete **Klassenbildungs-Fixture** (`input/klassenbildung.yaml`,
+  "Beispiel A" des Konzepts: 100 Kinder, 4 Klassen, 16 Gruppen, 3
+  Balance-Kriterien, 34 Wünsche, 1 Fixierung; Lauf per
+  `klassen bw-grundschule-beispiel`, siehe Abschnitt oben) - der
+  erwartete Zielwert 1001 ist als Beleg-Kommentar in der `config.yaml`
+  dokumentiert (1 unvermeidbarer Prio-3-Überlauf + 1 Prio-1-Split).
+
+- **`tests/bw-gms-beispiel/`** (6 Klassenstufen [5-10], 24 Klassen [4-zügig],
+  ~696 Schüler, 48 Lehrkräfte, BW-Gemeinschaftsschule) - realitätsnah von
+  Hand nach der BW-Kontingentstundentafel Gemeinschaftsschule (gültig ab
+  1.8.2025) nachgebildet, **nicht** über den `new`-Scaffold erzeugt (der
+  liefert nur ein generisches Grundgerüst ohne Differenzierung/Wahlbereich
+  - dieses Beispiel demonstriert stattdessen bewusst die volle Bandbreite
+  der Gruppen-/Parallelverbund-Mechanik aus Phase 2.20/2.23 an einem
+  einzigen, in sich konsistenten Referenzfall):
+  - **Niveaudifferenzierung ab Kl.7** (Deutsch/Mathematik/Englisch): G-/
+    E-Kurs in Kl.7/8, zusätzlich A-Kurs ab Kl.9 - jeder Kurs läuft
+    klassenstufenweit über alle 4 Parallelklassen synchron (`gruppen[]` +
+    `parallelverbund`), zusätzlich in klassengroße **Sektionen** (max. 35
+    Schüler) aufgeteilt, sobald die Kursgröße das überschreitet (z.B.
+    `Mathematik-E-1`/`Mathematik-E-2` als separate `faecher[]`-Einträge
+    mit identischem Stundenkontingent) - eine einzelne Gruppe mit >35
+    Schülern wäre für klassenraumgebundenen Fachunterricht nicht plausibel
+    (anders als die bewusst großflächige Chor-Gesamtprobe im
+    Grundschulbeispiel).
+  - **Wahlpflichtbereich ab Kl.6** (Technik/AES/Französisch als 2.
+    Fremdsprache), ebenfalls sektioniert (Technik/AES sind Werkstatt-/
+    Küchenräume mit echter Kapazitätsgrenze).
+  - **Profilfach ab Kl.8** (NwT/IMP/Sport-Profil/Musik-Profil/BK-Profil) -
+    laut Nutzervorgabe "i.d.R. Doppelqualifikation vorhandener
+    Fachlehrer": keine eigenen Lehrkräfte, sondern zusätzliche
+    `fach_lehrer_zuordnungen` für bereits bestehende Fachlehrkräfte.
+  - **Religion-ev/-kath/Ethik** über alle 6 Klassenstufen, ebenfalls
+    sektioniert.
+  - **Fachraumbedarf** über `constraints.yaml`/`room_requirement`
+    (`should`-Priorität): Sporthallen, NaWi-/Biologie-Fachräume,
+    Musik-/Kunsträume, Technik-/AES-Räume, Computerraum (IMP) - inkl. je
+    eines Eintrags pro tatsächlich generierter Sektionsvariante.
+  - **Lehrkräfte bedarfsgenau bemessen** (~90% Ziel-Deputatsausschöpfung
+    statt grosszügiger Pauschalgrössen): da eine klassenstufenweite Gruppe
+    (z.B. ein G-Kurs) die Nachfrage über alle 4 Parallelklassen hinweg auf
+    EINE Lehrkraft konsolidiert, wäre ein pauschal an der Klassenzahl
+    bemessener Lehrerpool strukturell überdimensioniert und würde
+    Deputat-Leerlauf erzeugen, den die (rein lineare) Deputat-Abweichungs-
+    Kostenfunktion beliebig auf einzelne Lehrkräfte verteilen kann (siehe
+    Kanarienvogel-Wirkung unten). Zusätzliche Sicherheitsmarge: jeder Pool
+    hat mindestens so viele Köpfe wie die größte Anzahl zeitgleicher
+    Gruppen im selben Parallelverbund (z.B. 2 gleichzeitige
+    Technik-Sektionen brauchen zwingend 2 verschiedene Lehrkräfte -
+    `Lehrereinsatzplanung.vb` prüft das selbst nicht, erst der
+    nachgelagerte `no_overlap(teacher)`-Constraint der Tag/Periode-Stufe
+    würde eine Kollision hart verhindern und das Szenario sonst
+    unlösbar machen).
+  - Erzeugt mit einem projektinternen, nicht committeten Python-
+    Wegwerfskript (gleiche Disziplin wie die 92-Constraint-Generierung in
+    Phase 2.23) - `stammdaten.yaml`/`constraints.yaml` selbst sind
+    normale, direkt im GitHub-Web-Editor bearbeitbare YAML-Dateien wie
+    jedes andere Beispiel.
+  ```bash
+  dotnet run --project SchoolTestRunner -- run bw-gms-beispiel
+  ```

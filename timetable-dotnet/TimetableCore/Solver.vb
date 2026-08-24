@@ -1,0 +1,1551 @@
+' Ported 1:1 from timetable/timetable_model.py. Builds a CP-SAT model
+' (Google.OrTools.Sat) from the same entities/constraints JSON shape as the
+' Python original and solves it. ValidateEntities (Validation.vb) is called
+' first, exactly like the Python build_model() - an out-of-range reference
+' would otherwise be silently dropped by the model builder (no session/
+' variable to attach it to), which can make an incomplete schedule solve as
+' OPTIMAL. See Validation.vb's header comment for the concrete incident that
+' motivated this ordering.
+Imports System.Diagnostics
+Imports System.Text.Json.Nodes
+Imports System.Threading
+Imports Google.OrTools.Sat
+
+
+Public NotInheritable Class Session
+    Public ReadOnly Property ClassName As String
+    Public ReadOnly Property Subject As String
+    Public ReadOnly Property Teacher As String
+
+    Public Sub New(className As String, subject As String, teacher As String)
+        Me.ClassName = className
+        Me.Subject = subject
+        Me.Teacher = teacher
+    End Sub
+End Class
+
+''' <summary>Composite key for the (class, subject, teacher, day, period)
+''' -keyed `lesson` dict and the (..., room)-keyed `room` dict in the
+''' Python original. VB.NET has no native tuple-hashing dict key like
+''' Python, so this struct stands in for it.</summary>
+Public Structure LessonKey
+    Implements IEquatable(Of LessonKey)
+
+    Public ReadOnly ClassName As String
+    Public ReadOnly Subject As String
+    Public ReadOnly Teacher As String
+    Public ReadOnly Day As String
+    Public ReadOnly Period As Integer
+
+    Public Sub New(className As String, subject As String, teacher As String, day As String, period As Integer)
+        Me.ClassName = className
+        Me.Subject = subject
+        Me.Teacher = teacher
+        Me.Day = day
+        Me.Period = period
+    End Sub
+
+    Public Overloads Function Equals(other As LessonKey) As Boolean Implements IEquatable(Of LessonKey).Equals
+        Return ClassName = other.ClassName AndAlso Subject = other.Subject AndAlso
+               Teacher = other.Teacher AndAlso Day = other.Day AndAlso Period = other.Period
+    End Function
+
+    Public Overrides Function Equals(obj As Object) As Boolean
+        Return TypeOf obj Is LessonKey AndAlso Equals(DirectCast(obj, LessonKey))
+    End Function
+
+    Public Overrides Function GetHashCode() As Integer
+        Return HashCode.Combine(ClassName, Subject, Teacher, Day, Period)
+    End Function
+End Structure
+
+Public Structure RoomKey
+    Implements IEquatable(Of RoomKey)
+
+    Public ReadOnly ClassName As String
+    Public ReadOnly Subject As String
+    Public ReadOnly Teacher As String
+    Public ReadOnly Day As String
+    Public ReadOnly Period As Integer
+    Public ReadOnly Room As String
+
+    Public Sub New(className As String, subject As String, teacher As String, day As String, period As Integer, room As String)
+        Me.ClassName = className
+        Me.Subject = subject
+        Me.Teacher = teacher
+        Me.Day = day
+        Me.Period = period
+        Me.Room = room
+    End Sub
+
+    Public Overloads Function Equals(other As RoomKey) As Boolean Implements IEquatable(Of RoomKey).Equals
+        Return ClassName = other.ClassName AndAlso Subject = other.Subject AndAlso
+               Teacher = other.Teacher AndAlso Day = other.Day AndAlso Period = other.Period AndAlso Room = other.Room
+    End Function
+
+    Public Overrides Function Equals(obj As Object) As Boolean
+        Return TypeOf obj Is RoomKey AndAlso Equals(DirectCast(obj, RoomKey))
+    End Function
+
+    Public Overrides Function GetHashCode() As Integer
+        Return HashCode.Combine(ClassName, Subject, Teacher, Day, Period, Room)
+    End Function
+End Structure
+
+''' <summary>Phase 2.5: one shared CP-SAT violation BoolVar per Kann
+''' ("should"-priority) constraint JSON object - keyed by the constraint's
+''' index in JsonHelpers.Constraints(data), so a single flag covers every
+''' slot/session that constraint touches (counting violated CONSTRAINTS,
+''' not violated slot-occurrences, per the "simple binary" weighting
+''' decision).</summary>
+Public NotInheritable Class BuiltModel
+    Public Property Model As CpModel
+    Public Property Lesson As Dictionary(Of LessonKey, BoolVar)
+    Public Property Room As Dictionary(Of RoomKey, BoolVar)
+    Public Property Sessions As List(Of Session)
+    Public Property Days As List(Of String)
+    Public Property Periods As List(Of Integer)
+    Public Property KannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String))
+End Class
+
+Public NotInheritable Class ScheduleEntry
+    Public Property ClassName As String
+    Public Property Subject As String
+    Public Property Teacher As String
+    Public Property Day As String
+    Public Property Period As Integer
+    Public Property Room As String
+End Class
+
+''' <summary>Whether one specific Kann-constraint ended up violated in the
+''' returned (optimal) solution, plus its type/reason for reporting -
+''' see Verifier.VerifyScheduleDetailed for the schedule-derived
+''' equivalent (independently re-checked, not read from these flags).</summary>
+Public NotInheritable Class KannConstraintFlag
+    Public Property ConstraintIndex As Integer
+    Public Property ConstraintType As String
+    Public Property Reason As String
+    Public Property Relaxed As Boolean
+End Class
+
+Public NotInheritable Class SolveResult
+    Public Property Status As CpSolverStatus
+    Public Property Solver As CpSolver
+    Public Property Schedule As List(Of ScheduleEntry)
+    Public Property KannConstraintFlags As List(Of KannConstraintFlag)
+    ''' <summary>True, wenn der Aufrufer per CancellationToken abgebrochen
+    ''' hat (arc42 8.11). Das Ergebnis ist dann das, was CP-SAT bis dahin
+    ''' hatte: Feasible mit Teilplan, oder Unknown ohne. War das Token schon
+    ''' beim Eintritt gesetzt, ist zusaetzlich Solver Nothing - dann wurde
+    ''' nicht einmal das Modell gebaut.</summary>
+    Public Property Cancelled As Boolean
+End Class
+
+''' <summary>Phase 2.8: why Solver.SolveTop's search loop stopped.</summary>
+Public Enum MultiSolveStopReason
+    MaxSolutionsReached
+    TimeLimitReached
+    ''' <summary>The solver returned Infeasible/ModelInvalid on a later
+    ''' iteration - no schedule distinct from the ones already found
+    ''' exists. If Solutions is empty, this means the scenario had no
+    ''' feasible solution at all.</summary>
+    SearchSpaceExhausted
+    ''' <summary>Der Aufrufer hat per CancellationToken abgebrochen (arc42
+    ''' 8.11). Solutions enthaelt alles, was bis dahin gefunden wurde -
+    ''' weiterhin nach Quality.Total sortiert. Der Abbruch kann VOR der
+    ''' ersten Loesung erfolgt sein (z.B. waehrend einer lexikographischen
+    ''' Stufe); dann ist Solutions LEER, ohne dass das Szenario unloesbar
+    ''' waere. Aufrufer duerfen aus einer leeren Liste hier also nicht auf
+    ''' Unloesbarkeit schliessen - anders als bei SearchSpaceExhausted.</summary>
+    Cancelled
+End Enum
+
+''' <summary>One incumbent improvement CP-SAT found while solving a single
+''' SolveTop iteration - ElapsedS/ObjectiveValue at the moment a new, better
+''' solution was accepted (NOT a fixed sampling interval - CP-SAT calls the
+''' underlying callback exactly once per incumbent, so a flat tail simply
+''' means no further improvement happened before the time limit).</summary>
+Public NotInheritable Class ConvergencePoint
+    Public Property ElapsedS As Double
+    Public Property ObjectiveValue As Double
+End Class
+
+''' <summary>Records every incumbent CP-SAT finds during one Solve() call,
+''' live-verified against the installed Google.OrTools DLL (9.15.6755):
+''' CpSolverSolutionCallback.OnSolutionCallback() fires per improving
+''' solution, and WallTime()/ObjectiveValue() are both readable from
+''' inside it (inherited from the SolutionCallback base class).</summary>
+''' <summary>Threadsicher seit dem Abbruch-/Fortschrittskanal (arc42 8.11):
+''' OnSolutionCallback laeuft auf einem CP-SAT-Workerthread, waehrend
+''' SolveRunner.RunSolve vom aufrufenden Thread aus liest. Vorher war Points
+''' eine blanke List(Of T), auf der Count und Last() als zwei getrennte
+''' Zugriffe gelesen wurden - mit dem Fortschrittskanal steigt die
+''' Lesefrequenz deutlich, deshalb jetzt durchgaengig unter _gate.
+'''
+''' BestObjectiveBound() ist laut Reflexion ueber die installierte DLL
+''' ebenfalls ein Member der SolutionCallback-Basis und damit von innen
+''' lesbar - dadurch kann die GUI die Optimalitaetsluecke live zeigen, statt
+''' erst nach dem Lauf ueber ScoredSolution. Der ganze Rumpf liegt in
+''' Try/Catch: eine Exception von hier wuerde ueber die native SWIG-Grenze
+''' propagieren.</summary>
+Friend NotInheritable Class ConvergenceCallback
+    Inherits CpSolverSolutionCallback
+
+    Private ReadOnly _gate As New Object()
+    Private ReadOnly _points As New List(Of ConvergencePoint)
+    Private _lastBound As Double
+
+    Public Overrides Sub OnSolutionCallback()
+        Try
+            Dim pt As New ConvergencePoint With {.ElapsedS = WallTime(), .ObjectiveValue = ObjectiveValue()}
+            Dim bound = BestObjectiveBound()
+            SyncLock _gate
+                _points.Add(pt)
+                _lastBound = bound
+            End SyncLock
+        Catch
+            ' Aufzeichnung ist Diagnostik, kein Vertrag - lieber einen Punkt
+            ' verlieren als den Solve ueber die native Grenze reissen.
+        End Try
+    End Sub
+
+    ''' <summary>Kopie der bisherigen Aufzeichnung. Kopie, weil der Aufrufer
+    ''' sie (als ScoredSolution.Convergence) behaelt, waehrend CP-SAT
+    ''' moeglicherweise noch weiterschreibt.</summary>
+    Public ReadOnly Property Points As List(Of ConvergencePoint)
+        Get
+            SyncLock _gate
+                Return New List(Of ConvergencePoint)(_points)
+            End SyncLock
+        End Get
+    End Property
+
+    ''' <summary>Anzahl und letzter Stand in EINEM gesperrten Zug.</summary>
+    Public Function Snapshot() As ConvergenceSnapshot
+        SyncLock _gate
+            If _points.Count = 0 Then Return New ConvergenceSnapshot()
+            Dim last = _points(_points.Count - 1)
+            Return New ConvergenceSnapshot With {
+                .Count = _points.Count,
+                .LastElapsedS = last.ElapsedS,
+                .LastObjective = last.ObjectiveValue,
+                .LastBound = _lastBound
+            }
+        End SyncLock
+    End Function
+End Class
+
+''' <summary>One candidate schedule from Solver.SolveTop, bundled with
+''' everything a caller needs to render/rank it - same bundling philosophy
+''' as KannViolationDetail (index/type/message/reason together).</summary>
+Public NotInheritable Class ScoredSolution
+    Public Property Schedule As List(Of ScheduleEntry)
+    Public Property KannConstraintFlags As List(Of KannConstraintFlag)
+    Public Property Quality As QualityScore
+    ''' <summary>Phase 2.18-Nachtrag: Optimal means CP-SAT proved no better
+    ''' solution exists within this solve's model; Feasible means the
+    ''' per-solve time limit ran out before optimality could be proven - a
+    ''' caller that wants a stronger optimality guarantee should raise
+    ''' perSolveTimeLimitS/totalTimeLimitS rather than maxSolutions (later
+    ''' iterations can only find equally-good alternatives, never a better
+    ''' Quality.Total, since they all optimize the same objective and only
+    ''' exclude already-found exact Lesson assignments).</summary>
+    Public Property Status As CpSolverStatus
+    ''' <summary>The raw CP-SAT objective (the same weighted Kann/Luecken/
+    ''' Randstunden/Ausgewogenheits-sum SolveTopObjective.ApplyQualityObjective
+    ''' builds into the model) that THIS solve iteration found - normally
+    ''' tracks Quality.Total closely, but is the model's own value, not a
+    ''' post-hoc recomputation (see Quality.Total's own doc comment for the
+    ''' narrow case where they can diverge).</summary>
+    Public Property ObjectiveValue As Double
+    ''' <summary>CP-SAT's proven lower bound on the objective for this
+    ''' iteration - at Status=Optimal this equals ObjectiveValue exactly
+    ''' (zero gap, proven optimal); at Status=Feasible it is strictly lower,
+    ''' and (ObjectiveValue - BestObjectiveBound) is how much better a
+    ''' solution COULD exist, not how much better one DOES exist.</summary>
+    Public Property BestObjectiveBound As Double
+    ''' <summary>Every incumbent this iteration's Solve() call found, in
+    ''' order - lets a caller show "how much did quality still improve over
+    ''' time" instead of only the final number. Defaults to an empty list
+    ''' (not Nothing) so a caller/test that constructs a ScoredSolution by
+    ''' hand without setting this - e.g. StundentafelJsonTests.vb's
+    ''' hand-built ScoredSolutions - never hits a NullReferenceException.</summary>
+    Public Property Convergence As New List(Of ConvergencePoint)
+End Class
+
+Public NotInheritable Class MultiSolveResult
+    ''' <summary>Sorted ascending by Quality.Total - best candidate first.</summary>
+    Public Property Solutions As List(Of ScoredSolution)
+    Public Property StopReason As MultiSolveStopReason
+    Public Property IterationsRun As Integer
+    Public Property ElapsedS As Double
+    ''' <summary>Phase 2.25: how many of the IterationsRun solves were cut
+    ''' short by the stagnation-cutoff (see SolveRunner.RunSolve) rather
+    ''' than running to their natural time limit or proving Optimal - lets a
+    ''' caller see whether/how often the mechanism actually fired instead of
+    ''' leaving it invisible. 0 whenever stagnationTimeoutS is Nothing.</summary>
+    Public Property StagnationTriggeredCount As Integer
+End Class
+
+''' <summary>Replaces the plain Dictionary(Of String, List(Of String)) that
+''' room_requirement used to collect into - now also carries the
+''' constraint's priority/index/reason so BuildModel's room-variable
+''' construction loop can decide must vs should per subject.</summary>
+Friend NotInheritable Class RoomRequirementInfo
+    Public ReadOnly AllowedRooms As List(Of String)
+    Public ReadOnly Priority As String
+    Public ReadOnly ConstraintIndex As Integer
+    Public ReadOnly Reason As String
+
+    Public Sub New(allowedRooms As List(Of String), priority As String, constraintIndex As Integer, reason As String)
+        Me.AllowedRooms = allowedRooms
+        Me.Priority = priority
+        Me.ConstraintIndex = constraintIndex
+        Me.Reason = reason
+    End Sub
+End Class
+
+Public Module Solver
+
+    ''' <summary>Phase 2.5: lazily creates (or returns the already-created)
+    ''' shared violation BoolVar for the Kann-constraint at `index` - one
+    ''' flag per JSON constraint object, reused across every slot/session it
+    ''' touches, so the objective counts violated CONSTRAINTS not violated
+    ''' occurrences.</summary>
+    Private Function GetOrCreateKannVar(model As CpModel, kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)),
+                                         index As Integer, constraintType As String, reason As String) As BoolVar
+        If Not kannVars.ContainsKey(index) Then
+            Dim v = model.NewBoolVar($"kann_violated[{index}]")
+            kannVars(index) = (constraintType, v, reason)
+        End If
+        Return kannVars(index).Var
+    End Function
+
+    ''' <summary>Code-Review-Umsetzung (R1): exakte Duplikate (gleiches
+    ''' Tripel Klasse/Fach/Lehrer) werden hier zusaetzlich defensiv
+    ''' dedupliziert - vorher ueberschrieb das zweite Duplikat den
+    ''' Lesson-Dictionary-Eintrag des ersten stillschweigend und liess
+    ''' dessen Variablen als unreferenzierte Waisen im Modell zurueck.
+    ''' Validation.ValidateEntities meldet solche Duplikate seit derselben
+    ''' Umsetzung als harten Fehler (Fail-Fast fuer den normalen
+    ''' Solve-Pfad); das Dedupe hier schuetzt Aufrufer, die BuildCoreModel
+    ''' umgehen koennten.</summary>
+    Private Function SessionsFromAssignments(data As JsonObject) As List(Of Session)
+        Dim seen As New HashSet(Of (String, String, String))
+        Dim sessions As New List(Of Session)
+        For Each c In JsonHelpers.Constraints(data)
+            If JsonHelpers.GetString(c, "type") <> "teacher_subject_assignment" Then Continue For
+            Dim className = JsonHelpers.GetString(c, "class")
+            Dim subject = JsonHelpers.GetString(c, "subject")
+            Dim teacher = JsonHelpers.GetString(c, "teacher")
+            If seen.Add((className, subject, teacher)) Then
+                sessions.Add(New Session(className, subject, teacher))
+            End If
+        Next
+        If sessions.Count = 0 Then
+            Throw New ArgumentException("Keine teacher_subject_assignment-Constraints gefunden - es gibt nichts zu planen.")
+        End If
+        Return sessions
+    End Function
+
+    ''' <summary>Phase 2.9: everything BuildModel does EXCEPT the final
+    ''' Minimize call, factored out so SolveTop can build its own, richer
+    ''' quality-aware objective on top of the same core model instead of
+    ''' the Kann-only one BuildModel sets. Verbatim body (no reordering) -
+    ''' CP-SAT's random_seed behavior is sensitive to variable-creation
+    ''' order, so this must stay a pure cut-paste of BuildModel's former
+    ''' pre-Minimize logic.</summary>
+    Private Function BuildCoreModel(data As JsonObject) As BuiltModel
+        Dim errors = Validation.ValidateEntities(data)
+        If errors.Any() Then
+            Throw New ArgumentException("Ungueltige Constraint-Referenzen:" & vbLf & String.Join(vbLf, errors))
+        End If
+
+        Dim model As New CpModel()
+        Dim ent = JsonHelpers.Entities(data)
+        Dim timeslots = JsonHelpers.Timeslots(ent)
+        Dim days = JsonHelpers.AsStringList(timeslots, "days")
+        Dim periodsPerDay = JsonHelpers.GetInt(timeslots, "periods_per_day").Value
+        Dim periods = Enumerable.Range(1, periodsPerDay).ToList()
+
+        Dim sessions = SessionsFromAssignments(data)
+
+        Dim lesson As New Dictionary(Of LessonKey, BoolVar)
+        For Each s In sessions
+            For Each d In days
+                For Each p In periods
+                    Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)
+                    lesson(key) = model.NewBoolVar($"lesson[{s.ClassName},{s.Subject},{s.Teacher},{d},{p}]")
+                Next
+            Next
+        Next
+
+        Dim kannVars As New Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String))
+
+        Dim allConstraints = JsonHelpers.Constraints(data)
+        Dim roomReq As New Dictionary(Of String, RoomRequirementInfo)
+        For ri = 0 To allConstraints.Count - 1
+            Dim c = allConstraints(ri)
+            If JsonHelpers.GetString(c, "type") = "room_requirement" Then
+                roomReq(JsonHelpers.GetString(c, "subject")) = New RoomRequirementInfo(
+                    JsonHelpers.AsStringList(c, "allowed_rooms"), JsonHelpers.GetPriority(c), ri, JsonHelpers.GetReason(c))
+            End If
+        Next
+
+        Dim room As New Dictionary(Of RoomKey, BoolVar)
+        For Each s In sessions
+            If Not roomReq.ContainsKey(s.Subject) Then Continue For
+            Dim info = roomReq(s.Subject)
+            Dim allowedRooms = info.AllowedRooms
+            If allowedRooms.Count = 0 Then Continue For
+
+            ' Phase 2.5: "should" splits the original equality
+            ' (Sum(choices) = lesson) into an always-true upper bound (never
+            ' assign an allowed room without the lesson, never more than
+            ' one) plus a reified lower bound (the lesson MUST get one of
+            ' the allowed rooms) - relaxing only the lower bound is what
+            ' lets the lesson happen with no allowed room assigned instead
+            ' of forcing Infeasible, without ever allowing more than one
+            ' room to be assigned at once.
+            Dim rrViolated As BoolVar = Nothing
+            If info.Priority = JsonHelpers.PriorityShould Then
+                rrViolated = GetOrCreateKannVar(model, kannVars, info.ConstraintIndex, "room_requirement", info.Reason)
+            End If
+
+            For Each d In days
+                For Each p In periods
+                    Dim choices As New List(Of BoolVar)
+                    For Each r In allowedRooms
+                        Dim v = model.NewBoolVar($"room[{s.ClassName},{s.Subject},{s.Teacher},{d},{p},{r}]")
+                        room(New RoomKey(s.ClassName, s.Subject, s.Teacher, d, p, r)) = v
+                        choices.Add(v)
+                    Next
+                    Dim lessonKey As New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)
+                    If rrViolated Is Nothing Then
+                        model.Add(LinearExpr.Sum(choices) = lesson(lessonKey))
+                    Else
+                        model.Add(LinearExpr.Sum(choices) <= lesson(lessonKey))
+                        model.Add(LinearExpr.Sum(choices) >= lesson(lessonKey)).OnlyEnforceIf(rrViolated.Not())
+                    End If
+                Next
+            Next
+        Next
+
+        ' Phase 2.20: Parallelgruppe-Pre-Pass - jede "parallel_group"-
+        ' Constraint bekommt pro (Tag,Periode) EINE geteilte BoolVar; jedes
+        ' Mitglied-Tripel (Klasse,Fach,Lehrer) wird per Gleichheit daran
+        ' gekoppelt, was Kreuz-Klassen-Synchronisation automatisch erzwingt
+        ' (identisches Slot-Muster ueber alle Mitglieder hinweg, auch wenn
+        ' sie zu verschiedenen echten Klassen gehoeren). Muss VOR
+        ' ApplyConstraints laufen, damit dessen "no_overlap"-Fall die
+        ' Gruppenzugehoerigkeit kennt: ohne Deduplizierung dort wuerde
+        ' no_overlap dieselbe (jetzt gleiche) Variable mehrfach in die Summe
+        ' aufnehmen und sie so permanent auf 0 zwingen (live durch einen
+        ' Plan-Agenten gegen den Code verifizierter Befund).
+        Dim parallelGroupOf As New Dictionary(Of (ClassName As String, Subject As String, Teacher As String), Integer)
+        Dim parallelVars As New Dictionary(Of (GroupIndex As Integer, Day As String, Period As Integer), BoolVar)
+        For ci = 0 To allConstraints.Count - 1
+            Dim c = allConstraints(ci)
+            If JsonHelpers.GetString(c, "type") <> "parallel_group" Then Continue For
+            Dim classesInGroup = JsonHelpers.AsStringList(c, "classes")
+            Dim subjectsInGroup = JsonHelpers.AsStringList(c, "subjects")
+            Dim teachersInGroup = JsonHelpers.AsStringList(c, "teachers")
+            For Each d In days
+                For Each p In periods
+                    parallelVars((ci, d, p)) = model.NewBoolVar($"parallel[{ci},{d},{p}]")
+                Next
+            Next
+            For mi = 0 To classesInGroup.Count - 1
+                Dim memberKey As (ClassName As String, Subject As String, Teacher As String) =
+                    (classesInGroup(mi), subjectsInGroup(mi), teachersInGroup(mi))
+                parallelGroupOf(memberKey) = ci
+                For Each d In days
+                    For Each p In periods
+                        Dim lessonKey As New LessonKey(memberKey.ClassName, memberKey.Subject, memberKey.Teacher, d, p)
+                        If lesson.ContainsKey(lessonKey) Then
+                            model.Add(lesson(lessonKey) = parallelVars((ci, d, p)))
+                        End If
+                    Next
+                Next
+            Next
+        Next
+
+        ApplyConstraints(model, data, sessions, lesson, room, days, periods, kannVars, parallelGroupOf, parallelVars)
+
+        Return New BuiltModel With {
+            .Model = model, .Lesson = lesson, .Room = room,
+            .Sessions = sessions, .Days = days, .Periods = periods, .KannVars = kannVars
+        }
+    End Function
+
+    ''' <summary>Phase 2.12: the exact one-line Kann-only objective BuildModel
+    ''' already sets - factored out so SolveTop's Stage 1 warm-start solve
+    ''' can reuse the identical, already-proven-fast objective without
+    ''' duplicating BuildModel's logic. BuildModel's own behavior is
+    ''' unchanged (same computation, same object identity of the resulting
+    ''' LinearExpr construction).</summary>
+    Private Function KannOnlyObjectiveExpr(kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String))) As LinearExpr
+        Return LinearExpr.Sum(kannVars.Values.Select(Function(kv) kv.Var))
+    End Function
+
+    Public Function BuildModel(data As JsonObject) As BuiltModel
+        Dim built = BuildCoreModel(data)
+        If built.KannVars.Count > 0 Then
+            built.Model.Minimize(KannOnlyObjectiveExpr(built.KannVars))
+        End If
+        Return built
+    End Function
+
+    ''' <summary>Phase 2.12: replaces any previously-set hints on `model`
+    ''' with `solver`'s just-found Boolean values for every `lesson` var -
+    ''' shared by the Stage 1 -&gt; Stage 2 warm-start handoff and by
+    ''' SolveTop's own iteration-to-iteration carryover. Deliberately
+    ''' Lesson-only (not the auxiliary occupied/hasAny/gapVar/rangeVar vars
+    ''' SolveTopObjective adds) - same "Lesson defines the schedule" scoping
+    ''' BlockSolution already uses; those auxiliary vars are pure reified
+    ''' functions of Lesson, and a live smoke test against the installed
+    ''' OrTools build (Phase 2.12a) confirmed CP-SAT's search log explicitly
+    ''' reports such a partial hint as "complete and feasible" - i.e. it
+    ''' derives the rest via propagation rather than requiring full
+    ''' coverage. ClearHints() first: the live smoke test confirmed this
+    ''' sequence (ClearHints then AddHint again) raises no exception and the
+    ''' model keeps solving correctly, the expected way to replace a
+    ''' previously-set hint between successive Solve() calls on the same
+    ''' mutated CpModel (same "one CpModel, many Solve() calls" pattern
+    ''' BlockSolution already established).</summary>
+    Private Sub ApplyLessonHints(model As CpModel, lesson As Dictionary(Of LessonKey, BoolVar), solver As CpSolver)
+        model.ClearHints()
+        For Each kvp In lesson
+            model.AddHint(kvp.Value, solver.BooleanValue(kvp.Value))
+        Next
+    End Sub
+
+    Private Sub AddBlockConstraint(model As CpModel, lesson As Dictionary(Of LessonKey, BoolVar),
+                                    session As Session, days As List(Of String), periods As List(Of Integer),
+                                    blockLen As Integer, Optional violated As BoolVar = Nothing)
+        Dim lastPeriod = periods(periods.Count - 1)
+        For Each d In days
+            Dim validStarts = periods.Where(Function(p) p + blockLen - 1 <= lastPeriod).ToList()
+            Dim blockStart As New Dictionary(Of Integer, BoolVar)
+            For Each p0 In validStarts
+                blockStart(p0) = model.NewBoolVar($"blockstart[{session.ClassName},{session.Subject},{session.Teacher},{d},{p0}]")
+            Next
+            For Each p In periods
+                Dim covering = validStarts.
+                    Where(Function(p0) p0 <= p AndAlso p <= p0 + blockLen - 1).
+                    Select(Function(p0) blockStart(p0)).
+                    ToList()
+                Dim key As New LessonKey(session.ClassName, session.Subject, session.Teacher, d, p)
+                If violated Is Nothing Then
+                    model.Add(lesson(key) = LinearExpr.Sum(covering))
+                Else
+                    ' Phase 2.5 "should": a chosen block-start still forces
+                    ' its covered periods to be scheduled (structural, not a
+                    ' preference - keep unconditional). Only the OTHER
+                    ' direction - every scheduled period must belong to a
+                    ' chosen block - is the actual "prefer blocks" ask, so
+                    ' only that half is gated.
+                    model.Add(lesson(key) >= LinearExpr.Sum(covering))
+                    model.Add(lesson(key) <= LinearExpr.Sum(covering)).OnlyEnforceIf(violated.Not())
+                End If
+            Next
+        Next
+    End Sub
+
+    ''' <summary>Code-Review-Umsetzung (R4): reiner Dispatcher - jeder
+    ''' Constraint-Typ lebt jetzt in einer eigenen ApplyXxx-Methode
+    ''' darunter (mechanische Extraktion der frueheren Select-Case-Bloecke,
+    ''' identisches Verhalten und identische Variablen-Erzeugungsreihenfolge;
+    ''' die frueheren sessionsOf*-Lambdas sind als gleichwertige
+    ''' LINQ-Filter in die Einzelmethoden gewandert).</summary>
+    Private Sub ApplyConstraints(model As CpModel, data As JsonObject, sessions As List(Of Session),
+                                  lesson As Dictionary(Of LessonKey, BoolVar), room As Dictionary(Of RoomKey, BoolVar),
+                                  days As List(Of String), periods As List(Of Integer),
+                                  kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)),
+                                  parallelGroupOf As Dictionary(Of (ClassName As String, Subject As String, Teacher As String), Integer),
+                                  parallelVars As Dictionary(Of (GroupIndex As Integer, Day As String, Period As Integer), BoolVar))
+
+        Dim constraintsList = JsonHelpers.Constraints(data)
+        For ci = 0 To constraintsList.Count - 1
+            Dim c = constraintsList(ci)
+            Dim constraintType = JsonHelpers.GetString(c, "type")
+            Dim priority = JsonHelpers.GetPriority(c)
+
+            Select Case constraintType
+                Case "teacher_availability"
+                    ApplyTeacherAvailability(model, c, ci, priority, sessions, lesson, days, periods, kannVars)
+                Case "weekly_hours"
+                    ApplyWeeklyHours(model, c, ci, priority, sessions, lesson, days, periods, kannVars)
+                Case "no_overlap"
+                    ApplyNoOverlap(model, c, sessions, lesson, room, days, periods, parallelGroupOf, parallelVars)
+                Case "shared_resource_conflict"
+                    ApplySharedResourceConflict(model, c, sessions, lesson, days, periods)
+                Case "forbidden_slot"
+                    ApplyForbiddenSlot(model, c, ci, priority, sessions, lesson, room, kannVars)
+                Case "required_slot"
+                    ApplyRequiredSlot(model, c, ci, priority, sessions, lesson, kannVars)
+                Case "occupied_slot"
+                    ApplyOccupiedSlot(model, c, ci, priority, sessions, lesson, kannVars)
+                Case "occupied_window"
+                    ApplyOccupiedWindow(model, c, priority, sessions, lesson, days)
+                Case "subject_period_window"
+                    ApplySubjectPeriodWindow(model, c, priority, sessions, lesson, days, periods)
+                Case "consecutive_required"
+                    ApplyConsecutiveRequired(model, c, ci, priority, sessions, lesson, days, periods, kannVars)
+                Case "teacher_subject_assignment", "room_requirement", "parallel_group"
+                    ' Already consumed above (session/room-choice construction / Phase-2.20 Parallelgruppe-Pre-Pass); no direct constraint here.
+                Case Else
+                    Throw New ArgumentException($"Unbekannter Constraint-Typ: '{constraintType}'")
+            End Select
+        Next
+    End Sub
+
+    Private Sub ApplyTeacherAvailability(model As CpModel, c As JsonObject, ci As Integer, priority As String,
+                                          sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                          days As List(Of String), periods As List(Of Integer),
+                                          kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)))
+        Dim teacher = JsonHelpers.GetString(c, "teacher")
+        Dim availDaysList = JsonHelpers.AsStringList(c, "available_days")
+        Dim availDays As New HashSet(Of String)(If(availDaysList.Any(), availDaysList, days))
+        Dim blocked As New HashSet(Of (Day As String, Period As Integer))
+        If c.ContainsKey("unavailable_periods") AndAlso c("unavailable_periods") IsNot Nothing Then
+            For Each node In c("unavailable_periods").AsArray()
+                Dim entryObj = node.AsObject()
+                blocked.Add((JsonHelpers.GetString(entryObj, "day"), JsonHelpers.GetInt(entryObj, "period").Value))
+            Next
+        End If
+        Dim taViolated As BoolVar = Nothing
+        If priority = JsonHelpers.PriorityShould Then
+            taViolated = GetOrCreateKannVar(model, kannVars, ci, "teacher_availability", JsonHelpers.GetReason(c))
+        End If
+        For Each s In sessions.Where(Function(x) x.Teacher = teacher)
+            For Each d In days
+                For Each p In periods
+                    If Not availDays.Contains(d) OrElse blocked.Contains((d, p)) Then
+                        Dim con = model.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)) = 0)
+                        If taViolated IsNot Nothing Then con.OnlyEnforceIf(taViolated.Not())
+                    End If
+                Next
+            Next
+        Next
+    End Sub
+
+    Private Sub ApplyWeeklyHours(model As CpModel, c As JsonObject, ci As Integer, priority As String,
+                                  sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                  days As List(Of String), periods As List(Of Integer),
+                                  kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)))
+        Dim className = JsonHelpers.GetString(c, "class")
+        Dim subject = JsonHelpers.GetString(c, "subject")
+        Dim hoursPerWeek = JsonHelpers.GetInt(c, "hours_per_week").Value
+        Dim maxPerDay = JsonHelpers.GetInt(c, "max_per_day")
+        ' priority only ever governs the max_per_day cap below -
+        ' hours_per_week's exact-count stays always-must
+        ' (Validation.vb rejects "should" without max_per_day).
+        Dim whViolated As BoolVar = Nothing
+        If priority = JsonHelpers.PriorityShould Then
+            whViolated = GetOrCreateKannVar(model, kannVars, ci, "weekly_hours", JsonHelpers.GetReason(c))
+        End If
+        For Each s In sessions.Where(Function(x) x.Subject = subject AndAlso x.ClassName = className)
+            Dim terms As New List(Of BoolVar)
+            For Each d In days
+                For Each p In periods
+                    terms.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)))
+                Next
+            Next
+            model.Add(LinearExpr.Sum(terms) = hoursPerWeek)
+
+            If maxPerDay.HasValue AndAlso maxPerDay.Value <> 0 Then
+                For Each d In days
+                    Dim dayTerms = periods.
+                        Select(Function(p) lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p))).
+                        ToList()
+                    Dim con = model.Add(LinearExpr.Sum(dayTerms) <= maxPerDay.Value)
+                    If whViolated IsNot Nothing Then con.OnlyEnforceIf(whViolated.Not())
+                Next
+            End If
+        Next
+    End Sub
+
+    Private Sub ApplyNoOverlap(model As CpModel, c As JsonObject, sessions As List(Of Session),
+                                lesson As Dictionary(Of LessonKey, BoolVar), room As Dictionary(Of RoomKey, BoolVar),
+                                days As List(Of String), periods As List(Of Integer),
+                                parallelGroupOf As Dictionary(Of (ClassName As String, Subject As String, Teacher As String), Integer),
+                                parallelVars As Dictionary(Of (GroupIndex As Integer, Day As String, Period As Integer), BoolVar))
+        Dim resource = JsonHelpers.GetString(c, "resource")
+        Dim entityVal = JsonHelpers.GetString(c, "entity")
+        Dim relevantSessions As List(Of Session)
+        Select Case resource
+            Case "class"
+                relevantSessions = sessions.Where(Function(s) s.ClassName = entityVal).ToList()
+            Case "teacher"
+                relevantSessions = sessions.Where(Function(s) s.Teacher = entityVal).ToList()
+            Case "room"
+                relevantSessions = sessions
+            Case Else
+                relevantSessions = New List(Of Session)
+        End Select
+
+        For Each d In days
+            For Each p In periods
+                Dim terms As New List(Of BoolVar)
+                If resource = "room" Then
+                    For Each s In relevantSessions
+                        Dim key As New RoomKey(s.ClassName, s.Subject, s.Teacher, d, p, entityVal)
+                        If room.ContainsKey(key) Then terms.Add(room(key))
+                    Next
+                Else
+                    ' Phase 2.20: Sessions belonging to the same
+                    ' Parallelgruppe must contribute only ONE
+                    ' shared term (the group's own parallelVar
+                    ' for this slot) instead of one term per
+                    ' member - their Lesson vars were already
+                    ' forced equal in the pre-pass, so summing
+                    ' each individually would count the same
+                    ' value multiple times and force the group
+                    ' permanently to 0 (the exact degeneracy the
+                    ' Plan-Agent review flagged).
+                    Dim countedGroups As New HashSet(Of Integer)
+                    For Each s In relevantSessions
+                        Dim gi As Integer
+                        If parallelGroupOf.TryGetValue((s.ClassName, s.Subject, s.Teacher), gi) Then
+                            If countedGroups.Add(gi) Then terms.Add(parallelVars((gi, d, p)))
+                        Else
+                            terms.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)))
+                        End If
+                    Next
+                End If
+                If terms.Count > 0 Then
+                    model.Add(LinearExpr.Sum(terms) <= 1)
+                End If
+            Next
+        Next
+    End Sub
+
+    Private Sub ApplySharedResourceConflict(model As CpModel, c As JsonObject, sessions As List(Of Session),
+                                             lesson As Dictionary(Of LessonKey, BoolVar),
+                                             days As List(Of String), periods As List(Of Integer))
+        Dim classesInvolved = JsonHelpers.AsStringList(c, "classes")
+        Dim sharedSubject = JsonHelpers.GetString(c, "subject")
+        Dim sharedTeacher = JsonHelpers.GetString(c, "teacher")
+        Dim relevantSessions = classesInvolved.
+            SelectMany(Function(cls) sessions.Where(Function(s) s.Subject = sharedSubject AndAlso s.ClassName = cls)).
+            Where(Function(s) s.Teacher = sharedTeacher).
+            ToList()
+        For Each d In days
+            For Each p In periods
+                Dim terms = relevantSessions.
+                    Select(Function(s) lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p))).
+                    ToList()
+                If terms.Count > 0 Then
+                    model.Add(LinearExpr.Sum(terms) <= 1)
+                End If
+            Next
+        Next
+    End Sub
+
+    Private Sub ApplyForbiddenSlot(model As CpModel, c As JsonObject, ci As Integer, priority As String,
+                                    sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                    room As Dictionary(Of RoomKey, BoolVar),
+                                    kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)))
+        Dim scope = JsonHelpers.GetString(c, "scope")
+        Dim entityVal = JsonHelpers.GetString(c, "entity")
+        Dim day = JsonHelpers.GetString(c, "day")
+        Dim period = JsonHelpers.GetInt(c, "period").Value
+
+        Dim relevantSessions As List(Of Session)
+        Select Case scope
+            Case "class"
+                relevantSessions = sessions.Where(Function(s) s.ClassName = entityVal).ToList()
+            Case "teacher"
+                relevantSessions = sessions.Where(Function(s) s.Teacher = entityVal).ToList()
+            Case "room"
+                relevantSessions = sessions
+            Case Else
+                relevantSessions = New List(Of Session)
+        End Select
+
+        Dim fsViolated As BoolVar = Nothing
+        If priority = JsonHelpers.PriorityShould Then
+            fsViolated = GetOrCreateKannVar(model, kannVars, ci, "forbidden_slot", JsonHelpers.GetReason(c))
+        End If
+
+        If scope = "room" Then
+            For Each s In relevantSessions
+                Dim key As New RoomKey(s.ClassName, s.Subject, s.Teacher, day, period, entityVal)
+                If room.ContainsKey(key) Then
+                    Dim con = model.Add(room(key) = 0)
+                    If fsViolated IsNot Nothing Then con.OnlyEnforceIf(fsViolated.Not())
+                End If
+            Next
+        Else
+            For Each s In relevantSessions
+                Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, day, period)
+                If lesson.ContainsKey(key) Then
+                    Dim con = model.Add(lesson(key) = 0)
+                    If fsViolated IsNot Nothing Then con.OnlyEnforceIf(fsViolated.Not())
+                End If
+            Next
+        End If
+    End Sub
+
+    ''' <summary>Phase 2.23: positives Gegenstueck zu forbidden_slot -
+    ''' erzwingt (statt verbietet) eine (Klasse,Fach)-Session auf einem
+    ''' exakten (Tag,Periode)-Slot. Kombiniert mit dem bestehenden
+    ''' parallel_group-Pre-Pass reicht es, NUR EIN Mitglied einer
+    ''' synchronisierten Gruppe zu pinnen - die per Gleichheit gekoppelten
+    ''' uebrigen Mitglieder wandern automatisch mit.</summary>
+    Private Sub ApplyRequiredSlot(model As CpModel, c As JsonObject, ci As Integer, priority As String,
+                                   sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                   kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)))
+        Dim reqClassName = JsonHelpers.GetString(c, "class")
+        Dim reqSubject = JsonHelpers.GetString(c, "subject")
+        Dim reqDay = JsonHelpers.GetString(c, "day")
+        Dim reqPeriod = JsonHelpers.GetInt(c, "period").Value
+
+        Dim rsViolated As BoolVar = Nothing
+        If priority = JsonHelpers.PriorityShould Then
+            rsViolated = GetOrCreateKannVar(model, kannVars, ci, "required_slot", JsonHelpers.GetReason(c))
+        End If
+
+        For Each s In sessions.Where(Function(x) x.Subject = reqSubject AndAlso x.ClassName = reqClassName)
+            Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, reqDay, reqPeriod)
+            If lesson.ContainsKey(key) Then
+                Dim con = model.Add(lesson(key) = 1)
+                If rsViolated IsNot Nothing Then con.OnlyEnforceIf(rsViolated.Not())
+            End If
+        Next
+    End Sub
+
+    ''' <summary>Subject-agnostic sibling of required_slot: "this class/
+    ''' teacher should have SOME lesson (any subject) at this exact
+    ''' (day,period)" - a scheduling-DENSITY preference, not a specific
+    ''' subject placement (an OR over the class'/teacher's own sessions at
+    ''' that slot, forbidden_slot's exact negation: that forces the SUM to
+    ''' 0, this forces it to &gt;= 1). Eine leere Treffermenge ist seit der
+    ''' Review-Umsetzung (R2) ein Validation-Fehler statt eines stillen
+    ''' No-Ops hier.</summary>
+    Private Sub ApplyOccupiedSlot(model As CpModel, c As JsonObject, ci As Integer, priority As String,
+                                   sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                   kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)))
+        Dim occScope = JsonHelpers.GetString(c, "scope")
+        Dim occEntity = JsonHelpers.GetString(c, "entity")
+        Dim occDay = JsonHelpers.GetString(c, "day")
+        Dim occPeriod = JsonHelpers.GetInt(c, "period").Value
+
+        Dim occRelevantSessions As List(Of Session)
+        Select Case occScope
+            Case "class"
+                occRelevantSessions = sessions.Where(Function(s) s.ClassName = occEntity).ToList()
+            Case "teacher"
+                occRelevantSessions = sessions.Where(Function(s) s.Teacher = occEntity).ToList()
+            Case Else
+                occRelevantSessions = New List(Of Session)
+        End Select
+
+        Dim occViolated As BoolVar = Nothing
+        If priority = JsonHelpers.PriorityShould Then
+            occViolated = GetOrCreateKannVar(model, kannVars, ci, "occupied_slot", JsonHelpers.GetReason(c))
+        End If
+
+        Dim occVars As New List(Of BoolVar)
+        For Each s In occRelevantSessions
+            Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, occDay, occPeriod)
+            If lesson.ContainsKey(key) Then occVars.Add(lesson(key))
+        Next
+        If occVars.Count > 0 Then
+            Dim con = model.Add(LinearExpr.Sum(occVars) >= 1L)
+            If occViolated IsNot Nothing Then con.OnlyEnforceIf(occViolated.Not())
+        End If
+    End Sub
+
+    ''' <summary>Code-Review-Umsetzung (P1): kompaktes Gegenstueck zur
+    ''' occupied_slot-BATTERIE - EIN Constraint-Objekt beschreibt ein
+    ''' ganzes (Tage x from_period..to_period)-Belegungsfenster einer
+    ''' Klasse/Lehrkraft statt einer Regel pro Slot. `must` erzwingt hier
+    ''' jeden Fenster-Slot hart (Sum >= 1, wie eine must-occupied_slot-
+    ''' Batterie, nur als ein Objekt). `should` erzeugt BEWUSST KEINE
+    ''' Kann-BoolVars: das Dichte-Defizit fliesst stattdessen als reine
+    ''' Linearsumme ueber das occupied-Scaffolding in SolveTops
+    ''' Zielfunktion ein (SolveTopObjective.BuildQualityTerms,
+    ''' QualityWeights.OccupiedDensity) - der P1-Befund war ja gerade,
+    ''' dass hunderte reifizierte Kann-Terme mit Gewicht 100 CP-SATs
+    ''' Bound-Beweis strukturell verhindern. Konsequenz: ein
+    ''' should-occupied_window hat im reinen Solve()/BuildModel-Pfad
+    ''' (Kann-only-Objective) keine Wirkung - es ist ein
+    ''' SolveTop-Qualitaetskriterium. occupied_slot bleibt als Typ
+    ''' vollstaendig erhalten (per-Slot-Kann-Semantik, wo genau EIN
+    ''' einzelner Slot gemeint ist).</summary>
+    Private Sub ApplyOccupiedWindow(model As CpModel, c As JsonObject, priority As String,
+                                     sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                     days As List(Of String))
+        If priority = JsonHelpers.PriorityShould Then Return
+
+        Dim scope = JsonHelpers.GetString(c, "scope")
+        Dim entity = JsonHelpers.GetString(c, "entity")
+        Dim fromPeriod = JsonHelpers.GetInt(c, "from_period").Value
+        Dim toPeriod = JsonHelpers.GetInt(c, "to_period").Value
+        Dim windowDaysList = JsonHelpers.AsStringList(c, "days")
+        Dim windowDays = If(windowDaysList.Any(), windowDaysList, days)
+
+        Dim relevantSessions As List(Of Session)
+        Select Case scope
+            Case "class"
+                relevantSessions = sessions.Where(Function(s) s.ClassName = entity).ToList()
+            Case "teacher"
+                relevantSessions = sessions.Where(Function(s) s.Teacher = entity).ToList()
+            Case Else
+                relevantSessions = New List(Of Session)
+        End Select
+
+        For Each d In windowDays
+            For p = fromPeriod To toPeriod
+                Dim slotVars As New List(Of BoolVar)
+                For Each s In relevantSessions
+                    Dim key As New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)
+                    If lesson.ContainsKey(key) Then slotVars.Add(lesson(key))
+                Next
+                If slotVars.Count > 0 Then
+                    model.Add(LinearExpr.Sum(slotVars) >= 1L)
+                End If
+            Next
+        Next
+    End Sub
+
+    ''' <summary>Rhythmisierung: fach-bezogenes Zeitfenster - der erlaubte
+    ''' Bereich fuer alle Stunden des (Klasse,Fach)-Paars ist das
+    ''' Kreuzprodukt `days x from_period..to_period` (Default-days: alle
+    ''' Tage). Ein Tag, der nicht in `days` steht, liegt VOLLSTAENDIG
+    ''' ausserhalb - "Sport-AG nur Mo-Do nachmittags" heisst also auch:
+    ''' nicht freitags. `must` verbietet jeden Slot ausserhalb hart
+    ''' (lesson = 0, wie ein fach-scoped forbidden_slot je Aussen-Slot).
+    ''' `should` erzeugt - dem occupied_window/P1-Muster folgend -
+    ''' BEWUSST KEINE Kann-BoolVars: die Fenster-Verstoesse fliessen als
+    ''' reine Linearsumme ueber die ohnehin existierenden
+    ''' Lesson-Variablen in SolveTops Zielfunktion ein
+    ''' (SolveTopObjective.BuildQualityTerms, QualityWeights.
+    ''' SubjectWindow) und werden nachgelagert exakt als
+    ''' QualityScore.SubjectWindowCount gezaehlt. Konsequenz: ein
+    ''' should-subject_period_window hat im reinen Solve()/BuildModel-
+    ''' Pfad (Kann-only-Objective) keine Wirkung - es ist ein
+    ''' SolveTop-Qualitaetskriterium.</summary>
+    Private Sub ApplySubjectPeriodWindow(model As CpModel, c As JsonObject, priority As String,
+                                          sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                          days As List(Of String), periods As List(Of Integer))
+        If priority = JsonHelpers.PriorityShould Then Return
+
+        Dim className = JsonHelpers.GetString(c, "class")
+        Dim subject = JsonHelpers.GetString(c, "subject")
+        Dim fromPeriod = JsonHelpers.GetInt(c, "from_period").Value
+        Dim toPeriod = JsonHelpers.GetInt(c, "to_period").Value
+        Dim windowDaysList = JsonHelpers.AsStringList(c, "days")
+        Dim windowDays As New HashSet(Of String)(If(windowDaysList.Any(), windowDaysList, days))
+
+        For Each s In sessions.Where(Function(x) x.ClassName = className AndAlso x.Subject = subject)
+            For Each d In days
+                For Each p In periods
+                    If Not windowDays.Contains(d) OrElse p < fromPeriod OrElse p > toPeriod Then
+                        model.Add(lesson(New LessonKey(s.ClassName, s.Subject, s.Teacher, d, p)) = 0)
+                    End If
+                Next
+            Next
+        Next
+    End Sub
+
+    Private Sub ApplyConsecutiveRequired(model As CpModel, c As JsonObject, ci As Integer, priority As String,
+                                          sessions As List(Of Session), lesson As Dictionary(Of LessonKey, BoolVar),
+                                          days As List(Of String), periods As List(Of Integer),
+                                          kannVars As Dictionary(Of Integer, (Type As String, Var As BoolVar, Reason As String)))
+        Dim className = JsonHelpers.GetString(c, "class")
+        Dim subject = JsonHelpers.GetString(c, "subject")
+        Dim blockLen = JsonHelpers.GetInt(c, "block_length").Value
+        Dim crViolated As BoolVar = Nothing
+        If priority = JsonHelpers.PriorityShould Then
+            crViolated = GetOrCreateKannVar(model, kannVars, ci, "consecutive_required", JsonHelpers.GetReason(c))
+        End If
+        For Each s In sessions.Where(Function(x) x.Subject = subject AndAlso x.ClassName = className)
+            AddBlockConstraint(model, lesson, s, days, periods, blockLen, crViolated)
+        Next
+    End Sub
+
+    ''' <summary>Phase 2.8: factored out of Solve() (verbatim body, no logic
+    ''' change) so SolveTop can reuse the same extraction on every iteration
+    ''' of its multi-solution loop without duplicating it.</summary>
+    Private Function ExtractSchedule(built As BuiltModel, solver As CpSolver, status As CpSolverStatus) As List(Of ScheduleEntry)
+        If status <> CpSolverStatus.Optimal AndAlso status <> CpSolverStatus.Feasible Then Return Nothing
+
+        ' Code-Review-Umsetzung (P5): das Room-Dictionary EINMAL nach dem
+        ' Lesson-Schluessel gruppieren statt es fuer jede wahre Lesson-Var
+        ' komplett linear zu durchsuchen - die Extraktion faellt damit von
+        ' O(Lessons x Rooms) auf O(Lessons + Rooms), spuerbar bei
+        ' Szenarien mit room_requirement und vielen max_solutions-
+        ' Iterationen (die Extraktion laeuft einmal pro Iteration).
+        Dim roomsByLesson As New Dictionary(Of LessonKey, List(Of (Room As String, Var As BoolVar)))
+        For Each rkvp In built.Room
+            Dim rk = rkvp.Key
+            Dim lessonKey As New LessonKey(rk.ClassName, rk.Subject, rk.Teacher, rk.Day, rk.Period)
+            Dim candidates As List(Of (Room As String, Var As BoolVar)) = Nothing
+            If Not roomsByLesson.TryGetValue(lessonKey, candidates) Then
+                candidates = New List(Of (Room As String, Var As BoolVar))
+                roomsByLesson(lessonKey) = candidates
+            End If
+            candidates.Add((rk.Room, rkvp.Value))
+        Next
+
+        Dim schedule As New List(Of ScheduleEntry)
+        For Each kvp In built.Lesson
+            If solver.BooleanValue(kvp.Value) Then
+                Dim key = kvp.Key
+                Dim assignedRoom As String = Nothing
+                Dim candidates As List(Of (Room As String, Var As BoolVar)) = Nothing
+                If roomsByLesson.TryGetValue(key, candidates) Then
+                    For Each candidate In candidates
+                        If solver.BooleanValue(candidate.Var) Then
+                            assignedRoom = candidate.Room
+                            Exit For
+                        End If
+                    Next
+                End If
+                schedule.Add(New ScheduleEntry With {
+                    .ClassName = key.ClassName, .Subject = key.Subject, .Teacher = key.Teacher,
+                    .Day = key.Day, .Period = key.Period, .Room = assignedRoom
+                })
+            End If
+        Next
+        Return schedule
+    End Function
+
+    ''' <summary>Phase 2.8: factored out of Solve() (verbatim body, no logic
+    ''' change) - see ExtractSchedule.</summary>
+    Private Function ExtractKannFlags(built As BuiltModel, solver As CpSolver, status As CpSolverStatus) As List(Of KannConstraintFlag)
+        If status <> CpSolverStatus.Optimal AndAlso status <> CpSolverStatus.Feasible Then Return Nothing
+        Dim kannFlags As New List(Of KannConstraintFlag)
+        For Each kvp In built.KannVars
+            kannFlags.Add(New KannConstraintFlag With {
+                .ConstraintIndex = kvp.Key, .ConstraintType = kvp.Value.Type,
+                .Reason = kvp.Value.Reason, .Relaxed = solver.BooleanValue(kvp.Value.Var)
+            })
+        Next
+        Return kannFlags
+    End Function
+
+    Public Function Solve(data As JsonObject,
+                           Optional timeLimitS As Double = 30.0,
+                           Optional seed As Integer = 42,
+                           Optional numWorkers As Integer = 1,
+                           Optional cancellationToken As CancellationToken = Nothing,
+                           Optional progress As IProgress(Of SolveProgress) = Nothing) As SolveResult
+        ' Vor dem Modellbau pruefen: BuildModel ist bei grossen Szenarien
+        ' selbst schon teuer, und ein bereits abgebrochener Aufruf soll gar
+        ' nichts tun (arc42 8.11).
+        If cancellationToken.IsCancellationRequested Then
+            Return New SolveResult With {.Status = CpSolverStatus.Unknown, .Cancelled = True}
+        End If
+
+        Dim built = BuildModel(data)
+        Dim solver As New CpSolver()
+        solver.StringParameters = $"max_time_in_seconds:{timeLimitS.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
+
+        Dim sw = Stopwatch.StartNew()
+        Dim cb As ConvergenceCallback = If(progress Is Nothing, Nothing, New ConvergenceCallback())
+        Dim run = SolveRunner.RunSolve(built.Model, solver, cb,
+                                       SolveRunner.SingleStage(SolvePhase.Iteration, "Stundenplan wird gerechnet",
+                                                               timeLimitS, cancellationToken, progress, sw))
+        Dim status = run.Status
+
+        Dim schedule = ExtractSchedule(built, solver, status)
+        Dim kannFlags = ExtractKannFlags(built, solver, status)
+
+        Return New SolveResult With {.Status = status, .Solver = solver, .Schedule = schedule,
+                                     .KannConstraintFlags = kannFlags, .Cancelled = run.Cancelled}
+    End Function
+
+    ''' <summary>Phase 2.8: adds a hard "no-good" cut to `model` forbidding
+    ''' the exact `Lesson`-variable assignment `solver` just found from ever
+    ''' recurring. Deliberately scoped to `Lesson` only (not `Room`) - that
+    ''' is what most naturally defines "a different schedule"; alternate
+    ''' Room-only variants of an already-returned Lesson assignment are not
+    ''' separately enumerated (documented, deliberate scope, not a bug).
+    ''' Verified against the actual installed OrTools build: BoolVar
+    ''' implements ILiteral directly (no cast needed) and this exact
+    ''' true-Not()/false-as-is split enumerates a small model's full
+    ''' distinct-assignment space with zero duplicates/omissions.</summary>
+    ''' <summary>Code-Review-Umsetzung (P3): `minDiversity >= 1` ergaenzt
+    ''' den exakten No-Good um einen echten Distanz-Cut - mindestens
+    ''' `minDiversity` der soeben WAHREN Lesson-Vars muessen in jeder
+    ''' spaeteren Loesung aus sein (`Sum(wahre Vars) <= Anzahl - d`). Da
+    ''' `weekly_hours` die Gesamtzahl wahrer Lesson-Vars fixiert, erzwingt
+    ''' das effektiv eine Mindest-Hamming-Distanz von 2*minDiversity zur
+    ''' blockierten Loesung, statt (wie der No-Good allein) triviale
+    ''' Ein-Slot-Nachbarn als "verschieden" zuzulassen. Der No-Good bleibt
+    ''' zusaetzlich immer gesetzt (bei minDiversity=0 unveraendert das
+    ''' einzige, exakt heutige Verhalten). Ein minDiversity groesser als
+    ''' die Anzahl wahrer Vars verlangt vollstaendige Disjunktheit - das
+    ''' darf (gewollt) zu SearchSpaceExhausted fuehren, wenn es keine so
+    ''' verschiedene Loesung gibt.</summary>
+    Private Sub BlockSolution(model As CpModel, lesson As Dictionary(Of LessonKey, BoolVar), solver As CpSolver,
+                               Optional minDiversity As Integer = 0)
+        Dim literals As New List(Of ILiteral)
+        Dim trueVars As New List(Of BoolVar)
+        For Each kvp In lesson
+            If solver.BooleanValue(kvp.Value) Then
+                literals.Add(kvp.Value.Not())
+                trueVars.Add(kvp.Value)
+            Else
+                literals.Add(kvp.Value)
+            End If
+        Next
+        model.AddBoolOr(literals)
+        If minDiversity >= 1 AndAlso trueVars.Count > 0 Then
+            model.Add(LinearExpr.Sum(trueVars) <= CLng(trueVars.Count) - CLng(minDiversity))
+        End If
+    End Sub
+
+    ' Phase 2.25s SolveWithStagnationCutoff ist in SolveRunner.RunSolve
+    ' (SolveControl.vb) aufgegangen: dieselbe Task-plus-Polling-Schleife,
+    ' erweitert um Abbruch und Fortschritt - und jetzt von ALLEN Solve-Stellen
+    ' des Kerns benutzt statt nur von der SolveTop-Iterationsschleife.
+
+    ''' <summary>Phase 2.8: returns up to `maxSolutions` distinct candidate
+    ''' schedules, ranked by ScheduleQuality.Score (ascending Total, best
+    ''' first), instead of Solve()'s single result. Builds the model once,
+    ''' then repeatedly solves the SAME CpModel with a fresh CpSolver each
+    ''' iteration - BlockSolution accumulates a no-good constraint after
+    ''' each find, so later iterations can never reproduce an earlier
+    ''' schedule. Stops on whichever of maxSolutions/totalTimeLimitS is hit
+    ''' first, or when the solver reports Infeasible (the distinct-solution
+    ''' search space is exhausted).
+    '''
+    ''' Because BuildModel still sets model.Minimize(...) whenever Kann
+    ''' constraints exist, every iteration keeps optimizing against that
+    ''' same objective - early iterations tend to surface the lowest-Kann-
+    ''' violation schedules first. Later iterations may return Feasible
+    ''' rather than Optimal if perSolveTimeLimitS is too tight to prove
+    ''' optimality within the shrinking remaining search space; this is
+    ''' still a usable candidate, and correctness of the final ranking
+    ''' never depends on iteration order since Solutions is always
+    ''' re-sorted by Quality.Total before returning.
+    '''
+    ''' Phase 2.12: `useStagedHints` (default True) fixes a real, observed
+    ''' cold-start weakness - the full quality objective's many auxiliary
+    ''' reified variables (see SolveTopObjective) make the search itself,
+    ''' not just optimality-proving, dramatically harder than the plain
+    ''' Kann-only model at large scale (a 30-class/75-teacher scenario found
+    ''' ZERO feasible solutions in 30 minutes at numWorkers:=1 without this,
+    ''' despite the Kann-only model solving the same scenario's constraints
+    ''' in ~93s). When enabled, a warm-start Stage 1 solve first finds a
+    ''' Kann-only-optimal complete schedule (reusing KannOnlyObjectiveExpr,
+    ''' the exact objective BuildModel already uses) within `stage1TimeLimitS`,
+    ''' then hints Stage 2's full-objective solve with that complete Lesson
+    ''' assignment via ApplyLessonHints - CP-SAT starts from a known-valid
+    ''' point instead of searching for one from nothing (a live smoke test,
+    ''' Phase 2.12a, confirmed CP-SAT completes such a partial hint - only
+    ''' Lesson vars, not the auxiliary ones - via propagation rather than
+    ''' requiring full coverage). The same helper then re-hints each
+    ''' subsequent iteration with its own just-found (now no-good-blocked,
+    ''' but still a useful "near miss" search bias) solution, instead of
+    ''' every iteration after the first starting cold. Hints only bias
+    ''' search order; they never change the feasible-solution set or any
+    ''' correctness guarantee.
+    '''
+    ''' Phase 2.25: `stagnationTimeoutS` (default 45.0s, ACTIVE BY DEFAULT -
+    ''' a deliberate exception to this module's usual "Nothing = today's
+    ''' behavior" convention, per explicit user decision) cuts an iteration
+    ''' short via SolveRunner.RunSolve once it has gone that long
+    ''' without a new incumbent AND already has at least one solution -
+    ''' motivated by a live-measured real scenario (bw-grundschule-beispiel)
+    ''' where BestObjectiveBound sat completely flat for a full 30-minute
+    ''' single run AND identically across 4 different-seed runs, while
+    ''' `perSolveTimeLimitS`/`totalTimeLimitS` had no way to react to that
+    ''' plateau except waiting it out. At the small default budgets most
+    ''' callers use (`perSolveTimeLimitS` default 30.0s), the cutoff is
+    ''' shorter than the iteration's own time limit and never fires - no
+    ''' behavior change there. `diversifySeed` (default True) makes
+    ''' iterations after the first use `seed + iterations` instead of the
+    ''' same fixed seed, so a stagnation-triggered or natural next iteration
+    ''' explores a different part of the search space instead of retracing
+    ''' the same one (still fully deterministic for repeated SolveTop calls
+    ''' with the same base seed, since it's a pure function of the iteration
+    ''' index). `randomizeSearch` (default True) sets CP-SAT's
+    ''' `randomize_search` parameter, adding search-order diversity
+    ''' independent of `numWorkers` (helpful at `numWorkers:=1`, where
+    ''' portfolio threading isn't already providing that). `relativeGapLimit`
+    ''' stays opt-in (default Nothing) - unlike the above, it changes WHEN
+    ''' CP-SAT accepts a solution as proven-final, a stronger behavioral
+    ''' change this phase deliberately does not force on every caller.
+    '''
+    ''' Code-Review-Umsetzung (P2/P3): `lexicographic` (Default True seit
+    ''' der expliziten Nutzerentscheidung dieser Review-Runde - eine
+    ''' bewusste Ausnahme von der "Default = altes Verhalten"-Konvention,
+    ''' wie zuvor schon stagnationTimeoutS) optimiert Kann -> ClassGaps
+    ''' als einzeln beweisbare Stufen und fixiert jedes Stufenoptimum als
+    ''' Constraint (`lexTolerance` weitet das Band pro Stufe);
+    ''' `lexTeacherGapsStage` (opt-in, Default False) haengt TeacherGaps
+    ''' als dritte Stufe an - ohne sie bleibt TeacherGaps gewichtet in der
+    ''' Rest-Zielfunktion. `lexicographic:=False` liefert den frueheren
+    ''' gewichteten Summenmodus unveraendert. `minDiversity` (Default 0 =
+    ''' heutiges Verhalten)
+    ''' erzwingt pro bereits gefundener Loesung einen echten Distanz-Cut
+    ''' statt nur des exakten No-Goods (siehe BlockSolution).
+    ''' `rehintFoundSolutions` (Default True = heutiges Verhalten) steuert,
+    ''' ob jede Iteration auf die soeben gefundene Loesung gehintet wird -
+    ''' fuer Diversitaets-Laeufe auf False setzen.</summary>
+    Public Function SolveTop(data As JsonObject,
+                              Optional maxSolutions As Integer = 10,
+                              Optional totalTimeLimitS As Double = 120.0,
+                              Optional perSolveTimeLimitS As Double = 30.0,
+                              Optional seed As Integer = 42,
+                              Optional numWorkers As Integer = 1,
+                              Optional stage1TimeLimitS As Double = 60.0,
+                              Optional useStagedHints As Boolean = True,
+                              Optional qualityWeights As QualityWeights = Nothing,
+                              Optional stagnationTimeoutS As Double? = 45.0,
+                              Optional diversifySeed As Boolean = True,
+                              Optional randomizeSearch As Boolean = True,
+                              Optional relativeGapLimit As Double? = Nothing,
+                              Optional lexicographic As Boolean = True,
+                              Optional lexTolerance As Integer = 0,
+                              Optional lexTeacherGapsStage As Boolean = False,
+                              Optional lexOccupiedDensityStage As Boolean = False,
+                              Optional lexSubjectWindowStage As Boolean = False,
+                              Optional minDiversity As Integer = 0,
+                              Optional rehintFoundSolutions As Boolean = True,
+                              Optional laterIterationsGapLimit As Double? = Nothing,
+                              Optional cancellationToken As CancellationToken = Nothing,
+                              Optional progress As IProgress(Of SolveProgress) = Nothing) As MultiSolveResult
+        If cancellationToken.IsCancellationRequested Then
+            Return New MultiSolveResult With {.Solutions = New List(Of ScoredSolution)(),
+                                              .StopReason = MultiSolveStopReason.Cancelled}
+        End If
+
+        Dim weights = If(qualityWeights, New QualityWeights())
+        Dim built = BuildCoreModel(data)
+        Dim sw = Stopwatch.StartNew()
+        ' Wird in der Vorphase (lexikografische Stufen / Warmstart) gesetzt -
+        ' dort gibt es noch keine Loesung, die man zurueckgeben koennte.
+        Dim cancelled = False
+
+        If lexicographic Then
+            ' Code-Review-Umsetzung (P2): lexikografische Stufen statt einer
+            ' einzigen grossen gewichteten Summe. Motiviert durch die
+            ' Phase-2.25-Livemessungen (Kann-only beweist Optimal in 0,2s,
+            ' das 7-Kriterien-Summenmodell blieb bei 97-99% Restluecke):
+            ' Kann -> ClassGaps -> TeacherGaps werden nacheinander einzeln
+            ' minimiert und ihr jeweils gefundenes Optimum als Constraint
+            ' fixiert (`<= opt + lexTolerance`), dann laeuft die normale
+            ' Iterationsschleife mit der gewichteten Rest-Zielfunktion
+            ' (EdgePeriod/AfternoonDayCount/LoadVariance, soweit aktiv)
+            ' innerhalb dieses Toleranzbands. Re-Minimize auf demselben
+            ' CpModel ersetzt die Zielfunktion nachweislich (dieselbe
+            ' Zwei-Minimize-Sequenz nutzte SolveTop schon vor diesem Umbau,
+            ' Stage 1 -> ApplyQualityObjective; das dokumentierte Fehlen
+            ' von ClearObjective() auf der installierten DLL ist deshalb
+            ' kein Hindernis). Die Stufenreihenfolge ist FIX (Kann vor
+            ' ClassGaps, optional gefolgt von TeacherGaps) - die
+            ' konfigurierten Gewichte steuern in diesem Modus nur noch die
+            ' Rest-Zielfunktion und das nachgelagerte Quality-Ranking,
+            ' nicht mehr die relative Prioritaet der Stufen. Seit der
+            ' expliziten Nutzerentscheidung dieser Review-Runde ist dieser
+            ' Modus DEFAULT (lexicographic:=True) - der gewichtete Modus
+            ' bleibt per lexicographic:=False fuer Aufrufer erreichbar, die
+            ' ihre Prioritaeten frei ueber Gewichte tauschen wollen (siehe
+            ' SolveTopQualityWeightsInfluenceChosenSchedule-Test, der
+            ' genau deshalb explizit False setzt). Die TeacherGaps-Stufe
+            ' ist dabei OPT-IN (lexTeacherGapsStage, Default False -
+            ' ebenfalls Nutzerentscheidung): ohne sie wird TeacherGaps
+            ' nicht hart auf sein Optimum fixiert, sondern wandert mit
+            ' seinem konfigurierten Gewicht in die Rest-Zielfunktion -
+            ' Lehrer-Springstunden bleiben so gegen die uebrigen
+            ' Restkriterien abwaegbar, statt Klassenplaene dem
+            ' Lehrerplan-Optimum unterzuordnen.
+            Dim terms = SolveTopObjective.BuildQualityTerms(built, data, weights)
+            Dim stageExprs As New List(Of LinearExpr)
+            If terms.KannSum IsNot Nothing Then stageExprs.Add(terms.KannSum)
+            ' Dichte-Stufe (opt-in, Antwort auf den P1-Langvergleich): die
+            ' occupied_slot-Batterie dominierte die Fensterabdeckung, weil
+            ' ihre Kann-Stufe der Dichte ein DEDIZIERTES Budget gab und das
+            ' Ergebnis als hartes Band fixierte - diese Stufe gibt dem
+            ' kompakten occupied_window-Kriterium exakt denselben Vorteil,
+            ' ohne zur Batterie zurueckzukehren. Position VOR ClassGaps:
+            ' das entspricht der Batterie-Reihenfolge (Dichte sass dort in
+            ' Stufe 1, ClassGaps folgte) und damit dem Verhalten, gegen das
+            ' der Vergleich gemessen wurde.
+            If lexOccupiedDensityStage AndAlso terms.OccupiedDensitySum IsNot Nothing Then stageExprs.Add(terms.OccupiedDensitySum)
+            ' Fach-Fenster-Stufe (opt-in, gleiches Muster wie die
+            ' Dichte-Stufe): fixiert die minimale Zahl von Stunden
+            ' ausserhalb ihrer subject_period_window-Bereiche als hartes
+            ' Band, bevor ClassGaps optimiert wird.
+            If lexSubjectWindowStage AndAlso terms.SubjectWindowSum IsNot Nothing Then stageExprs.Add(terms.SubjectWindowSum)
+            If terms.ClassGapsSum IsNot Nothing Then stageExprs.Add(terms.ClassGapsSum)
+            If lexTeacherGapsStage AndAlso terms.TeacherGapsSum IsNot Nothing Then stageExprs.Add(terms.TeacherGapsSum)
+
+            Dim stageIndex = 0
+            For Each stageExpr In stageExprs
+                stageIndex += 1
+                If cancellationToken.IsCancellationRequested Then
+                    cancelled = True
+                    Exit For
+                End If
+                Dim stageLimit = Math.Min(stage1TimeLimitS, Math.Max(totalTimeLimitS - sw.Elapsed.TotalSeconds, 0.0))
+                If stageLimit <= 0 Then Exit For
+                built.Model.Minimize(stageExpr)
+                Dim stageSolver As New CpSolver()
+                stageSolver.StringParameters = $"max_time_in_seconds:{stageLimit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
+                Dim stageCb As ConvergenceCallback = If(progress Is Nothing, Nothing, New ConvergenceCallback())
+                Dim stageRun = SolveRunner.RunSolve(built.Model, stageSolver, stageCb,
+                    SolveRunner.Options(Nothing, cancellationToken, progress,
+                        New SolveProgress With {.Phase = SolvePhase.LexStufe, .PhaseIndex = stageIndex,
+                                                .PhaseCount = stageExprs.Count, .BudgetS = totalTimeLimitS,
+                                                .Label = $"Vorstufe {stageIndex} von {stageExprs.Count} wird optimiert"},
+                        sw))
+                If stageRun.Cancelled Then
+                    cancelled = True
+                    Exit For
+                End If
+                Dim stageStatus = stageRun.Status
+                If stageStatus <> CpSolverStatus.Optimal AndAlso stageStatus <> CpSolverStatus.Feasible Then Exit For
+                ' Auch ein nur-Feasible-Stufenwert ist eine ERREICHTE obere
+                ' Schranke - sie zu fixieren schneidet keine Loesung ab,
+                ' die besser waere als das bereits Gefundene.
+                Dim stageBound = CLng(Math.Round(stageSolver.ObjectiveValue)) + CLng(Math.Max(lexTolerance, 0))
+                built.Model.Add(stageExpr <= stageBound)
+                If useStagedHints Then ApplyLessonHints(built.Model, built.Lesson, stageSolver)
+            Next
+
+            ' Rest-Zielfunktion fuer die Iterationsschleife: die nicht
+            ' gestuften Kriterien; existiert keines, die (jetzt eng
+            ' eingeschraenkte, daher schnell beweisbare) gewichtete
+            ' Gesamtsumme - so behaelt jede Iteration eine wohldefinierte
+            ' ObjectiveValue/Bound-Semantik.
+            Dim finalObjective = SolveTopObjective.WeightedResidual(terms, weights,
+                teacherGapsInResidual:=Not lexTeacherGapsStage,
+                occupiedDensityInResidual:=Not lexOccupiedDensityStage,
+                subjectWindowInResidual:=Not lexSubjectWindowStage)
+            If finalObjective Is Nothing Then finalObjective = SolveTopObjective.WeightedTotal(terms, weights)
+            If finalObjective IsNot Nothing Then built.Model.Minimize(finalObjective)
+        Else
+            If useStagedHints Then
+                Dim stage1Limit = Math.Min(stage1TimeLimitS, Math.Max(totalTimeLimitS - sw.Elapsed.TotalSeconds, 0.0))
+                If stage1Limit > 0 Then
+                    If built.KannVars.Count > 0 Then
+                        built.Model.Minimize(KannOnlyObjectiveExpr(built.KannVars))
+                    End If
+                    Dim stage1Solver As New CpSolver()
+                    stage1Solver.StringParameters = $"max_time_in_seconds:{stage1Limit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{seed},num_search_workers:{numWorkers}"
+                    Dim stage1Cb As ConvergenceCallback = If(progress Is Nothing, Nothing, New ConvergenceCallback())
+                    Dim stage1Run = SolveRunner.RunSolve(built.Model, stage1Solver, stage1Cb,
+                        SolveRunner.Options(Nothing, cancellationToken, progress,
+                            New SolveProgress With {.Phase = SolvePhase.WarmStart, .PhaseIndex = 1, .PhaseCount = 1,
+                                                    .BudgetS = totalTimeLimitS, .Label = "Warmstart wird gerechnet"},
+                            sw))
+                    If stage1Run.Cancelled Then cancelled = True
+                    Dim stage1Status = stage1Run.Status
+                    If stage1Status = CpSolverStatus.Optimal OrElse stage1Status = CpSolverStatus.Feasible Then
+                        ApplyLessonHints(built.Model, built.Lesson, stage1Solver)
+                    End If
+                End If
+            End If
+
+            SolveTopObjective.ApplyQualityObjective(built, data, weights)
+        End If
+        ' Abbruch in der Vorphase: es existiert noch keine einzige Loesung.
+        ' Bewusst mit leerer Liste zurueck statt Exception - siehe
+        ' MultiSolveStopReason.Cancelled.
+        If cancelled Then
+            Return New MultiSolveResult With {.Solutions = New List(Of ScoredSolution)(),
+                                              .StopReason = MultiSolveStopReason.Cancelled,
+                                              .ElapsedS = sw.Elapsed.TotalSeconds}
+        End If
+
+        Dim solutions As New List(Of ScoredSolution)
+        Dim iterations = 0
+        Dim stagnationTriggeredCount = 0
+        Dim stopReason As MultiSolveStopReason
+
+        Do
+            Dim remaining = totalTimeLimitS - sw.Elapsed.TotalSeconds
+            ' Reihenfolge ist Absicht: maxSolutions ZUERST. Faellt der Abbruch
+            ' zufaellig mit dem Erreichen des Solls zusammen, waere die Suche
+            ' ohnehin hier zu Ende gewesen - dann ist MaxSolutionsReached die
+            ' wahrheitsgemaessere Auskunft. Cancelled meldet der Kern nur,
+            ' wenn tatsaechlich noch Arbeit offen war.
+            If solutions.Count >= maxSolutions Then
+                stopReason = MultiSolveStopReason.MaxSolutionsReached
+                Exit Do
+            End If
+            If cancellationToken.IsCancellationRequested Then
+                stopReason = MultiSolveStopReason.Cancelled
+                Exit Do
+            End If
+            If remaining <= 0 Then
+                stopReason = MultiSolveStopReason.TimeLimitReached
+                Exit Do
+            End If
+            Dim thisLimit = Math.Min(perSolveTimeLimitS, remaining)
+
+            Dim effectiveSeed = If(diversifySeed, seed + iterations, seed)
+            Dim paramsStr = $"max_time_in_seconds:{thisLimit.ToString(Globalization.CultureInfo.InvariantCulture)},random_seed:{effectiveSeed},num_search_workers:{numWorkers}"
+            If randomizeSearch Then paramsStr &= ",randomize_search:true"
+            ' P6: laterIterationsGapLimit gilt ab der ZWEITEN Iteration und
+            ' ueberstimmt dort ein gesetztes relativeGapLimit - die erste
+            ' Iteration darf weiterhin sorgfaeltig beweisen, waehrend
+            ' Folge-Iterationen (deren Zweck ALTERNATIVEN sind, kein
+            ' besseres Optimum) eine Loesung innerhalb dieser relativen
+            ' Luecke frueher akzeptieren und so mehr Kandidaten ins selbe
+            ' Gesamtbudget passen. Nothing = unveraendertes Verhalten.
+            Dim effectiveGapLimit = If(iterations >= 1 AndAlso laterIterationsGapLimit.HasValue, laterIterationsGapLimit, relativeGapLimit)
+            If effectiveGapLimit.HasValue Then paramsStr &= $",relative_gap_limit:{effectiveGapLimit.Value.ToString(Globalization.CultureInfo.InvariantCulture)}"
+
+            Dim solver As New CpSolver()
+            solver.StringParameters = paramsStr
+            Dim convergenceCb As New ConvergenceCallback()
+            Dim thisStagnationTimeout = If(stagnationTimeoutS.HasValue AndAlso stagnationTimeoutS.Value < thisLimit, stagnationTimeoutS, Nothing)
+            Dim run = SolveRunner.RunSolve(built.Model, solver, convergenceCb,
+                SolveRunner.Options(thisStagnationTimeout, cancellationToken, progress,
+                    New SolveProgress With {.Phase = SolvePhase.Iteration, .PhaseIndex = iterations + 1,
+                                            .SolutionsFound = solutions.Count, .BudgetS = totalTimeLimitS,
+                                            .Label = $"Loesung {solutions.Count + 1} wird gesucht"},
+                    sw))
+            Dim status = run.Status
+            If run.StagnationTriggered Then stagnationTriggeredCount += 1
+            iterations += 1
+
+            ' Abbruch, BEVOR diese Iteration etwas Verwertbares hatte. Ohne
+            ' diesen Zweig fiele der Fall unten in den Unknown-Ast und
+            ' bekaeme faelschlich TimeLimitReached. Hatte die Iteration
+            ' dagegen schon eine Loesung, wird sie unten normal verwertet -
+            ' der Abbruch greift dann am Schleifenkopf der naechsten Runde.
+            If run.Cancelled AndAlso status <> CpSolverStatus.Optimal AndAlso status <> CpSolverStatus.Feasible Then
+                stopReason = MultiSolveStopReason.Cancelled
+                Exit Do
+            End If
+
+            If status = CpSolverStatus.Infeasible OrElse status = CpSolverStatus.ModelInvalid Then
+                ' A genuine proof that no further distinct solution exists.
+                stopReason = MultiSolveStopReason.SearchSpaceExhausted
+                Exit Do
+            ElseIf status <> CpSolverStatus.Optimal AndAlso status <> CpSolverStatus.Feasible Then
+                ' CpSolverStatus.Unknown: this solve's own time budget ran
+                ' out without a conclusive answer either way - that is a
+                ' time-budget exhaustion, not a proof the search space is
+                ' exhausted, so it must not be mislabeled as such.
+                stopReason = MultiSolveStopReason.TimeLimitReached
+                Exit Do
+            End If
+
+            Dim schedule = ExtractSchedule(built, solver, status)
+            Dim kannFlags = ExtractKannFlags(built, solver, status)
+            Dim kannCount = Verifier.VerifyScheduleDetailed(data, schedule).KannViolations.Count
+            Dim quality = ScheduleQuality.Score(data, schedule, kannCount, weights)
+            solutions.Add(New ScoredSolution With {
+                .Schedule = schedule, .KannConstraintFlags = kannFlags, .Quality = quality, .Status = status,
+                .ObjectiveValue = solver.ObjectiveValue, .BestObjectiveBound = solver.BestObjectiveBound,
+                .Convergence = convergenceCb.Points})
+
+            BlockSolution(built.Model, built.Lesson, solver, minDiversity)
+            ' P3: das Re-Hinting auf die soeben blockierte Loesung ist eine
+            ' AEHNLICHKEITS-Heuristik (beschleunigt Feasibility, zieht die
+            ' naechste Iteration aber aktiv zum naechstgelegenen Nachbarn) -
+            ' fuer Laeufe, deren Ziel DIVERSE Alternativen sind, per
+            ' rehintFoundSolutions:=False abschaltbar; der Stage-1-/Stufen-
+            ' Warm-Start-Hint vor der ersten Iteration bleibt davon
+            ' unberuehrt.
+            If useStagedHints AndAlso rehintFoundSolutions Then ApplyLessonHints(built.Model, built.Lesson, solver)
+        Loop
+
+        Return New MultiSolveResult With {
+            .Solutions = solutions.OrderBy(Function(s) s.Quality.Total).ToList(),
+            .StopReason = stopReason, .IterationsRun = iterations, .ElapsedS = sw.Elapsed.TotalSeconds,
+            .StagnationTriggeredCount = stagnationTriggeredCount
+        }
+    End Function
+
+    Public Function StatusName(status As CpSolverStatus) As String
+        Return status.ToString()
+    End Function
+
+    ''' <summary>Phase 2.11: orchestrates the three Kursstufe CP-SAT stages
+    ''' (Kursblockung.vb -> Schienenraster.vb -> Raumzuordnung.vb)
+    ''' end-to-end. Each of stages B/C is solved via THIS SAME Solve()
+    ''' function operating on a synthetic scenario - not one line of
+    ''' BuildModel/BuildCoreModel/ApplyConstraints/AddBlockConstraint above
+    ''' changes for this feature; only this new function and the three new
+    ''' modules exist. Stops at the first stage that doesn't solve
+    ''' Optimal/Feasible, so a caller can tell WHICH stage failed (see
+    ''' KursstufeSolveResult) instead of only "it didn't work".
+    ''' Precondition: Validation.ValidateKursstufeEntities(data) returned
+    ''' no errors (same "validate before solving" discipline as
+    ''' BuildCoreModel/Validation.ValidateEntities).</summary>
+    Public Function SolveKursstufe(data As JsonObject,
+                                    Optional timeLimitS As Double = 30.0,
+                                    Optional seed As Integer = 42,
+                                    Optional numWorkers As Integer = 1,
+                                    Optional cancellationToken As CancellationToken = Nothing,
+                                    Optional progress As IProgress(Of SolveProgress) = Nothing) As KursstufeSolveResult
+        If cancellationToken.IsCancellationRequested Then
+            Return New KursstufeSolveResult With {.KursblockungStatus = CpSolverStatus.Unknown, .Cancelled = True}
+        End If
+
+        ' Drei verkettete Stufen. Der Adapter etikettiert die Meldungen der
+        ' inneren Aufrufe als "Stufe n von 3" um und laesst die Uhr ueber alle
+        ' drei durchlaufen - sonst spraenge die Anzeige je Stufe auf 0 zurueck.
+        Dim sw = Stopwatch.StartNew()
+        Dim gesamt = timeLimitS * 3.0
+
+        Dim kb = Kursblockung.SolveKursblockung(data, timeLimitS, seed, numWorkers, cancellationToken,
+            StageProgressAdapter.Wrap(progress, SolvePhase.Stufe, 1, 3, "Kursblockung", sw, gesamt))
+        If kb.Cancelled Then
+            Return New KursstufeSolveResult With {.KursblockungStatus = kb.Status, .Cancelled = True}
+        End If
+        If kb.Status <> CpSolverStatus.Optimal AndAlso kb.Status <> CpSolverStatus.Feasible Then
+            Return New KursstufeSolveResult With {.KursblockungStatus = kb.Status}
+        End If
+
+        Dim schienenScenario = Schienenraster.BuildSchienenrasterScenario(data, kb.Assignment)
+        Dim schienenResult = Solve(schienenScenario, timeLimitS, seed, numWorkers, cancellationToken,
+            StageProgressAdapter.Wrap(progress, SolvePhase.Stufe, 2, 3, "Schienenraster", sw, gesamt))
+        If schienenResult.Cancelled Then
+            Return New KursstufeSolveResult With {.KursblockungStatus = kb.Status,
+                                                  .SchienenrasterStatus = schienenResult.Status, .Cancelled = True}
+        End If
+        If schienenResult.Status <> CpSolverStatus.Optimal AndAlso schienenResult.Status <> CpSolverStatus.Feasible Then
+            Return New KursstufeSolveResult With {.KursblockungStatus = kb.Status, .SchienenrasterStatus = schienenResult.Status}
+        End If
+
+        Dim raumScenario = Raumzuordnung.BuildRaumzuordnungScenario(data, kb.Assignment, schienenResult.Schedule)
+        Dim raumResult = Solve(raumScenario, timeLimitS, seed, numWorkers, cancellationToken,
+            StageProgressAdapter.Wrap(progress, SolvePhase.Stufe, 3, 3, "Raumzuordnung", sw, gesamt))
+        If raumResult.Cancelled Then
+            Return New KursstufeSolveResult With {
+                .KursblockungStatus = kb.Status, .SchienenrasterStatus = schienenResult.Status,
+                .RaumzuordnungStatus = raumResult.Status, .Cancelled = True}
+        End If
+        If raumResult.Status <> CpSolverStatus.Optimal AndAlso raumResult.Status <> CpSolverStatus.Feasible Then
+            Return New KursstufeSolveResult With {
+                .KursblockungStatus = kb.Status, .SchienenrasterStatus = schienenResult.Status, .RaumzuordnungStatus = raumResult.Status}
+        End If
+
+        Return New KursstufeSolveResult With {
+            .KursblockungStatus = kb.Status, .SchienenrasterStatus = schienenResult.Status,
+            .RaumzuordnungStatus = raumResult.Status, .Schedule = raumResult.Schedule
+        }
+    End Function
+
+End Module
+
+''' <summary>Phase 2.11: per-stage diagnostics for Solver.SolveKursstufe -
+''' which of the three CP-SAT stages succeeded, and the final per-Kurs
+''' schedule (each entry's .ClassName is the real Kurs id, not a Schiene
+''' or class name - see Raumzuordnung.vb) once all three have. A stage's
+''' Status property stays Nothing if an earlier stage already failed, so
+''' a caller can tell exactly where the pipeline stopped.</summary>
+Public NotInheritable Class KursstufeSolveResult
+    Public Property KursblockungStatus As CpSolverStatus
+    Public Property SchienenrasterStatus As CpSolverStatus?
+    Public Property RaumzuordnungStatus As CpSolverStatus?
+    Public Property Schedule As List(Of ScheduleEntry)
+    ''' <summary>Abbruch durch den Aufrufer (arc42 8.11). Welche Stufe es
+    ''' traf, zeigt das uebliche Muster: die Status-Properties der bereits
+    ''' gelaufenen Stufen sind gesetzt, die spaeteren Nothing.</summary>
+    Public Property Cancelled As Boolean
+End Class
+

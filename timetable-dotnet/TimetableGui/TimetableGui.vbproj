@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- WPF und WebView2 sind Windows-only; TimetableCore/-Yaml/-Workflow/
+         -Projekt bleiben bewusst plattformneutrales net8.0 (arc42 5.1). -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>TimetableGui</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <!-- Das Test-Projekt prueft auch Friend-Mitglieder (z.B.
+       HauptViewModel.VerwerteErgebnis). Sie deshalb Public zu machen,
+       waere die falsche Reihenfolge: die Sichtbarkeit richtet sich nach
+       dem Entwurf, nicht nach dem Testwerkzeug. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="TimetableGui.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TimetableCore\TimetableCore.vbproj" />
+    <ProjectReference Include="..\TimetableYaml\TimetableYaml.vbproj" />
+    <ProjectReference Include="..\TimetableWorkflow\TimetableWorkflow.vbproj" />
+    <ProjectReference Include="..\TimetableProjekt\TimetableProjekt.vbproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Import Include="TimetableCore" />
+    <Import Include="TimetableYaml" />
+    <Import Include="TimetableWorkflow" />
+    <Import Include="TimetableProjekt" />
+  </ItemGroup>
+
+  <!-- Die WPF-Global-Imports, die das VB-Projektvorlage sonst mitbringt.
+       Ohne sie kennt der Code-Behind weder Window noch RoutedEventArgs -
+       XAML-generierter Code setzt sie stillschweigend voraus. -->
+  <ItemGroup>
+    <Import Include="System.Windows" />
+    <Import Include="System.Windows.Controls" />
+    <Import Include="System.Windows.Data" />
+    <Import Include="System.Windows.Documents" />
+    <Import Include="System.Windows.Input" />
+    <Import Include="System.Windows.Media" />
+    <Import Include="System.Windows.Navigation" />
+    <Import Include="System.Windows.Shapes" />
+    <Import Include="System.Windows.Threading" />
+  </ItemGroup>
+
+  <!-- Die einzige neue Abhaengigkeit der GUI. Der Viewer-Host laeuft
+       gegen die Evergreen-Runtime, die auf aktuellen Windows-10/11-
+       Systemen vorhanden ist (arc42 7). -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
+  </ItemGroup>
+
+</Project>

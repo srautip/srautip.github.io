@@ -1,0 +1,148 @@
+<Window x:Class="ProjektAssistent"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Neues Projekt" Height="640" Width="880"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource farbe-flaeche}"
+        Foreground="{StaticResource farbe-text}"
+        FontFamily="{StaticResource schrift-stapel}"
+        FontSize="{StaticResource grad-basis}">
+
+    <!-- Projekt-Assistent (gui-ui-konzept.md 6.1). Fuenf Schritte, immer
+         nur einer sichtbar: ein Assistent, der alles gleichzeitig zeigt,
+         ist ein Formular mit Zusatzknoepfen.
+
+         Die Schrittleiste links traegt den Zustand doppelt - Zeichen UND
+         Farbe -, weil die Doppelkodierung im Klassenbildungs-Konzept
+         (419) ausdruecklich Pflicht ist und hier nichts dagegen spricht. -->
+
+    <DockPanel Margin="{StaticResource pad-platte}">
+
+        <Border DockPanel.Dock="Bottom" Margin="0,16,0,0"
+                BorderBrush="{StaticResource farbe-linie}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="ZurueckKnopf" Content="Zurück" Click="AufZurueck" />
+                    <Button x:Name="WeiterKnopf" Content="Weiter" Margin="8,0,0,0"
+                            Style="{StaticResource KnopfPrimaer}" Click="AufWeiter" />
+                    <Button Content="Abbrechen" Margin="8,0,0,0" IsCancel="True" />
+                </StackPanel>
+                <TextBlock x:Name="Befund" VerticalAlignment="Center" TextWrapping="Wrap"
+                           MaxWidth="520" HorizontalAlignment="Left"
+                           FontSize="{StaticResource grad-klein}" />
+            </DockPanel>
+        </Border>
+
+        <!-- Schrittleiste -->
+        <ItemsControl x:Name="Leiste" DockPanel.Dock="Left" Width="220" Margin="0,0,20,0">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="{Binding Zeichen}" Width="22"
+                                   FontFamily="{StaticResource schrift-symbole}"
+                                   Foreground="{Binding Farbe}" />
+                        <TextBlock Text="{Binding Titel}" TextWrapping="Wrap" MaxWidth="180"
+                                   Foreground="{Binding Farbe}" FontWeight="{Binding Gewicht}" />
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <DockPanel>
+            <TextBlock x:Name="Kopf" DockPanel.Dock="Top" Margin="0,0,0,2"
+                       FontSize="{StaticResource grad-titel}" FontWeight="SemiBold" />
+            <TextBlock x:Name="Unterkopf" DockPanel.Dock="Top" Margin="0,0,0,14" TextWrapping="Wrap"
+                       FontSize="{StaticResource grad-klein}"
+                       Foreground="{StaticResource farbe-text-2}" />
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <Grid>
+                    <!-- Schritt 1: Schule -->
+                    <StackPanel x:Name="Schritt1">
+                        <TextBlock Text="Schulname" Foreground="{StaticResource farbe-text-2}" />
+                        <TextBox x:Name="NameFeld" MaxWidth="420" HorizontalAlignment="Left" MinWidth="320"
+                                 TextChanged="AufFeld" />
+                        <TextBlock Text="Schulart" Margin="0,12,0,0" Foreground="{StaticResource farbe-text-2}" />
+                        <ComboBox x:Name="SchulartFeld" MaxWidth="420" HorizontalAlignment="Left" MinWidth="320"
+                                  SelectionChanged="AufSchulart" />
+                        <TextBlock Text="Bundesland" Margin="0,12,0,0" Foreground="{StaticResource farbe-text-2}" />
+                        <ComboBox x:Name="BundeslandFeld" MaxWidth="420" HorizontalAlignment="Left" MinWidth="320"
+                                  SelectionChanged="AufFeld" />
+                        <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Left"
+                                   FontSize="{StaticResource grad-klein}"
+                                   Foreground="{StaticResource farbe-text-3}"
+                                   Text="Nur für Baden-Württemberg sind die Kontingentstundentafeln recherchiert. Für andere Länder die Stammdaten von Hand anlegen – erfundene Lehrplanzahlen wären schlimmer als etwas Tipparbeit." />
+                        <TextBlock Text="Schuljahr" Margin="0,12,0,0" Foreground="{StaticResource farbe-text-2}" />
+                        <TextBox x:Name="SchuljahrFeld" Width="140" HorizontalAlignment="Left"
+                                 TextChanged="AufFeld" />
+                    </StackPanel>
+
+                    <!-- Schritt 2: Struktur -->
+                    <StackPanel x:Name="Schritt2" Visibility="Collapsed">
+                        <TextBlock x:Name="StufenLabel" Foreground="{StaticResource farbe-text-2}" />
+                        <TextBox x:Name="StufenFeld" Width="100" HorizontalAlignment="Left" TextChanged="AufFeld" />
+                        <TextBlock Text="Züge je Klassenstufe" Margin="0,12,0,0"
+                                   Foreground="{StaticResource farbe-text-2}" />
+                        <TextBox x:Name="ZuegeFeld" Width="100" HorizontalAlignment="Left" TextChanged="AufFeld" />
+                        <TextBlock x:Name="LehrerLabel" Margin="0,12,0,0"
+                                   Foreground="{StaticResource farbe-text-2}" />
+                        <TextBox x:Name="LehrerFeld" Width="100" HorizontalAlignment="Left" TextChanged="AufFeld" />
+                        <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Left"
+                                   FontSize="{StaticResource grad-klein}"
+                                   Foreground="{StaticResource farbe-text-3}"
+                                   Text="Gemeint sind nur die Klassenlehrkräfte. Fachlehrkräfte (Religion, Englisch, NaWi …) ergänzt der Assistent bedarfsgerecht – ihre Zahl folgt aus den Wochenstunden, nicht aus einer Eingabe." />
+                        <TextBlock x:Name="StrukturVorschau" Margin="0,14,0,0" TextWrapping="Wrap"
+                                   MaxWidth="480" HorizontalAlignment="Left"
+                                   Foreground="{StaticResource farbe-text-2}" />
+                    </StackPanel>
+
+                    <!-- Schritt 3: Schueler und Gruppen -->
+                    <StackPanel x:Name="Schritt3" Visibility="Collapsed">
+                        <TextBlock TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left"
+                                   Foreground="{StaticResource farbe-text-2}"
+                                   Text="Überspringbar. Der Stundenplan braucht grundsätzlich keine Einzelschüler – Klassen tragen nur eine informative Schülerzahl. Nötig ist dieser Schritt erst, wenn klassenübergreifende Gruppen (Religion, Förderung, Niveaukurse) mitgeplant werden sollen." />
+                        <TextBlock Text="Kinder je Klasse" Margin="0,14,0,4" FontWeight="SemiBold" />
+                        <StackPanel x:Name="SchuelerFelder" />
+                        <TextBlock Text="Gruppen-Vorlagen" Margin="0,16,0,4" FontWeight="SemiBold" />
+                        <StackPanel x:Name="VorlagenFelder" />
+                    </StackPanel>
+
+                    <!-- Schritt 4: Schutz -->
+                    <StackPanel x:Name="Schritt4" Visibility="Collapsed">
+                        <TextBlock Text="Projekt-Passwort" Foreground="{StaticResource farbe-text-2}" />
+                        <PasswordBox x:Name="PasswortFeld" Width="320" HorizontalAlignment="Left"
+                                     PasswordChanged="AufFeld" />
+                        <TextBlock Text="Wiederholung" Margin="0,12,0,0"
+                                   Foreground="{StaticResource farbe-text-2}" />
+                        <PasswordBox x:Name="PasswortFeld2" Width="320" HorizontalAlignment="Left"
+                                     PasswordChanged="AufFeld" />
+                        <TextBlock x:Name="StaerkeLabel" Margin="0,6,0,0"
+                                   FontSize="{StaticResource grad-klein}" />
+                        <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left"
+                                   FontSize="{StaticResource grad-klein}"
+                                   Foreground="{StaticResource farbe-text-3}"
+                                   Text="Das Passwort verschlüsselt die Projektdatei. Es gibt keine Wiederherstellung – geht es verloren, ist der Inhalt verloren." />
+                        <TextBlock Text="Speicherort" Margin="0,16,0,4" Foreground="{StaticResource farbe-text-2}" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="PfadLabel" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                       MaxWidth="420" Foreground="{StaticResource farbe-text-2}" />
+                            <Button x:Name="PfadKnopf" Content="Wählen…" Margin="12,0,0,0" Click="AufPfad" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Schritt 5: Zusammenfassung -->
+                    <StackPanel x:Name="Schritt5" Visibility="Collapsed">
+                        <ItemsControl x:Name="Bilanz">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" MaxWidth="540"
+                                               Margin="0,0,0,4" HorizontalAlignment="Left" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+        </DockPanel>
+    </DockPanel>
+</Window>

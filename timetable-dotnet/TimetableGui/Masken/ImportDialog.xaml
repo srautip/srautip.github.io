@@ -1,0 +1,59 @@
+<Window x:Class="ImportDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Aus Zwischenablage einfügen" Height="520" Width="760"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource farbe-flaeche}"
+        Foreground="{StaticResource farbe-text}"
+        FontFamily="{StaticResource schrift-stapel}"
+        FontSize="{StaticResource grad-basis}">
+
+    <!-- Zeigt, was der Import VERSTANDEN hat, bevor er etwas anlegt.
+         Ein Import, der erst nach dem Ausfuehren zeigt, was er gelesen
+         hat, ist bei hundert Kindern nicht mehr zurueckzunehmen.
+
+         Die Spaltenbedeutung entscheidet der Nutzer. Ein Import, der
+         Spalten selbsttaetig deutet, liegt irgendwann falsch - und
+         schreibt dann Klarnamen in ein Attributfeld, wo sie nicht
+         hingehoeren (Datenhaltung 6.1). -->
+
+    <DockPanel Margin="{StaticResource pad-platte}">
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="Abbrechen" IsCancel="True" />
+            <Button Content="Übernehmen" Margin="8,0,0,0" IsDefault="True"
+                    Style="{StaticResource KnopfPrimaer}" Click="AufOk" />
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock x:Name="Kopfzeile" TextWrapping="Wrap" Margin="0,0,0,10" />
+            <CheckBox x:Name="HatKopfzeile" Content="Erste Zeile ist eine Spaltenüberschrift"
+                      Margin="0,0,0,4" Click="AufKopfzeile" />
+            <TextBlock Text="Eine falsch verworfene erste Zeile ist ein verlorenes Kind – bitte prüfen."
+                       FontSize="{StaticResource grad-mikro}"
+                       Foreground="{StaticResource farbe-text-3}" Margin="0,0,0,12" />
+
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock Text="Nachname:" Width="90" VerticalAlignment="Center"
+                           Foreground="{StaticResource farbe-text-2}"
+                           FontSize="{StaticResource grad-klein}" />
+                <ComboBox x:Name="NachnameWahl" Width="220" SelectionChanged="AufSpaltenwahl" />
+                <TextBlock Text="Vorname:" Width="80" Margin="16,0,0,0" VerticalAlignment="Center"
+                           Foreground="{StaticResource farbe-text-2}"
+                           FontSize="{StaticResource grad-klein}" />
+                <ComboBox x:Name="VornameWahl" Width="220" SelectionChanged="AufSpaltenwahl" />
+            </StackPanel>
+            <TextBlock x:Name="Attributzeile" TextWrapping="Wrap" Margin="0,8,0,12"
+                       FontSize="{StaticResource grad-klein}"
+                       Foreground="{StaticResource farbe-text-2}" />
+        </StackPanel>
+
+        <Border BorderBrush="{StaticResource farbe-linie}" BorderThickness="1"
+                CornerRadius="{StaticResource radius-m}">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <Grid x:Name="Tabelle" Margin="8" />
+            </ScrollViewer>
+        </Border>
+    </DockPanel>
+</Window>

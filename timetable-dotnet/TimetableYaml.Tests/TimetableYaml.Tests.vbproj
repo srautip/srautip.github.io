@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Wie bei Klassenbildung.Tests bewusst NICHT "TimetableYaml.Tests":
+         ein lexikalisch unter "TimetableYaml" liegender RootNamespace
+         wuerde die gleichnamigen Module verschatten. -->
+    <RootNamespace>TimetableYamlTests</RootNamespace>
+    <TargetFramework>net8.0</TargetFramework>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.0.4" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.0.4" />
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TimetableCore\TimetableCore.vbproj" />
+    <ProjectReference Include="..\TimetableYaml\TimetableYaml.vbproj" />
+  </ItemGroup>
+
+</Project>

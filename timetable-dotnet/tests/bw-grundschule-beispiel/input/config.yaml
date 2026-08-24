@@ -1,0 +1,211 @@
+# Steuert Solver.SolveTop (siehe tests/README.md, Abschnitt
+# "config.yaml (optional)"): wie lange darf der Solver nach dem
+# Stundenplan suchen, bevor er abbricht? Ein hoeherer Wert gibt CP-SAT
+# mehr Zeit, den gefundenen Plan als OPTIMAL zu beweisen statt nur
+# FEASIBLE (zeitlimitiert) zurueckzugeben - sichtbar im
+# "CP-SAT-Status"-Feld in output/stundenplan.md.
+#
+# Kurzauftrag (Code-Review-Umsetzung P1): 3-Min-Gesamtbudget fuer den
+# Performancevergleich "occupied_slot-Batterie (140 Kann-Regeln) vs.
+# kompaktes occupied_window-Dichte-Kriterium (8 Regeln)" - Messwerte
+# beider Varianten im Kommentar bei quality_weights unten.
+solve_time_limit_s: 180.0
+
+# Anzahl paralleler CP-SAT-Suchpfade (Portfolio-Threading). Hoeher kann
+# helfen, ueberhaupt schneller eine erste Loesung zu finden, geht aber zu
+# Lasten der pro Suchpfad verfuegbaren Zeit.
+num_workers: 2
+
+# Begrenzt (getrennt von solve_time_limit_s) jede EINZELNE Solve-
+# Iteration in Solver.SolveTop. Nutzervorgabe: 3 Min - damit deckt eine
+# einzelne Iteration notfalls das komplette Gesamtbudget ab; dass
+# trotzdem mehrere verschiedene Loesungen entstehen, uebernimmt allein
+# die Stagnationserkennung (unten, 4s): sie kappt Iterationen, die
+# nicht mehr verbessern, und gibt die restliche Zeit an weitere
+# Iterationen weiter.
+per_solve_time_limit_s: 180.0
+
+# Phase 2.25: bricht eine einzelne Solve-Iteration vorzeitig ab, sobald so
+# lange keine neue Verbesserung mehr gefunden wurde - die gesparte Zeit
+# steht der naechsten Iteration zur Verfuegung. Bewusst deutlich UNTER
+# per_solve_time_limit_s gesetzt, damit eine Iteration, die bereits
+# frueh ihr Optimum gefunden hat (oder feststeckt), nicht unnoetig bis
+# zum vollen 30s-Limit weiterlaeuft, sondern die eingesparte Zeit fuer
+# eine WEITERE, andere Loesung genutzt wird.
+#
+# Live kalibriert (3 Testlaeufe je volles 180s-Budget, siehe
+# tests/bw-grundschule-beispiel/output/stundenplan.json fuer das
+# tatsaechliche Ergebnis): 8.0s -> 11 Loesungen (Quality.Total 192.6-408.4),
+# 4.0s -> 14 Loesungen (167.8-236.2, insgesamt beste Einzelloesung UND
+# engste Streuung), 2.0s -> 21 Loesungen, aber deutlich breitere Streuung
+# nach oben (171.0-357.6 - mehrere schlechte Ausreisser, da manche
+# Iterationen zu frueh abgebrochen werden, um ueberhaupt ein brauchbares
+# lokales Optimum zu erreichen). 4.0s gewaehlt als bester Kompromiss aus
+# Anzahl UND Qualitaet der gefundenen Alternativen.
+stagnation_timeout_s: 4.0
+
+# Phase 2.21: wie viele vergleichbare Loesungs-Alternativen sollen in
+# output/stundenplan.json + output/stundentafel.html exportiert werden?
+# Das Gesamt-Zeitbudget bleibt unabhaengig davon durch solve_time_limit_s
+# gedeckelt (Solver.SolveTop prueft das verbleibende Budget vor jeder
+# weiteren Iteration) - ein hoeherer Wert verlangsamt den Lauf also nicht
+# ueber das obige Zeitbudget hinaus. Hoch gesetzt, damit NICHT dieses
+# Feld (sondern das Zeitbudget) die begrenzende Groesse ist.
+max_solutions: 30
+
+# Code-Review-Umsetzung P2: der lexikografische Modus (Kann und
+# ClassGaps als einzeln beweisbare Stufen, Optimum je Stufe als
+# Constraint fixiert, danach Enumeration ueber die gewichtete
+# Rest-Zielfunktion) ist inzwischen PROJEKTWEITER DEFAULT
+# (Nutzerentscheidung) - hier nur noch explizit gesetzt, damit die
+# Kalibrierung dieses Referenzbeispiels selbsterklaerend bleibt.
+# TeacherGaps ist per Default KEINE eigene Stufe
+# (lex_teacher_gaps_stage: false), sondern wirkt mit seinem
+# quality_weights-Gewicht (50) in der Rest-Zielfunktion - abwaegbar
+# gegen Randstunden/Nachmittage/Ausgewogenheit.
+# lex_tolerance 0 = jede exportierte Alternative ist exakt stufen-optimal.
+lexicographic: true
+lex_tolerance: 0
+lex_teacher_gaps_stage: false
+
+# Code-Review-Umsetzung P3: jede weitere Loesung muss mindestens 8 der
+# bisher belegten Slots anders belegen (~5% der Gesamt-Wochenstunden) -
+# echte Alternativen statt Ein-Slot-Nachbarn. Dazu passend das
+# Re-Hinting auf die jeweils letzte Loesung aus (das ist eine
+# Aehnlichkeits-, keine Diversitaetsheuristik).
+# Mehr-Zuteilungs-Modus: zwei nichtsymmetrische Lehrer-Zuteilungen aus
+# Stufe 1 (Toleranzband 0 = nur gleich gute Alternativen; die
+# Lex-Symmetriebrechung ueber die Aequivalenzklassen ist bei
+# max_assignments > 1 automatisch aktiv - reine Permutationen
+# austauschbarer Lehrkraefte zaehlen nicht als Alternative), jede mit
+# eigenem Stufe-2-Lauf: solve_time_limit_s und max_solutions werden
+# gleichmaessig aufgeteilt (hier: 90s / 15 Loesungen je Zuteilung).
+# BELEG-LAUF (180s gesamt): 2 Zuteilungen gefunden (beide
+# Lehrereinsatz-Objective 1010, Band haelt), je 15 Loesungen, alle
+# Optimal. Aequivalenzklasse: {Klassenlehrer-2,4,5,6,7,8} (6 direkt
+# tauschbare Lehrkraefte; -1 per feste_zuordnung gebunden, -3 hat die
+# zusaetzliche Ethik-Qualifikation). Zuteilung 2 unterscheidet sich
+# ECHT (kein Permutations-Duplikat): 3a/3b tauschen Klassenlehrer-6
+# gegen den NICHT aequivalenten Klassenlehrer-3 - und liefert die
+# global beste Loesung (Total 198.6 vs. 204.6 aus Zuteilung 1): der
+# Mehr-Zuteilungs-Modus fand einen besseren Plan, den der bisherige
+# Ein-Zuteilungs-Lauf (220.8) strukturell nicht erreichen konnte.
+max_assignments: 2
+assignment_tolerance: 0
+
+min_diversity: 8
+rehint_found_solutions: false
+
+# Phase 2.24/2.25-Nachtrag-2: Springstunden (Luecken zwischen belegten
+# Stunden an einem Tag) fuer Klassen deutlich staerker gewichtet als fuer
+# Lehrkraefte - Nutzerentscheidung fuer dieses Beispiel, ClassGaps auf das
+# 20-fache von TeacherGaps zu setzen (unabhaengig konfigurierbar, siehe
+# tests/README.md "quality_weights" - die Big-M-freie Kodierung aus Phase
+# 2.25-Nachtrag-2 aendert daran nichts, sie betrifft nur, WIE eine
+# einzelne Luecken-Variable berechnet wird, nicht wie die beiden Summen
+# gewichtet in die Zielfunktion einfliessen).
+#
+# Nutzervorgabe: die vier Sekundaerkriterien (Randstunden,
+# Nachmittags-Tage, Klassen-/Lehrer-Tagesausgewogenheit) sind wieder
+# STRUKTURELL abgeschaltet (include_*: false - keine Hilfsvariablen im
+# Modell, nicht nur Gewicht 0). Die Rest-Zielfunktion besteht damit nur
+# noch aus TeacherGaps (50) und der occupied_window-Dichte (100);
+# ScheduleQuality.Score und der Stundentafel-Viewer zeigen die echten
+# Werte der vier Kriterien weiterhin an (gedaempfte Spalten in der
+# Loesungsuebersicht - nur die SUCHE ist blind, nicht die Anzeige).
+# Zwischenzeitlich waren sie als Rest-Zielfunktion aktiv - die
+# Messreihe unten dokumentiert beide Zustaende.
+#
+# Live gemessen (je volles 2-Min-Budget, ehrlicher Vergleich):
+# - Vorher (Summenmodell, committeter Stand): Feasible mit 71-74%
+#   Luecke, 1-2 Loesungen, beste Quality.Total 167-187.
+# - Lexikografisch, Restkriterien AUS: alle 3 Stufen bewiesen optimal
+#   (Objective=Bound=0), 30 disjunkt-diverse Loesungen - aber
+#   Quality.Total 312-345, komplett getrieben von den vier dann voellig
+#   ungesteuerten Kriterien.
+# - Lexikografisch, Restkriterien AN, TeacherGaps als Stufe: Stufen
+#   fixiert auf 0/0/0, 15 diverse Loesungen, beste Quality.Total 183.6,
+#   Streuung bis 210.8.
+# - Lexikografisch, Restkriterien AN, TeacherGaps in der
+#   Rest-Zielfunktion (dieser Stand, jetzt projektweiter Default):
+#   Kann/ClassGaps fixiert auf 0/0, 16 diverse Loesungen, beste
+#   Quality.Total ebenfalls 183.6 bei deutlich ENGERER Streuung
+#   (183.6-185.5) - die Rest-Zielfunktion (inkl. TeacherGaps, Gewicht 50)
+#   bleibt pro Iteration Feasible (ihr eigenes Optimum im Band ist im
+#   4s-Stagnation-Fenster nicht beweisbar), was aber nur noch die
+#   Restkriterien betrifft, nie mehr Kann/ClassGaps.
+# - Dieser Stand (Nutzervorgabe: vier Kriterien strukturell aus,
+#   per_solve = Gesamtbudget 180s): Lauf beendet nach nur 41s -
+#   MaxSolutionsReached mit 30 Loesungen, JEDE einzelne bewiesen
+#   Optimal, und alle gesteuerten Metriken auf 0 (Kann, ClassGaps,
+#   TeacherGaps, Fenster-Defizit). Die kleine Rest-Zielfunktion
+#   (nur TeacherGaps 50 + Dichte 100) ist fuer CP-SAT vollstaendig
+#   beweisbar. Quality.Total 247.8-352.4 liegt HOEHER als mit aktiven
+#   Restkriterien (183.6) - der Total-Wert zaehlt die vier jetzt
+#   ungesteuerten Kriterien (Randstunden usw.) weiterhin mit; im
+#   Viewer sind diese Spalten gedaempft und per Gewichts-Betrachtung
+#   nachgelagert bewertbar.
+quality_weights:
+  class_gaps: 1000.0
+  teacher_gaps: 50.0
+  # P1: Gewicht pro unbelegtem occupied_window-Slot - 100 entspricht dem
+  # frueheren Kann-Gewicht der abgeloesten occupied_slot-Batterie (dort
+  # zaehlte jede verletzte Regel = jeder unbelegte Slot ebenfalls 100).
+  #
+  # Performancevergleich (je exakt 180s Gesamtbudget, identischer Seed
+  # und identische uebrige Config, dieselbe Maschine direkt
+  # nacheinander):
+  # - Variante A (140 occupied_slot-Kann-Regeln, alter Stand):
+  #   21 Loesungen, beste Quality.Total 186.0, alle Fenster in ALLEN
+  #   Loesungen belegt (die Kann-Stufe fixiert die Batterie hart auf 0),
+  #   Totals eng geclustert (186.0-197.4), Residual-Luecke 68.7%.
+  # - Variante B (8 occupied_window-Regeln, dieser Stand):
+  #   21 Loesungen, beste Quality.Total 187.2 (praktisch gleich), 140
+  #   Kann-BoolVars + 140 reifizierte Constraints + die komplette
+  #   Kann-Stufe entfallen (constraints.yaml: 1581 -> 663 Zeilen);
+  #   Dichte ist jetzt ABWAEGBAR statt hart fixiert - 20/21 Loesungen
+  #   voll belegt, 1 spaete (vom 4s-Stagnation-Cutoff frueh gekappte)
+  #   Iteration mit 6 unbelegten Fenster-Slots + 19 Lehrer-Springstunden
+  #   landet als ehrlicher Ausreisser am Listenende (Rang 21/21;
+  #   die ClassGaps-Stufe hielt auch dort: 0 Klassen-Springstunden).
+  # Fazit fuer diese Schulgroesse: gleichwertige Ergebnisqualitaet bei
+  # deutlich kleinerem Modell/Datenbestand; der eigentliche
+  # Bound-Beweis-Gewinn von P1 wird bei der ~5x groesseren
+  # occupied_slot-Batterie des bw-gms-beispiels erwartet. Wer die alte
+  # harte Fenster-Garantie zurueckwill: priority auf must setzen (haerter
+  # als vorher) oder occupied_density weiter anheben.
+  occupied_density: 100.0
+  # Rhythmisierung: Gewicht pro Kernfach-Stunde (Mathematik/Deutsch, je
+  # Klasse) ausserhalb des Vormittagsblocks 1-4 (16 should-
+  # subject_period_window-Regeln in constraints.yaml). Startwert 100 =
+  # gleicher Tier wie occupied_density - eine spuerbare, aber gegen
+  # ClassGaps (1000) klar untergeordnete Praeferenz.
+  # BELEG-LAUF (180s-Budget, direkt nach Einfuehrung der Regeln): alle
+  # 30 Loesungen Optimal, subject_window_count ueberall 0 - saemtliche
+  # 98 Kernfach-Stunden je Loesung liegen im Vormittagsblock 1-4
+  # (unabhaengig aus den Grids nachgerechnet). Vorher (identische
+  # Config OHNE die 16 Regeln): 22-36 Kernfach-Stunden ausserhalb je
+  # Loesung. Kosten: keine - ClassGaps 0, TeacherGaps 0,
+  # Fenster-Defizit 0 wie zuvor; beste Quality.Total 220.8 (vorher
+  # 226.8; Skalen wegen des neuen Kriteriums nur bedingt vergleichbar).
+  subject_window: 100.0
+  include_edge_period: false
+  include_afternoon_day_count: false
+  include_class_load_variance: false
+  include_teacher_load_variance: false
+
+# Stufe 0 (docs/klassenbildung-plan.md, K4): Parameter des
+# `klassen`-Subkommandos - Klassenbildung aus input/klassenbildung.yaml
+# (Beispiel A des Konzepts: 100 Kinder -> 4 Klassen).
+# BELEG-LAUF (Beispiel A, 100 Kinder -> 4 Klassen): 3 Varianten, alle
+# Optimal mit Zielwert 1001 - exakt die Konzept-Vorhersage: der
+# unvermeidbare Sozialverhalten-Ueberlauf (5 Kinder, Kappe 1, 4
+# Klassen -> Mass 1 x Gewicht 1000) plus ein Nordstadt-Buendelungs-
+# Split (Mass 1 x Gewicht 1); alle 34 Wuensche und alle drei Balance-
+# Kriterien erfuellt, Rollstuhl-Fixierung haelt, Groessen 26/26/26/22.
+# Varianten-Diffs zu V1: 11 bzw. 59 Kinder; Konsens-Kern 33/100.
+klassenbildung:
+  zeitlimit_s: 20.0
+  n_varianten: 3
+  epsilon: 0.05
+  min_distanz: 8

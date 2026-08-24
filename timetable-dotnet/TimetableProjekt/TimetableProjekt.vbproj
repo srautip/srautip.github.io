@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>TimetableProjekt</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TimetableCore\TimetableCore.vbproj" />
+    <ProjectReference Include="..\TimetableYaml\TimetableYaml.vbproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Import Include="TimetableCore" />
+    <Import Include="TimetableYaml" />
+  </ItemGroup>
+
+  <!-- KEINE PackageReferences: Container (System.IO.Compression), Krypto
+       (System.Security.Cryptography.AesGcm/Rfc2898DeriveBytes) und
+       Serialisierung (System.Text.Json) sind vollstaendig BCL - der
+       "keine neuen Abhaengigkeiten"-Grundsatz aus
+       docs/gui-datenhaltung-konzept.md 4. Bewusst NICHT hier: das
+       optionale "Passwort merken" per Windows-DPAPI. Es braucht ein
+       Windows-only NuGet-Paket und wuerde dieses Projekt an eine
+       Plattform binden; es gehoert in TimetableGui (net8.0-windows). -->
+
+</Project>

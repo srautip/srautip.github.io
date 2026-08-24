@@ -1,0 +1,6 @@
+
+# Manuell erzeugte Testbuilds der GUI (dotnet publish -o gui-test).
+# Sie liegen bewusst in der Repo-Wurzel, damit sie leicht zu finden
+# sind - gehoeren aber nicht ins Repository: dies ist srautip.github.io,
+# ein OEFFENTLICHES Repo, und ein Publish-Ordner sind ~34 Binaerdateien.
+gui-test/

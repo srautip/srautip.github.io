@@ -1,0 +1,136 @@
+<Window x:Class="RegelnFenster"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Regeln" Height="760" Width="1140"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource farbe-flaeche}"
+        Foreground="{StaticResource farbe-text}"
+        FontFamily="{StaticResource schrift-stapel}"
+        FontSize="{StaticResource grad-basis}">
+
+    <!-- Regelverwaltung (gui-ui-konzept.md 6.10): Handregeln editierbar,
+         generierte read-only, dazu der YAML-Expertenmodus.
+
+         Die Masken werden aus Regeltypen.vb GEBAUT, nicht hier
+         ausgeschrieben. Acht fast gleiche XAML-Bloecke waeren acht
+         Stellen, an denen Pflichtfeldpruefung und Grund-Feld
+         auseinanderlaufen koennen. -->
+
+    <DockPanel Margin="{StaticResource pad-platte}">
+
+        <Border DockPanel.Dock="Bottom" Margin="0,16,0,0"
+                BorderBrush="{StaticResource farbe-linie}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="Prüfen" Click="AufPruefen" />
+                    <Button Content="Schließen" Margin="8,0,0,0" IsCancel="True"
+                            Style="{StaticResource KnopfPrimaer}" />
+                </StackPanel>
+                <TextBlock x:Name="Statuszeile" VerticalAlignment="Center"
+                           Foreground="{StaticResource farbe-text-2}"
+                           FontSize="{StaticResource grad-klein}" />
+            </DockPanel>
+        </Border>
+
+        <TabControl x:Name="Reiter" Background="Transparent" BorderThickness="0"
+                    SelectionChanged="AufReiterWechsel">
+
+            <TabItem Header="Regeln">
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="420" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- links: Filter und Liste -->
+                    <DockPanel Grid.Column="0">
+                        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                            <StackPanel Orientation="Horizontal">
+                                <ComboBox x:Name="TypFilter" Width="200" SelectionChanged="AufFilter" />
+                                <TextBox x:Name="TextFilter" Width="200" Margin="8,0,0,0"
+                                         TextChanged="AufFilter" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <ComboBox x:Name="NeuTyp" Width="260" />
+                                <Button x:Name="NeuKnopf" Content="Neu" Margin="8,0,0,0" Click="AufNeu" />
+                                <Button Content="Löschen" Margin="8,0,0,0" Click="AufLoeschen" />
+                            </StackPanel>
+                        </StackPanel>
+                        <ListBox x:Name="Liste" SelectionChanged="AufAuswahl"
+                                 BorderBrush="{StaticResource farbe-linie}" BorderThickness="1" />
+                    </DockPanel>
+
+                    <!-- rechts: die Maske -->
+                    <DockPanel Grid.Column="1" Margin="16,0,0,0">
+                        <TextBlock x:Name="Maskenkopf" DockPanel.Dock="Top" TextWrapping="Wrap"
+                                   Margin="0,0,0,4" FontSize="{StaticResource grad-kopf}"
+                                   FontWeight="SemiBold" />
+                        <TextBlock x:Name="Maskenhinweis" DockPanel.Dock="Top" TextWrapping="Wrap"
+                                   Margin="0,0,0,10" FontSize="{StaticResource grad-klein}"
+                                   Foreground="{StaticResource farbe-text-2}" />
+                        <StackPanel x:Name="Maskenfuss" DockPanel.Dock="Bottom" Orientation="Horizontal"
+                                    Margin="0,12,0,0">
+                            <Button x:Name="AnlegenKnopf" Content="Anlegen"
+                                    Style="{StaticResource KnopfPrimaer}" Click="AufAnlegen" />
+                            <TextBlock x:Name="Anlegenhinweis" VerticalAlignment="Center" Margin="12,0,0,0"
+                                       FontSize="{StaticResource grad-klein}"
+                                       Foreground="{StaticResource farbe-text-2}" />
+                        </StackPanel>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel x:Name="Maske" />
+                        </ScrollViewer>
+                    </DockPanel>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Generierte Regeln">
+                <StackPanel Margin="0,12,0,0">
+                    <TextBlock TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left"
+                               Foreground="{StaticResource farbe-text-2}">
+                        Diese Regeln erzeugt der Lehrereinsatz bei jedem Lauf neu –
+                        <Run FontWeight="SemiBold">teacher_subject_assignment</Run>,
+                        <Run FontWeight="SemiBold">weekly_hours</Run>,
+                        <Run FontWeight="SemiBold">no_overlap</Run>,
+                        <Run FontWeight="SemiBold">parallel_group</Run>
+                        und die aus der Blocklänge abgeleiteten Blöcke.
+                        Handpflege ist dort ausdrücklich verboten; die Oberfläche bietet
+                        sie deshalb gar nicht erst an. Was hier steht, ist Anzeige.
+                    </TextBlock>
+                    <ListBox x:Name="Generierte" Margin="0,12,0,0" MaxHeight="520"
+                             BorderBrush="{StaticResource farbe-linie}" BorderThickness="1"
+                             Foreground="{StaticResource farbe-text-3}" />
+                </StackPanel>
+            </TabItem>
+
+            <TabItem Header="YAML-Expertenmodus">
+                <DockPanel Margin="0,12,0,0">
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock TextWrapping="Wrap" MaxWidth="900" HorizontalAlignment="Left"
+                                   Foreground="{StaticResource farbe-text-2}"
+                                   FontSize="{StaticResource grad-klein}"
+                                   Text="Der vollständige constraints.yaml-Inhalt – für seltene Typen, für die es keine Maske gibt. Masken und Editor arbeiten auf demselben Bestand." />
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="Prüfen" Click="AufYamlPruefen" />
+                            <Button Content="Übernehmen" Margin="8,0,0,0" Click="AufYamlUebernehmen" />
+                            <Button Content="Verwerfen" Margin="8,0,0,0" Click="AufYamlVerwerfen" />
+                        </StackPanel>
+                    </StackPanel>
+                    <Border DockPanel.Dock="Bottom" Margin="0,8,0,0" MaxHeight="180"
+                            BorderBrush="{StaticResource farbe-linie}" BorderThickness="1"
+                            CornerRadius="{StaticResource radius-m}">
+                        <ScrollViewer>
+                            <TextBlock x:Name="YamlBefunde" TextWrapping="Wrap" Margin="10"
+                                       FontFamily="{StaticResource schrift-mono}"
+                                       FontSize="{StaticResource grad-klein}" />
+                        </ScrollViewer>
+                    </Border>
+                    <TextBox x:Name="YamlEditor" AcceptsReturn="True" AcceptsTab="True"
+                             FontFamily="{StaticResource schrift-mono}"
+                             FontSize="{StaticResource grad-klein}"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto" />
+                </DockPanel>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

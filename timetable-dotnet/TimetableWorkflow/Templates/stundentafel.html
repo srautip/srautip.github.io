@@ -1,0 +1,1649 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Stundentafel</title>
+<style>
+/* == DESIGN-TOKENS: erzeugt aus Templates/design-tokens.css.
+      NICHT VON HAND AENDERN - DesignTokenTests haelt die Kopien
+      zeichengleich zur Quelle. == */
+:root {
+  color-scheme: light;
+
+  /* --- Neutrale, als ROLLEN statt als Rampe. Leichter Kaltstich in
+         Richtung des Akzents: reines Grau neben blauem Akzent liest
+         sich schmutzig. Acht Rollen ersetzen die rund zwanzig
+         Einzelwerte des Bestands - #ccc, #bbb, #ddd, #999 und #eee
+         heissen dort alle "ein Rahmen".
+         Die zugrundeliegende Zehnerrampe ist bewusst NICHT als Token
+         abgelegt: sie ist die Herleitung, nicht die Schnittstelle.
+         Als Token waere sie eine zweite Wahrheit neben den Rollen
+         (jeder Wert stuende zweimal da) und haette tote Stufen. --- */
+  --farbe-flaeche:#ffffff;
+  --farbe-flaeche-2:#fafbfc;
+  --farbe-flaeche-3:#f2f4f7;
+  --farbe-linie:#e6e9ee;
+  --farbe-linie-stark:#d5dae1;
+  --farbe-text:#1a1f26;
+  --farbe-text-2:#626b76;
+  --farbe-text-3:#8a929d;
+
+  /* --- Status: gesaettigt, kleinflaechig, IMMER mit Symbol.
+         Ein Triplett je Zustand macht die heutigen zwei Gelbtoene
+         (#a16207 fuer den Text, #ca8a04 fuer Balken und Kartenkante)
+         und die zwei Neutralgraus (#94a3b8/#9ca3af) strukturell
+         unmoeglich. Die Symbole bleiben Text - die Doppelkodierung
+         ist laut klassenbildung-konzept.md:419 Pflicht. --- */
+  --farbe-ok-text:#0f7938;    --farbe-ok-rand:#86c9a4;    --farbe-ok-flaeche:#e9f6ef;
+  --farbe-warn-text:#8a5a00;  --farbe-warn-rand:#ddb45f;  --farbe-warn-flaeche:#fdf3e4;
+  --farbe-krit-text:#b3261e;  --farbe-krit-rand:#eaa6a1;  --farbe-krit-flaeche:#fcecea;
+  /* "frei" hat bewusst KEINE eigene Flaeche: sie waere wertgleich mit
+     --farbe-flaeche-3 und damit eine zweite Wahrheit fuer denselben Ton. */
+  --farbe-frei-text:#626b76;  --farbe-frei-rand:#d5dae1;
+
+  --farbe-akzent:#0f6cbd;
+  --farbe-akzent-hover:#115ea3;
+  --farbe-akzent-flaeche:#eff6fc;
+  --farbe-diff:#a8480b;
+  /* Vergleichsauswahl ist NICHT dasselbe wie aktive Auswahl - beide
+     koennen gleichzeitig sichtbar sein (eine Loesung gewaehlt, eine
+     zum Vergleich). Deshalb eine eigene Rolle statt eines Farbtons
+     der Akzentfamilie. */
+  --farbe-vergleich-flaeche:#fdf1e3;
+
+  /* --- Kategoriale Palette: 16 Gruppenfarben.
+         Basis hsl(H 38% 46%) in gleichmaessigen 22,5-Grad-Schritten,
+         danach 10 % eines Ockers hsl(35 38% 46%) beigemischt. Der
+         Anker hat DIESELBE Saettigung und Helligkeit - die Mischung
+         verschiebt deshalb nur den Ton und daempft die kalten Toene,
+         ohne die Helligkeit anzutasten.
+
+         Die feste, niedrige Saettigung ist die tragende Zusage:
+         eine GESAETTIGTE Farbe im Bild ist immer Status, nie
+         Identitaet (klassenbildung-ui-konzept.md:35 nennt die
+         Trennung "strikt" und fordert entsaettigte Toene). Eine
+         reine Ton-Trennung waere bei 16 Kategorien unmoeglich - die
+         drei Ampelbaender belegen ein Sechstel des Kreises; die
+         Trennung MUSS auf Saettigung plus Pflicht-Kuerzel ruhen.
+
+         Reihenfolge handsortiert: benachbarte Indizes liegen
+         mindestens 45 Grad auseinander, denn genau die treffen im
+         Board aufeinander. Rot steht bewusst auf Platz 16.
+
+         Heute verletzt der Bestand die eigene Regel: #15803d ist
+         gleichzeitig Ampel-Gruen und Gruppenfarbe 11, #c2410c
+         gleichzeitig Diff-Marker und Gruppenfarbe 16. --- */
+  --kat-1:#528099;  --kat-2:#529e7b;  --kat-3:#984e99;  --kat-4:#a28b49;
+  --kat-5:#529e99;  --kat-6:#a24e85;  --kat-7:#7a9e49;  --kat-8:#5c4e99;
+  --kat-9:#a26c49;  --kat-10:#529e5d; --kat-11:#7a4e99; --kat-12:#989e49;
+  --kat-13:#526299; --kat-14:#a24e67; --kat-15:#5c9e49; --kat-16:#a24e49;
+
+  /* --- Typografie: fuenf Rollen statt vierzehn gewachsener Werte.
+         Keine Webschrift - die Viewer laufen per Doppelklick ohne
+         Netz, ein CDN scheidet aus (viewer-ausbau-plan.md
+         "Leitplanken"). Hierarchie kommt aus Groesse, Gewicht und
+         Flaeche. Zeilenhoehen sind heute NIRGENDS deklariert. --- */
+  --schrift-stapel:-apple-system,"Segoe UI",Roboto,sans-serif;
+  --schrift-mono:ui-monospace,Consolas,monospace;
+  --t-titel:1.25rem;
+  --t-kopf:0.9375rem;
+  --t-basis:0.8125rem;
+  --t-klein:0.75rem;
+  --t-mikro:0.6875rem;
+  --lh-eng:1.2;
+  --lh-basis:1.4;
+
+  /* --- Mass: 4-px-Raster. Heute liegen die Werte auf jedem
+         0,05-rem-Schritt zwischen 0,1 und 0,6 - kein Raster. --- */
+  --mass-05:2px; --mass-1:4px; --mass-2:8px; --mass-3:12px;
+  --mass-4:16px; --mass-5:20px; --mass-6:24px;
+
+  /* --- Radius nach Rolle: Marke, Steuerelement, Flaeche. --- */
+  --radius-s:2px; --radius-m:4px; --radius-l:8px;
+
+  /* --- Elevation: EIN Rezept fuer schwebende Flaechen. Popover und
+         Aufklappmenue teilen sich heute die Rolle, aber nicht das
+         Rezept - zwei Raender, zwei Radien, zwei Schatten. --- */
+  --schatten-1:0 2px 8px rgba(16,24,40,.10), 0 0 1px rgba(16,24,40,.16);
+
+  /* --- Zustand. Der Fokusring ist neu: es gibt heute keine einzige
+         :focus-Regel, obwohl klassenbildung-ui-konzept.md:203
+         Tastaturbedienung ausdruecklich zusagt. --- */
+  --zustand-hover:rgba(16,24,40,.045);
+  --fokus-ring:2px solid var(--farbe-akzent);
+  --uebergang:120ms ease;
+
+  /* --- Dichte. --dichte-zeile meint die GESAMTHOEHE der Zeile, nicht
+         ihre Inhaltshoehe - die Zeilenelemente setzen dafuer
+         box-sizing:border-box. Ohne das kaemen Polsterung und Rahmen
+         obendrauf, und "22 px" ergaeben 28 (live gemessen).
+         Stufe "kompakt" entspricht der heutigen Kartenhoehe von 24 px. Kompakt kostet also nichts; komfortabel ist der
+         Zugewinn fuer kleinere Anzeigen. --- */
+  --dichte-zeile:24px;
+  --dichte-pad-y:2px;
+  --dichte-pad-x:6px;
+  --dichte-gap:4px;
+}
+
+:root[data-dichte="komfortabel"] {
+  --dichte-zeile:32px;
+  --dichte-pad-y:5px;
+  --dichte-pad-x:9px;
+  --dichte-gap:6px;
+}
+
+/* Bewegung abschalten, wenn das System es verlangt. Bewusst ueber den
+   Token und nicht ueber `* { transition: none !important }`: jeder
+   Uebergang liest --uebergang, also genuegt EINE Zuweisung - kein
+   Spezifitaetskampf, kein !important. Das ist der Nutzen des
+   Token-Satzes an einer Stelle, an der man ihn sofort sieht. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --uebergang:0s; }
+}
+/* == ENDE DESIGN-TOKENS == */
+
+/* == DESIGN-BASIS: erzeugt aus Templates/design-basis.css.
+      NICHT VON HAND AENDERN - DesignTokenTests haelt die Kopien
+      zeichengleich zur Quelle. == */
+  body {
+    font-family: var(--schrift-stapel);
+    margin: var(--mass-6);
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
+    font-size: var(--t-basis);
+    line-height: var(--lh-basis);
+  }
+  h1 {
+    font-size: var(--t-titel);
+    line-height: var(--lh-eng);
+    margin-bottom: var(--mass-1);
+    color: var(--farbe-text);
+  }
+  h2 {
+    font-size: var(--t-kopf);
+    line-height: var(--lh-eng);
+    margin: var(--mass-5) 0 var(--mass-2);
+    color: var(--farbe-text);
+  }
+  #meta {
+    color: var(--farbe-text-2);
+    margin-bottom: var(--mass-4);
+    font-size: var(--t-basis);
+  }
+  #controls {
+    margin-bottom: var(--mass-4);
+    display: flex;
+    align-items: center;
+    gap: var(--mass-3);
+    flex-wrap: wrap;
+    font-size: var(--t-klein);
+  }
+  #compare-info {
+    margin: 0 0 var(--mass-2);
+    font-size: var(--t-klein);
+    color: var(--farbe-text-2);
+  }
+
+  /* Sichtbarer Fokus fuer Tastaturbedienung. `:focus-visible` statt
+     `:focus`, damit Mausnutzer keinen Ring sehen. Es gab bisher in
+     KEINER Vorlage eine Fokusregel, obwohl
+     klassenbildung-ui-konzept.md:203 Tastaturbedienung ausdruecklich
+     zusagt ("Pin = Enter auf fokussierter Karte").
+
+     `[tabindex]` deckt alles ab, was in Stufe 5 fokussierbar gemacht
+     wird - Karten, Badges, Panelzeilen, Loesungszeilen. Deshalb steht
+     hier eine Regel und nicht eine Liste, die dann mitwachsen muesste.
+     Selektoren, die in einer Vorlage nichts treffen, sind harmlos. */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [tabindex]:focus-visible {
+    outline: var(--fokus-ring);
+    outline-offset: 1px;
+  }
+
+  /* Symbole aus dem Inline-Sprite (siehe direkt nach <body>).
+     Monochrom, erben currentColor, skalieren mit der Schriftgroesse -
+     und vor allem: keine Datei, keine Schrift, kein CDN. Damit passen
+     sie unter die Self-contained-Leitplanke, die den Doppelklick-
+     Betrieb sichert (viewer-ausbau-plan.md "Leitplanken").
+
+     Vorher standen dort Emoji. Die rendern in FARBE und je nach
+     Betriebssystem verschieden, ignorieren die Textfarbe, sind in der
+     Groesse nicht steuerbar und drucken schlecht - auf einer Flaeche,
+     deren gesamte Bedeutungslehre auf kontrollierter Farbe beruht, ist
+     ein unkontrolliert farbiges Zeichen ein Fremdkoerper.
+
+     KEIN uebernommenes Duplikat, sondern eine neue geteilte Regel des
+     Designsystems: die Stundentafel nutzt den Satz heute noch nicht,
+     eine Klasse ohne Verwendung ist dort aber folgenlos. */
+  .ico {
+    width: 1em;
+    height: 1em;
+    flex: none;
+    vertical-align: -0.125em;
+  }
+  .ico use, .ico path, .ico rect, .ico circle {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .ico.voll path, .ico.voll rect { fill: currentColor; }
+  .ico-punkte circle { fill: currentColor; stroke: none; }
+
+  /* ---- Druck ----------------------------------------------------
+     Es gab bisher kein Druckbild, obwohl Stundenplan und Klassenliste
+     die typischen Druckartefakte sind - und obwohl das Konzept den
+     Druck ausdruecklich als Grund fuer die Gruppen-Kuerzel nennt
+     (klassenbildung-ui-konzept.md:41).
+
+     Selektoren, die in einer der beiden Vorlagen nichts treffen, sind
+     folgenlos; deshalb steht der Block geteilt statt zweimal. */
+  @media print {
+    /* OHNE das hier faerbt kein Browser die Flaechen - und damit
+       verschwaende genau die Kodierung, um die es geht: Ampelrand,
+       Gruppenfarbe, belegte Zelle. */
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    body { margin: 0; background: #fff; }
+
+    /* Bedienelemente drucken nicht mit - sie sind auf Papier weder
+       bedienbar noch informativ. */
+    #controls, #prozess, #varianten, #warnung, #fixierungen,
+    #pareto-label, #compare-info, .dropdown, #weights-menu,
+    button, .karte .pin, .gruppe-zeile .fixieren { display: none; }
+
+    /* Zusammengehoeriges nicht ueber die Seitengrenze reissen. */
+    .karte, .stapel, .klasse-spalte, .gruppe-zeile, tr { break-inside: avoid; }
+    h1, h2 { break-after: avoid; }
+
+    /* Auf Papier gibt es keinen Scrollbereich - alles muss stehen. */
+    #panel, #table-container, #lehrer-table-container, #solutions-overview {
+      max-height: none;
+      overflow: visible;
+    }
+    /* Schwebende Flaechen und Hover-Zustaende sind auf Papier sinnlos. */
+    #popover { display: none; }
+    .karte, .klasse-spalte, #panel, .variante-kachel { box-shadow: none; }
+
+    /* Kopfzeilen wiederholen sich auf jeder Seite - ein Raster ohne
+       Tages- und Stundenspalte ist auf Seite zwei nicht mehr lesbar. */
+    thead { display: table-header-group; }
+  }
+/* == ENDE DESIGN-BASIS == */
+
+  #solution-summary {
+    font-size: var(--t-basis);
+    color: var(--farbe-text);
+  }
+  #solution-summary a {
+    color: var(--farbe-akzent);
+  }  #lehrer-controls {
+    margin-bottom: var(--mass-2);
+    display: flex;
+    align-items: center;
+    gap: var(--mass-2);
+  }
+  #table-container, #lehrer-table-container {
+    /* Frueher overflow:hidden - dadurch waren die vorhandenen
+       position:sticky-Kopfzeilen wirkungslos. Die horizontale Achse
+       schaltet fitOneTable je nach Bedarf. */
+    overflow: auto;
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-m);
+  }
+  #table-container table, #lehrer-table-container table {
+    transform-origin: top left;
+  }
+  table {
+    border-collapse: collapse;
+    font-size: var(--t-klein);
+    min-width: 100%;
+  }
+  th, td {
+    border: 1px solid var(--farbe-linie);
+    padding: var(--dichte-pad-y) var(--dichte-pad-x);
+    text-align: center;
+    vertical-align: middle;
+    min-width: 4.2rem;
+    color: var(--farbe-text);
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
+    z-index: 2;
+  }
+  tbody th {
+    position: sticky;
+    left: 0;
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
+    z-index: 1;
+  }
+  td.leer {
+    background: var(--farbe-flaeche-3);
+  }
+  .klasse-badge {
+    display: block;
+    font-weight: 700;
+    font-size: var(--t-mikro);
+    color: var(--farbe-text-2);
+  }
+  .subject {
+    font-weight: 600;
+    color: var(--farbe-text);
+  }
+  .teacher {
+    font-size: var(--t-mikro);
+    color: var(--farbe-text-2);
+  }
+  .dropdown {
+    position: relative;
+  }
+  .dropdown-btn {
+    font: inherit;
+    font-size: var(--t-klein);
+    padding: var(--mass-1) var(--mass-3);
+    border: 1px solid var(--farbe-linie-stark);
+    border-radius: var(--radius-m);
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
+    cursor: pointer;
+    transition: background var(--uebergang);
+  }
+  .dropdown-btn:hover {
+    background: var(--zustand-hover);
+  }
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: var(--mass-1);
+    background: var(--farbe-flaeche);
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-l);
+    padding: var(--mass-2) var(--mass-3);
+    box-shadow: var(--schatten-1);
+    z-index: 10;
+    min-width: 10rem;
+  }
+  .dropdown-menu[hidden] {
+    display: none;
+  }
+  .dropdown-menu label {
+    display: flex;
+    align-items: center;
+    gap: var(--mass-2);
+    padding: var(--mass-05) 0;
+    white-space: nowrap;
+    cursor: pointer;
+    color: var(--farbe-text);
+  }
+  /* Viewer-Ausbau Schritt 2 (docs/viewer-ausbau-plan.md): sortierbare
+     Loesungsuebersicht - eine Zeile pro Loesung, Spalten = voller
+     Qualitaetsvektor. Eigenstaendiger Scroll-Container; die globalen
+     table/th/td-Regeln oben (min-width, sticky) werden hier gezielt
+     zurueckgesetzt. */
+  #solutions-overview {
+    margin-bottom: var(--mass-4);
+    overflow-x: auto;
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-m);
+    max-height: 22rem;
+    overflow-y: auto;
+  }
+  #solutions-overview table {
+    font-variant-numeric: tabular-nums;
+    font-size: var(--t-klein);
+    width: 100%;
+  }
+  #solutions-overview th, #solutions-overview td {
+    min-width: 0;
+    padding: var(--mass-1) var(--mass-2);
+    text-align: right;
+    white-space: nowrap;
+  }
+  #solutions-overview th.txt, #solutions-overview td.txt {
+    text-align: left;
+  }
+  #solutions-overview thead th {
+    cursor: pointer;
+    user-select: none;
+  }
+  #solutions-overview tbody tr {
+    cursor: pointer;
+    transition: background var(--uebergang);
+  }
+  #solutions-overview tbody tr:hover {
+    background: var(--zustand-hover);
+  }
+  #solutions-overview tbody tr.active {
+    background: var(--farbe-akzent-flaeche);
+  }
+  #solutions-overview .muted-col {
+    color: var(--farbe-text-3);
+  }
+  #solutions-overview .overview-note {
+    font-size: var(--t-mikro);
+    color: var(--farbe-text-2);
+    padding: var(--mass-1) var(--mass-2);
+  }
+  /* Viewer-Ausbau Schritt 4: dominierte Loesungen werden abgedunkelt
+     statt entfernt (Transparenz: sichtbar bleibt, WAS aussortiert
+     wurde). */
+  #solutions-overview tbody tr.dominated {
+    opacity: 0.42;
+  }
+  /* Viewer-Ausbau Schritt 3: Gewichts-Panel - gleiche Dropdown-Optik wie
+     die bestehenden Filter. */
+  #weights-menu {
+    min-width: 16rem;
+  }
+  #weights-menu .weight-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mass-2);
+    padding: var(--mass-05) 0;
+  }
+  #weights-menu .weight-row input {
+    width: 5.5rem;
+    font: inherit;
+    font-size: var(--t-klein);
+    text-align: right;
+    border: 1px solid var(--farbe-linie-stark);
+    border-radius: var(--radius-m);
+    padding: var(--mass-05) var(--mass-1);
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
+  }
+  #weights-menu .weight-row.muted-crit span {
+    color: var(--farbe-text-3);
+  }
+  #weights-menu .weights-note {
+    font-size: var(--t-mikro);
+    color: var(--farbe-text-2);
+    max-width: 18rem;
+    margin-top: var(--mass-2);
+  }
+  /* War bisher ein ungestylter Browser-Standardknopf direkt neben
+     gestylten Nachbarn - jetzt dieselbe Grundform wie .dropdown-btn. */
+  #weights-menu .weights-reset {
+    margin-top: var(--mass-2);
+    font: inherit;
+    font-size: var(--t-klein);
+    padding: var(--mass-1) var(--mass-2);
+    border: 1px solid var(--farbe-linie-stark);
+    border-radius: var(--radius-m);
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
+    cursor: pointer;
+    transition: background var(--uebergang);
+  }
+  #weights-menu .weights-reset:hover {
+    background: var(--zustand-hover);
+  }
+  #pareto-label {
+    display: flex;
+    align-items: center;
+    gap: var(--mass-1);
+    font-size: var(--t-klein);
+    cursor: pointer;
+  }
+  #pareto-count {
+    font-size: var(--t-klein);
+    color: var(--farbe-text-2);
+  }
+  /* Viewer-Ausbau Schritt 5: Loesungs-Diff - Zellen, die sich zwischen
+     der gewaehlten und der Vergleichsloesung unterscheiden, bekommen
+     einen deutlichen Rahmen (Inhalt bleibt der der gewaehlten Loesung;
+     der Tooltip zeigt die Belegung der Vergleichsloesung). */
+  td.diff-cell {
+    outline: 3px solid var(--farbe-diff);
+    outline-offset: -3px;
+  }  #compare-info .compare-hint {
+    color: var(--farbe-text-2);
+    font-size: var(--t-klein);
+  }
+  #solutions-overview tbody tr.compare {
+    background: var(--farbe-vergleich-flaeche);
+  }
+  #solutions-overview tbody tr.compare.active {
+    background: var(--farbe-akzent-flaeche);
+  }
+  /* Aequivalenz-Anzeige: Lehrkraefte, die per identischem
+     Pipeline-Profil direkt tauschbar sind. */
+  #tausch-legende {
+    margin: 0 0 var(--mass-2);
+    font-size: var(--t-klein);
+    color: var(--farbe-text-2);
+  }
+  #lehrer-table-container th.tauschbar {
+    color: var(--farbe-akzent);
+  }
+  #convergence-panel {
+    margin-bottom: var(--mass-4);
+    font-size: var(--t-klein);
+    color: var(--farbe-text);
+  }
+  #convergence-panel .gap-line {
+    margin-bottom: var(--mass-1);
+  }
+  #convergence-panel .conv-note {
+    color: var(--farbe-text-2);
+    font-size: var(--t-klein);
+    margin-bottom: var(--mass-1);
+  }
+  #convergence-panel svg {
+    display: block;
+    background: var(--farbe-flaeche-2);
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-s);
+  }
+</style>
+</head>
+<body>
+  <h1 id="schul-name">Stundentafel</h1>
+  <div id="meta"></div>
+  <div id="controls">
+    <label for="compare-select">Vergleichen mit:</label>
+    <select id="compare-select"></select>
+    <div class="dropdown">
+      <button type="button" id="stufe-filter-btn" class="dropdown-btn"></button>
+      <div id="stufe-filter-menu" class="dropdown-menu" hidden></div>
+    </div>
+    <span id="solution-summary"></span>
+    <div class="dropdown">
+      <button type="button" id="weights-btn" class="dropdown-btn" hidden>Gewichte ▾</button>
+      <div id="weights-menu" class="dropdown-menu" hidden></div>
+    </div>
+    <label id="pareto-label" hidden><input type="checkbox" id="pareto-toggle">Pareto-Filter</label>
+    <span id="pareto-count" hidden></span>
+  </div>
+  <div id="solutions-overview"></div>
+  <div id="compare-info" hidden></div>
+  <div id="convergence-panel"></div>
+  <div id="table-container"></div>
+
+  <h2>Lehrerstundenplan</h2>
+  <div id="lehrer-controls">
+    <div class="dropdown">
+      <button type="button" id="lehrer-filter-btn" class="dropdown-btn"></button>
+      <div id="lehrer-filter-menu" class="dropdown-menu" hidden></div>
+    </div>
+  </div>
+  <div id="tausch-legende" hidden></div>
+  <div id="lehrer-table-container"></div>
+
+  <script type="application/json" id="stundentafel-data">__STUNDENTAFEL_JSON__</script>
+  <script>
+    (function () {
+      var raw = document.getElementById('stundentafel-data').textContent;
+      var data = JSON.parse(raw);
+
+      document.getElementById('schul-name').textContent = 'Stundentafel: ' + data.schul_name;
+      document.getElementById('meta').textContent =
+        data.tage.join(', ') + ' | ' + data.periods_per_day + ' Stunden/Tag | Stop-Grund: ' + data.stop_reason;
+
+      // Die Klassenstufen-Farben stammen aus der kategorialen Palette der
+      // Design-Tokens (--kat-1..16). Frueher rechnete diese Datei sich
+      // eigene, gleichverteilte Toene mit 65 % Saettigung aus - ein
+      // zweites, unverbundenes Farbsystem neben dem des
+      // Klassenbildungs-Viewers, und gesaettigt genug, um mit der
+      // Ampel-Semantik zu kollidieren, die das Konzept exklusiv fuer den
+      // Status reserviert (klassenbildung-ui-konzept.md:35).
+      // Macht ein Element per Tastatur bedienbar. Enter und
+      // Leertaste loesen denselben Klick aus, den die Maus ausloesen
+      // wuerde - dadurch KANN die Tastaturbedienung nicht von der
+      // Maus abweichen. Es gab bisher keinen Tastaturweg zu
+      // Sortierung und Loesungsauswahl, obwohl beides nur per Klick
+      // auf ein <th> bzw. <tr> erreichbar war.
+      function bedienbar(el, rolle, beschriftung) {
+        el.tabIndex = 0;
+        el.setAttribute('role', rolle);
+        if (beschriftung) el.setAttribute('aria-label', beschriftung);
+        el.addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+          e.preventDefault();
+          el.click();
+        });
+      }
+
+      var katPalette = (function () {
+        var wurzel = getComputedStyle(document.documentElement), p = [];
+        for (var i = 1; i <= 16; i++) {
+          var wert = wurzel.getPropertyValue('--kat-' + i).trim();
+          if (wert) p.push(wert);
+        }
+        return p;
+      })();
+
+      function alsRgb(hex) {
+        var h = hex.replace('#', '');
+        if (h.length === 3) {
+          h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+        }
+        return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)];
+      }
+
+      // Parallelklassen (gleiche Klassenstufe, unterschiedliche Zeilen-
+      // Position rowIndex) behalten die Identitaetsfarbe ihrer
+      // Klassenstufe und werden nur stufenweise aufgehellt - so bleiben
+      // sie auf einen Blick unterscheidbar, ohne die Zuordnung zu
+      // verlieren. Das war schon die Absicht der alten Rechnung.
+      //
+      // NEU ist die UNTERGRENZE des Weissanteils: die alte Formel ging
+      // bis Helligkeit 40 % herunter, wo der schwarze Zelltext kaum noch
+      // lesbar war. Eine Schule mit vielen Parallelklassen traf das als
+      // erste.
+      function stufeColor(stufeIndex, rowIndex) {
+        if (!katPalette.length) return '#ffffff';
+        var basis = alsRgb(katPalette[stufeIndex % katPalette.length]);
+        var weiss = 0.84 - rowIndex * 0.11;
+        if (weiss < 0.46) weiss = 0.46;
+        var c = [];
+        for (var k = 0; k < 3; k++) {
+          c.push(Math.round(basis[k] * (1 - weiss) + 255 * weiss));
+        }
+        return 'rgb(' + c.join(', ') + ')';
+      }
+
+      var lastTable = null;
+      var lastLehrerTable = null;
+      // Nur horizontal an die verfuegbare Breite anpassen - eine
+      // zusaetzliche Verkleinerung anhand der Bildschirmhoehe wuerde bei
+      // vielen Perioden/Spalten den Text unnoetig klein machen. Die Hoehe
+      // folgt proportional (gleicher Skalierungsfaktor fuer beide Achsen,
+      // kein Verzerren) - reicht die Bildschirmhoehe nicht, scrollt die
+      // Seite normal statt die Schrift weiter zu schrumpfen. Wird sowohl
+      // fuer den Klassen- als auch den Lehrerstundenplan verwendet.
+      // Untergrenze der Verkleinerung. Ohne sie schrumpfte die Tabelle
+      // unbegrenzt weiter: eine breite Schule mit vielen Klassen und
+      // Perioden landete bei einem Bruchteil der Schriftgroesse, und der
+      // Plan war schlicht nicht mehr lesbar. Unterhalb dieser Grenze
+      // wird deshalb gescrollt statt weiter geschrumpft - eine Tabelle,
+      // die man verschieben muss, ist besser als eine, die man nicht
+      // entziffern kann.
+      var SKALA_MIN = 0.72;
+
+      function fitOneTable(table, container) {
+        if (!table) return;
+        table.style.transform = 'none';
+        var natW = table.scrollWidth;
+        var natH = table.scrollHeight;
+        var availW = container.clientWidth;
+        var scale = availW / natW;
+        if (!isFinite(scale) || scale <= 0) scale = 1;
+        if (scale > 1) scale = 1;
+        if (scale < SKALA_MIN) scale = SKALA_MIN;
+        table.style.transform = 'scale(' + scale + ')';
+        container.style.height = (natH * scale) + 'px';
+        // Passt die Tabelle auch bei Mindestgroesse nicht, uebernimmt
+        // der Behaelter das Scrollen. Die sticky-Kopfzeilen greifen
+        // dann endlich - im frueheren overflow:hidden waren sie
+        // wirkungslos.
+        container.style.overflowX = (natW * scale > availW + 1) ? 'auto' : 'hidden';
+      }
+      function fitTable() {
+        fitOneTable(lastTable, document.getElementById('table-container'));
+        fitOneTable(lastLehrerTable, document.getElementById('lehrer-table-container'));
+      }
+      window.addEventListener('resize', fitTable);
+
+      // Die Loesungsauswahl laeuft ausschliesslich ueber die
+      // Uebersichtstabelle (Zeilenklick, siehe renderOverview) - das
+      // fruehere "Loesung:"-Dropdown ist ersetzt. currentIndex ist die
+      // eine Quelle der Wahrheit fuer die aktuell gewaehlte Loesung und
+      // wird zentral in render() gesetzt.
+      var currentIndex = 0;
+
+      // ---- Loesungs-Diff (Viewer-Ausbau Schritt 5) ---------------------
+      // Zweite Auswahl "Vergleichen mit": markiert im Klassen- UND
+      // Lehrerraster jede Zelle, deren Belegung sich von der
+      // Vergleichsloesung unterscheidet (Inhalt bleibt der der aktuell
+      // gewaehlten Loesung, der Tooltip zeigt die Belegung der
+      // Vergleichsloesung), und zeigt die Slot-Distanz an - dieselbe
+      // Groessenordnung, die min_diversity beim Enumerieren erzwingt.
+      var compareSelect = document.getElementById('compare-select');
+      var compareIndex = null;
+      (function () {
+        var noneOpt = document.createElement('option');
+        noneOpt.value = '';
+        noneOpt.textContent = '- kein Vergleich -';
+        compareSelect.appendChild(noneOpt);
+        data.solutions.forEach(function (sol, i) {
+          var opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = 'Loesung ' + (i + 1);
+          compareSelect.appendChild(opt);
+        });
+        compareSelect.addEventListener('change', function () {
+          compareIndex = compareSelect.value === '' ? null : parseInt(compareSelect.value, 10);
+          render(currentIndex);
+        });
+      })();
+
+      function getCell(sol, klasse, tag, periode) {
+        var perClass = sol.classes[klasse];
+        return perClass && perClass[tag] ? perClass[tag][String(periode)] : null;
+      }
+      function cellSignature(cell) {
+        if (!cell) return '';
+        return (cell.subject || '') + '|' + (cell.teacher || '') + '|' + (cell.room || '');
+      }
+      // Der Vergleich laeuft ueber die tatsaechliche Belegung
+      // (Fach/Lehrkraft/Raum) je (Klasse, Tag, Stunde) - "frei" vs.
+      // "belegt" zaehlt ebenso als Unterschied wie andere Inhalte.
+      function cellsDiffer(solA, solB, klasse, tag, periode) {
+        return cellSignature(getCell(solA, klasse, tag, periode)) !==
+               cellSignature(getCell(solB, klasse, tag, periode));
+      }
+      function computeDiffCount(solA, solB) {
+        var count = 0;
+        var klassen = {};
+        Object.keys(solA.classes).forEach(function (k) { klassen[k] = true; });
+        Object.keys(solB.classes).forEach(function (k) { klassen[k] = true; });
+        Object.keys(klassen).forEach(function (klasse) {
+          data.tage.forEach(function (tag) {
+            for (var p = 1; p <= data.periods_per_day; p++) {
+              if (cellsDiffer(solA, solB, klasse, tag, p)) count++;
+            }
+          });
+        });
+        return count;
+      }
+      function compareTitle(cellB) {
+        if (!cellB) return 'Vergleichsloesung: frei';
+        var text = cellB.subject + (cellB.teacher ? ' (' + cellB.teacher + ')' : '');
+        if (cellB.room) text += ' [' + cellB.room + ']';
+        return 'Vergleichsloesung ' + (compareIndex + 1) + ': ' + text;
+      }
+      function activeCompareSol(solIndex) {
+        if (compareIndex === null || compareIndex === solIndex) return null;
+        return data.solutions[compareIndex];
+      }
+      function updateCompareInfo(solIndex) {
+        var info = document.getElementById('compare-info');
+        var cmp = activeCompareSol(solIndex);
+        if (!cmp) {
+          info.hidden = true;
+          info.innerHTML = '';
+          return;
+        }
+        var diffCount = computeDiffCount(data.solutions[solIndex], cmp);
+        info.hidden = false;
+        info.innerHTML = '';
+        var line = document.createElement('div');
+        line.textContent = 'Vergleich Loesung ' + (solIndex + 1) + ' mit Loesung ' + (compareIndex + 1) +
+          ': ' + diffCount + ' unterschiedlich belegte Slots';
+        info.appendChild(line);
+        var hint = document.createElement('div');
+        hint.className = 'compare-hint';
+        hint.textContent = 'Markierte Zellen unterscheiden sich - der Tooltip zeigt die Belegung der Vergleichsloesung.';
+        info.appendChild(hint);
+      }
+      // ------------------------------------------------------------------
+
+      // ---- Loesungsuebersicht (Viewer-Ausbau Schritt 2) ----------------
+      // Eine Zeile pro Loesung mit dem vollen Qualitaetsvektor; Klick auf
+      // eine Zeile waehlt die Loesung, Klick auf einen Spaltenkopf
+      // sortiert. Aeltere stundenplan.json ohne die neuen Felder bleiben
+      // oeffenbar: fehlende Werte erscheinen als "-" und sortieren ans
+      // Ende. Kriterien, die per include_*-Flag strukturell aus der SUCHE
+      // ausgeschlossen waren, werden gedaempft dargestellt - ihr Wert ist
+      // nur nachgelagert gezaehlt.
+      var qw = data.quality_weights || {};
+      function isMuted(includeKey) {
+        return qw[includeKey] === false;
+      }
+
+      // ---- Gewichts-Regler + Pareto-Filter (Viewer-Ausbau 3+4) ---------
+      // Beide brauchen den vollen Qualitaetsvektor pro Loesung; bei
+      // aelteren stundenplan.json ohne die Felder bleiben Panel und
+      // Filter ausgeblendet (defensiv, wie die '-'-Spalten).
+      // subject_window_count kam nachtraeglich dazu (Rhythmisierung:
+      // subject_period_window-Constraint). Fehlt das Feld, stammt die
+      // JSON aus einer Zeit, in der der Constraint-Typ nicht existierte -
+      // 0 ist dann der KORREKTE Wert (nicht "unbekannt"), deshalb wird
+      // er normalisiert statt die Vektor-Features zu deaktivieren.
+      data.solutions.forEach(function (s) {
+        if (s.subject_window_count === undefined || s.subject_window_count === null) s.subject_window_count = 0;
+      });
+      var vectorFields = ['muss_violation_count', 'kann_violation_count', 'occupied_density_count',
+        'subject_window_count', 'class_gap_count', 'teacher_gap_count', 'edge_period_count',
+        'afternoon_day_count', 'class_load_variance', 'teacher_load_variance'];
+
+      // Mehr-Zuteilungs-Modus: mehrere Lehrer-Zuteilungen aus Stufe 1
+      // liefen als je eigener Stufe-2-Lauf; jede Loesung traegt dann
+      // assignment_index. Aeltere JSONs ohne die Felder: beides inaktiv.
+      var multiAssignments = !!(data.assignments && data.assignments.length > 1);
+      // Aequivalenzklassen: Lehrkraefte, die fuer die gesamte Pipeline
+      // ununterscheidbar sind - innerhalb einer Gruppe direkt tauschbar,
+      // ohne dass sich die Plan-Qualitaet aendert.
+      var eqPartner = {};
+      (data.teacher_equivalence_classes || []).forEach(function (group) {
+        group.forEach(function (name) {
+          eqPartner[name] = group.filter(function (o) { return o !== name; });
+        });
+      });
+      var hasFullVector = data.solutions.length > 0 && data.solutions.every(function (s) {
+        return vectorFields.every(function (f) { return s[f] !== undefined && s[f] !== null; });
+      });
+
+      // Schritt 3: Total wird client-seitig aus Vektor x Gewichten neu
+      // berechnet - bewusste, dokumentierte Duplikation der Formel aus
+      // ScheduleQuality.Score, damit der Viewer eine per Doppelklick
+      // oeffenbare statische Datei ohne Server bleibt. Die Regler aendern
+      // NUR das Ranking/die Anzeige der bereits gefundenen Loesungen,
+      // nie die Suche (die lief mit den Schulgewichten bzw. Stufen).
+      var weightDefs = [
+        { key: 'kann', label: 'Kann-Verstoss', field: 'kann_violation_count' },
+        { key: 'class_gaps', label: 'Springstd. Klassen', field: 'class_gap_count', includeKey: 'include_class_gaps' },
+        { key: 'teacher_gaps', label: 'Springstd. Lehrer', field: 'teacher_gap_count', includeKey: 'include_teacher_gaps' },
+        { key: 'occupied_density', label: 'Fenster-Slot frei', field: 'occupied_density_count', includeKey: 'include_occupied_density' },
+        { key: 'subject_window', label: 'Fach-Fenster-Verstoss', field: 'subject_window_count', includeKey: 'include_subject_window' },
+        { key: 'edge_period', label: 'Randstunde', field: 'edge_period_count', includeKey: 'include_edge_period' },
+        { key: 'afternoon_day_count', label: 'Nachmittags-Tag', field: 'afternoon_day_count', includeKey: 'include_afternoon_day_count' },
+        { key: 'class_load_variance', label: 'Var. Klassen', field: 'class_load_variance', includeKey: 'include_class_load_variance' },
+        { key: 'teacher_load_variance', label: 'Var. Lehrer', field: 'teacher_load_variance', includeKey: 'include_teacher_load_variance' }
+      ];
+      var weightsEnabled = hasFullVector && !!data.quality_weights;
+      var schoolWeights = {};
+      var currentWeights = {};
+      weightDefs.forEach(function (d) {
+        schoolWeights[d.key] = (typeof qw[d.key] === 'number') ? qw[d.key] : 0;
+        currentWeights[d.key] = schoolWeights[d.key];
+      });
+      function computeTotal(sol, weights) {
+        var total = 0;
+        weightDefs.forEach(function (d) { total += weights[d.key] * sol[d.field]; });
+        return total;
+      }
+      function displayTotal(sol) {
+        return weightsEnabled ? computeTotal(sol, currentWeights) : sol.quality_total;
+      }
+      function weightsDirty() {
+        return weightDefs.some(function (d) { return currentWeights[d.key] !== schoolWeights[d.key]; });
+      }
+
+      // Schritt 4: Dominanz ueber den ECHTEN Vektor (inkl. Muss und der
+      // strukturell abgeschalteten Kriterien), gewichtsunabhaengig - der
+      // Filter ergaenzt die Regler, statt sie zu doppeln. Loesung b
+      // dominiert a, wenn b in ALLEN Feldern <= a und in mindestens
+      // einem < a ist. Einmal berechnet (statische Daten).
+      var dominatedBy = {};
+      if (hasFullVector) {
+        data.solutions.forEach(function (a, i) {
+          for (var j = 0; j < data.solutions.length; j++) {
+            if (i === j) continue;
+            var b = data.solutions[j];
+            var allLe = true;
+            var oneLt = false;
+            for (var f = 0; f < vectorFields.length; f++) {
+              var fa = a[vectorFields[f]];
+              var fb = b[vectorFields[f]];
+              if (fb > fa) { allLe = false; break; }
+              if (fb < fa) oneLt = true;
+            }
+            if (allLe && oneLt) {
+              dominatedBy[i] = j + 1;
+              break;
+            }
+          }
+        });
+      }
+      var paretoActive = false;
+      // ------------------------------------------------------------------
+      var overviewColumns = [
+        { key: '__nr', label: 'Nr.', txt: true },
+        { key: 'status', label: 'Status', txt: true },
+        { key: 'muss_violation_count', label: 'Muss' },
+        { key: 'kann_violation_count', label: 'Kann' },
+        { key: 'occupied_density_count', label: 'Fenster frei', muted: isMuted('include_occupied_density') },
+        { key: 'subject_window_count', label: 'Fach-Fenster', muted: isMuted('include_subject_window') },
+        { key: 'class_gap_count', label: 'Springstd. Kl.', muted: isMuted('include_class_gaps') },
+        { key: 'teacher_gap_count', label: 'Springstd. Lehrer', muted: isMuted('include_teacher_gaps') },
+        { key: 'edge_period_count', label: 'Randstd.', muted: isMuted('include_edge_period') },
+        { key: 'afternoon_day_count', label: 'Nachm.-Tage', muted: isMuted('include_afternoon_day_count') },
+        { key: 'class_load_variance', label: 'Var. Klassen', digits: 2, muted: isMuted('include_class_load_variance') },
+        { key: 'teacher_load_variance', label: 'Var. Lehrer', digits: 2, muted: isMuted('include_teacher_load_variance') },
+        { key: 'quality_total', label: 'Total', digits: 1 }
+      ];
+      if (multiAssignments) {
+        overviewColumns.splice(2, 0, { key: 'assignment_index', label: 'Zuteilung' });
+      }
+      var mutedTitle = 'Suche war fuer dieses Kriterium blind (include-Flag aus) - Wert nur nachgelagert gezaehlt';
+      var overviewSort = { key: 'quality_total', dir: 1 };
+
+      function overviewValue(sol, col) {
+        if (col.key === '__nr') return sol.__nr;
+        if (col.key === 'quality_total') return displayTotal(sol);
+        return sol[col.key];
+      }
+      function formatOverviewValue(v, col) {
+        if (v === undefined || v === null) return '-';
+        if (col.digits !== undefined && typeof v === 'number') return v.toFixed(col.digits);
+        return String(v);
+      }
+
+      function renderOverview() {
+        var container = document.getElementById('solutions-overview');
+        container.innerHTML = '';
+        if (data.solutions.length === 0) return;
+
+        var rows = data.solutions.map(function (sol, i) {
+          sol.__nr = i + 1;
+          return sol;
+        }).slice();
+        var sortCol = null;
+        overviewColumns.forEach(function (c) { if (c.key === overviewSort.key) sortCol = c; });
+        if (sortCol) {
+          rows.sort(function (a, b) {
+            var va = overviewValue(a, sortCol);
+            var vb = overviewValue(b, sortCol);
+            if (va === undefined || va === null) return 1;
+            if (vb === undefined || vb === null) return -1;
+            if (va < vb) return -overviewSort.dir;
+            if (va > vb) return overviewSort.dir;
+            return a.__nr - b.__nr;
+          });
+        }
+
+        var table = document.createElement('table');
+        var thead = document.createElement('thead');
+        var headRow = document.createElement('tr');
+        overviewColumns.forEach(function (col) {
+          var th = document.createElement('th');
+          var arrow = '';
+          if (overviewSort.key === col.key) arrow = overviewSort.dir === 1 ? ' ▲' : ' ▼';
+          var label = col.label;
+          if (col.key === 'quality_total' && weightsEnabled && weightsDirty()) {
+            label = col.label + '*';
+            th.title = 'Total mit den aktuell eingestellten (vom Schul-Default abweichenden) Gewichten berechnet';
+          }
+          th.textContent = label + arrow;
+          if (col.txt) th.className = 'txt';
+          if (col.muted) {
+            th.className = (th.className ? th.className + ' ' : '') + 'muted-col';
+            th.title = mutedTitle;
+          }
+          bedienbar(th, 'columnheader', 'Nach ' + col.label + ' sortieren');
+          th.addEventListener('click', function () {
+            if (overviewSort.key === col.key) {
+              overviewSort.dir = -overviewSort.dir;
+            } else {
+              overviewSort.key = col.key;
+              overviewSort.dir = 1;
+            }
+            renderOverview();
+          });
+          headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        var tbody = document.createElement('tbody');
+        rows.forEach(function (sol) {
+          var tr = document.createElement('tr');
+          tr.setAttribute('data-sol-index', sol.__nr - 1);
+          if (paretoActive && dominatedBy[sol.__nr - 1] !== undefined) {
+            tr.setAttribute('data-dominated', '1');
+            tr.title = 'Dominiert von Loesung ' + dominatedBy[sol.__nr - 1] + ' (in allen Kriterien mindestens gleich gut, in mindestens einem besser)';
+          }
+          overviewColumns.forEach(function (col) {
+            var td = document.createElement('td');
+            td.textContent = formatOverviewValue(overviewValue(sol, col), col);
+            if (col.txt) td.className = 'txt';
+            if (col.muted) {
+              td.className = (td.className ? td.className + ' ' : '') + 'muted-col';
+              td.title = mutedTitle;
+            }
+            tr.appendChild(td);
+          });
+          bedienbar(tr, 'button', 'Loesung ' + sol.__nr + ' waehlen');
+          tr.addEventListener('click', function () {
+            render(sol.__nr - 1);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+
+        var note = document.createElement('div');
+        note.className = 'overview-note';
+        note.textContent = 'Zeile anklicken = Loesung waehlen; Spaltenkopf anklicken = sortieren. Gedaempfte Spalten waren fuer die Suche strukturell abgeschaltet.';
+        container.appendChild(note);
+        updateOverviewActive(currentIndex);
+      }
+
+      function updateOverviewActive(solIndex) {
+        var trs = document.getElementById('solutions-overview').querySelectorAll('tbody tr');
+        for (var i = 0; i < trs.length; i++) {
+          var idx = parseInt(trs[i].getAttribute('data-sol-index'), 10);
+          var classes = [];
+          if (trs[i].getAttribute('data-dominated') === '1') classes.push('dominated');
+          if (idx === solIndex) classes.push('active');
+          if (compareIndex !== null && compareIndex !== solIndex && idx === compareIndex) classes.push('compare');
+          trs[i].className = classes.join(' ');
+        }
+      }
+
+      // Gewichts-Panel (Schritt 3) aufbauen - nur bei vollem Vektor +
+      // exportierten Gewichten sichtbar.
+      var weightsBtn = document.getElementById('weights-btn');
+      var weightsMenu = document.getElementById('weights-menu');
+      if (weightsEnabled) {
+        weightsBtn.hidden = false;
+        var weightInputs = {};
+        weightDefs.forEach(function (d) {
+          var row = document.createElement('div');
+          row.className = 'weight-row' + (d.includeKey && isMuted(d.includeKey) ? ' muted-crit' : '');
+          var span = document.createElement('span');
+          span.textContent = d.label;
+          if (d.includeKey && isMuted(d.includeKey)) span.title = mutedTitle;
+          var input = document.createElement('input');
+          input.type = 'number';
+          input.min = '0';
+          input.step = 'any';
+          input.value = currentWeights[d.key];
+          input.addEventListener('input', function () {
+            var v = parseFloat(input.value);
+            currentWeights[d.key] = isFinite(v) && v >= 0 ? v : 0;
+            renderOverview();
+            updateSummary(currentIndex);
+          });
+          weightInputs[d.key] = input;
+          row.appendChild(span);
+          row.appendChild(input);
+          weightsMenu.appendChild(row);
+        });
+        var weightsNote = document.createElement('div');
+        weightsNote.className = 'weights-note';
+        weightsNote.textContent = 'Gewichte wirken nur auf Total/Ranking der bereits gefundenen Loesungen - nicht auf die Suche (die lief mit den Schulgewichten bzw. den lexikografischen Stufen).';
+        weightsMenu.appendChild(weightsNote);
+        var resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'weights-reset';
+        resetBtn.textContent = 'Schulgewichte zuruecksetzen';
+        resetBtn.addEventListener('click', function () {
+          weightDefs.forEach(function (d) {
+            currentWeights[d.key] = schoolWeights[d.key];
+            weightInputs[d.key].value = schoolWeights[d.key];
+          });
+          renderOverview();
+          updateSummary(currentIndex);
+        });
+        weightsMenu.appendChild(resetBtn);
+
+        weightsBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          weightsMenu.hidden = !weightsMenu.hidden;
+        });
+        document.addEventListener('click', function (e) {
+          if (!weightsMenu.hidden && e.target !== weightsBtn && !weightsMenu.contains(e.target)) {
+            weightsMenu.hidden = true;
+          }
+        });
+      }
+
+      // Pareto-Toggle (Schritt 4) - nur bei vollem Vektor sichtbar.
+      var paretoToggle = document.getElementById('pareto-toggle');
+      var paretoCount = document.getElementById('pareto-count');
+      if (hasFullVector) {
+        document.getElementById('pareto-label').hidden = false;
+        paretoToggle.addEventListener('change', function () {
+          paretoActive = paretoToggle.checked;
+          if (paretoActive) {
+            var dominatedCount = Object.keys(dominatedBy).length;
+            paretoCount.textContent = (data.solutions.length - dominatedCount) + ' von ' + data.solutions.length + ' Loesungen Pareto-optimal';
+            paretoCount.hidden = false;
+          } else {
+            paretoCount.hidden = true;
+          }
+          renderOverview();
+        });
+      }
+      // ------------------------------------------------------------------
+
+      var stufeVisible = data.klassenstufen.map(function () { return true; });
+      var filterBtn = document.getElementById('stufe-filter-btn');
+      var filterMenu = document.getElementById('stufe-filter-menu');
+
+      function updateFilterBtnLabel() {
+        var count = stufeVisible.filter(Boolean).length;
+        filterBtn.textContent = 'Klassenstufen (' + count + '/' + stufeVisible.length + ') ▾';
+      }
+
+      data.klassenstufen.forEach(function (ks, ksIndex) {
+        var label = document.createElement('label');
+        var checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = true;
+        checkbox.addEventListener('change', function () {
+          stufeVisible[ksIndex] = checkbox.checked;
+          updateFilterBtnLabel();
+          syncLehrerFilterToStufen();
+          render(currentIndex);
+        });
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(ks.bezeichnung));
+        filterMenu.appendChild(label);
+      });
+      updateFilterBtnLabel();
+
+      filterBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        filterMenu.hidden = !filterMenu.hidden;
+      });
+      document.addEventListener('click', function (e) {
+        if (!filterMenu.hidden && e.target !== filterBtn && !filterMenu.contains(e.target)) {
+          filterMenu.hidden = true;
+        }
+      });
+
+      // Lehrerliste UND Klasse->Lehrer-Zuordnung werden aus ALLEN Loesungen
+      // zusammengefuehrt (nicht nur der aktuell gewaehlten) -
+      // teacher_subject_assignment ist bereits vor SolveTop fest
+      // zugeordnet, die Lehrkraefte-Menge ist deshalb ueber alle Loesungen
+      // identisch; die Union macht das robust auch ohne diese Annahme zu
+      // erzwingen. Zellen mit mehreren gleichzeitig unterrichtenden
+      // Lehrkraeften (Parallelgruppen, z.B. "Ethiklehrer-1 / Religions-
+      // lehrer-ev-1 / ...") werden auf ihre einzelnen Namen aufgeteilt,
+      // damit jede Lehrkraft im Filter einzeln waehlbar ist UND korrekt
+      // ihrer jeweiligen Klasse zugeordnet wird (classTeachers).
+      var teacherSet = {};
+      var classTeachers = {};
+      data.solutions.forEach(function (sol) {
+        Object.keys(sol.classes).forEach(function (klasse) {
+          var perClass = sol.classes[klasse];
+          if (!classTeachers[klasse]) classTeachers[klasse] = {};
+          data.tage.forEach(function (tag) {
+            for (var p = 1; p <= data.periods_per_day; p++) {
+              var cell = perClass[tag] ? perClass[tag][String(p)] : null;
+              if (cell && cell.teacher) {
+                cell.teacher.split(' / ').forEach(function (t) {
+                  teacherSet[t] = true;
+                  classTeachers[klasse][t] = true;
+                });
+              }
+            }
+          });
+        });
+      });
+      var allTeachers = Object.keys(teacherSet).sort();
+
+      var lehrerVisible = {};
+      var lehrerCheckboxes = {};
+      allTeachers.forEach(function (t) { lehrerVisible[t] = true; });
+      var lehrerFilterBtn = document.getElementById('lehrer-filter-btn');
+      var lehrerFilterMenu = document.getElementById('lehrer-filter-menu');
+
+      function updateLehrerFilterBtnLabel() {
+        var count = allTeachers.filter(function (t) { return lehrerVisible[t]; }).length;
+        lehrerFilterBtn.textContent = 'Lehrkraefte (' + count + '/' + allTeachers.length + ') ▾';
+      }
+
+      // Wird vom Klassenstufen-Filter aufgerufen (siehe Checkbox-Handler
+      // oben): setzt die Lehrer-Auswahl komplett neu auf genau die
+      // Lehrkraefte, die in einer der aktuell sichtbaren Klassenstufen
+      // unterrichten - ueberschreibt eine vorherige manuelle
+      // Lehrer-Auswahl bewusst, wie angefragt ("Lehrer auf alle in den
+      // gefilterten Klassenstufen enthaltenen Lehrer gefiltert").
+      function syncLehrerFilterToStufen() {
+        var relevant = {};
+        visibleKlassenstufen().forEach(function (entry) {
+          entry.ks.klassen.forEach(function (klasse) {
+            if (klasse === null || !classTeachers[klasse]) return;
+            Object.keys(classTeachers[klasse]).forEach(function (t) { relevant[t] = true; });
+          });
+        });
+        allTeachers.forEach(function (t) {
+          var visible = !!relevant[t];
+          lehrerVisible[t] = visible;
+          if (lehrerCheckboxes[t]) lehrerCheckboxes[t].checked = visible;
+        });
+        updateLehrerFilterBtnLabel();
+      }
+
+      allTeachers.forEach(function (t) {
+        var label = document.createElement('label');
+        var checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = true;
+        checkbox.addEventListener('change', function () {
+          lehrerVisible[t] = checkbox.checked;
+          updateLehrerFilterBtnLabel();
+          render(currentIndex);
+        });
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(t));
+        lehrerFilterMenu.appendChild(label);
+        lehrerCheckboxes[t] = checkbox;
+      });
+      updateLehrerFilterBtnLabel();
+
+      lehrerFilterBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        lehrerFilterMenu.hidden = !lehrerFilterMenu.hidden;
+      });
+      document.addEventListener('click', function (e) {
+        if (!lehrerFilterMenu.hidden && e.target !== lehrerFilterBtn && !lehrerFilterMenu.contains(e.target)) {
+          lehrerFilterMenu.hidden = true;
+        }
+      });
+
+      function visibleKlassenstufen() {
+        var result = [];
+        data.klassenstufen.forEach(function (ks, ksIndex) {
+          if (stufeVisible[ksIndex]) {
+            result.push({ ks: ks, index: ksIndex });
+          }
+        });
+        return result;
+      }
+
+      function buildSparkline(points) {
+        var w = 260, h = 60, pad = 6;
+        var maxT = points[points.length - 1].elapsed_s || 1;
+        var objs = points.map(function (p) { return p.objective_value; });
+        var minObj = Math.min.apply(null, objs);
+        var maxObj = Math.max.apply(null, objs);
+        var objRange = (maxObj - minObj) || 1;
+
+        var coords = points.map(function (p) {
+          var x = pad + (p.elapsed_s / maxT) * (w - 2 * pad);
+          // Standard chart convention: the larger value plots higher on
+          // screen (SVG y grows downward, so this needs the "1 - ..."
+          // flip). Lower objective is better, so as the solve improves
+          // over time the line falls toward the bottom - directly
+          // mirroring the number itself dropping, same as any normal
+          // "this value is decreasing" chart.
+          var y = pad + (1 - (p.objective_value - minObj) / objRange) * (h - 2 * pad);
+          return x.toFixed(1) + ',' + y.toFixed(1);
+        });
+
+        var svgNs = 'http://www.w3.org/2000/svg';
+        var svg = document.createElementNS(svgNs, 'svg');
+        svg.setAttribute('width', w);
+        svg.setAttribute('height', h);
+        svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+
+        var polyline = document.createElementNS(svgNs, 'polyline');
+        polyline.setAttribute('points', coords.join(' '));
+        polyline.setAttribute('fill', 'none');
+        polyline.setAttribute('stroke', '#333');
+        polyline.setAttribute('stroke-width', '1.5');
+        svg.appendChild(polyline);
+
+        coords.forEach(function (c) {
+          var parts = c.split(',');
+          var circle = document.createElementNS(svgNs, 'circle');
+          circle.setAttribute('cx', parts[0]);
+          circle.setAttribute('cy', parts[1]);
+          circle.setAttribute('r', '2');
+          circle.setAttribute('fill', '#333');
+          svg.appendChild(circle);
+        });
+
+        return svg;
+      }
+
+      function renderConvergence(sol) {
+        var panel = document.getElementById('convergence-panel');
+        panel.innerHTML = '';
+
+        var gapLine = document.createElement('div');
+        gapLine.className = 'gap-line';
+        if (sol.status === 'Optimal') {
+          gapLine.textContent = 'Optimalitaets-Luecke: bewiesen optimal (0%).';
+        } else {
+          gapLine.textContent = 'Optimalitaets-Luecke: bis zu ' + sol.gap_percent.toFixed(1) +
+            '% moegliche Verbesserung (Objective ' + sol.objective_value.toFixed(1) +
+            ', bewiesene untere Schranke ' + sol.best_objective_bound.toFixed(1) + ').';
+        }
+        panel.appendChild(gapLine);
+
+        var note = document.createElement('div');
+        note.className = 'conv-note';
+        if (sol.convergence.length > 1) {
+          var last = sol.convergence[sol.convergence.length - 1];
+          note.textContent = 'Verlauf dieses Solve-Versuchs (letzte Verbesserung bei ' + last.elapsed_s.toFixed(1) + 's):';
+          panel.appendChild(note);
+          panel.appendChild(buildSparkline(sol.convergence));
+        } else {
+          note.textContent = 'Nur eine Loesung in diesem Versuch gefunden - kein Verbesserungsverlauf.';
+          panel.appendChild(note);
+        }
+      }
+
+      function cellContentHtml(klasse, cell) {
+        var badge = '<span class="klasse-badge">' + klasse + '</span>';
+        var teacher = cell.teacher ? '<div class="teacher">' + cell.teacher + '</div>' : '';
+        var title = cell.room ? ' title="Raum: ' + cell.room + '"' : '';
+        return '<span' + title + '>' + badge + '<div class="subject">' + cell.subject + '</div>' + teacher + '</span>';
+      }
+
+      // Der Lehrerstundenplan wird NICHT vom Solver/Formatting.vb geliefert
+      // (nur klassenweise Grids sind eingebettet) - er wird hier rein
+      // clientseitig aus denselben sol.classes-Daten abgeleitet, die auch
+      // der Klassenstundenplan verwendet (also garantiert dieselbe
+      // Loesung). Bei einer Parallelgruppen-Zelle (mehrere gleichzeitig
+      // unterrichtende Lehrkraefte, subject/teacher als " / "-Liste in
+      // MATCHENDER Reihenfolge, siehe Formatting.vb GridToJsonObject)
+      // werden alle Klassen, die zur selben Zeit vom selben Lehrer
+      // unterrichtet werden, zu einer Zelle zusammengefasst.
+      function teacherSlotEntries(sol, teacherName, day, period) {
+        var subjectToClasses = {};
+        Object.keys(sol.classes).forEach(function (klasse) {
+          var perClass = sol.classes[klasse];
+          var cell = perClass && perClass[day] ? perClass[day][String(period)] : null;
+          if (!cell || !cell.teacher) return;
+          var subjects = cell.subject.split(' / ');
+          var teachers = cell.teacher.split(' / ');
+          teachers.forEach(function (t, idx) {
+            if (t === teacherName) {
+              var subj = subjects[idx] !== undefined ? subjects[idx] : cell.subject;
+              if (!subjectToClasses[subj]) subjectToClasses[subj] = [];
+              subjectToClasses[subj].push(klasse);
+            }
+          });
+        });
+        return Object.keys(subjectToClasses).map(function (s) {
+          return { subject: s, classes: subjectToClasses[s] };
+        });
+      }
+
+      // Schritt 5: Signatur der Lehrer-Zelle (alle Eintraege sortiert
+      // zusammengefasst) fuer den Diff-Vergleich im Lehrerraster.
+      function teacherEntriesSignature(sol, teacherName, tag, period) {
+        return teacherSlotEntries(sol, teacherName, tag, period).
+          map(function (e) { return e.subject + '|' + e.classes.join(','); }).
+          sort().join(';');
+      }
+      function teacherEntriesText(sol, teacherName, tag, period) {
+        var entries = teacherSlotEntries(sol, teacherName, tag, period);
+        if (entries.length === 0) return 'frei';
+        return entries.map(function (e) { return e.subject + ' (' + e.classes.join(', ') + ')'; }).join('; ');
+      }
+
+      function renderLehrerTable(sol, cmpSol) {
+        var container = document.getElementById('lehrer-table-container');
+        var visibleTeachers = allTeachers.filter(function (t) { return lehrerVisible[t]; });
+        if (visibleTeachers.length === 0) {
+          lastLehrerTable = null;
+          container.style.height = '';
+          container.innerHTML = '';
+          var msg = document.createElement('div');
+          msg.style.padding = '1rem';
+          msg.textContent = 'Keine Lehrkraft ausgewaehlt.';
+          container.appendChild(msg);
+          return;
+        }
+
+        var table = document.createElement('table');
+        var thead = document.createElement('thead');
+
+        var headRow1 = document.createElement('tr');
+        var stdTh = document.createElement('th');
+        stdTh.textContent = 'Std.';
+        stdTh.rowSpan = 2;
+        headRow1.appendChild(stdTh);
+        data.tage.forEach(function (tag) {
+          var th = document.createElement('th');
+          th.textContent = tag;
+          th.colSpan = visibleTeachers.length;
+          headRow1.appendChild(th);
+        });
+        thead.appendChild(headRow1);
+
+        var headRow2 = document.createElement('tr');
+        data.tage.forEach(function () {
+          visibleTeachers.forEach(function (t) {
+            var th = document.createElement('th');
+            th.textContent = t;
+            // Aequivalenz-Markierung: diese Lehrkraft ist mit anderen
+            // direkt tauschbar (identisches Pipeline-Profil).
+            if (eqPartner[t] && eqPartner[t].length > 0) {
+              th.textContent = t + ' ⇄';
+              th.className = 'tauschbar';
+              th.title = 'Direkt tauschbar mit: ' + eqPartner[t].join(', ') +
+                ' (identische Qualifikationen, Deputate, Verfuegbarkeiten und Constraints - ein Tausch aendert die Plan-Qualitaet nicht)';
+            }
+            headRow2.appendChild(th);
+          });
+        });
+        thead.appendChild(headRow2);
+        table.appendChild(thead);
+
+        var tbody = document.createElement('tbody');
+        for (var period = 1; period <= data.periods_per_day; period++) {
+          var tr = document.createElement('tr');
+          var periodTh = document.createElement('th');
+          periodTh.textContent = period;
+          tr.appendChild(periodTh);
+          data.tage.forEach(function (tag) {
+            visibleTeachers.forEach(function (t) {
+              var td = document.createElement('td');
+              var entries = teacherSlotEntries(sol, t, tag, period);
+              if (entries.length === 0) {
+                td.className = 'leer';
+              } else {
+                td.innerHTML = entries.map(function (e) {
+                  return '<div class="subject">' + e.subject + '</div><div class="teacher">' + e.classes.join(', ') + '</div>';
+                }).join('');
+              }
+              if (cmpSol && teacherEntriesSignature(sol, t, tag, period) !== teacherEntriesSignature(cmpSol, t, tag, period)) {
+                td.className += (td.className ? ' ' : '') + 'diff-cell';
+                td.title = 'Vergleichsloesung ' + (compareIndex + 1) + ': ' + teacherEntriesText(cmpSol, t, tag, period);
+              }
+              tr.appendChild(td);
+            });
+          });
+          tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+
+        container.innerHTML = '';
+        container.appendChild(table);
+        lastLehrerTable = table;
+      }
+
+      function updateSummary(solIndex) {
+        var sol = data.solutions[solIndex];
+        if (!sol) return;
+        var totalLabel = (weightsEnabled && weightsDirty()) ? 'Quality (Total*)' : 'Quality (Total)';
+        // Ohne das fruehere Dropdown traegt die Zusammenfassung die
+        // Kennung der gewaehlten Loesung selbst.
+        var summary = document.getElementById('solution-summary');
+        summary.textContent =
+          'Loesung ' + (solIndex + 1) + ' (' + sol.status +
+          (multiAssignments && sol.assignment_index ? ', Zuteilung ' + sol.assignment_index : '') + ')' +
+          ' | Muss-Verstoesse: ' + sol.muss_violation_count + ' | Kann-Verstoesse: ' + sol.kann_violation_count +
+          ' | ' + totalLabel + ': ' + displayTotal(sol).toFixed(1);
+        // Ist die Loesung Pareto-dominiert, nennt die Beschreibung die
+        // bessere Loesung direkt - unabhaengig davon, ob der
+        // Pareto-Filter aktiv ist (dominatedBy ist statisch
+        // vorberechnet). Der Link waehlt die dominierende Loesung.
+        if (hasFullVector && dominatedBy[solIndex] !== undefined) {
+          var better = dominatedBy[solIndex];
+          summary.appendChild(document.createTextNode(' | Pareto: dominiert von '));
+          var link = document.createElement('a');
+          link.href = '#';
+          link.textContent = 'Loesung ' + better;
+          link.title = 'Loesung ' + better + ' ist in allen Kriterien mindestens gleich gut und in mindestens einem besser - anklicken zum Wechseln';
+          link.addEventListener('click', function (e) {
+            e.preventDefault();
+            render(better - 1);
+          });
+          summary.appendChild(link);
+        }
+      }
+
+      function render(solIndex) {
+        currentIndex = solIndex;
+        var sol = data.solutions[solIndex];
+        var cmpSol = activeCompareSol(solIndex);
+        updateSummary(solIndex);
+        updateOverviewActive(solIndex);
+        updateCompareInfo(solIndex);
+        renderConvergence(sol);
+
+        var container = document.getElementById('table-container');
+        var vks = visibleKlassenstufen();
+        if (vks.length === 0) {
+          lastTable = null;
+          container.style.height = '';
+          container.innerHTML = '';
+          var msg = document.createElement('div');
+          msg.style.padding = '1rem';
+          msg.textContent = 'Keine Klassenstufe ausgewaehlt.';
+          container.appendChild(msg);
+          renderLehrerTable(sol, cmpSol);
+          fitTable();
+          return;
+        }
+
+        var table = document.createElement('table');
+        var thead = document.createElement('thead');
+
+        var headRow1 = document.createElement('tr');
+        var stdTh = document.createElement('th');
+        stdTh.textContent = 'Std.';
+        stdTh.rowSpan = 2;
+        headRow1.appendChild(stdTh);
+        data.tage.forEach(function (tag) {
+          var th = document.createElement('th');
+          th.textContent = tag;
+          th.colSpan = vks.length;
+          headRow1.appendChild(th);
+        });
+        thead.appendChild(headRow1);
+
+        var headRow2 = document.createElement('tr');
+        data.tage.forEach(function () {
+          vks.forEach(function (entry) {
+            var th = document.createElement('th');
+            th.textContent = entry.ks.bezeichnung;
+            th.style.backgroundColor = stufeColor(entry.index, 0);
+            th.style.color = '#000';
+            headRow2.appendChild(th);
+          });
+        });
+        thead.appendChild(headRow2);
+        table.appendChild(thead);
+
+        var tbody = document.createElement('tbody');
+        for (var period = 1; period <= data.periods_per_day; period++) {
+          for (var rowIndex = 0; rowIndex < data.max_parallel_klassen; rowIndex++) {
+            var tr = document.createElement('tr');
+            if (rowIndex === 0) {
+              var periodTh = document.createElement('th');
+              periodTh.textContent = period;
+              periodTh.rowSpan = data.max_parallel_klassen;
+              tr.appendChild(periodTh);
+            }
+            data.tage.forEach(function (tag) {
+              vks.forEach(function (entry) {
+                var klasse = entry.ks.klassen[rowIndex];
+                var td = document.createElement('td');
+                var cell = null;
+                if (klasse !== null) {
+                  var perClass = sol.classes[klasse];
+                  cell = perClass && perClass[tag] ? perClass[tag][String(period)] : null;
+                }
+                if (klasse === null || !cell) {
+                  td.className = 'leer';
+                } else {
+                  td.style.backgroundColor = stufeColor(entry.index, rowIndex);
+                  td.innerHTML = cellContentHtml(klasse, cell);
+                }
+                if (klasse !== null && cmpSol && cellsDiffer(sol, cmpSol, klasse, tag, period)) {
+                  td.className += (td.className ? ' ' : '') + 'diff-cell';
+                  td.title = compareTitle(getCell(cmpSol, klasse, tag, period));
+                }
+                tr.appendChild(td);
+              });
+            });
+            tbody.appendChild(tr);
+          }
+        }
+        table.appendChild(tbody);
+
+        container.innerHTML = '';
+        container.appendChild(table);
+        lastTable = table;
+        renderLehrerTable(sol, cmpSol);
+        fitTable();
+      }
+
+      // Tausch-Legende: einmalig befuellt - die Aequivalenz ist eine
+      // Eigenschaft der Eingabedaten (Stammdaten + Constraints), nicht
+      // der einzelnen Loesung.
+      (function () {
+        var groups = data.teacher_equivalence_classes || [];
+        if (groups.length === 0) return;
+        var div = document.getElementById('tausch-legende');
+        div.hidden = false;
+        div.textContent = 'Direkt tauschbare Lehrkraefte (aequivalent - ein Tausch aendert die Plan-Qualitaet nicht): ' +
+          groups.map(function (g) { return g.join(' ⇄ '); }).join('  |  ');
+      })();
+
+      if (data.solutions.length > 0) {
+        renderOverview();
+        render(0);
+      } else {
+        document.getElementById('table-container').textContent = 'Keine Loesungen vorhanden.';
+        document.getElementById('lehrer-table-container').textContent = 'Keine Loesungen vorhanden.';
+      }
+    })();
+  
+      // ---- Dichteschalter ------------------------------------------
+      // Kompakt oder komfortabel. Bewusst im localStorage und NICHT im
+      // Projekt: die Dichte ist eine Eigenschaft des Bildschirms, an dem
+      // jemand sitzt, nicht des Plans. Sie folgt deshalb dem Rechner und
+      // nicht der Datei - und funktioniert dadurch in beiden
+      // Betriebsarten gleich, denn auch der WebView2-Host liefert unter
+      // einer echten Herkunft aus, wo localStorage nutzbar ist.
+      //
+      // "kompakt" entspricht exakt der bisherigen Dichte; komfortabel
+      // ist der Zugewinn fuer kleinere Anzeigen, nicht der Normalfall.
+      (function () {
+        var SCHLUESSEL = 'stundenplan-dichte';
+        var wurzel = document.documentElement;
+
+        function anwenden(wert) {
+          if (wert === 'komfortabel') wurzel.setAttribute('data-dichte', wert);
+          else wurzel.removeAttribute('data-dichte');
+        }
+
+        var start = 'kompakt';
+        try {
+          if (localStorage.getItem(SCHLUESSEL) === 'komfortabel') start = 'komfortabel';
+        } catch (e) { /* file:// ist unzuverlaessig - dann eben Standard */ }
+        anwenden(start);
+
+        var leiste = document.getElementById('controls');
+        if (!leiste) return;
+        var l = document.createElement('label');
+        l.title = 'Kompakt zeigt mehr auf einmal; komfortabel ist auf kleinen Anzeigen leichter zu treffen.';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = (start === 'komfortabel');
+        cb.addEventListener('change', function () {
+          var wert = cb.checked ? 'komfortabel' : 'kompakt';
+          anwenden(wert);
+          try { localStorage.setItem(SCHLUESSEL, wert); } catch (e) { }
+        });
+        l.appendChild(cb);
+        l.appendChild(document.createTextNode(' komfortable Dichte'));
+        leiste.appendChild(l);
+      })();
+</script>
+</body>
+</html>
