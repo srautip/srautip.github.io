@@ -204,8 +204,11 @@
   <section class="panel">
     <h2>Verbindung</h2>
 
+    <label for="serverUrl">Server-URL</label>
+    <input type="text" id="serverUrl" value="wss://ais.openwaters.io/v1/stream" autocomplete="off" />
+
     <label for="apiKey">API-Key</label>
-    <input type="password" id="apiKey" placeholder="Dein AISstream.io API-Key" autocomplete="off" />
+    <input type="password" id="apiKey" placeholder="Dein API-Key" autocomplete="off" />
 
     <h2 style="margin-top:1.2rem">Bounding Box</h2>
     <div class="bbox-grid">
@@ -248,9 +251,13 @@
 
     <p class="hint">
       Der API-Key wird ausschließlich lokal im Browser gehalten und direkt per
-      WebSocket an <code>wss://stream.aisstream.io/v0/stream</code> gesendet — es gibt
-      keinen Server dazwischen. Kostenlosen Key gibt es auf
-      <a href="https://aisstream.io" target="_blank" rel="noopener">aisstream.io</a>.
+      WebSocket an die oben eingetragene Server-URL gesendet — es gibt keinen
+      Server dazwischen. Standardmäßig voreingestellt ist
+      <a href="https://openwaters.io/ais" target="_blank" rel="noopener">openwaters.io/ais</a>
+      (inoffizieller Drittanbieter mit gleichem Protokoll, als Ausweichlösung
+      während der AISstream.io-Störung). Offizieller Dienst mit eigenem Key:
+      <a href="https://aisstream.io" target="_blank" rel="noopener">aisstream.io</a>
+      (dort <code>wss://stream.aisstream.io/v0/stream</code> eintragen).
     </p>
   </section>
 
@@ -283,7 +290,6 @@
 (function () {
   "use strict";
 
-  var STREAM_URL = "wss://stream.aisstream.io/v0/stream";
   var MAX_TABLE_ROWS = 200;
 
   var socket = null;
@@ -298,6 +304,7 @@
   var statusText = document.getElementById("statusText");
   var connectBtn = document.getElementById("connectBtn");
   var disconnectBtn = document.getElementById("disconnectBtn");
+  var serverUrlInput = document.getElementById("serverUrl");
   var apiKeyInput = document.getElementById("apiKey");
   var latMinInput = document.getElementById("latMin");
   var lonMinInput = document.getElementById("lonMin");
@@ -310,6 +317,9 @@
 
   var storedKey = localStorage.getItem("aisstream_api_key");
   if (storedKey) apiKeyInput.value = storedKey;
+
+  var storedUrl = localStorage.getItem("aisstream_server_url");
+  if (storedUrl) serverUrlInput.value = storedUrl;
 
   var map = null;
   var mapAvailable = typeof L !== "undefined";
@@ -517,6 +527,13 @@
     }
     manualDisconnect = false;
 
+    var serverUrl = serverUrlInput.value.trim();
+    if (!serverUrl) {
+      alert("Bitte eine Server-URL eingeben.");
+      return;
+    }
+    localStorage.setItem("aisstream_server_url", serverUrl);
+
     var apiKey = apiKeyInput.value.trim();
     if (!apiKey) {
       alert("Bitte einen API-Key eingeben.");
@@ -538,7 +555,7 @@
     setStatus("", "verbinde…");
     connectBtn.disabled = true;
 
-    socket = new WebSocket(STREAM_URL);
+    socket = new WebSocket(serverUrl);
 
     socket.onopen = function () {
       reconnectAttempt = 0;
