@@ -385,6 +385,44 @@
     cursor: pointer;
     color: var(--farbe-text);
   }
+  /* Stufe G2: Aktionsleiste des GUI-Hosts. Sie liegt UNTER der
+     Loesungsuebersicht, weil ihre beiden Aktionen sich auf die dort
+     gewaehlte Zeile beziehen - eine Leiste am Seitenkopf haette den
+     Bezug verloren. Farben und Masse ausschliesslich aus den Tokens. */
+  #gui-aktionen {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mass-2);
+    margin-bottom: var(--mass-4);
+    padding: var(--mass-2) var(--mass-3);
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-m);
+    background: var(--farbe-flaeche-2);
+    font-size: var(--t-klein);
+  }
+  #gui-aktionen[hidden] { display: none; }
+  #gui-aktionen label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mass-1);
+    color: var(--farbe-text-2);
+  }
+  #gui-aktionen input[type="number"] {
+    width: 5rem;
+    padding: var(--mass-1);
+    border: 1px solid var(--farbe-linie);
+    border-radius: var(--radius-s);
+    background: var(--farbe-flaeche);
+    color: var(--farbe-text);
+    font: inherit;
+  }
+  #gui-aktionen .gui-trenner {
+    width: 1px;
+    align-self: stretch;
+    background: var(--farbe-linie);
+  }
+  #gui-rueckmeldung { color: var(--farbe-text-2); }
   /* Viewer-Ausbau Schritt 2 (docs/viewer-ausbau-plan.md): sortierbare
      Loesungsuebersicht - eine Zeile pro Loesung, Spalten = voller
      Qualitaetsvektor. Eigenstaendiger Scroll-Container; die globalen
@@ -567,6 +605,20 @@
     <span id="pareto-count" hidden></span>
   </div>
   <div id="solutions-overview"></div>
+  <!-- Bruecke zum GUI-Host (gui-ui-konzept.md 5). Standardmaessig
+       verborgen: im Doppelklick-Betrieb gibt es keinen Host, der die
+       Knoepfe bedienen koennte, und ein toter Knopf ist schlimmer als
+       keiner. Sichtbar macht sie ausschliesslich die Feature-Erkennung
+       unten - der dokumentierte file://-Pfad (arc42 8.10) bleibt damit
+       Zeichen fuer Zeichen derselbe. -->
+  <div id="gui-aktionen" hidden>
+    <button type="button" id="gui-uebernehmen">Diese Lösung als Arbeitsstand übernehmen</button>
+    <span class="gui-trenner"></span>
+    <label>Zeitbudget <input type="number" id="gui-budget" min="1" max="3600" step="10"> s</label>
+    <label>Lösungen <input type="number" id="gui-loesungen" min="1" max="200" step="1"></label>
+    <button type="button" id="gui-rechnen">Neu rechnen</button>
+    <span id="gui-rueckmeldung"></span>
+  </div>
   <div id="compare-info" hidden></div>
   <div id="convergence-panel"></div>
   <div id="table-container"></div>
@@ -1601,6 +1653,65 @@
         document.getElementById('table-container').textContent = 'Keine Loesungen vorhanden.';
         document.getElementById('lehrer-table-container').textContent = 'Keine Loesungen vorhanden.';
       }
+
+      // ---- Bruecke zum GUI-Host (Stufe G2, gui-ui-konzept.md 5) --------
+      // Additiv und an der Feature-Erkennung haengend, genau wie im
+      // Klassenbildungs-Board: der Doppelklick-Betrieb ist eine
+      // dokumentierte Zusage (arc42 8.10) und darf sich nicht aendern.
+      // Ohne Host bleibt #gui-aktionen verborgen, und nichts unten
+      // laeuft ueberhaupt an.
+      (function () {
+        var host = !!(window.chrome && window.chrome.webview &&
+                      typeof window.chrome.webview.postMessage === 'function');
+        if (!host) return;
+
+        var leiste = document.getElementById('gui-aktionen');
+        if (!leiste) return;
+        leiste.hidden = false;
+
+        var rueck = document.getElementById('gui-rueckmeldung');
+        function sende(typ, nutzlast) {
+          try {
+            window.chrome.webview.postMessage(JSON.stringify({ v: 1, typ: typ, nutzlast: nutzlast }));
+            return true;
+          } catch (e) {
+            // Host weg - die Seite bleibt lesbar, sagt es aber.
+            rueck.textContent = 'Keine Verbindung zur Anwendung.';
+            return false;
+          }
+        }
+
+        document.getElementById('gui-uebernehmen').addEventListener('click', function () {
+          var sol = data.solutions[currentIndex];
+          if (!sol) return;
+          // 1-basiert wie in der Uebersicht angezeigt. Ohne
+          // Mehr-Zuteilungs-Modus gibt es genau eine Zuteilung.
+          var zuteilung = (sol.assignment_index || 1);
+          if (sende('plan-uebernehmen', { zuteilung: zuteilung, loesung: currentIndex + 1 })) {
+            rueck.textContent = 'Übernommen: Lösung ' + (currentIndex + 1) +
+                                ' (Zuteilung ' + zuteilung + ').';
+          }
+        });
+
+        var budget = document.getElementById('gui-budget');
+        var loesungen = document.getElementById('gui-loesungen');
+        // Vorbelegung aus dem Lauf, der diese Seite erzeugt hat - der
+        // Nutzer soll sehen, womit gerechnet WURDE, bevor er es aendert.
+        var vorgabe = window.__planParameter;
+        if (vorgabe) {
+          if (vorgabe.zeitbudget_s) budget.value = vorgabe.zeitbudget_s;
+          if (vorgabe.max_loesungen) loesungen.value = vorgabe.max_loesungen;
+        }
+
+        document.getElementById('gui-rechnen').addEventListener('click', function () {
+          var nutzlast = {};
+          if (budget.value !== '') nutzlast.zeitbudget_s = Number(budget.value);
+          if (loesungen.value !== '') nutzlast.max_loesungen = Number(loesungen.value);
+          if (sende('plan-neu-rechnen', nutzlast)) {
+            rueck.textContent = 'Neuberechnung gestartet …';
+          }
+        });
+      })();
     })();
   
       // ---- Dichteschalter ------------------------------------------

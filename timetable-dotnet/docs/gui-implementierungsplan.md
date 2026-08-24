@@ -364,6 +364,31 @@ Template stammen und nicht aus dem Sekretariat.
 - Klarnamen-Export nur hinter Warndialog **und** Audit-Eintrag — die einzige
   gekennzeichnete Ausnahme von der Pseudonymitäts-Grenze.
 
+
+**Schnitt (analog zu F).** G1 zweites Dashboard und Lauf – G2 Brücke im
+Stundentafel-Viewer – G3 Bereich *Läufe* mit Stände-Historie und Freigabe –
+G4 YAML-Ex-/Import – G5 CSV-Import mit Spalten-Zuordnung und
+Klarnamen-Export – G6 Startseite als vollständige Schrittleiste.
+
+**Nachtrag zu G1/G2.** Drei Dinge, die beim Umsetzen auffielen:
+
+- **Ein `ViewerAuslieferung`, zwei Dashboards.** Der Wechsel von
+  Klassenbildung auf Stundenplan zeigte weiter das Board – gleiche URL,
+  alter Inhalt, und nichts daran sichtbar falsch. Das `HauptViewModel` hält
+  jetzt je Bereich eine Seite und liefert beim Wechsel die passende aus.
+  Ein `Verwerten` wechselt dabei selbst in seinen Bereich – ein Ergebnis
+  gehört dorthin, wo man es sieht.
+- **Die Vorlage `stundentafel.html` hatte gar keine Brücke.** Sie ist jetzt
+  nach dem Muster des Klassenbildungs-Boards nachgerüstet: additiv, an der
+  Feature-Erkennung hängend, standardmäßig verborgen. Der
+  Doppelklick-Betrieb ist eine dokumentierte Zusage (arc42 8.10); belegt ist
+  sie durch einen Test, der ohne Host prüft, dass die Leiste unsichtbar
+  bleibt – und durch den Diff der neu gerenderten Beispielseiten:
+  111 Zeilen hinzu, null geändert.
+- **Der Arbeitsstand braucht kein neues Dateiformat.** `ProjektStand.Lauf`
+  ist ein freies `JsonObject` und wird bereits round-trip-sicher
+  gespeichert; die Markierung liegt darin unter `arbeitsstand`.
+
 ---
 
 ## Risiken

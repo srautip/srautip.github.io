@@ -35,6 +35,7 @@
             </MenuItem>
             <MenuItem Header="_Planung">
                 <MenuItem Header="Klassenbildung rechnen" InputGestureText="F5" Command="{Binding KlassenbildungBefehl}" />
+                <MenuItem Header="Stundenplan rechnen" InputGestureText="F6" Command="{Binding StundenplanBefehl}" />
                 <MenuItem Header="Lauf abbrechen" Command="{Binding Monitor.AbbrechenBefehl}" />
             </MenuItem>
             <MenuItem Header="_Extras">

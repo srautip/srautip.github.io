@@ -82,6 +82,7 @@ Public NotInheritable Class HauptViewModel
         SpeichernBefehl = New Befehl(Sub() Speichern(), Function() ProjektOffen AndAlso Not Monitor.Laeuft)
         ImportierenBefehl = New Befehl(Sub() Importieren(), Function() Not Monitor.Laeuft)
         KlassenbildungBefehl = New Befehl(Sub() KlassenbildungRechnenAsync(), Function() KannKlassenbildungRechnen)
+        StundenplanBefehl = New Befehl(Sub() StundenplanRechnenAsync(), Function() KannStundenplanRechnen)
         WechsleBefehl = New Befehl(Sub(z) Bereich = CType(z, Bereich))
     End Sub
 
@@ -93,6 +94,7 @@ Public NotInheritable Class HauptViewModel
     Public ReadOnly Property SpeichernBefehl As Befehl
     Public ReadOnly Property ImportierenBefehl As Befehl
     Public ReadOnly Property KlassenbildungBefehl As Befehl
+    Public ReadOnly Property StundenplanBefehl As Befehl
     Public ReadOnly Property WechsleBefehl As Befehl
 
     Public Property Projekt As Projekt
@@ -104,6 +106,7 @@ Public NotInheritable Class HauptViewModel
                 Melde(NameOf(ProjektOffen))
                 Melde(NameOf(Titel))
                 Melde(NameOf(KannKlassenbildungRechnen))
+                Melde(NameOf(KannStundenplanRechnen))
                 MeldeSchritte()
                 Befehl.MeldeAenderung()
             End If
@@ -132,9 +135,37 @@ Public NotInheritable Class HauptViewModel
             Return _bereich
         End Get
         Set
-            Setze(_bereich, value)
+            If _bereich = value Then Return
+            _bereich = value
+            ' Die Seite VOR dem Melden wechseln: das Fenster reagiert auf
+            ' die Meldung und zeigt dann schon die richtige an.
+            SeiteFuerBereichAusliefern()
+            Melde(NameOf(Bereich))
         End Set
     End Property
+
+    ''' <summary>Zwei Dashboards, aber nur EIN ViewerAuslieferung-Slot.
+    ''' Ohne dieses Gedaechtnis zeigte der Wechsel von Klassenbildung auf
+    ''' Stundenplan weiter das Board - dieselbe URL, alter Inhalt, und
+    ''' nichts daran sichtbar falsch.</summary>
+    Private ReadOnly _seiten As New Dictionary(Of Bereich, String)
+
+    Private Sub SeiteFuerBereichAusliefern()
+        Dim html As String = Nothing
+        _seiten.TryGetValue(_bereich, html)
+        Auslieferung.Setze(html)
+    End Sub
+
+    ''' <summary>Hinterlegt die Seite eines Bereichs und liefert sie
+    ''' aus, falls dieser Bereich gerade sichtbar ist.</summary>
+    Private Sub SeiteHinterlegen(zielbereich As Bereich, html As String)
+        If html Is Nothing Then
+            _seiten.Remove(zielbereich)
+        Else
+            _seiten(zielbereich) = html
+        End If
+        If _bereich = zielbereich Then Auslieferung.Setze(html)
+    End Sub
 
     ''' <summary>Letzte Rueckmeldung an den Nutzer - was die Statusleiste
     ''' zeigt, solange kein Lauf aktiv ist.</summary>
@@ -424,14 +455,19 @@ Public NotInheritable Class HauptViewModel
     ''' widersinnig, die fertige Variante wegzuwerfen, weil der Nutzer die
     ''' zweite nicht mehr abwarten wollte.</summary>
     Friend Sub VerwerteErgebnis(schule As String, e As KlassenbildungLaufErgebnis)
+        ' Ein Ergebnis gehoert dorthin, wo man es sieht. Auf dem
+        ' regulaeren Weg hat der Lauf den Bereich schon gewechselt -
+        ' hier steht es fuer den direkten Aufruf, damit beide Wege
+        ' dasselbe tun.
+        Bereich = Bereich.Klassenbildung
         If e.Geloeste.Count = 0 Then
-            Auslieferung.Setze(Nothing)
+            SeiteHinterlegen(Bereich.Klassenbildung, Nothing)
             Meldung = If(e.Abgebrochen, "Abgebrochen - noch keine Variante fertig.",
                          "Keine Loesung: " & String.Join(" | ", e.Meldungen))
             Return
         End If
 
-        Auslieferung.Setze(ViewerInhalt.KlassenbildungSeite(schule, e))
+        SeiteHinterlegen(Bereich.Klassenbildung, ViewerInhalt.KlassenbildungSeite(schule, e))
 
         Dim zeitpunkt = _jetzt()
         Dim stand As New ProjektStand With {
@@ -452,6 +488,123 @@ Public NotInheritable Class HauptViewModel
         MeldeSchritte()
     End Sub
 
+
+    ' ---------------------------------------------------------------
+    ' Stundenplan rechnen (Stufe G1)
+    ' ---------------------------------------------------------------
+
+    ''' <summary>Anders als bei der Klassenbildung haengt hier nichts an
+    ''' einer Einschulungsliste: der Stundenplan braucht grundsaetzlich
+    ''' KEINE Einzelschueler (6.1). Die Schwelle ist deshalb der
+    ''' Stammdatenkern - Klassen, Faecher, Lehrkraefte.</summary>
+    Public ReadOnly Property KannStundenplanRechnen As Boolean
+        Get
+            If Not ProjektOffen OrElse Monitor.Laeuft Then Return False
+            Dim b = _projekt.Bestand
+            Return b.Klassen.Count > 0 AndAlso b.Faecher.Count > 0 AndAlso b.Lehrkraefte.Count > 0
+        End Get
+    End Property
+
+    Public Async Function StundenplanRechnenAsync() As Task
+        If Not KannStundenplanRechnen Then Return
+
+        Dim fehler = StammdatenPruefen()
+        If fehler.Count > 0 Then
+            _dialoge.Hinweis("Stammdaten unvollstaendig",
+                             "Vor dem Rechnen muessen diese Punkte geklaert sein:" & vbLf & vbLf &
+                             String.Join(vbLf, fehler.Take(20).Select(Function(f) "- " & f)))
+            Return
+        End If
+
+        Dim token = Monitor.Starte()
+        Bereich = Bereich.Stundenplan
+        Befehl.MeldeAenderung()
+        Dim fortschritt As New Progress(Of SolveProgress)(Sub(p) Monitor.Uebernehmen(p))
+
+        ' Der Bestand geht als REFERENZ in den Hintergrund-Task. Das ist
+        ' vertretbar, weil die Masken waehrend eines Laufs gesperrt sind
+        ' (Befehl.MeldeAenderung oben, Monitor.Laeuft) - eine Tiefkopie
+        ' waere bei 3.000 Schuelern teurer als der Schutz wert ist.
+        Dim bestand = _projekt.Bestand
+        Dim regeln = _projekt.Constraints
+        Dim cfg = _projekt.Config
+
+        Try
+            Dim e = Await Task.Run(Function() StundenplanLauf.Ausfuehren(bestand, regeln, cfg, token, fortschritt))
+            VerwerteStundenplan(e)
+        Catch ex As Exception
+            _dialoge.Hinweis("Lauf fehlgeschlagen", ex.Message)
+            Meldung = "Lauf fehlgeschlagen."
+        Finally
+            Monitor.Beende()
+            Befehl.MeldeAenderung()
+        End Try
+    End Function
+
+    ''' <summary>Wie bei der Klassenbildung: Seite an den Viewer, Ergebnis
+    ''' als Stand, Audit-Zeile. Auch ein ABGEBROCHENER Lauf wird verwertet,
+    ''' sofern er eine Loesung hervorgebracht hat.
+    '''
+    ''' Ein Lauf MIT Loesung, aber mit Verstoessen, ist kein Fehlschlag,
+    ''' sondern ein Befund: die Loesung wird gezeigt und die Verstoesse
+    ''' benannt. Sie wegzuwerfen naehme dem Nutzer genau die Information,
+    ''' die er zum Nachbessern braucht.</summary>
+    Friend Sub VerwerteStundenplan(e As LaufErgebnis)
+        Bereich = Bereich.Stundenplan
+        Dim seite = ViewerInhalt.StundenplanSeite(e)
+        If seite Is Nothing Then
+            SeiteHinterlegen(Bereich.Stundenplan, Nothing)
+            ' Ein leeres Meldungen-Feld ist kein Versehen: die Solverstufe
+            ' hat nichts zu melden, wenn sie schlicht nichts gefunden hat.
+            ' "Keine Loesung (Solverlauf):" mit nichts dahinter waere die
+            ' unbrauchbarste aller Meldungen.
+            Dim grund = If(e.Meldungen.Count > 0,
+                           String.Join(" | ", e.Meldungen.Take(3)),
+                           "im Zeitbudget wurde keine gefunden - mehr Zeit geben oder Regeln lockern")
+            Meldung = If(e.Abgebrochen, "Abgebrochen - noch keine Loesung fertig.",
+                         $"Keine Loesung ({StufenName(e.Stufe)}): {grund}")
+            Return
+        End If
+
+        SeiteHinterlegen(Bereich.Stundenplan, seite)
+
+        Dim loesungen = e.Laeufe.Sum(Function(l) l.Result.Solutions.Count)
+        Dim zeitpunkt = _jetzt()
+        Dim stand As New ProjektStand With {
+            .Id = zeitpunkt.ToString("yyyy-MM-dd-HHmmss") & "-stundenplan",
+            .Label = $"Stundenplan, {loesungen} Loesung(en)",
+            .Erstellt = zeitpunkt,
+            .Stundenplan = StundenplanBericht.BaueStundentafelJson(e)
+        }
+        _projekt.StandHinzufuegen(stand)
+
+        Dim verstoesse = e.PlanVerstoesse.Count + e.LehrereinsatzVerstoesse
+        _projekt.Protokolliere(Umgebung.Benutzer, "lauf",
+            $"Stundenplan gerechnet: {loesungen} Loesung(en) aus {e.Einsaetze.Count} Zuteilung(en), " &
+            $"{verstoesse} Verstoss/Verstoesse" & If(e.Abgebrochen, " (abgebrochen)", ""), zeitpunkt)
+        Geaendert = True
+
+        Meldung = $"{loesungen} Loesung(en) aus {e.Einsaetze.Count} Zuteilung(en)" &
+                  If(verstoesse = 0, ", ohne Verstoesse", $", {verstoesse} Verstoss/Verstoesse") &
+                  If(e.Abgebrochen, " (abgebrochen)", "")
+        MeldeSchritte()
+    End Sub
+
+    ''' <summary>Die gescheiterte Stufe im Klartext. Ohne sie hiesse es nur
+    ''' "keine Loesung" - und der Unterschied zwischen "die Stammdaten
+    ''' widersprechen sich" und "der Solver fand nichts" ist genau der,
+    ''' den der Nutzer wissen muss.</summary>
+    Private Shared Function StufenName(stufe As LaufStufe) As String
+        Select Case stufe
+            Case LaufStufe.Stammdatenpruefung : Return "Stammdatenpruefung"
+            Case LaufStufe.Lehrereinsatz : Return "Lehrereinsatzplanung"
+            Case LaufStufe.Lehrereinsatzpruefung : Return "Pruefung des Lehrereinsatzes"
+            Case LaufStufe.Szenarienaufbau : Return "Szenarienaufbau"
+            Case LaufStufe.Stundenplan : Return "Solverlauf"
+            Case Else : Return stufe.ToString()
+        End Select
+    End Function
+
     ' ---------------------------------------------------------------
     ' Bruecke zum Board (U5)
     ' ---------------------------------------------------------------
@@ -468,7 +621,16 @@ Public NotInheritable Class HauptViewModel
                 If anzeige.Length > 0 Then namen(m.Id) = anzeige
             Next
         End If
-        Return Bruecke.StartSkript(If(ProjektOffen, _projekt.GuiState, Nothing), namen)
+        ' Was die Kurz-Parameter-Felder des Dashboards vorbelegen soll:
+        ' womit zuletzt gerechnet WURDE. Ein leeres Feld zwaenge den
+        ' Nutzer zu raten, was gerade gilt.
+        Dim planParameter As JsonObject = Nothing
+        If ProjektOffen Then
+            planParameter = New JsonObject From {
+                {"zeitbudget_s", _projekt.Config.SolveTimeLimitS},
+                {"max_loesungen", _projekt.Config.MaxSolutions}}
+        End If
+        Return Bruecke.StartSkript(If(ProjektOffen, _projekt.GuiState, Nothing), namen, planParameter)
     End Function
 
     ''' <summary>Nimmt eine Nachricht des Boards entgegen. Unbekannte
@@ -490,6 +652,12 @@ Public NotInheritable Class HauptViewModel
 
             Case "neu-rechnen"
                 NeuRechnenAsync(n.Nutzlast)
+
+            Case "plan-uebernehmen"
+                LoesungUebernehmen(n.Nutzlast)
+
+            Case "plan-neu-rechnen"
+                PlanNeuRechnenAsync(n.Nutzlast)
         End Select
     End Sub
 
@@ -518,6 +686,62 @@ Public NotInheritable Class HauptViewModel
             " - Neuberechnung gestartet", _jetzt())
 
         Await KlassenbildungRechnenAsync()
+    End Function
+
+
+    ''' <summary>"Diese Loesung als Arbeitsstand uebernehmen" (5). Der
+    ''' Stand traegt die Markierung selbst, in seinem freien `lauf`-Objekt
+    ''' - so ueberlebt sie das Speichern, ohne dass das Dateiformat eine
+    ''' neue Zusage braucht.</summary>
+    Friend Sub LoesungUebernehmen(nutzlast As JsonObject)
+        Dim wahl = Bruecke.LiesPlanAuswahl(nutzlast)
+        If Not wahl.HasValue Then Return
+
+        Dim stand = _projekt.Staende.LastOrDefault(Function(s) s.Stundenplan IsNot Nothing)
+        If stand Is Nothing Then
+            _dialoge.Hinweis("Kein Stand", "Es gibt noch keinen Stundenplan-Stand, den man markieren koennte.")
+            Return
+        End If
+
+        Dim zeitpunkt = _jetzt()
+        If stand.Lauf Is Nothing Then stand.Lauf = New JsonObject()
+        stand.Lauf("arbeitsstand") = New JsonObject From {
+            {"zuteilung", wahl.Value.Zuteilung},
+            {"loesung", wahl.Value.Loesung},
+            {"gewaehlt_am", zeitpunkt.ToString("o")}
+        }
+        _projekt.Protokolliere(Umgebung.Benutzer, "arbeitsstand",
+            $"Loesung {wahl.Value.Loesung} der Zuteilung {wahl.Value.Zuteilung} " &
+            $"als Arbeitsstand markiert (Stand {stand.Id})", zeitpunkt)
+        Geaendert = True
+        Meldung = $"Arbeitsstand: Zuteilung {wahl.Value.Zuteilung}, Loesung {wahl.Value.Loesung}."
+    End Sub
+
+    ''' <summary>"Neu rechnen" mit Kurz-Parametern direkt aus dem Dashboard
+    ''' (5). Die Werte werden in die Projekt-Config UEBERNOMMEN, nicht nur
+    ''' fuer diesen Lauf verwendet: sonst zeigten die Solver-Einstellungen
+    ''' (6.12) danach etwas anderes an als gerechnet wurde.</summary>
+    Friend Async Function PlanNeuRechnenAsync(nutzlast As JsonObject) As Task
+        If Not ProjektOffen OrElse Monitor.Laeuft Then Return
+
+        Dim kurz = Bruecke.LiesKurzparameter(nutzlast)
+        Dim uebernommen As New List(Of String)
+        If kurz.Zeitbudget.HasValue Then
+            _projekt.Config.SolveTimeLimitS = kurz.Zeitbudget.Value
+            uebernommen.Add($"Zeitbudget {kurz.Zeitbudget.Value:0.#} s")
+        End If
+        If kurz.MaxLoesungen.HasValue Then
+            _projekt.Config.MaxSolutions = kurz.MaxLoesungen.Value
+            uebernommen.Add($"{kurz.MaxLoesungen.Value} Loesung(en)")
+        End If
+
+        If uebernommen.Count > 0 Then
+            Geaendert = True
+            _projekt.Protokolliere(Umgebung.Benutzer, "einstellung",
+                "Aus dem Dashboard uebernommen: " & String.Join(", ", uebernommen), _jetzt())
+        End If
+
+        Await StundenplanRechnenAsync()
     End Function
 
 End Class

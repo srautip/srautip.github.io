@@ -25,6 +25,7 @@ Class MainWindow
 
         InputBindings.Add(New KeyBinding(_modell.SpeichernBefehl, Key.S, ModifierKeys.Control))
         InputBindings.Add(New KeyBinding(_modell.KlassenbildungBefehl, Key.F5, ModifierKeys.None))
+        InputBindings.Add(New KeyBinding(_modell.StundenplanBefehl, Key.F6, ModifierKeys.None))
     End Sub
 
     Private Async Sub AufModellAenderung(sender As Object, e As PropertyChangedEventArgs)
