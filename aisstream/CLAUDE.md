@@ -436,6 +436,82 @@ Laden bereits **deaktiviert**, weil die Seite von selbst verbindet. Skripte
 müssen den Klick überspringen:
 `if (!await page.evaluate(()=>document.getElementById('connectBtn').disabled)) await page.click('#connectBtn');`
 
+## Layout auf iPhone und iPad
+
+Der Client wird viel auf dem Telefon benutzt. Leitgedanke: **Schiffsdaten
+zuerst, Technik weg.**
+
+### Drei Layoutstufen
+
+| Breite | Verhalten |
+|---|---|
+| > 1024 px | Zweispaltig wie bisher, Technik als feste Seitenspalte |
+| ≤ 1024 px (iPad hoch, iPhone quer) | Technik wird zur Schublade von rechts, Inhalt einspaltig, Karte 42 vh |
+| ≤ 700 px (iPhone) | Zusätzlich: Tabelle als Kartenliste, Filterleiste als Scrollzeilen, Schublade voll breit, Karte 38 vh |
+
+Vorher rutschte bei ≤ 900 px das komplette Technikpanel **über** Karte und
+Tabelle — man scrollte an API-Key, Bounding Box und Log vorbei, bevor ein
+einziges Schiff sichtbar wurde. Jetzt hängt es hinter dem Knopf
+„Verbindung & Technik" in der Kopfzeile (`#settings`, Schließen per Kreuz,
+`Esc` oder Tipp daneben; auf dem Telefon voll breit, weil bei 92 vw nur
+32 px Hintergrund übrig blieben — als Tippziel unbrauchbar).
+
+### Tabelle → Kartenliste, ohne zweiten Render-Pfad
+
+Jede `<td>` trägt ein `data-label` mit ihrer Spaltenüberschrift und eine
+Klasse `c-*`. Unter 700 px stellt CSS dieselben Zeilen auf `display: block`
+um, blendet den `thead` aus und setzt das Label per `::before` davor. Es gibt
+**keine** zweite Renderfunktion — wer eine Spalte ergänzt, hat sie
+automatisch auch in der Kartenansicht.
+
+Der Name steht per `order: -1` als Überschrift oben (unabhängig von der
+Spaltenreihenfolge), davor ein Punkt in der Typfarbe als Bezug zur Karte.
+Flagge absolut oben rechts. `Lat`, `Lon`, `Zeit` und `Rufzeichen` sind
+ausgeblendet — die stehen in der Detailansicht.
+
+### iOS-spezifisch
+
+- `viewport-fit=cover` plus `env(safe-area-inset-*)` an Kopfzeile, `main`,
+  Schublade und Detailansicht — sonst liegt Inhalt unter Notch und
+  Home-Indicator
+- **Eingabefelder auf 16 px** unter 700 px: Alles darunter lässt iOS beim
+  Fokus in das Feld hineinzoomen, und die Seite bleibt danach verschoben
+- `-webkit-text-size-adjust: 100%`, sonst vergrößert iOS Text im Querformat
+- `map.invalidateSize()` nach `resize` und `orientationchange` (debounced) —
+  Leaflet kennt die Höhe einer `vh`-Karte sonst nicht nach dem Drehen
+- Legende startet unter 700 px **zugeklappt**, sofern nichts gemerkt ist:
+  aufgeklappt verdeckt sie fast die ganze 250-px-Karte
+
+### Zwei CSS-Fallen, beide dieselbe Ursache
+
+Beide haben das Dokument überbreit gemacht und quer scrollen lassen — **auch
+auf dem Desktop**, wo es jahrelang unbemerkt blieb:
+
+- **`main > * { min-width: 0 }`** — ohne das wächst ein Grid-Kind auf die
+  *Mindestbreite seines Inhalts*. Die 13-spaltige Tabelle blies das Dokument
+  auf 1678 px auf, obwohl sie in einem `overflow: auto`-Container steckt.
+- **Filterleiste auf dem Telefon als `display: block`, nicht Column-Flex.**
+  Als Flex-Item hat `.filtergroup` seine Cross-Achse nicht auf die
+  Containerbreite begrenzt und ist trotz `overflow-x: auto` und
+  `min-width: 0` auf 846 px aufgegangen. Als Blockelement füllt sie schlicht
+  die Breite und scrollt darin.
+
+**Merke:** Bei „die Seite scrollt quer" nicht raten, sondern messen —
+Elemente nacheinander auf `display: none` setzen und `scrollWidth`
+beobachten. Ein Detektor über Bounding-Rects liefert Fehltreffer, weil er
+geclippte Kinder (Leaflet-Kacheln, Off-Canvas-Schubladen) mitzählt.
+
+### Testen
+
+`playwright.devices` liefert die echten Geräteprofile — **eigene
+`viewport`-Objekte reichen nicht**, ohne `screen` löst `width=device-width`
+auf eine falsche Breite auf und die Media Queries greifen anders als auf dem
+Gerät. Benutzt wurden `iPhone 15`, `iPhone 15 landscape`, `iPad Pro 11`,
+`iPad Pro 11 landscape` plus ein Desktop-Viewport. Geprüft wird je Größe:
+Position und Höhe der Karte, ob die Technik ausgelagert ist, ob die Tabelle
+als Karten läuft, `scrollWidth` gegen `clientWidth` und die Schriftgröße im
+Eingabefeld. Bedienung per `page.tap()`, nicht `click()`.
+
 ## Was in `localStorage` liegt
 
 Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
@@ -597,6 +673,9 @@ verifiziert:
 - **MMSI-Filter** (`FiltersShipMMSI`) im UI, kommagetrennt, in `localStorage`
   persistiert; wird beim `change`-Event neu subscribed (nicht bei jedem
   Tastendruck)
+- **Angepasst für iPhone und iPad** (siehe eigenen Abschnitt oben): Technik
+  hinter einer Schublade, Tabelle als Kartenliste, Safe-Area-Ränder,
+  kein Zoom beim Fokus in Eingabefelder
 - **Filterleiste über Karte und Tabelle** (siehe eigenen Abschnitt oben):
   Schiffstyp und Navigationsstatus als Mehrfachauswahl, beide Ansichten
   zeigen immer dieselbe Auswahl, Zustand wird gemerkt

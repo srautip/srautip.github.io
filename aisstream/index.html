@@ -2,7 +2,9 @@
 <html lang="de">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#0f1420" />
 <title>AISstream.io Client</title>
 <meta name="description" content="Browserbasierter Live-Client für die AISstream.io WebSocket-API zur Verfolgung von Schiffspositionen (AIS)." />
 <link rel="icon" href="../favicon.ico" />
@@ -63,6 +65,10 @@
     gap: 1rem;
     padding: 1rem 1.5rem 2rem;
   }
+  /* Ohne min-width:0 waechst ein Grid-Kind auf die Mindestbreite seines
+     Inhalts - die 13-spaltige Tabelle hat das Dokument auf 1678px
+     aufgeblasen und quer scrollen lassen, auch auf dem Desktop. */
+  main > * { min-width: 0; }
   @media (max-width: 900px) {
     main { grid-template-columns: 1fr; }
   }
@@ -487,19 +493,217 @@
   .filter-count b { color: var(--text); }
   #filterReset { all: unset; cursor: pointer; font-size: 0.74rem; color: var(--accent); }
   #filterReset[hidden] { display: none; }
+  /* --- iPhone / iPad -------------------------------------------------- */
+
+  html { -webkit-text-size-adjust: 100%; }
+  body { -webkit-tap-highlight-color: rgba(63, 169, 255, 0.25); }
+
+  .headright { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+  #settingsToggle {
+    flex: 0 0 auto;
+    width: auto;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.8rem;
+  }
+  .settings-head {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  #settingsClose { flex: 0 0 auto; width: 34px; padding: 0.2rem; font-size: 1.1rem; line-height: 1; }
+  .row-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 0.4rem;
+    vertical-align: 0;
+    flex: 0 0 auto;
+  }
+
+  /* Auf dem iPad hochkant ist eine 320px-Spalte plus Karte zu eng:
+     Technik wandert dort schon in die Schublade. */
+  @media (max-width: 1024px) {
+    header { padding: 0.85rem 1rem; }
+    header h1 { font-size: 1rem; }
+    main { grid-template-columns: 1fr; padding: 0.75rem 1rem 2rem; }
+    .settings-head { display: flex; }
+
+    /* Schublade statt Spalte - sonst schiebt sich die komplette Technik
+       ueber Karte und Tabelle, und man scrollt an API-Key und Log vorbei,
+       bevor ein einziges Schiff sichtbar wird. */
+    #settings {
+      position: fixed;
+      top: 0; right: 0; bottom: 0;
+      width: min(420px, 92vw);
+      z-index: 1300;
+      overflow-y: auto;
+      border-radius: 0;
+      border: none;
+      border-left: 1px solid var(--border);
+      box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
+      transform: translateX(100%);
+      transition: transform 0.2s ease-out;
+      padding-top: max(1rem, env(safe-area-inset-top));
+      padding-right: max(1rem, env(safe-area-inset-right));
+      padding-bottom: max(2rem, env(safe-area-inset-bottom));
+      -webkit-overflow-scrolling: touch;
+    }
+    #settings.open { transform: translateX(0); }
+    #settingsBackdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1250;
+    }
+    #settingsBackdrop[hidden] { display: none; }
+    #map { height: 42vh; min-height: 260px; }
+    .table-wrap { max-height: none; }
+  }
+
+  /* iPhone: Tabelle als Kartenliste. Dieselben Zeilen, nur anders gelegt -
+     13 Spalten sind auf 390px Breite nicht lesbar. */
+  @media (max-width: 700px) {
+    body { padding-bottom: env(safe-area-inset-bottom); }
+    header {
+      padding: 0.7rem max(1rem, env(safe-area-inset-right)) 0.7rem max(1rem, env(safe-area-inset-left));
+      padding-top: max(0.7rem, env(safe-area-inset-top));
+    }
+    main { padding: 0.6rem max(0.75rem, env(safe-area-inset-left)) 2rem max(0.75rem, env(safe-area-inset-right)); gap: 0.75rem; }
+    /* Auf dem Telefon volle Breite: bei 92vw blieben 32px Hintergrund
+       uebrig - als "danebentippen zum Schliessen" unbrauchbar. Hier
+       schliessen Kreuz und Esc, wie bei einem iOS-Sheet ueblich. */
+    #settings { width: 100%; border-left: none; }
+    header h1 { font-size: 0.92rem; }
+    header h1 span { display: none; }
+    .headright { gap: 0.5rem; }
+    #settingsToggle { padding: 0.35rem 0.55rem; font-size: 0.74rem; }
+    .status { font-size: 0.75rem; }
+    /* Der Zusatz "Zeile anklicken fuer Details" kostet auf dem Telefon zwei
+       Zeilen und sagt nichts, was die Karten nicht schon zeigen. */
+    .panel h2 > span { display: none; }
+    .search-row { gap: 0.4rem; }
+    #map { height: 38vh; min-height: 220px; }
+    .panel { padding: 0.75rem; }
+    /* Umbrechende Chips haben auf 393px Breite sechs Zeilen erzeugt und die
+       Karte unter die Falz geschoben. Je Gruppe jetzt eine Zeile, die quer
+       scrollt. */
+    /* Blocklayout statt Column-Flex: als Flex-Item hat die Gruppe ihre
+       Cross-Achse nicht auf die Containerbreite begrenzt und ist trotz
+       overflow-x auf 846px aufgegangen. Als Blockelement fuellt sie
+       schlicht die Breite und scrollt darin. */
+    .filterbar { display: block; padding: 0.45rem 0.5rem; }
+    .filterbar > * + * { margin-top: 0.35rem; }
+    .filtergroup {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      /* Ohne min-width:0 scrollt die Gruppe nicht, sondern waechst auf die
+         Breite aller Chips und zieht die ganze Seite mit. */
+      min-width: 0;
+      gap: 0.3rem;
+      padding-bottom: 0.1rem;
+      scrollbar-width: none;
+    }
+    .filtergroup::-webkit-scrollbar { display: none; }
+    .filtergroup > .lbl { position: sticky; left: 0; background: var(--panel); padding-right: 0.2rem; z-index: 1; }
+    .filter-count { margin-left: 0; width: 100%; font-size: 0.7rem; }
+    #filterReset { align-self: flex-start; }
+
+    /* 16px verhindert, dass iOS beim Fokus in ein Feld hineinzoomt. */
+    input[type="text"], input[type="password"], input[type="number"], input[type="search"] {
+      font-size: 16px;
+    }
+    .chip, button { min-height: 34px; }
+
+    table, thead, tbody, tr, td { display: block; }
+    thead { display: none; }
+    .table-wrap { overflow: visible; }
+    tbody tr {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.5rem 0.6rem;
+      margin-bottom: 0.5rem;
+      background: var(--panel-2);
+    }
+    tbody tr.selected { background: #24365a; border-color: var(--accent); }
+    tbody td {
+      border: none;
+      padding: 0.1rem 0;
+      white-space: normal;
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      font-size: 0.8rem;
+    }
+    tbody td::before {
+      content: attr(data-label);
+      color: var(--muted);
+      flex: 0 0 auto;
+      font-size: 0.72rem;
+    }
+    /* Der Name ist die Ueberschrift der Karte, nicht ein Feld unter vielen -
+       per order nach oben, unabhaengig von der Spaltenreihenfolge. */
+    tbody td.c-name {
+      order: -1;
+      display: flex;
+      align-items: center;
+      font-size: 0.95rem;
+      font-weight: 600;
+      justify-content: flex-start;
+      padding-right: 3.2rem;
+      margin-bottom: 0.15rem;
+    }
+    tbody td.c-name::before { content: none; }
+    tbody td.c-flag {
+      position: absolute;
+      top: 0.45rem;
+      right: 0.6rem;
+      display: block;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    tbody td.c-flag::before { content: none; }
+    /* In der Detailansicht ohnehin vorhanden - hier nur Rauschen. */
+    tbody td.c-lat, tbody td.c-lon, tbody td.c-time, tbody td.c-call { display: none; }
+    tbody td.c-mmsi { color: var(--muted); font-size: 0.72rem; }
+
+    #detail { padding-top: max(1rem, env(safe-area-inset-top)); padding-bottom: max(2rem, env(safe-area-inset-bottom)); }
+    .map-legend { max-width: 46vw; font-size: 0.65rem; }
+  }
+
+  /* iPad quer: zwei Spalten fuer die Kartenliste waeren zu breit,
+     aber die Tabelle darf scrollen. */
+  @media (min-width: 701px) and (max-width: 1024px) {
+    .table-wrap { overflow-x: auto; }
+  }
 </style>
 </head>
 <body>
 <header>
   <h1>AISstream.io <span>Live-Client</span></h1>
-  <div class="status">
-    <span class="dot" id="statusDot"></span>
-    <span id="statusText">nicht verbunden</span>
+  <div class="headright">
+    <div class="status">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">nicht verbunden</span>
+    </div>
+    <button type="button" id="settingsToggle" aria-expanded="false" aria-controls="settings">
+      <span aria-hidden="true">⚙</span> Verbindung &amp; Technik
+    </button>
   </div>
 </header>
 
+<div id="settingsBackdrop" hidden></div>
+
 <main>
-  <section class="panel">
+  <aside class="panel" id="settings" aria-label="Verbindung und Technik">
+    <div class="settings-head">
+      <h2 style="margin:0">Verbindung &amp; Technik</h2>
+      <button type="button" id="settingsClose" title="Schließen">&times;</button>
+    </div>
     <h2>Verbindung</h2>
 
     <label for="serverUrl">Server-URL</label>
@@ -625,9 +829,9 @@
       offiziellen <a href="https://aisstream.io" target="_blank" rel="noopener">aisstream.io</a>-Key
       verwenden.
     </p>
-  </section>
+  </aside>
 
-  <section>
+  <section id="content">
     <div class="filterbar">
       <div class="filtergroup" id="typeFilter"><span class="lbl">Typ</span></div>
       <div class="filtergroup" id="statusFilter"><span class="lbl">Status</span></div>
@@ -1146,7 +1350,10 @@
         div.querySelector(".chev").textContent = open ? "▾" : "▸";
         try { localStorage.setItem("aisstream_legend_open", open ? "1" : "0"); } catch (e) {}
       };
-      setOpen(localStorage.getItem("aisstream_legend_open") !== "0");
+      // Auf einer 250px hohen Telefonkarte verdeckt die aufgeklappte Legende
+      // fast alles - dort standardmaessig zu, sofern nichts gemerkt ist.
+      var stored = localStorage.getItem("aisstream_legend_open");
+      setOpen(stored != null ? stored !== "0" : window.innerWidth > 700);
       head.addEventListener("click", function () {
         setOpen(head.getAttribute("aria-expanded") !== "true");
       });
@@ -2007,21 +2214,27 @@
       var row = document.createElement("tr");
       row.dataset.mmsi = entry.mmsi;
       if (entry.mmsi === selectedMmsi) row.className = "selected";
+      // data-label traegt die Spaltenueberschrift mit; auf schmalen Displays
+      // wird dieselbe Zeile per CSS zur Karte, ohne zweiten Render-Pfad.
+      var cat = typeCategory(entry);
+      var dot = '<span class="row-dot" style="background:' +
+        (cat ? TYPE_COLOR_MAP[cat] : NEUTRAL_COLOR) + '"></span>';
       row.innerHTML =
-        "<td>" + esc(entry.mmsi) + "</td>" +
-        '<td title="' + esc(info.country || "") + '"><span class="flag">' + (info.flag || "") + "</span>" +
-          esc(info.iso || "") + "</td>" +
-        "<td>" + esc(entry.name || "-") + "</td>" +
-        "<td>" + esc(entry.callSign || "-") + "</td>" +
-        "<td>" + esc(entry.typeDetail || entry.typeLabel || "-") + "</td>" +
-        "<td>" + esc(navStatusLabel(entry.navStatus) || "-") + "</td>" +
-        "<td>" + esc(entry.size || "-") + "</td>" +
-        "<td>" + esc(entry.destination || "-") + "</td>" +
-        "<td>" + entry.lat.toFixed(4) + "</td>" +
-        "<td>" + entry.lon.toFixed(4) + "</td>" +
-        "<td>" + (entry.speed != null ? esc(entry.speed.toFixed(1)) : "-") + "</td>" +
-        "<td>" + (entry.course != null ? esc(entry.course.toFixed(0) + "° " + compass(entry.course)) : "-") + "</td>" +
-        "<td>" + esc(entry.time || "-") + "</td>";
+        '<td data-label="MMSI" class="c-mmsi">' + esc(entry.mmsi) + "</td>" +
+        '<td data-label="Flagge" class="c-flag" title="' + esc(info.country || "") + '"><span class="flag">' +
+          (info.flag || "") + "</span>" + esc(info.iso || "") + "</td>" +
+        '<td data-label="Name" class="c-name">' + dot + esc(entry.name || "-") + "</td>" +
+        '<td data-label="Rufzeichen" class="c-call">' + esc(entry.callSign || "-") + "</td>" +
+        '<td data-label="Typ" class="c-type">' + esc(entry.typeDetail || entry.typeLabel || "-") + "</td>" +
+        '<td data-label="Status" class="c-status">' + esc(navStatusLabel(entry.navStatus) || "-") + "</td>" +
+        '<td data-label="Größe" class="c-size">' + esc(entry.size || "-") + "</td>" +
+        '<td data-label="Ziel" class="c-dest">' + esc(entry.destination || "-") + "</td>" +
+        '<td data-label="Lat" class="c-lat">' + entry.lat.toFixed(4) + "</td>" +
+        '<td data-label="Lon" class="c-lon">' + entry.lon.toFixed(4) + "</td>" +
+        '<td data-label="Speed" class="c-sog">' + (entry.speed != null ? esc(entry.speed.toFixed(1)) + " kn" : "-") + "</td>" +
+        '<td data-label="Kurs" class="c-cog">' +
+          (entry.course != null ? esc(entry.course.toFixed(0) + "° " + compass(entry.course)) : "-") + "</td>" +
+        '<td data-label="Zeit (UTC)" class="c-time">' + esc(entry.time || "-") + "</td>";
       tableBody.appendChild(row);
     });
     shipCountEl.textContent = shown.length;
@@ -3164,6 +3377,48 @@
   loadFilters();
   buildFilterChips();
 
+  /* --- Einstellungs-Schublade (nur auf schmalen Displays sichtbar) ----- */
+
+  var settingsEl = document.getElementById("settings");
+  var settingsToggle = document.getElementById("settingsToggle");
+  var settingsBackdrop = document.getElementById("settingsBackdrop");
+
+  function setSettingsOpen(open) {
+    settingsEl.classList.toggle("open", open);
+    settingsBackdrop.hidden = !open;
+    settingsToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    // Hintergrund nicht mitscrollen lassen, solange die Schublade offen ist.
+    document.body.style.overflow = open ? "hidden" : "";
+    if (open) settingsEl.scrollTop = 0;
+  }
+
+  settingsToggle.addEventListener("click", function () {
+    setSettingsOpen(!settingsEl.classList.contains("open"));
+  });
+  document.getElementById("settingsClose").addEventListener("click", function () {
+    setSettingsOpen(false);
+  });
+  settingsBackdrop.addEventListener("click", function () { setSettingsOpen(false); });
+
+  // Wechselt das Gerät zurück auf die Breitdarstellung, muss der
+  // Sperrzustand weg - sonst bleibt die Seite unscrollbar.
+  window.addEventListener("resize", function () {
+    if (window.innerWidth > 1024 && settingsEl.classList.contains("open")) setSettingsOpen(false);
+  });
+
+  // Leaflet kennt die Kartenhöhe erst nach dem Layout; bei vh-Höhen und
+  // beim Drehen des Geräts muss die Größe neu berechnet werden.
+  if (mapAvailable) {
+    var resizeTimer = null;
+    var invalidate = function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () { map.invalidateSize(); }, 200);
+    };
+    window.addEventListener("resize", invalidate);
+    window.addEventListener("orientationchange", invalidate);
+    setTimeout(function () { map.invalidateSize(); }, 300);
+  }
+
   snapshotBtn.addEventListener("click", loadSnapshot);
   document.getElementById("clearCacheBtn").addEventListener("click", clearAllCaches);
   autoEnrichInput.addEventListener("change", function () {
@@ -3202,7 +3457,9 @@
   });
 
   document.addEventListener("keydown", function (evt) {
-    if (evt.key === "Escape" && selectedMmsi) closeDetail();
+    if (evt.key !== "Escape") return;
+    if (settingsEl.classList.contains("open")) setSettingsOpen(false);
+    else if (selectedMmsi) closeDetail();
   });
 
   // pagehide fires on tab close and on mobile backgrounding, where a
