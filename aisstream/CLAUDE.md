@@ -48,12 +48,20 @@ Reaktion). `openwaters.io` ist ein **inoffizieller Drittanbieter**
 (community-betrieben), der unter `/v0/stream` das aisstream.io-Protokoll
 1:1 spiegelt ("frozen, nichts weicht ab" laut deren Doku).
 
-**Wenn eine neue Session hier weitermacht:** Prüfen, ob AISstream.io wieder
-läuft (z. B. https://github.com/aisstream/issues Issues checken). Falls ja,
-kann der User einfach im UI die Server-URL auf
-`wss://stream.aisstream.io/v0/stream` umstellen und seinen echten
-aisstream.io-Key eintragen — kein Code-Change nötig, das Feld ist frei
-editierbar und persistiert in `localStorage`.
+**Stand 24. Aug. 2026 — AISstream.io antwortet wieder.** Gemessen:
+`https://aisstream.io/` liefert HTTP 200, und
+`https://stream.aisstream.io/v0/stream` antwortet mit HTTP 400 — genau das,
+was ein lebender WebSocket-Endpunkt auf ein Plain-GET ohne Upgrade-Header
+zurückgibt. Ein „tot" sähe anders aus (Timeout, Connection Reset, 502).
+
+Das ist **noch kein Beweis, dass der Dienst wieder Daten liefert** — dafür
+bräuchte es einen gültigen aisstream.io-Key, den diese Sandbox nicht hat.
+Wer einen hat: im UI die Server-URL auf
+`wss://stream.aisstream.io/v0/stream` umstellen und den Key eintragen — kein
+Code-Change nötig, das Feld ist frei editierbar und persistiert in
+`localStorage`. Wenn das stabil läuft, kann der Default zurückgestellt
+werden (dann `SUPERSEDED_DEFAULT_URLS` um die openwaters-URL ergänzen, damit
+alte gespeicherte Werte verworfen statt wiederhergestellt werden).
 
 Der "Token holen"-Button ist **openwaters.io-spezifisch** (mintet dort per
 `POST https://ais.openwaters.io/v1/keys` einen `ak1....`-Token via
@@ -96,6 +104,28 @@ zum Nachschlagen einzelner MMSIs, weil openwaters mehrere Quellen bündelt
 eingespeiste Empfänger) und dadurch Schiffe kennt, die der eigene Stream
 gerade nicht liefert.
 
+## openwaters-Token: Limits, die stillschweigend greifen
+
+`POST https://ais.openwaters.io/v1/keys` (der „Token holen"-Button) liefert
+einen `personal`-Token mit diesen Claims — hier die real gemessenen Werte:
+
+```
+conns: 2      gleichzeitige Verbindungen
+rate:  50     Nachrichten pro Sekunde
+area:  400    Quadratgrad Bounding-Box-Fläche
+mmsis: 50     MMSIs im FiltersShipMMSI
+```
+
+**Fallstrick, der eine halbe Debug-Runde kostet:** Wird die Box größer als
+`area`, verwirft der Server die Subscription **kommentarlos** — kein
+`SubscriptionConfirmation`, keine Fehlermeldung, einfach nie Daten. Passiert
+schnell: `[[35,-10],[62,30]]` (Europa) sind 40° × 40° = 1600 sq° und damit
+das Vierfache des Erlaubten. `[[51.0,3.8],[52.3,7.6]]` (Rhein-/Maasdelta)
+sind 4,9 sq° und funktionieren.
+
+Wer also „verbunden, aber keine Nachrichten" sieht: zuerst die Boxfläche
+rechnen, nicht den Client debuggen.
+
 ## Application Specific Messages — implementiert, aber der Feed führt sie nicht
 
 Der Client dekodiert `BinaryBroadcastMessage` (Msg 8) und
@@ -125,6 +155,15 @@ oben: der Feed liefert keine). `binaryDataToBits()` erkennt deshalb zur
 Laufzeit Base64 (auch URL-safe), Hex und reine Bitstrings. Alle drei sind
 per Round-Trip getestet. Wer je ein echtes Sample in die Finger bekommt:
 bitte hier notieren, dann kann die Erkennung entfallen.
+
+**Konkreter nächster Schritt, jetzt machbar:** Die Sandbox kommt per Node
+nach draußen (siehe Testabschnitt), und AISstream.io antwortet wieder. Mit
+einem gültigen aisstream.io-Key ließe sich in ein paar Minuten prüfen, ob
+*deren* Feed ASM durchreicht — dann wären sowohl der Befund „Feed führt
+keine" als auch die Kodierungsfrage endgültig geklärt. Rezept: kleines
+Node-Skript, `FilterMessageTypes: ["BinaryBroadcastMessage",
+"AddressedBinaryMessage"]`, Box über der Rhein-/Maasdelta
+(`[[51.0,3.8],[52.3,7.6]]`), ein paar Minuten mitzählen.
 
 ## Protokoll-Fallstricke (bereits gelöst, aber gut zu wissen)
 
@@ -270,48 +309,119 @@ Marker. Wer einen neuen Nachrichtentyp ergänzt, hängt einfach einen weiteren
 `else if`-Zweig in `processMessageText()` an und füllt die passenden Felder —
 Tabelle, Popup und Detailansicht ziehen automatisch nach.
 
-## Testen — wichtig, sonst verschwendest du Zeit
+## Testen — die Sandbox ist offen, aber nur zur Hälfte
 
-**Stand 24. Aug. 2026 — das hat sich geändert:** `ais.openwaters.io` ist
-aus der Sandbox **per `curl` und Node erreichbar** (REST *und* WebSocket,
-inklusive Token-Minting über `POST /v1/keys`). Damit sind echte
-Endpunkt-Tests möglich — genau so wurden die `/v1/vessels`-Parameter und der
-ASM-Befund oben verifiziert.
+**Alles unten am 24. Aug. 2026 gemessen, nicht vermutet.** Die frühere Notiz
+„aisstream.io, openwaters, unpkg sind blockiert, echte Tests unmöglich" ist
+**überholt** — sie stimmt für `curl`/Node nicht mehr.
 
-**Aber: Chromium kommt weiterhin nicht raus.** Der Agent-Proxy lässt
-curl/Node durch und resettet Browser-Verbindungen (`ERR_CONNECTION_RESET`)
-— auch für `unpkg.com`. Konsequenz für Tests:
+### Was geht und was nicht
 
-- Netzabhängige Pfade **nicht** live aus dem Test-Browser prüfen. Stattdessen
-  Antworten vorab per `curl` holen, als Datei ablegen und im Test per
-  `page.route(...)` ausliefern. So wird gegen *echte* Daten getestet, ohne am
-  Proxy zu scheitern.
-- `page.route()` mit Glob (`'**host/pfad**'`) matcht diese URLs **nicht**
-  zuverlässig — Regex nehmen: `page.route(/ais\.openwaters\.io\/v1\/vessels/, …)`.
-- `--proxy-server=…` an Chromium zu hängen hilft nicht, der Reset kommt
-  trotzdem.
+| Von wo | HTTP | HTTPS / WSS |
+|---|---|---|
+| `curl`, Node | ✅ | ✅ **auch direkt ohne Proxy** |
+| Chromium (Playwright) | ✅ | ❌ `ERR_CONNECTION_RESET`, **bei jedem Host** |
 
-**Wie bisher getestet wurde (funktioniert zuverlässig):**
-1. `python3 -m http.server 8000` im Repo-Root, Seite unter
-   `http://localhost:8000/aisstream/` aufrufen
-2. Playwright + das lokal vorinstallierte Chromium
-   (`/opt/pw-browsers/chromium-1194/chrome-linux/chrome`, `--no-sandbox`)
-3. `window.WebSocket` im Browser-Kontext durch eine Fake-Klasse ersetzen
-   (`page.addInitScript`), die realistische Nachrichten simuliert — **wichtig:**
-   `this.readyState` muss von 0 auf 1 wechseln, sobald `onopen` feuert (der
-   Code prüft das jetzt explizit vor jedem `send()`, siehe `sendSubscription()`)
-4. Für Tests, die eine echte Kartenansicht brauchen (Bbox-Sync, Viewport-Filter):
-   Leaflet lässt sich nicht vom CDN laden, aber `npm pack leaflet@1.9.4` +
-   `page.route(...)` auf die unpkg-URLs, die stattdessen die lokal
-   entpackten `dist/leaflet.js`/`dist/leaflet.css` ausliefern, funktioniert
-   gut. Tile-Requests ebenfalls faken (z. B. 1×1-GIF), sonst hängt Leaflet.
-5. Reales Pannen der Karte lässt sich über echte `page.mouse.move/down/up`-
-   Drag-Gesten auf `#map` simulieren (nicht nötig, interne Funktionen
-   künstlich freizulegen)
+Per `curl`/Node erreichbar und verifiziert: `ais.openwaters.io` (REST,
+WebSocket **und** Token-Minting über `POST /v1/keys`), `unpkg.com`,
+`tile.openstreetmap.org`, `query.wikidata.org` (SPARQL), `www.wikidata.org`
+(API), `aisstream.io`.
 
-Es gibt kein Test-Framework/keine Test-Dateien im Repo — alle bisherigen
-Tests waren Wegwerf-Skripte im Scratchpad-Verzeichnis der jeweiligen
-Session. Bei Bedarf neu aufsetzen nach obigem Muster.
+**Chromium kommt per HTTPS nirgends hin** — auch nicht zu `example.com`.
+Plain HTTP funktioniert. Erfolglos durchprobiert, spar dir die Zeit:
+`--proxy-server`, Playwrights `proxy:`-Launchoption,
+`--ignore-certificate-errors`, `--disable-features=EncryptedClientHello`,
+`--disable-quic`. Der Proxy protokolliert die Requests nicht einmal, es ist
+kein CA-Problem.
+
+### Trotzdem live testen: zwei Brücken
+
+Beides ist erprobt, Skripte lagen im Scratchpad der Session (`liveproxy.js`,
+`wsbridge.js`, `livefull.js`) — bei Bedarf nach diesem Muster neu bauen.
+
+**1. HTTPS: im Test abfangen und aus Node beantworten.** Node kann TLS, der
+Browser nicht — also alle `https://`-Requests umleiten:
+
+```js
+await page.route(/^https:\/\//, async route => {
+  const req = route.request();
+  const res = await fetch(req.url(), { method: req.method(), headers: req.headers(),
+    body: ['GET','HEAD'].includes(req.method()) ? undefined : req.postData() });
+  const body = Buffer.from(await res.arrayBuffer());
+  const headers = Object.fromEntries(res.headers);
+  delete headers['content-encoding']; delete headers['content-length'];
+  headers['access-control-allow-origin'] = '*';
+  await route.fulfill({ status: res.status, headers, body });
+});
+```
+
+Damit läuft im Test **echtes** Leaflet von unpkg, es kommen **echte**
+OSM-Kacheln, `GET /v1/vessels` liefert **echte** Schiffe, und sogar der
+„Token holen"-Button funktioniert im Browser. Kein `npm pack leaflet` und
+keine Fake-Kacheln mehr nötig — der alte Weg über lokal entpackte
+Leaflet-Dateien ist damit hinfällig.
+
+**2. WebSocket: kleine Plain-`ws://`-Brücke in Node.** Der Browser kann
+Plain-WS zu localhost, Node kann WSS nach draußen:
+
+```js
+const { WebSocketServer } = require('ws');           // npm i ws
+new WebSocketServer({ port: 9001 }).on('connection', page => {
+  const up = new WebSocket('wss://ais.openwaters.io/v0/stream');
+  const queue = [];
+  up.binaryType = 'arraybuffer';
+  up.onopen    = () => queue.splice(0).forEach(m => up.send(m));
+  up.onmessage = e => page.send(typeof e.data === 'string' ? e.data : Buffer.from(e.data));
+  page.on('message', m => up.readyState === 1 ? up.send(m.toString()) : queue.push(m.toString()));
+  page.on('close', () => up.close());
+});
+```
+
+Im Test dann einfach `#serverUrl` auf `ws://localhost:9001` setzen — das
+Feld ist frei editierbar, es braucht keinen Eingriff in den Client. So
+getestet: echter Live-Stream im Wattenmeer, „verbunden", Schiffe mit echten
+Namen, Flaggen und Navigationsstatus in der Tabelle.
+
+**Was nicht funktioniert:** Playwrights `page.routeWebSocket()` mit
+`connectToServer()`. Der Handler feuert, `connectToServer()` wirft nicht,
+aber die Serververbindung schließt sofort mit Code 1006 — Playwright baut
+sie über den **Browser**-Netzwerkstack auf, und der kann kein WSS. Deshalb
+die Brücke als eigener Prozess.
+
+### Wann weiterhin gefaked wird
+
+Live ist nicht immer besser. Mit dem Fake-WebSocket (`page.addInitScript`)
+testen, wenn es um **Determinismus oder um Nachrichten geht, die real nie
+kommen**:
+
+- Binärnachrichten DAC 200 FI 10 / FI 55 — der Feed führt sie schlicht nicht
+  (siehe eigener Abschnitt oben), synthetisch ist der einzige Weg
+- Kapazitätsschätzung an Referenzschiffen mit exakt gesetzten Maßen
+- Sentinel- und Fehlerfälle (`TrueHeading` 511, `RateOfTurn` ±127,
+  `@`-Padding, XSS-Versuche in Namen, Gzip-Binärframes)
+- Der Fallback ohne Leaflet (CDN-Requests einfach `route.abort()`)
+
+**Wichtig beim Fake-WS:** `this.readyState` muss von 0 auf 1 wechseln, bevor
+`onopen` feuert — `sendSubscription()` prüft das explizit.
+
+### Weitere Stolpersteine, die Zeit gekostet haben
+
+- **`page.route()` mit Glob matcht diese URLs nicht.** `'**ais.openwaters.io/v1/vessels**'`
+  greift nicht, `/ais\.openwaters\.io\/v1\/vessels/` greift. Im Zweifel Regex.
+- **Viewport-Filter schlägt bei manuell gesetzter Box zu.** Die Tabelle zeigt
+  nur, was in `map.getBounds()` liegt. Wer die Bbox-Felder von Hand auf ein
+  anderes Revier setzt, ohne die Karte zu bewegen, bekommt Daten und eine
+  leere Tabelle. Im Test entweder die Default-Box lassen oder die Karte
+  wirklich per `page.mouse`-Drag bewegen. (Der Client loggt inzwischen einen
+  Hinweis, wenn ein Snapshot komplett außerhalb der Sicht landet.)
+- **Testserver:** `python3 -m http.server 8000` im Repo-Root, Seite unter
+  `http://localhost:8000/aisstream/`. Läuft er nicht, gibt es nur ein
+  nacktes `ERR_CONNECTION_REFUSED`.
+- Chromium liegt unter `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`,
+  immer mit `--no-sandbox` starten.
+
+Es gibt weiterhin **kein Test-Framework und keine Testdateien im Repo** —
+alle Tests waren Wegwerf-Skripte im Scratchpad der jeweiligen Session.
 
 ## Offene Punkte / mögliche nächste Schritte
 
@@ -325,7 +435,10 @@ Session. Bei Bedarf neu aufsetzen nach obigem Muster.
   aber einen Key — und ein Key im Browser-JS ist öffentlich, das bräuchte
   einen kleinen Proxy und damit erstmals ein Backend
 - Kein automatisiertes Test-Setup — bei größeren Änderungen die
-  Playwright-Smoke-Tests wie oben beschrieben neu aufsetzen
+  Playwright-Smoke-Tests wie oben beschrieben neu aufsetzen. Da jetzt echte
+  Live-Tests möglich sind (HTTPS-Relay + ws-Brücke), wäre ein kleines
+  eingechecktes `test/`-Verzeichnis statt Wegwerf-Skripten allmählich
+  lohnend — bisher wird jede Session neu aufgesetzt
 - Schiffsdaten sind rein flüchtig: Reload verwirft alle gesammelten MMSIs
   samt Track. Eine Persistenz in `localStorage`/IndexedDB wäre der nächste
   logische Schritt, ebenso ein Deeplink `?mmsi=…`, der die Detailansicht
