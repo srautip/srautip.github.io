@@ -1515,6 +1515,9 @@
   // also weder in der Tabelle auftauchen noch von den Filtern oder von
   // pruneStaleShips() erwischt werden.
   var OWN_POS_PX = 18;
+  // Die Koordinaten getrennt vom Marker fuehren: Die Detailansicht rechnet
+  // damit, und sie soll nicht ueber ein Leaflet-Objekt gehen muessen.
+  var ownPos = null;
   var ownPosMarker = null;
   var ownPosWatch = null;
   var ownPosLogged = false;
@@ -1538,7 +1541,18 @@
     });
   }
 
+  function mapCenterAsRef() {
+    if (!mapAvailable) return null;
+    var c = map.getCenter();
+    return { lat: c.lat, lon: c.lng };
+  }
+
   function showOwnPos(lat, lon) {
+    ownPos = { lat: lat, lon: lon };
+    // Entfernung und Peilung in der offenen Detailansicht beziehen sich auf
+    // diesen Punkt - ohne das Neuzeichnen stuenden dort bis zur naechsten
+    // Nachricht noch die Werte ab Kartenmitte.
+    if (selectedMmsi && ships.has(selectedMmsi)) renderDetail(ships.get(selectedMmsi));
     if (!mapAvailable) return;
     if (ownPosMarker) {
       ownPosMarker.setLatLng([lat, lon]);
@@ -1557,6 +1571,8 @@
   function hideOwnPos() {
     if (ownPosMarker && mapAvailable) map.removeLayer(ownPosMarker);
     ownPosMarker = null;
+    ownPos = null;
+    if (selectedMmsi && ships.has(selectedMmsi)) renderDetail(ships.get(selectedMmsi));
   }
 
   function stopOwnPos() {
@@ -1872,14 +1888,24 @@
       (box.margin ? " (+" + API_MARGIN_KM + " km Rand)" : "");
   }
 
-  // Great-circle distance in nautical miles.
-  function haversineNm(lat1, lon1, lat2, lon2) {
+  // Great-circle distance in Kilometern.
+  function haversineKm(lat1, lon1, lat2, lon2) {
     var rad = Math.PI / 180;
     var dLat = (lat2 - lat1) * rad;
     var dLon = (lon2 - lon1) * rad;
     var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) / 1.852;
+    return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  // Unter einem Kilometer sind zwei Nachkommastellen unlesbar und suggerieren
+  // ausserdem eine Genauigkeit, die weder AIS-Position noch Handy-Ortung
+  // hergeben - dort lieber ganze Meter.
+  function formatKm(km) {
+    if (km == null || isNaN(km)) return null;
+    if (km < 1) return Math.round(km * 1000) + " m";
+    if (km < 100) return km.toFixed(1) + " km";
+    return Math.round(km) + " km";
   }
 
   function bearingDeg(lat1, lon1, lat2, lon2) {
@@ -2103,11 +2129,11 @@
     return Math.max(1, Math.round(value)) + " t";
   }
 
-  // Sums the great-circle legs of a stored track, in nautical miles.
-  function trackDistanceNm(track) {
+  // Sums the great-circle legs of a stored track, in Kilometern.
+  function trackDistanceKm(track) {
     var total = 0;
     for (var i = 1; i < track.length; i++) {
-      total += haversineNm(track[i - 1].lat, track[i - 1].lon, track[i].lat, track[i].lon);
+      total += haversineKm(track[i - 1].lat, track[i - 1].lon, track[i].lat, track[i].lon);
     }
     return total;
   }
@@ -2314,6 +2340,16 @@
     rows.sort(function (a, b) { return b.updatedAt - a.updatedAt; });
     rows = rows.slice(0, AIS_MAX);
 
+    // Kein einziger frischer Datensatz ist ein voellig normaler Fall - ein
+    // Snapshot mit lauter Positionen von vor Stunden liefert genau das. Ohne
+    // diesen Ausstieg laeuft die Schleife unten nie an und der Code meldet
+    // faelschlich "Kein Platz im lokalen Speicher".
+    if (!rows.length) {
+      try { localStorage.setItem(AIS_CACHE_KEY, "{}"); } catch (e) {}
+      updateCacheCounts();
+      return;
+    }
+
     // Frueher stand hier ein blankes removeItem im catch: War das Kontingent
     // voll, loeschte der Speichervorgang den kompletten AIS-Cache - nach dem
     // naechsten Reload war die Karte leer, ohne eine einzige Meldung. Der
@@ -2327,19 +2363,27 @@
         AIS_FIELDS.forEach(function (f) { if (entry[f] != null) rec[f] = entry[f]; });
         out[entry.mmsi] = rec;
       });
+      // Nur das setItem gehoert in den try. Stand hier auch das Aufraeumen
+      // danach, verwandelte jeder beliebige Fehler daraus - ein fehlendes
+      // Element im Zaehler genuegt - den Speichervorgang in ein
+      // vermeintliches Platzproblem, samt Halbieren und falscher Meldung.
+      var written = false;
       try {
         localStorage.setItem(AIS_CACHE_KEY, JSON.stringify(out));
+        written = true;
+      } catch (e) {
+        // Erst den Platz zurueckholen, der ohnehin tot ist, statt frische
+        // Positionen wegzuwerfen.
+        if (!freed) { freed = true; pruneEnrichCache(true); continue; }
+        limit = Math.floor(limit / 2);
+      }
+      if (written) {
         if (limit < rows.length) {
           log("Speicher knapp: nur die " + limit + " neuesten von " + rows.length +
             " Schiffen zwischengespeichert.");
         }
         updateCacheCounts();
         return;
-      } catch (e) {
-        // Erst den Platz zurueckholen, der ohnehin tot ist, statt frische
-        // Positionen wegzuwerfen.
-        if (!freed) { freed = true; pruneEnrichCache(true); continue; }
-        limit = Math.floor(limit / 2);
       }
     }
     // Bewusst KEIN removeItem: Ein vorhandener aelterer Stand ist besser als
@@ -3663,11 +3707,14 @@
       return k + ": " + entry.counts[k];
     }).join(", ");
 
+    // Der eigene Standort ist der Bezugspunkt, den man tatsaechlich meint.
+    // Die Kartenmitte bleibt der Rueckfall, solange keiner vorliegt - sie
+    // verschiebt sich beim Scrollen, taugt also nur als Notloesung.
+    var ref = ownPos || (mapAvailable ? mapCenterAsRef() : null);
     var distance = null, bearing = null;
-    if (mapAvailable && entry.lat != null) {
-      var center = map.getCenter();
-      distance = haversineNm(center.lat, center.lng, entry.lat, entry.lon).toFixed(2) + " sm";
-      var brg = bearingDeg(center.lat, center.lng, entry.lat, entry.lon);
+    if (ref && entry.lat != null) {
+      distance = formatKm(haversineKm(ref.lat, ref.lon, entry.lat, entry.lon));
+      var brg = bearingDeg(ref.lat, ref.lon, entry.lat, entry.lon);
       bearing = brg.toFixed(0) + "° (" + compass(brg) + ")";
     }
 
@@ -3680,7 +3727,7 @@
     var regDt = reg.dt || {};
     var est = capacityEstimate(entry);
 
-    var travelled = entry.track.length > 1 ? trackDistanceNm(entry.track) : 0;
+    var travelled = entry.track.length > 1 ? trackDistanceKm(entry.track) : 0;
     var span = entry.track.length > 1
       ? (entry.track[entry.track.length - 1].t - entry.track[0].t) / 3600000
       : 0;
@@ -3750,7 +3797,7 @@
         ["Containerkapazität", est.teu],
         ["Grundlage", est.basis]
       ]) +
-      section("Relativ zur Kartenmitte", [
+      section(ownPos ? "Relativ zum eigenen Standort" : "Relativ zur Kartenmitte", [
         ["Entfernung", distance],
         ["Peilung", bearing]
       ]) +
@@ -3789,8 +3836,11 @@
         ["Nach Typ", counts],
         ["Letzter Typ", entry.lastMessageType],
         ["Trackpunkte", entry.track.length],
-        ["Strecke im Track", travelled ? travelled.toFixed(2) + " sm" : null],
-        ["Ø Geschwindigkeit", span > 0.002 && travelled ? (travelled / span).toFixed(1) + " kn" : null]
+        ["Strecke im Track", formatKm(travelled || null)],
+        // Die Geschwindigkeit bleibt in Knoten: SOG kommt so aus dem AIS-Feed
+        // und steht direkt darueber in der Fahrtdaten-Sektion.
+        ["Ø Geschwindigkeit",
+          span > 0.002 && travelled ? (travelled / span / 1.852).toFixed(1) + " kn" : null]
       ]);
 
     // Das Foto steht bewusst NICHT in detailBody: renderDetail laeuft bei

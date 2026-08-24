@@ -424,6 +424,30 @@ keinen* Callback auf — weder Erfolg noch Fehler, auch nach 12 s nicht. Die
 Fehlercodes muss man per `addInitScript` selbst stellen
 (`scratchpad/ownpos.js`), sonst prüft man Chromium statt der eigenen Logik.
 
+### Entfernung und Peilung: vom eigenen Standort, in Kilometern
+
+Der Bezugspunkt der Sektion „Relativ zu…" ist **der eigene Standort**, sobald
+einer vorliegt; die Kartenmitte ist nur noch der Rückfall. Die Überschrift sagt
+jeweils, welcher der beiden gilt — ohne das rät man beim Ablesen.
+
+Warum: Die Kartenmitte verschiebt sich bei jedem Scrollen. Eine Entfernung, die
+sich ändert, weil man die Karte bewegt hat, beantwortet keine Frage, die
+irgendwer stellt. Nachgewiesen in `scratchpad/disttest.js`: Karte um 160 px nach
+Osten geschoben → mit Standort bleibt es bei 3,3 km / 90°, ohne Standort springt
+derselbe Wert auf 7,5 km / 270°.
+
+**Alle Entfernungen in km**, nicht in Seemeilen: `haversineKm()`,
+`trackDistanceKm()`, Ausgabe über `formatKm()`. Unter 1 km ganze Meter — zwei
+Nachkommastellen suggerieren dort eine Genauigkeit, die weder die AIS-Position
+noch die Handy-Ortung hergibt.
+
+**Geschwindigkeiten bleiben in Knoten.** SOG kommt so aus dem AIS-Feed und steht
+in derselben Ansicht direkt darüber; die Ø-Geschwindigkeit aus dem Track wird
+deshalb aus km/h zurückgerechnet (`/ 1.852`) statt mitgewandelt.
+
+`showOwnPos()` und `hideOwnPos()` zeichnen die offene Detailansicht neu — sonst
+stünden dort bis zur nächsten Nachricht noch die Werte des alten Bezugspunkts.
+
 ## Namen kommen verzögert — `syncMarker()` ist die einzige Nachziehstelle
 
 Ein Schiffsname trudelt aus bis zu fünf Quellen ein, zeitlich versetzt:
@@ -976,6 +1000,19 @@ neu geladen.
 **Regel für neue Speicher:** Ein Cache, der bei Platzmangel den eigenen
 Bestand wegwirft, ist schlimmer als gar kein Cache — er verliert Daten
 lautlos und genau dann, wenn am meisten drinsteht.
+
+**Zwei Nachzügler aus genau diesem Umbau**, beide im Test aufgefallen:
+
+- **Null Zeilen ist kein Platzmangel.** Bei `rows.length === 0` lief die
+  Schrumpfschleife gar nicht erst an, und der Code fiel direkt auf die
+  Meldung „Kein Platz im lokalen Speicher" durch. Ausgelöst hat das ein
+  völlig normaler Fall: ein Snapshot, dessen Positionen alle älter als
+  30 Minuten sind — dann bleibt nach dem TTL-Filter keine Zeile übrig.
+  Jetzt wird in dem Fall eine leere Map geschrieben und zurückgekehrt.
+- **Nur `setItem` gehört in den `try`.** Standen `log()` und
+  `updateCacheCounts()` mit darin, hätte ein beliebiger Fehler daraus — ein
+  fehlendes Zählerelement genügt — den Speichervorgang in ein vermeintliches
+  Platzproblem verwandelt, samt Halbieren der Zeilen und falscher Meldung.
 
 „Zwischenspeicher leeren" räumt **nur den Speicher**, nicht die laufende
 Sitzung. Die Namen der Schiffe, die man gerade ansieht, verschwinden zu
