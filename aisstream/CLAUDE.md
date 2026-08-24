@@ -299,8 +299,8 @@ dataviz-Skill über den OKLCH-Farbtonkreis gesucht.
 *All-Pairs*-Form — alle Farben liegen gleichzeitig nebeneinander, „benachbart"
 gibt es nicht. Unter `--pairs all` fällt die 8er-Referenzordnung durch
 (schlechtestes Paar CVD ΔE 3,2) und ist dort auf drei Slots gedeckelt. Eine
-eigene Suche über den Farbtonkreis liefert **sechs** Farben, die das *strenge*
-Gate halten.
+eigene Suche über den Farbtonkreis hält das *strenge* Gate mit **sieben**
+Farben.
 
 | Kategorie | Hex | ITU-Typcode |
 |---|---|---|
@@ -308,15 +308,33 @@ Gate halten.
 | Tanker | `#ab2000` | 80–89 |
 | Passagierschiff | `#77a400` | 60–69 |
 | Fischerei | `#007a61` | 30 |
-| Schlepper & Arbeitsschiffe | `#8c2c95` | 31–35, 50–59 |
+| Schlepper & Arbeitsschiffe | `#8c2c95` | 31–34, 50–54, 56–58 |
 | Sport & Segel | `#ca7197` | 36, 37 |
+| Militär & Behörden | `#460fdb` | 35, 55, 59 |
 | Sonstige / unbekannt | `#6b6b68` | Rest — neutral, kein Slot |
 
 Gemessen gegen **beide** dominanten Kachelfarben (Land `#f2efe9`, Wasser
 `#aad3df`): schlechtestes Paar CVD ΔE 8,8 · normal ΔE 19,0 — alle Prüfungen
-bestanden. **Sechs ist das gemessene Maximum**, eine siebte Farbe hält die
-Schwellen nicht mehr. Wer Kategorien ergänzen will, muss also eine andere
-zusammenlegen — nicht einfach eine Farbe dazuerfinden.
+bestanden.
+
+**Korrektur:** Hier stand „sechs ist das gemessene Maximum". Das war falsch und
+kam von einer zu groben Suche — gleichmäßig verteilte Farbtöne bei *einem*
+gemeinsamen L und C. So scheitert schon die Sechserpalette (bestes Ergebnis
+CVD ΔE 3,0), während die tatsächlich eingesetzte 8,8 hält: Die Trennung kommt
+nicht aus dem Farbton allein, sondern aus L und C **je Slot** — genau dann,
+wenn Protanopie den Farbton einebnet, trägt der Helligkeitsunterschied.
+
+Mit per-Slot-Suche (`scratchpad/best7.mjs`, 6813 Kandidaten über den ganzen
+Farbtonkreis) kostet der siebte Platz **nichts**: Das schlechteste Paar bleibt
+`#ca7197`/`#007a61` bei CVD ΔE 8,8, der nächste Nachbar der neuen Farbe liegt
+bei CVD ΔE 11,4 (Arbeit) und Normalsicht ΔE 18,7 (Fracht). Nur drei der 6813
+Kandidaten erfüllen zusätzlich Kontrast ≥ 2,9 — alle im tiefen Blauviolett um
+`#460fdb`. Cyan- und Stahlblautöne halten die Trennung nur hell (L ≈ 0,74) und
+bleiben dann unter 2,6 Kontrast; dunkles Cyan kollidiert mit dem Fischerei-Teal.
+
+**Regel bleibt:** Eine Farbe nie dazuerfinden. Erst suchen lassen, dann den
+Validator unter `--pairs all` laufen lassen, und die neue Farbe darf das
+schlechteste Paar der Palette nicht verschlechtern.
 
 Der Kontrast-WARN (zwei bzw. drei Farben unter 3:1 gegen die Kacheln) ist
 durch „relief" gedeckt: Der Typ steht im Klartext in der Tabelle und im Popup,
@@ -447,6 +465,27 @@ deshalb aus km/h zurückgerechnet (`/ 1.852`) statt mitgewandelt.
 
 `showOwnPos()` und `hideOwnPos()` zeichnen die offene Detailansicht neu — sonst
 stünden dort bis zur nächsten Nachricht noch die Werte des alten Bezugspunkts.
+
+### „Militärschiff" gibt es im Standard nicht
+
+ITU-R M.1371 kennt **kein** Kriegsschiff. Was es gibt:
+
+| Code | Bedeutung | im Client |
+|---|---|---|
+| 35 | Military operations | „Militär" |
+| 55 | Law enforcement (Polizei, Zoll, Küstenwache) | „Polizei/Behörde" |
+| 59 | Nichtkämpfendes Schiff nach RR Res. 18 (Mob-83) | „Nichtkämpfendes Schiff" |
+
+Marineeinheiten senden im Regelfall entweder gar kein AIS oder melden sich
+unter 35 — mehr gibt die Datenquelle nicht her. Die drei Codes teilen sich
+deshalb **eine** Kategorie „Militär & Behörden"; sie einzeln einzufärben würde
+drei Farben für etwas verbrauchen, das sich in der Praxis kaum unterscheiden
+lässt.
+
+Vorher lagen 35 und 55 zusammen mit Schleppern und Lotsenbooten im Topf
+„Schlepper & Arbeitsschiffe" — das Label in Tabelle und Detailansicht war
+korrekt („Militär"), nur Kartenfarbe und Filter kannten die Unterscheidung
+nicht. 56, 57 und 59 hatten überhaupt kein Label und standen als „Typ 56" da.
 
 ## Namen kommen verzögert — `syncMarker()` ist die einzige Nachziehstelle
 
@@ -586,8 +625,12 @@ Eine gemeinsame Filterleiste über beidem (nicht je Ansicht eine eigene —
 Karte und Tabelle zeigen immer denselben Ausschnitt der Daten). Zwei
 Gruppen, beide als Mehrfachauswahl:
 
-- **Typ** — die sechs Kategoriefarben plus „Sonstige / unbekannt", jeder Chip
-  mit seinem Farbpunkt, damit der Bezug zur Karte sofort da ist
+- **Typ** — die sieben Kategoriefarben plus „Sonstige / unbekannt", jeder Chip
+  mit seinem Farbpunkt, damit der Bezug zur Karte sofort da ist. Kommt eine
+  Kategorie dazu, muss `FILTER_VERSION` hoch: Die Chips sind opt-in, eine
+  gespeicherte Auswahl kennt die neue Kategorie nicht und würde deren Schiffe
+  stumm ausblenden. Beim Versionswechsel fällt die Typauswahl einmal auf
+  „kein Filter" zurück.
 - **Status** — Navigationsstatus zu fünf Gruppen zusammengefasst:
   `In Fahrt` (0, 8) · `Vor Anker / fest` (1, 5) · `Eingeschränkt`
   (2, 3, 4, 6, 11, 12) · `Fischerei` (7) · `Sonstige / unbekannt` (Rest und
@@ -1178,7 +1221,7 @@ verifiziert:
   über `syncMarker()` aus allen Quellen zuverlässig nachgezogen (siehe
   eigenen Abschnitt oben)
 - **Kartenmarker kodieren Typ und Größe** (siehe eigenen Abschnitt oben):
-  sechs validierte Kategoriefarben, vier Größenstufen S/M/L/XL am Durchmesser,
+  sieben validierte Kategoriefarben, vier Größenstufen S/M/L/XL am Durchmesser,
   Form trennt Schiff / Seezeichen / Landstation, einklappbare Legende
 - **MMSI-Dekodierung offline** (`decodeMmsi()`): Stationsart nach ITU-R M.585
   (Schiff / Küstenfunkstelle / Gruppenruf / SAR-Luftfahrzeug / Seezeichen /

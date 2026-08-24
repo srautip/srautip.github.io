@@ -1285,7 +1285,13 @@
     { key: "passenger", label: "Passagierschiff", color: "#77a400" },
     { key: "fishing", label: "Fischerei", color: "#007a61" },
     { key: "working", label: "Schlepper & Arbeitsschiffe", color: "#8c2c95" },
-    { key: "leisure", label: "Sport & Segel", color: "#ca7197" }
+    { key: "leisure", label: "Sport & Segel", color: "#ca7197" },
+    // Siebter Platz, geprueft mit dem Validator der dataviz-Skill unter
+    // --pairs all: Das schlechteste Paar der Palette bleibt #ca7197/#007a61
+    // bei CVD ΔE 8,8 - die neue Farbe wird also nicht zum Engpass. Ihr
+    // naechster Nachbar liegt bei CVD ΔE 11,4 (Arbeit) und Normalsicht 18,7
+    // (Fracht), beides deutlich ueber Zielwert 8 und Schranke 15.
+    { key: "military", label: "Militär & Behörden", color: "#460fdb" }
   ];
   var TYPE_COLOR_MAP = (function () {
     var m = {};
@@ -1319,12 +1325,18 @@
       if (/container|massengut|bulk|fracht|cargo|schwergut|mehrzweck|roro|ro-ro|stückgut/i.test(known)) return "cargo";
       if (/kreuzfahrt|fähre|ferry|passagier/i.test(known)) return "passenger";
       if (/fisch/i.test(known)) return "fishing";
+      if (/marine|navy|kriegsschiff|fregatte|korvette|zerstörer|minen(jagd|such)|patrouillen|küstenwache|coast ?guard|schulschiff der marine/i.test(known)) return "military";
       if (/schlepper|tug|bagger|lotsen|rettung|polizei|arbeits/i.test(known)) return "working";
       if (/yacht|segel|sport/i.test(known)) return "leisure";
     }
     if (code === 30) return "fishing";
     if (code === 36 || code === 37) return "leisure";
-    if ((code >= 31 && code <= 35) || (code >= 50 && code <= 59)) return "working";
+    // 35 = Militaerische Operationen, 55 = Polizei/Zoll/Kuestenwache,
+    // 59 = nichtkaempfendes Schiff nach RR Res. 18. ITU-R M.1371 kennt kein
+    // "Kriegsschiff": Marineeinheiten senden entweder gar kein AIS oder
+    // melden sich unter 35 - mehr gibt der Standard nicht her.
+    if (code === 35 || code === 55 || code === 59) return "military";
+    if ((code >= 31 && code <= 34) || (code >= 50 && code <= 58)) return "working";
     if (code >= 60 && code <= 69) return "passenger";
     if (code >= 70 && code <= 79) return "cargo";
     if (code >= 80 && code <= 89) return "tanker";
@@ -1645,7 +1657,10 @@
     if (code === 53) return "Hafenboot";
     if (code === 54) return "Ölbekämpfung";
     if (code === 55) return "Polizei/Behörde";
+    if (code === 56 || code === 57) return "Reserviert (lokal)";
     if (code === 58) return "Medizinisch";
+    // RR Resolution No. 18 (Mob-83): Marineschiff im nichtkaempfenden Einsatz.
+    if (code === 59) return "Nichtkämpfendes Schiff";
     if (code >= 60 && code <= 69) return "Passagierschiff";
     if (code >= 70 && code <= 79) return "Frachtschiff";
     if (code >= 80 && code <= 89) return "Tanker";
@@ -2569,10 +2584,13 @@
     return true;
   }
 
+  // Hochzaehlen, sobald eine Typkategorie dazukommt oder wegfaellt.
+  var FILTER_VERSION = 2;
+
   function saveFilters() {
     try {
       localStorage.setItem("aisstream_filters",
-        JSON.stringify({ types: filterTypes, statuses: filterStatuses }));
+        JSON.stringify({ v: FILTER_VERSION, types: filterTypes, statuses: filterStatuses }));
     } catch (e) {}
   }
 
@@ -2581,6 +2599,14 @@
       var raw = localStorage.getItem("aisstream_filters");
       if (!raw) return;
       var parsed = JSON.parse(raw);
+      // Eine gespeicherte Auswahl kennt die neue Kategorie nicht. Da die Chips
+      // opt-in sind, wuerde jedes aktive Filterset die neuen Schiffe stumm
+      // ausblenden - deshalb faellt die Typauswahl beim Versionswechsel einmal
+      // zurueck auf "kein Filter", was alles zeigt.
+      if (parsed.v !== FILTER_VERSION) {
+        filterStatuses = parsed.statuses || {};
+        return;
+      }
       filterTypes = parsed.types || {};
       filterStatuses = parsed.statuses || {};
     } catch (e) {}
