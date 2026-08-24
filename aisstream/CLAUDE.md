@@ -663,6 +663,66 @@ Dazu ein Speicher **außerhalb** von `localStorage`:
 |---|---|---|
 | Cache Storage `aisstream-photos-v1` | Schiffsfotos als Blob (Miniatur 480 px) | 120 Bilder, älteste zuerst |
 
+### VesselFinder & Co.: geprüft, geht nicht
+
+Naheliegende Idee: die Detailseite (`vesselfinder.com/vessels/details/<IMO>`)
+scrapen und das Foto übernehmen. **Am 24. Aug. 2026 geprüft — aus dem Browser
+technisch ausgeschlossen:**
+
+- Die Seite antwortet mit HTTP 200, sendet aber **keinen
+  `access-control-allow-origin`-Header**, auch nicht mit gesetztem `Origin`.
+  Ein `fetch()` von unserer Seite kann den HTML-Text also nicht lesen. Ohne
+  Backend gibt es keinen Weg daran vorbei.
+- `robots.txt` liefert selbst **403 Forbidden** — der Betreiber blockt
+  automatisierte Zugriffe grundsätzlich.
+
+Dazu kommt: Fremde Bilder direkt einzubinden ist Hotlinking auf deren Kosten,
+und die Nutzungsbedingungen solcher Anbieter untersagen automatisiertes
+Auslesen üblicherweise. Auch mit Proxy wäre es also keine gute Idee. Das gilt
+sinngemäß für MarineTraffic, ShipSpotting und FleetMon.
+
+**Der gangbare Weg für mehr Bilder ist Wikimedia Commons** (siehe direkt
+darunter): frei lizenziert, CORS offen, kein Schlüssel.
+
+### Zweite Bildquelle: Commons über die IMO
+
+Wikidatas `P18` gibt es nur zu bekannteren Schiffen. Auf Commons liegen
+dagegen tausende Schiffsfotos, deren **Dateiname die IMO enthält**.
+
+`fetchCommonsPhoto(imo)` holt in **einem** Aufruf Treffer, Thumbnail-URL,
+Urheber und Lizenz:
+
+```
+action=query&generator=search&gsrsearch=IMO <nr>&gsrnamespace=6
+&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=480&origin=*
+```
+
+**Die IMO muss im Dateinamen stehen — das ist die entscheidende Regel.** Die
+Volltextsuche ist unscharf: Für IMO 9892896 („Bore Wave") lieferte sie
+*„Aftermath of Severn Bore wave"*, also einen **Fluss**. In einer Stichprobe
+von 15 Schiffen fing die Regel **8 solche Fehltreffer** ab und lieferte
+**6 richtige Fotos** — darunter die MAERSK VIRGINIA (IMO 9235531), zu der
+Wikidata nichts hat. Lieber kein Bild als das falsche Schiff.
+
+Läuft **nur, wenn Wikidata kein Foto hat** — dessen `P18` ist dem Schiff
+eindeutig zugeordnet statt über eine Textsuche gefunden.
+
+**Lizenz:** Commons-Fotos stehen meist unter CC-BY. Urheber und Lizenz kommen
+aus `extmetadata` und werden unter dem Bild ausgewiesen, dazu ein Link auf die
+Dateiseite. Ohne das wäre die Einbindung nicht lizenzkonform — beim Ergänzen
+weiterer Bildquellen bitte genauso halten.
+
+### Hängende Abfrage blockierte die ganze Warteschlange
+
+Beim Testen der Commons-Anbindung fiel auf: Alle Registerabfragen laufen
+serialisiert durch `throttled()`. Eine Anfrage, die **nie** antwortet,
+blockiert damit jede weitere — im Test kam das zweite Schiff gar nicht mehr
+an die Reihe, der Zustand blieb auf „wird abgefragt".
+
+Jeder Abruf hat deshalb jetzt eine harte Frist (`fetchWithTimeout`,
+12 s für Register, 15 s für Bilder, per `AbortController`). Wer eine weitere
+Quelle einhängt: dieselbe Frist benutzen, nicht das nackte `fetch`.
+
 ### Bildzwischenspeicher (Cache Storage, nicht localStorage)
 
 Die Bild-URL lag längst im Anreicherungs-Cache, die **Bilddaten** aber nicht —
@@ -946,6 +1006,8 @@ verifiziert:
   - Passagierzahlen werden **bewusst nicht geschätzt** — Fähre und
     Kreuzfahrtschiff gleicher Länge liegen um eine Größenordnung
     auseinander. Echte Zahlen gibt es nur über FI 55
+- **Schiffsfotos** aus Wikidata `P18`, ersatzweise über die IMO-Suche auf
+  Wikimedia Commons, mit Urheber- und Lizenzangabe
 - **Registeranreicherung je MMSI** (siehe eigenen Abschnitt oben): Digitraffic
   liefert IMO, Rufzeichen, Ziel, ETA, Tiefgang und Maße, Wikidata
   Bruttoraumzahl, Schiffsklasse, Eigner, Betreiber, Werft, Baujahr,

@@ -832,7 +832,10 @@
       Fragt <a href="https://meri.digitraffic.fi" target="_blank" rel="noopener">Digitraffic</a>
       (IMO, Rufzeichen, Ziel, Maße) und
       <a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>
-      (Bruttoraumzahl, Reederei, Werft, Baujahr, Foto, echter Schiffstyp) ab &ndash;
+      (Bruttoraumzahl, Reederei, Werft, Baujahr, Foto, echter Schiffstyp) sowie
+      &ndash; falls Wikidata kein Foto hat &ndash;
+      <a href="https://commons.wikimedia.org" target="_blank" rel="noopener">Wikimedia&nbsp;Commons</a>
+      nach einem Bild mit der IMO im Dateinamen ab &ndash;
       beide frei und ohne Schlüssel, immer nur für das geöffnete Schiff.
       Ergebnisse werden lokal zwischengespeichert. Trefferquote in einer
       Stichprobe von 75 Schiffen: Digitraffic 21&nbsp;%, Wikidata 23&nbsp;% &ndash;
@@ -2831,6 +2834,10 @@
     if (!raw) return "";
     var url = String(raw).replace(/^http:\/\//i, "https://");
     if (/[?&]width=/.test(url)) return url;
+    // Commons liefert über die API bereits eine fertige Thumbnail-URL auf
+    // upload.wikimedia.org; ein angehängtes width= wäre dort wirkungslos
+    // bis schädlich. Nur die Special:FilePath-Form braucht den Parameter.
+    if (url.indexOf("/thumb/") !== -1 || url.indexOf("upload.wikimedia.org") !== -1) return url;
     return url + (url.indexOf("?") === -1 ? "?" : "&") + "width=" + PHOTO_WIDTH;
   }
 
@@ -2854,7 +2861,7 @@
     return caches.open(PHOTO_CACHE).then(function (cache) {
       return cache.match(url).then(function (hit) {
         if (hit) return hit.blob().then(function (b) { return URL.createObjectURL(b); });
-        return fetch(url, { mode: "cors" }).then(function (res) {
+        return fetchWithTimeout(url, 15000).then(function (res) {
           if (!res.ok) throw new Error("HTTP " + res.status);
           return cache.put(url, res.clone())
             .then(function () { return prunePhotoCache(cache); })
@@ -2884,6 +2891,25 @@
   var ENRICH_TTL_HIT = 30 * 24 * 3600 * 1000;
   var ENRICH_TTL_MISS = 3 * 24 * 3600 * 1000;
   var ENRICH_GAP_MS = 350;
+
+  // Alle Registerabfragen laufen serialisiert durch eine Warteschlange.
+  // Eine Anfrage, die nie antwortet, wuerde damit jede weitere blockieren -
+  // im Test genau passiert: Das zweite Schiff kam nie an die Reihe. Deshalb
+  // bekommt jeder Abruf eine harte Frist.
+  var ENRICH_TIMEOUT_MS = 12000;
+
+  function fetchWithTimeout(url, ms) {
+    if (typeof AbortController !== "function") return fetch(url);
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, ms || ENRICH_TIMEOUT_MS);
+    return fetch(url, { signal: ctrl.signal }).then(function (res) {
+      clearTimeout(timer);
+      return res;
+    }, function (err) {
+      clearTimeout(timer);
+      throw err;
+    });
+  }
 
   var enrichInFlight = {};
   var enrichQueue = Promise.resolve();
@@ -2947,7 +2973,7 @@
   }
 
   function fetchDigitraffic(mmsi) {
-    return fetch(DIGITRAFFIC_VESSEL + encodeURIComponent(mmsi)).then(function (res) {
+    return fetchWithTimeout(DIGITRAFFIC_VESSEL + encodeURIComponent(mmsi)).then(function (res) {
       if (res.status === 404) return null;
       if (!res.ok) throw new Error("Digitraffic HTTP " + res.status);
       return res.json();
@@ -2996,7 +3022,7 @@
       ' SERVICE wikibase:label { bd:serviceParam wikibase:language "de,en" } } LIMIT 1';
     // format=json in the query string avoids an Accept header and with it a
     // CORS preflight on every lookup.
-    return fetch(WIKIDATA_SPARQL + "?format=json&query=" + encodeURIComponent(query))
+    return fetchWithTimeout(WIKIDATA_SPARQL + "?format=json&query=" + encodeURIComponent(query))
       .then(function (res) {
         if (!res.ok) throw new Error("Wikidata HTTP " + res.status);
         return res.json();
@@ -3034,6 +3060,57 @@
         out.image = img ? img.replace(/^http:\/\//i, "https://") : null;
         return out;
       });
+  }
+
+  // Zweite Bildquelle: Wikimedia Commons über die IMO-Nummer. Wikidata hat
+  // nur zu bekannteren Schiffen ein P18; auf Commons liegen dagegen tausende
+  // Schiffsfotos, deren Dateiname die IMO enthält.
+  //
+  // **Die IMO muss im Dateinamen stehen.** Die Volltextsuche ist unscharf:
+  // Bei IMO 9892896 ("Bore Wave") lieferte sie "Aftermath of Severn Bore
+  // wave" - einen Fluss. In einer Stichprobe von 15 Schiffen hat diese Regel
+  // 8 solche Fehltreffer abgefangen und 6 richtige Fotos geliefert. Lieber
+  // kein Bild als das falsche Schiff.
+  var COMMONS_API = "https://commons.wikimedia.org/w/api.php";
+
+  function stripHtml(value) {
+    if (!value) return null;
+    var text = String(value).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    return text.length ? text : null;
+  }
+
+  function fetchCommonsPhoto(imo) {
+    if (!imo) return Promise.resolve(null);
+    var url = COMMONS_API + "?action=query&generator=search" +
+      "&gsrsearch=" + encodeURIComponent("IMO " + imo) +
+      "&gsrnamespace=6&gsrlimit=10" +
+      "&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=" + PHOTO_WIDTH +
+      "&format=json&origin=*";
+    return fetchWithTimeout(url).then(function (res) {
+      if (!res.ok) throw new Error("Commons HTTP " + res.status);
+      return res.json();
+    }).then(function (json) {
+      var pages = json && json.query && json.query.pages;
+      if (!pages) return null;
+      var hit = null;
+      Object.keys(pages).forEach(function (k) {
+        var page = pages[k];
+        if (hit || !page.imageinfo || !/\.(jpe?g|png)$/i.test(page.title)) return;
+        if (page.title.indexOf(String(imo)) === -1) return;
+        hit = page;
+      });
+      if (!hit) return null;
+      var info = hit.imageinfo[0];
+      var meta = info.extmetadata || {};
+      return {
+        image: info.thumburl || info.url,
+        imageCredit: {
+          artist: stripHtml(meta.Artist && meta.Artist.value),
+          licence: stripHtml(meta.LicenseShortName && meta.LicenseShortName.value),
+          page: hit.title ? "https://commons.wikimedia.org/wiki/" + encodeURIComponent(hit.title) : null
+        }
+      };
+    });
   }
 
   function fetchWikidata(mmsi, imo) {
@@ -3128,7 +3205,19 @@
           });
           merged.sources.push("Wikidata");
         }
-        return merged;
+        // Nur ergaenzend: Wikidatas eigenes Foto hat Vorrang, es ist dem
+        // Schiff eindeutig zugeordnet statt ueber eine Textsuche gefunden.
+        if (merged.image || !imo) return merged;
+        return throttled(function () {
+          return fetchCommonsPhoto(imo).catch(function () { return null; });
+        }).then(function (photo) {
+          if (photo) {
+            merged.image = photo.image;
+            merged.imageCredit = photo.imageCredit;
+            merged.sources.push("Commons");
+          }
+          return merged;
+        });
       });
     }).then(function (data) {
       applyEnrichment(entry, data);
@@ -3504,7 +3593,16 @@
       detailMedia.dataset.src = wantImage;
       detailMedia.innerHTML = "";
       if (wantImage) {
-        var credit = '<div class="enrich-photo-credit">Foto: Wikimedia Commons' +
+        // Commons-Fotos stehen meist unter CC-BY - Urheber und Lizenz gehören
+        // dazu, sonst ist die Einbindung nicht lizenzkonform.
+        var cr = reg.imageCredit || {};
+        var creditParts = [];
+        if (cr.artist) creditParts.push(esc(cr.artist));
+        if (cr.licence) creditParts.push(esc(cr.licence));
+        var credit = '<div class="enrich-photo-credit">Foto: ' +
+          (cr.page ? '<a href="' + esc(cr.page) + '" target="_blank" rel="noopener">Wikimedia Commons</a>'
+                   : "Wikimedia Commons") +
+          (creditParts.length ? " &middot; " + creditParts.join(" &middot; ") : "") +
           (reg.entity ? ' &middot; <a href="' + esc(reg.entity) + '" target="_blank" rel="noopener">Wikidata</a>' : "") +
           "</div>";
         cachedPhoto(wantImage).then(function (src) {
