@@ -844,6 +844,7 @@
       <div>Schiffsstatik<br /><b id="staticCacheCount">0</b></div>
       <div>Registerdaten<br /><b id="enrichCacheCount">0</b></div>
       <div>AIS-Daten (30 min)<br /><b id="aisCacheCount">0</b></div>
+      <div>Bilder<br /><b id="photoCacheCount">0</b></div>
     </div>
     <button type="button" id="clearCacheBtn">Zwischenspeicher leeren</button>
     <p class="hint" style="margin-top:0.35rem">
@@ -851,7 +852,8 @@
       damit Schiffe nach einem Neuladen sofort benannt sind. Position,
       Fahrtdaten, Ziel, ETA und Tiefgang halten <strong>30 Minuten</strong> &ndash;
       danach werden sie verworfen. Wie alt ein Wert ist, steht in der Tabelle
-      hinter dem Namen.
+      hinter dem Namen. Registerdaten und Schiffsfotos werden ebenfalls lokal
+      gehalten, Fotos als Miniatur im Cache-Speicher des Browsers.
     </p>
 
     <div class="stats">
@@ -1161,6 +1163,7 @@
   var autoConnectInput = document.getElementById("autoConnect");
   var staticCacheCountEl = document.getElementById("staticCacheCount");
   var aisCacheCountEl = document.getElementById("aisCacheCount");
+  var photoCacheCountEl = document.getElementById("photoCacheCount");
   var enrichCacheCountEl = document.getElementById("enrichCacheCount");
   var searchInput = document.getElementById("shipSearch");
   var searchHintEl = document.getElementById("searchHint");
@@ -2108,6 +2111,7 @@
       if (raw) n = Object.keys(JSON.parse(raw)).length;
     } catch (e) {}
     aisCacheCountEl.textContent = n;
+    countPhotoCache().then(function (c) { photoCacheCountEl.textContent = c; });
   }
 
   // Clears what persists, not what is on screen. Wiping the names of ships
@@ -2126,6 +2130,10 @@
       localStorage.removeItem(AIS_CACHE_KEY);
     } catch (e) {}
     aisDirty = false;
+    releaseDetailPhoto();
+    if (typeof caches !== "undefined") {
+      caches.delete(PHOTO_CACHE).then(updateCacheCounts);
+    }
     updateCacheCounts();
     log("Zwischenspeicher geleert - die aktuelle Sitzung behält ihre Daten bis zum Neuladen.");
   }
@@ -2152,14 +2160,21 @@
   var AIS_TTL = 30 * 60 * 1000;
   var AIS_MAX = 1500;
   var AIS_SAVE_DEBOUNCE = 5000;
+  // "persons" (Besatzung/Passagiere aus FI 55) und "inland" (ENI, ERI, blaue
+  // Kegel, beladen) lagen bisher nirgends: Der Statik-Cache haelt nur die
+  // dauerhaften Binnenfelder, die Zahl der Personen an Bord und die
+  // Ladungsangaben gingen bei jedem Reload verloren. Sie sind reisebezogen,
+  // gehoeren also hierher und nicht in den 60-Tage-Speicher.
   var AIS_FIELDS = ["lat", "lon", "speed", "course", "heading", "navStatus", "rot",
     "accuracy", "raim", "maneuver", "fixType", "msgTimestamp", "destination",
-    "eta", "draught", "time"];
+    "eta", "draught", "time", "persons", "personsAt", "inland"];
 
   var aisDirty = false;
   var aisSaveTimer = null;
 
   function rememberAis(entry) {
+    // Ohne Position gibt es nichts wiederherzustellen - der Datensatz waere
+    // beim Laden weder auf der Karte noch in der Tabelle sichtbar.
     if (entry.lat == null || entry.lon == null) return;
     aisDirty = true;
     if (!aisSaveTimer) aisSaveTimer = setTimeout(saveAisCache, AIS_SAVE_DEBOUNCE);
@@ -2786,14 +2801,76 @@
       if (stat.eriLength && stat.eriBeam) entry.size = stat.eriLength + "×" + stat.eriBeam;
       if (stat.eriDraught) entry.draught = stat.eriDraught;
       rememberStatic(entry);
+      rememberAis(entry);
       syncMarker(entry);
     } else if (dac === 200 && fi === 55) {
       var persons = decodeInlandPersons(bits);
       if (!persons) return;
       entry.persons = Object.assign({}, entry.persons, persons);
       entry.personsAt = Date.now();
+      rememberAis(entry);
       syncMarker(entry);
     }
+  }
+
+  /* --- Bildzwischenspeicher -------------------------------------------- */
+
+  // Die Bild-URL steckt laengst im Anreicherungs-Cache, die Bilddaten aber
+  // nicht - die holte der Browser bei jedem Laden neu. Cache Storage ist
+  // dafuer das richtige Werkzeug: Es legt Blobs ab, ohne sie wie
+  // localStorage in Base64 aufzublaehen, und funktioniert ohne Service
+  // Worker.
+  var PHOTO_CACHE = "aisstream-photos-v1";
+  // Ohne width-Parameter liefert Commons das Original - mehrere Megabyte,
+  // und die Umleitung landet gelegentlich auf einer HTML-Seite statt auf dem
+  // Bild. Das Thumbnail ist rund 50 KB und kommt direkt.
+  var PHOTO_WIDTH = 480;
+  var PHOTO_MAX = 120;
+
+  function photoUrl(raw) {
+    if (!raw) return "";
+    var url = String(raw).replace(/^http:\/\//i, "https://");
+    if (/[?&]width=/.test(url)) return url;
+    return url + (url.indexOf("?") === -1 ? "?" : "&") + "width=" + PHOTO_WIDTH;
+  }
+
+  function prunePhotoCache(cache) {
+    return cache.keys().then(function (keys) {
+      if (keys.length <= PHOTO_MAX) return;
+      // keys() liefert Einfuegereihenfolge, die aeltesten stehen vorn.
+      return Promise.all(keys.slice(0, keys.length - PHOTO_MAX).map(function (k) {
+        return cache.delete(k);
+      }));
+    });
+  }
+
+  // Liefert eine anzeigbare Quelle: bevorzugt aus dem Zwischenspeicher, sonst
+  // einmal aus dem Netz und dann abgelegt. Faellt auf die nackte URL zurueck,
+  // wenn Cache Storage fehlt oder der Abruf scheitert - lieber ein Bild aus
+  // dem Netz als gar keins.
+  function cachedPhoto(url) {
+    if (!url) return Promise.resolve("");
+    if (typeof caches === "undefined") return Promise.resolve(url);
+    return caches.open(PHOTO_CACHE).then(function (cache) {
+      return cache.match(url).then(function (hit) {
+        if (hit) return hit.blob().then(function (b) { return URL.createObjectURL(b); });
+        return fetch(url, { mode: "cors" }).then(function (res) {
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          return cache.put(url, res.clone())
+            .then(function () { return prunePhotoCache(cache); })
+            .then(function () { return res.blob(); })
+            .then(function (b) { return URL.createObjectURL(b); });
+        });
+      });
+    }).catch(function () { return url; });
+  }
+
+  function countPhotoCache() {
+    if (typeof caches === "undefined") return Promise.resolve(0);
+    return caches.open(PHOTO_CACHE)
+      .then(function (c) { return c.keys(); })
+      .then(function (k) { return k.length; })
+      .catch(function () { return 0; });
   }
 
   /* --- Anreicherung aus Schiffsregistern ------------------------------ */
@@ -3421,15 +3498,25 @@
     // jedes Mal ein frisches <img>, der Browser begann den Ladevorgang von
     // vorn - das Bild flackerte oder erschien nie. Der eigene Container wird
     // nur angefasst, wenn sich die URL wirklich aendert.
-    var wantImage = reg.image || "";
+    var wantImage = photoUrl(reg.image);
     if (detailMedia.dataset.src !== wantImage) {
+      releaseDetailPhoto();
       detailMedia.dataset.src = wantImage;
-      detailMedia.innerHTML = wantImage
-        ? '<img class="enrich-photo" src="' + esc(wantImage) + '" alt="" loading="lazy" />' +
-          '<div class="enrich-photo-credit">Foto: Wikimedia Commons' +
+      detailMedia.innerHTML = "";
+      if (wantImage) {
+        var credit = '<div class="enrich-photo-credit">Foto: Wikimedia Commons' +
           (reg.entity ? ' &middot; <a href="' + esc(reg.entity) + '" target="_blank" rel="noopener">Wikidata</a>' : "") +
-          "</div>"
-        : "";
+          "</div>";
+        cachedPhoto(wantImage).then(function (src) {
+          // Inzwischen koennte ein anderes Schiff offen sein.
+          if (detailMedia.dataset.src !== wantImage) {
+            if (src.slice(0, 5) === "blob:") URL.revokeObjectURL(src);
+            return;
+          }
+          if (src.slice(0, 5) === "blob:") detailMedia.dataset.objurl = src;
+          detailMedia.innerHTML = '<img class="enrich-photo" src="' + esc(src) + '" alt="" />' + credit;
+        });
+      }
     }
 
     var extra = "";
@@ -3461,15 +3548,22 @@
         : "");
   }
 
+  // Ein Blob-Object-URL bleibt bis zum Widerruf im Speicher liegen.
+  function releaseDetailPhoto() {
+    if (detailMedia.dataset.objurl) {
+      URL.revokeObjectURL(detailMedia.dataset.objurl);
+      delete detailMedia.dataset.objurl;
+    }
+    detailMedia.dataset.src = "";
+    detailMedia.innerHTML = "";
+  }
+
   function openDetail(mmsi) {
     mmsi = String(mmsi);
     if (!ships.has(mmsi)) return;
     // Beim Schiffswechsel muss das alte Bild weg, sonst haengt es am neuen
     // Schiff, bis dessen Registerabfrage durch ist.
-    if (selectedMmsi !== mmsi) {
-      detailMedia.dataset.src = "";
-      detailMedia.innerHTML = "";
-    }
+    if (selectedMmsi !== mmsi) releaseDetailPhoto();
     selectedMmsi = mmsi;
     detailEl.classList.add("open");
     detailEl.setAttribute("aria-hidden", "false");
