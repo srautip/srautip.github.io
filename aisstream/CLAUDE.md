@@ -432,6 +432,63 @@ Drei Punkte, die aus dem Anti-Pattern-Katalog der Skill kamen:
 Bestätigt Wikidata einen Typ, schlägt der den ITU-Code (`typeCategory()`) —
 ein „Frachtschiff" laut Code, das laut Register ein Tanker ist, wird rot.
 
+#### „sport" steckt in „Autotran**sport**schiff"
+
+Gemeldet: *„Das Autotransportschiff IMO 9561277 wird unter Sport/Segel
+gefiltert?"* — Glorious Ace, MMSI 319409000. Wikidatas `P31` sagt
+`Autotransportschiff`, und die Regel `/yacht|segel|sport/i` traf **„sport" an
+Position 8, mitten im Wort**. Dieselbe Fehlerfamilie wie „Marines"/„Marlin"
+beim MMSI-Weg.
+
+**Der Reflex „dann eben Wortgrenzen" wäre hier grundfalsch.** Deutsche
+Komposita tragen das Grundwort **hinten**, und genau davon lebt die Regel.
+Gemessen über die 300 häufigsten `P31`-Werte von Schiffen mit IMO:
+
+| P31 | Kategorie | Treffer sitzt | Schiffe |
+|---|---|---|---|
+| Öl**tanker** | tanker ✅ | mitten im Wort | 3070 |
+| Zement**frachter** | cargo ✅ | mitten im Wort | 197 |
+| Auto**fähre** | passenger ✅ | mitten im Wort | 109 |
+| Motor**yacht** | leisure ✅ | mitten im Wort | 145 |
+| Hafen**schlepper** | working ✅ | mitten im Wort | 33 |
+
+Eine `\b`-Regel hätte allein 3070 Öltanker in die Neutralfarbe geworfen. **Die
+Teilzeichenkette ist für Grundwörter richtig** — falsch ist sie nur, wenn das
+Stichwort zufällig in einem *fremden Stamm* steckt.
+
+Betroffen war genau ein Stichwort, „sport" in „Transport":
+
+| P31 | vorher | jetzt | Schiffe |
+|---|---|---|---|
+| Autotransportschiff | leisure | **cargo** | 484 |
+| Tiertransporter | leisure | **cargo** | 45 |
+| Truppentransporter | leisure | **military** | 22 |
+| Transportunternehmen · Amphibisches Transportdock · attack transport · Holzspänetransporter | leisure | ITU-Code | 33 |
+
+**Der Fix ist zweiteilig**, und beide Hälften braucht es:
+
+1. **`transport` wird vorher abgefangen** — `truppentransport` → `military`,
+   `autotransport|fahrzeugtransport|tiertransport|car carrier` → `cargo`.
+2. **Die Sportregel verlangt, dass kein Buchstabe davorsteht**:
+   `/yacht|segel|(^|[^a-zäöüß])sport/i`. „Sportboot" trifft weiter, „Transport"
+   nicht mehr. Nur dieses eine Stichwort bekommt die Schranke — `yacht`,
+   `tanker`, `fähre` und die anderen Grundwörter behalten die freie
+   Teilzeichenkette, weil sie sie brauchen.
+
+Vier Werte fallen jetzt auf den ITU-Code durch statt eine Registerkategorie zu
+bekommen. Das ist **besser als eine geratene**: „Transportunternehmen" ist eine
+Reederei, gar kein Schiff.
+
+**Kontrolliert, nicht gehofft:** Über alle 300 Typen ändern sich **7** (584
+Schiffe), **293 bleiben gleich**. `scratchpad/typkategorie.js` hält beide Seiten
+fest — die drei reparierten Fälle **und** zwölf Komposita, die weiter treffen
+müssen. Gegenprobe mit zurückgebautem Fix meldet exakt die gemeldete
+Fehlzuordnung (`leisure`) und lässt die Komposita grün.
+
+**Testfalle dabei:** Der Client liest aus der SPARQL-Antwort `?typeLabel`, nicht
+`?type`. Wer den Mock falsch stellt, bekommt überall den ITU-Code zurück und
+misst gar nichts — im ersten Lauf standen deshalb 12 falsche „FEHL".
+
 ### Ladereihenfolge — schon zweimal reingefallen
 
 `addMapLegend()` stand zuerst im Karten-Init-Block, also **vor** der

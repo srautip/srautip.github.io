@@ -1593,13 +1593,25 @@
     // a bulker, and a cruise ship from a cargo vessel.
     var known = entry.enrich && entry.enrich.typeLabel;
     if (known) {
+      // Deutsche Komposita tragen das Grundwort HINTEN, deshalb wird bewusst
+      // als Teilzeichenkette gesucht: "Öltanker", "Autofähre" und
+      // "Hafenschlepper" treffen nur so. Eine Wortgrenzenregel wie beim
+      // MMSI-Weg waere hier falsch - sie wuerfe 3070 Öltanker weg.
+      //
+      // Genau EIN Stichwort steckt aber auch in einem fremden Stamm:
+      // "sport" in "Autotran(sport)schiff". Gemeldet als "Autotransportschiff
+      // wird unter Sport/Segel gefiltert" - 484 Autotransporter, 45 Tier- und
+      // 22 Truppentransporter landeten so bei den Sportbooten. Deshalb steht
+      // "transport" hier VOR der Sportregel, und die verlangt zusaetzlich,
+      // dass kein Buchstabe davorsteht.
+      if (/truppentransport/i.test(known)) return "military";
       if (/tanker/i.test(known)) return "tanker";
-      if (/container|massengut|bulk|fracht|cargo|schwergut|mehrzweck|roro|ro-ro|stückgut/i.test(known)) return "cargo";
+      if (/autotransport|fahrzeugtransport|tiertransport|car carrier|container|massengut|bulk|fracht|cargo|schwergut|mehrzweck|roro|ro-ro|stückgut/i.test(known)) return "cargo";
       if (/kreuzfahrt|fähre|ferry|passagier/i.test(known)) return "passenger";
       if (/fisch/i.test(known)) return "fishing";
       if (/marine|navy|kriegsschiff|fregatte|korvette|zerstörer|minen(jagd|such)|patrouillen|küstenwache|coast ?guard|schulschiff der marine/i.test(known)) return "military";
       if (/schlepper|tug|bagger|lotsen|rettung|polizei|arbeits/i.test(known)) return "working";
-      if (/yacht|segel|sport/i.test(known)) return "leisure";
+      if (/yacht|segel|(^|[^a-zäöüß])sport/i.test(known)) return "leisure";
     }
     if (code === 30) return "fishing";
     if (code === 36 || code === 37) return "leisure";
