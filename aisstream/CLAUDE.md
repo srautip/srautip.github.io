@@ -416,6 +416,9 @@ Feldern.
 **Form** trennt die Entitätsklassen, ohne eine Farbe zu verbrauchen: Kreis =
 Schiff, Raute = Seezeichen, Quadrat = Landstation.
 
+**Fahrtrichtung** kommt als kleines Dreieck am Punktrand dazu (siehe unten) —
+außerhalb des Punktes, damit Farbe und Durchmesser unangetastet bleiben.
+
 Drei Punkte, die aus dem Anti-Pattern-Katalog der Skill kamen:
 - **Klickziel:** Ein 8-px-Punkt ist ein mieses Ziel. Der Marker sitzt deshalb
   zentriert in einer transparenten **24-px-Box** (`MARKER_HIT_PX`) — sichtbare
@@ -440,6 +443,53 @@ Fehlertyp wie bei `loadStaticCache()`.
 **Merke:** In dieser Datei sind Funktionsdeklarationen gehoistet, `var`-Werte
 nicht. Alles, was auf die Konstanten weiter unten zugreift, gehört in den
 Verdrahtungsblock am Ende der IIFE, nicht in den Init oben.
+
+### Fahrtrichtung: kleines Dreieck am Punktrand
+
+Die vierte Kodierung am Marker, nach Farbe (Typ), Durchmesser (Länge) und Form
+(Entitätsklasse). Ein gefülltes Dreieck **außerhalb** des Punktes, Spitze in
+Fahrtrichtung, Abstand `px/2 + 3` von der Mitte — dieselbe Formel wie die Lücke
+im Fadenkreuz, damit sich beide bei jeder Punktgröße vertragen. Farbe = Typfarbe
+des Schiffs mit weißem Umriss; ein andersfarbiges Dreieck würde eine zweite,
+konkurrierende Kodierung aufmachen.
+
+**Wann es erscheint** (`travelCourse()`):
+
+1. `entry.course` (COG) — die Richtung, in die das Schiff **fährt**.
+2. sonst `entry.heading` (Bugrichtung) als Rückfall — nachrangig, denn ein quer
+   versetztes Schiff zeigt woanders hin, als es fährt.
+3. sonst `null` → **kein Dreieck**. Die Abwesenheit einer Angabe darf nicht wie
+   „fährt nach Norden" aussehen.
+
+Dazu eine Fahrtschwelle: **unter 0,5 kn kein Dreieck** (`DIR_MIN_SOG`). Ein
+festgemachtes Schiff sendet weiter einen Kurs, der sich zufällig dreht — ohne
+die Schwelle stünde eine Reede voll zappelnder Dreiecke. Fehlt die
+Geschwindigkeit ganz, entscheidet allein der Kurs.
+
+Beide Quellen sind schon am Eingang von ihren Sentinels befreit
+(`normalizeCog` verwirft 360, `normalizeHeading` die 511) — im Marker-Code
+deshalb **nur auf `null` prüfen**, nicht noch einmal auf 360/511.
+
+#### Gedreht wird ohne Icon-Neubau
+
+Der Kurs ändert sich mit **jeder** Positionsmeldung. Stünde der Winkel im
+`iconKey()`, riefe `refreshMarkerIcon()` bei jeder Nachricht `setIcon()` und
+baute das Marker-DOM neu — bei 400 Schiffen und 100 Nachrichten/s genau die Art
+Dauerlast, die man nicht einbaut. Deshalb dreigeteilt:
+
+- **`iconKey()` trägt nur, OB ein Dreieck da ist** (`"dir"` / `"-"`).
+  Erscheinen und Verschwinden sind selten und rechtfertigen einen Neubau.
+- **Der Winkel läuft über die CSS-Variable `--dir`** am vorhandenen Element
+  (`refreshMarkerDirection()`, aufgerufen aus `syncMarker()`): ein
+  Style-Schreibvorgang statt eines DOM-Neubaus.
+- **Der Winkel steht zusätzlich inline im Icon-HTML.** Leaflet erzeugt das
+  Element bei `setIcon()` und bei **jedem** `addLayer` neu, und
+  `applyMapFilter()` hängt Marker beim Verschieben der Karte laufend ab und
+  wieder an. Ohne den Wert im HTML stünde das Dreieck danach auf 0° (Norden).
+
+Gemessen (`scratchpad/richtung.js`): Kurswechsel 90° → 180° zieht nach, dabei
+**null** `setIcon`-Aufrufe; die Latenz unter Dauerlast bleibt bei 48 ms
+(vorher 46 ms, `markerlast.js`).
 
 ### Ausgewähltes Schiff: gelbes Fadenkreuz mit freier Mitte
 
