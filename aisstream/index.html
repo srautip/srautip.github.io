@@ -1892,6 +1892,26 @@
     return length + "×" + width;
   }
 
+  // 0 heisst laut Spezifikation "nicht verfuegbar" - fuer jede der vier
+  // Strecken einzeln. Ein Dimension-Objekt aus lauter Nullen ist damit keine
+  // Angabe, sondern deren Abwesenheit. Als Objekt ist es aber truthy, und das
+  // hat zweimal wehgetan:
+  //   - `entry.dim = msg.Dimension || entry.dim` hat bekannte Masse mit Nullen
+  //     ueberschrieben. Da Class A seine Statik alle sechs Minuten wiederholt,
+  //     sprang der Marker zwischen richtiger Groesse und Ring hin und her,
+  //     waehrend die Tabelle weiter "291×40" zeigte.
+  //   - `if (msg.Dimension && !entry.dim)` liess sich von so einem Objekt
+  //     dauerhaft blockieren: Ein Class-B-Schiff, das einmal Nullen meldete,
+  //     wuchs nie mehr - Msg 5 kommt dort nie.
+  // Massgeblich ist die Laenge: Sie traegt Markergroesse und Groessenklasse.
+  // Eine fehlende Breite ist unschoen, aber kein Grund, die Laenge wegzuwerfen
+  // (shipSize() verlangt fuer den Text "L×B" weiterhin beides).
+  function usableDim(dim) {
+    if (!dim) return null;
+    var length = (Number(dim.A) || 0) + (Number(dim.B) || 0);
+    return length ? dim : null;
+  }
+
   /* --- Per-MMSI Aufbereitung ---------------------------------------- */
 
   function esc(value) {
@@ -2444,7 +2464,7 @@
     STATIC_FIELDS.forEach(function (f) {
       if (entry[f] != null && entry[f] !== "") { record[f] = entry[f]; any = true; }
     });
-    if (entry.dim) { record.dim = entry.dim; any = true; }
+    if (usableDim(entry.dim)) { record.dim = entry.dim; any = true; }
     if (entry.inland) {
       var inland = {};
       STATIC_INLAND_FIELDS.forEach(function (f) {
@@ -2465,7 +2485,8 @@
     STATIC_FIELDS.forEach(function (f) {
       if (record[f] != null) entry[f] = record[f];
     });
-    if (record.dim) entry.dim = record.dim;
+    // Aeltere Cache-Bestaende koennen noch ein Nullobjekt enthalten.
+    if (usableDim(record.dim)) entry.dim = record.dim;
     if (record.inland) entry.inland = Object.assign({}, record.inland);
     entry.staticFromCache = record.at;
   }
@@ -3115,9 +3136,13 @@
             entry.typeLabel = shipTypeLabel(msg.ShipType) || entry.typeLabel;
             entry.typeDetail = shipTypeDetail(msg.ShipType) || entry.typeDetail;
           }
-          if (msg.Dimension && !entry.dim) {
-            entry.dim = msg.Dimension;
-            entry.size = shipSize(msg.Dimension) || entry.size;
+          // Frueher nur fuellend (`&& !entry.dim`). Msg 19 wiederholt sich,
+          // also darf eine spaetere brauchbare Angabe die alte ersetzen -
+          // sonst blieb ein Schiff nach einer Nullmeldung fuer immer ohne Masse.
+          var dim19 = usableDim(msg.Dimension);
+          if (dim19) {
+            entry.dim = dim19;
+            entry.size = shipSize(dim19) || entry.size;
           }
           rememberStatic(entry);
         }
@@ -3143,7 +3168,7 @@
       entry.typeCode = msg.Type != null ? msg.Type : entry.typeCode;
       entry.typeLabel = shipTypeLabel(msg.Type) || entry.typeLabel;
       entry.typeDetail = shipTypeDetail(msg.Type) || entry.typeDetail;
-      entry.dim = msg.Dimension || entry.dim;
+      entry.dim = usableDim(msg.Dimension) || entry.dim;
       entry.size = shipSize(msg.Dimension) || entry.size;
       entry.fixType = msg.FixType != null ? msg.FixType : (msg.Fixtype != null ? msg.Fixtype : entry.fixType);
       entry.staticFromCache = null;
@@ -3163,9 +3188,10 @@
         entry.typeLabel = shipTypeLabel(partB.ShipType) || entry.typeLabel;
         entry.typeDetail = shipTypeDetail(partB.ShipType) || entry.typeDetail;
       }
-      if (partB.Dimension) {
-        entry.dim = partB.Dimension;
-        entry.size = shipSize(partB.Dimension) || entry.size;
+      var dim24 = usableDim(partB.Dimension);
+      if (dim24) {
+        entry.dim = dim24;
+        entry.size = shipSize(dim24) || entry.size;
       }
       entry.vendor = cleanText(partB.VendorIDName) || entry.vendor;
       entry.serial = partB.SerialNumber != null ? String(partB.SerialNumber) : entry.serial;
@@ -3180,7 +3206,7 @@
       entry.typeDetail = entry.typeLabel;
       entry.atonVirtual = msg.VirtualAtoN;
       entry.atonOffPosition = msg.OffPosition;
-      entry.dim = msg.Dimension || entry.dim;
+      entry.dim = usableDim(msg.Dimension) || entry.dim;
       entry.size = shipSize(msg.Dimension) || entry.size;
       entry.fixType = msg.Fixtype != null ? msg.Fixtype : (msg.FixType != null ? msg.FixType : entry.fixType);
       rememberStatic(entry);
@@ -4106,9 +4132,10 @@
     fill("draught", dt.draught);
     // Wikidata zuerst (gepflegter Registername), sonst Digitraffic.
     fill("name", data.name || dt.name);
-    if (dt.dim && !entry.dim) {
-      entry.dim = dt.dim;
-      entry.size = shipSize(dt.dim) || entry.size;
+    var dimReg = usableDim(dt.dim);
+    if (dimReg && !entry.dim) {
+      entry.dim = dimReg;
+      entry.size = shipSize(dimReg) || entry.size;
     }
     if (dt.typeCode != null && entry.typeCode == null) {
       entry.typeCode = dt.typeCode;

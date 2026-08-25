@@ -361,6 +361,44 @@ Der Snapshot liefert Typen, aber keine Maße, und der Stream liefert Maße nur
 mit einer `ShipStaticData`. In einem Testlauf über der Deutschen Bucht hatten
 **26 von 26** Markern keine Länge, aber 18 davon einen bekannten Typ.
 
+### `Dimension` aus lauter Nullen ist ein Sentinel, kein Maß
+
+Gemeldet als „Verzögerungen, bis der Marker die neuen Abmessungen zeigt". Der
+Weg selbst ist schnell — gemessen **7 ms** vom Eintreffen der Statiknachricht
+bis zum größeren Marker, und **46 ms** unter Dauerlast (400 Schiffe,
+100 Nachrichten/s). Das Problem lag in den Daten, nicht im Rendern.
+
+AIS meldet fehlende Abmessungen als `Dimension {A:0, B:0, C:0, D:0}` — 0 heißt
+für jede der vier Strecken „nicht verfügbar". Als **Objekt** ist das aber
+truthy, und das schlug an zwei Stellen durch (`scratchpad/nulldim.js`):
+
+| Fall | vorher | jetzt |
+|---|---|---|
+| Class A: echte Maße, dann eine Nullmeldung | Marker fällt auf den 11-px-Ring zurück, Tabelle zeigt weiter „291×40" | Marker bleibt bei 20 px |
+| Class B: erst Nullen, dann echte Maße (Msg 19) | Marker wächst **nie** | Marker wächst |
+
+Der erste Fall ist der gemeldete: Class A wiederholt seine Statik alle sechs
+Minuten, der Marker sprang also im Takt zwischen richtiger Größe und Ring hin
+und her. Der zweite ist ein Dauerzustand — `if (msg.Dimension && !entry.dim)`
+ließ sich von einem Nullobjekt **dauerhaft** blockieren, und Msg 5 kommt bei
+Class B nie.
+
+`usableDim(dim)` gibt die Maße nur zurück, wenn `A+B` eine Länge ergibt, und
+steht jetzt an **jeder** Zuweisung: Msg 5, Msg 19, Msg 24, Seezeichen,
+Registeranreicherung, Statik-Cache (alte Bestände können noch Nullobjekte
+enthalten) und `rememberStatic()`. Maßgeblich ist die **Länge** — sie trägt
+Markergröße und Größenklasse; eine fehlende Breite ist kein Grund, die Länge
+wegzuwerfen (`shipSize()` verlangt für den Text „L×B" weiterhin beides).
+
+Msg 19 füllt dabei nicht mehr nur Lücken, sondern übernimmt jede brauchbare
+Angabe — die Nachricht wiederholt sich, also darf eine spätere die frühere
+ersetzen. Nur die **Registeranreicherung** bleibt füllend: Der Stream ist
+aktuell, das Register kann Jahre alt sein.
+
+**Merke:** Dieselbe Familie wie SOG 102,3 und COG 360 — ein Sentinel, der als
+echter Wert durchrutscht. Bei `Dimension` ist er besonders tückisch, weil er
+nicht als Zahl auffällt, sondern als vorhandenes Objekt.
+
 ### Die Falle: Größenkodierung darf die Farbkodierung nicht überschreiben
 
 Erste Fassung setzte für unbekannte Länge `background: #ffffff !important`
