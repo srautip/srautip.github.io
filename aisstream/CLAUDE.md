@@ -1300,6 +1300,74 @@ Regel unnötig: Wer dort einsortiert ist, gehört zum Schiff. Genau deshalb
 kommen jetzt auch die sechs „Maersk Virginia, Fremantle, 2015"-Aufnahmen in
 Frage, die die Titelregel verworfen hätte.
 
+#### Die IMO bleibt am Rumpf, der Name wechselt
+
+Gemeldeter Fall: MMSI 275482000 (BON VIVANT) zeigte ein **Stadtbild**. Die
+Kette nachgefahren:
+
+```
+MMSI 275482000  --Digitraffic-->  IMO 9052692
+IMO 9052692     --Commons-------> Category:IMO 9052692
+                                    -> Category:Vestfjord (ship, 1993)
+                                       -> File:Vestfjord anchored in Tallinn Bay
+                                          Tallinn 6 September 2016.jpg
+```
+
+**Die Zuordnung ist richtig.** Die Commons-Kategorie zu IMO 9052692 sagt
+`Name of ship: VESTFJORD (since 01/01/2011)`, MMSI 246162000, Baujahr 1993;
+Wikidata führt **dieselbe IMO** als *Bon Vivant*. Es ist derselbe Rumpf: **Die
+IMO-Nummer bleibt lebenslang am Schiff, Name, Flagge und MMSI wechseln mit dem
+Eigner.** Aus VESTFJORD (Niederlande) wurde BON VIVANT (Lettland).
+
+**Daraus folgt eine Regel für künftige Umbauten:** Ein Commons-Foto darf zu
+Recht einen *anderen* Schiffsnamen tragen als der AIS-Feed. Wer eine
+Namensprüfung auf den **Kategorieweg** legen will — so wie sie der MMSI-Weg
+braucht —, wirft damit die richtigen Bilder aller umbenannten Schiffe weg. Der
+Kategorieweg bleibt deshalb bewusst ohne Titelregel: Wer dort einsortiert ist,
+gehört zum Rumpf.
+
+**Das Bild taugt trotzdem nicht.** Es zeigt zu etwa neun Zehnteln die Altstadt
+von Tallinn — rote Dächer, Kirchtürme, ein Baukran; das Schiff liegt als
+wenige Pixel auf dem Horizontstreifen. Jemand hat auf Commons ein
+Stadtpanorama in eine Schiffskategorie einsortiert. Die Meldung war also in
+der Sache berechtigt, nur lag der Fehler nicht im Client.
+
+**Und dagegen hilft kein Filter** — geprüft, was an Metadaten zur Verfügung
+steht:
+
+- Der **Titel enthält den Schiffsnamen** („Vestfjord anchored in Tallinn Bay").
+  Eine „Name muss im Titel stehen"-Regel hätte das Bild **durchgelassen**.
+- Die **Kategorie enthält genau eine Datei**. Eine Sortierregel läuft ins Leere.
+- **Strukturierte Daten** führen weder Motiv noch Bildinhalt (`haswbstatement`
+  liefert für diese Kennungen ohnehin null Treffer, siehe oben).
+
+Ob ein Schiff auf einem Bild formatfüllend oder als Pixelfleck zu sehen ist,
+steht in **keinem abfragbaren Feld**. Ohne die Pixel anzusehen ist dieser Fall
+nicht entscheidbar, und Bildanalyse im Browser wäre für diese App
+unverhältnismäßig. Das ist die **Grenze des Verfahrens** — kein Fehler, den man
+wegprogrammiert.
+
+Grenzt sich ab von der Regel „lieber kein Bild als das falsche Schiff": Hier
+ist es **das richtige Schiff auf einem untauglichen Bild**, ein anderer Fall.
+
+Der naheliegende Ausweg wäre eine **Bildunterschrift** — Dateititel unter das
+Foto, plus bei abweichendem Kategorienamen eine Zeile „Aufnahme unter dem Namen
+*Vestfjord*". `commonsCredit()` hat den Titel bereits in der Hand
+(`page.title`) und benutzt ihn heute nur für den Link. Damit kann der Leser
+selbst einordnen, was er sieht. Noch nicht umgesetzt.
+
+**Zwei Merksätze aus diesem Fall:**
+
+- **Erst die Kette nachfahren, dann den zuletzt geänderten Weg beschuldigen.**
+  Der Verdacht fiel auf den neuen MMSI-Weg — Commons hat zu `"275482000"` aber
+  **null** Treffer, `commonsByMmsi()` war gar nicht beteiligt. Schuld war der
+  alte IMO-Kategorieweg.
+- **Ein Dateititel ist keine Bildbeschreibung.** Aus „anchored in Tallinn Bay"
+  hatte ich auf eine Hafenszene mit Schiff im Vordergrund geschlossen und das
+  dem Nutzer so gesagt; das Bild ist ein Stadtpanorama. Dieselbe Lehre wie beim
+  [Richtungspfeil](#fahrtrichtung-kleiner-pfeil-im-punkt) — **ansehen bzw.
+  messen, nicht ableiten.**
+
 **Auswahl stabil halten:** Aus der Kategorie kommen bis zu 20 Dateien. Sortiert
 wird IMO-im-Namen zuerst, sonst alphabetisch — sonst zeigt dasselbe Schiff bei
 jedem Abruf ein anderes Bild.
