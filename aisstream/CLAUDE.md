@@ -771,6 +771,7 @@ Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
 | `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss, max. `ENRICH_MAX` = 400 |
 | `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d, max. 2000 |
 | `aisstream_ais` | **eine** JSON-Map MMSI → Position, Fahrtdaten, Personen an Bord, Binnenangaben | **30 min**, max. 1500 |
+| `aisstream_diary` | Schiff-Spotter-Tagebuch: Sichtungen mit eingefrorenem Schiffszustand | **kein Cache** — läuft nie ab, wird nie gekürzt |
 
 **Alle drei brauchen eine Obergrenze.** Das Kontingent liegt bei ~5 MB und
 teilen sich alle Schlüssel; wer einen vierten Speicher ergänzt, gibt ihm ein
@@ -782,6 +783,7 @@ Dazu ein Speicher **außerhalb** von `localStorage`:
 | Speicher | Inhalt | Grenze |
 |---|---|---|
 | Cache Storage `aisstream-photos-v1` | Schiffsfotos als Blob (Miniatur 480 px) | 120 Bilder, älteste zuerst |
+| Cache Storage `aisstream-diary-photos-v1` | Fotos zu Tagebucheinträgen | **ohne Obergrenze**, wird nie beschnitten |
 
 ### VesselFinder & Co.: geprüft, geht nicht
 
@@ -1130,6 +1132,91 @@ Sitzung. Die Namen der Schiffe, die man gerade ansieht, verschwinden zu
 lassen wäre ein überraschender Nebeneffekt; alles im Speicher wurde
 legitim empfangen. Der Log sagt das auch so.
 
+## Schiff-Spotter-Tagebuch
+
+Die erste Datenmenge in dieser App, die **der Nutzer erzeugt**. Daraus folgt die
+einzige Regel, die hier wirklich zählt:
+
+> **Das Tagebuch ist kein Cache.** Es läuft nicht ab, „Zwischenspeicher leeren"
+> fasst es nicht an, und bei Platzmangel wird es nicht gekürzt, sondern gemeldet.
+
+Bei einem Cache ist „im Zweifel wegwerfen" der richtige Reflex — genau der hat
+[weiter oben](#voller-speicher-löschte-den-kompletten-ais-cache-behoben) einmal
+alle AIS-Daten gelöscht. Hier wäre derselbe Reflex Datenverlust ohne Rückweg.
+Konkret: `saveDiary()` versucht `setItem`, räumt bei `QuotaExceededError` den
+Anreicherungs-Cache auf, versucht **einmal** erneut — und lässt danach den
+gespeicherten Bestand unverändert stehen, mit Meldung im Log. Auch eine
+unbekannte `v` im Datensatz führt **nicht** zum Verwerfen.
+
+### Eingefrorener Zustand, aber nicht eingefrorene Texte
+
+Ein Eintrag muss für sich allein stehen: `pruneStaleShips()` entfernt das Schiff
+nach 30 Minuten aus `ships`, der AIS-Cache verfällt genauso. Gespeichert wird
+deshalb ein Abzug des Schiffszustands — aber **entry-kompatibel geformt**, mit
+denselben Feldnamen wie im Live-Datensatz. Dadurch laufen die vorhandenen
+Ableitungen unverändert auf dem gespeicherten Objekt:
+
+| Anzeige | wiederverwendet |
+|---|---|
+| Flagge, MMSI-Kategorie | `decodeMmsi()` |
+| Farbpunkt | `typeCategory()` + `TYPE_COLOR_MAP` |
+| Größenklasse, Verdrängung, **TEU** | `capacityEstimate()` |
+| Entfernung, Peilung | `formatKm()`, `compass()` |
+
+Fertig formatierte Strings einzufrieren wäre der naheliegende, aber schlechtere
+Weg: Eine spätere Verbesserung der TEU-Schätzung wirkt so auch auf alte
+Einträge. Wer Felder ergänzt, erweitert `DIARY_SHIP_FIELDS` — nicht die
+Anzeigefunktionen.
+
+### Fotos: eigener Topf
+
+`prunePhotoCache()` wirft im normalen Bildspeicher alles über `PHOTO_MAX = 120`
+weg. Ein Tagebuchfoto gehört zu einem Eintrag, den der Nutzer behalten will, und
+liegt deshalb in `aisstream-diary-photos-v1` **ohne** Obergrenze. Beim Löschen
+einer Sichtung wird das Bild nur entfernt, wenn **kein anderer Eintrag** darauf
+zeigt — dasselbe Schiff darf mehrfach im Tagebuch stehen.
+
+Der Export enthält nur die Bild-**URLs**, nicht die Bilddaten; sonst wäre die
+Datei um Größenordnungen größer. Nach einem Import wird ein Foto bei Bedarf neu
+geladen.
+
+### Zwei Schubladen, ein Abdunkler
+
+`#settings` ist erst unter 1024 px eine Schublade und darüber eine Spalte;
+`#diary` ist auf **jeder** Breite eine. `setDrawerOpen()` schließt deshalb immer
+die jeweils andere und zeigt den Abdunkler nur, wenn die offene Schublade an
+dieser Breite auch wirklich eine ist (`istSchublade()`). Beides ist im Bauen
+schiefgegangen: Ohne das Erste nimmt das Schließen der einen den Hintergrund
+unter der anderen weg, ohne das Zweite legt sich der Abdunkler am Desktop über
+genau die Technik-Spalte, die er freigeben soll.
+
+### Stapelreihenfolge: die Kopfzeile war unter der Detailleiste begraben
+
+`#detail` ist eine feste Leiste ganz rechts über die volle Höhe (z-index 1200) —
+also genau über den Knöpfen der Kopfzeile. Bei geöffnetem Schiff war
+„Verbindung & Technik" nicht anklickbar; mit dem Tagebuch-Knopf fiel es auf, weil
+man ihn gerade dann braucht.
+
+Die Ordnung ist jetzt: `#detail` 1200 · **Kopfzeile 1220** · Abdunkler 1250 ·
+Schubladen 1300. Die Kopfzeile liegt über der Detailleiste (Knöpfe erreichbar),
+aber unter den Schubladen (die bringen ihr eigenes Kreuz mit). Damit die
+Detailleiste dabei nicht ihr **eigenes** Schließkreuz unter die Kopfzeile
+schiebt, beginnt ihr Inhalt bei `--head-h` — einer CSS-Variablen, die das Skript
+aus der echten Kopfzeilenhöhe setzt und bei `resize`/`orientationchange`
+nachführt (die Höhe ändert sich mit umbrechenden Knöpfen).
+
+### Test
+
+`scratchpad/diarytest.js` (24 Prüfungen) und `scratchpad/diaryquota.js`.
+Die beiden Proben, die den Charakter der Funktion festhalten:
+**„Zwischenspeicher leeren" lässt das Tagebuch unberührt**, und bei vollem
+`localStorage` bleibt der gespeicherte Bestand vollständig stehen.
+
+Zwei Fallen beim Testen: Ein `localStorage.removeItem("aisstream_ais")` vor
+einem Reload wird vom `pagehide`-Sichern sofort rückgängig gemacht — es gehört
+in ein `addInitScript`. Und am Desktop ist `#settingsClose` per CSS ausgeblendet,
+weil die Technik dort eine Spalte ist.
+
 ## Protokoll-Fallstricke (bereits gelöst, aber gut zu wissen)
 
 Alle über mehrere Debugging-Runden mit dem User empirisch/per Doku
@@ -1194,6 +1281,9 @@ verifiziert:
 
 ## Implementierte Features
 
+- **Schiff-Spotter-Tagebuch**: Sichtungen dauerhaft lokal festhalten, mit
+  eingefrorenem Schiffszustand, Notiz, Foto und Entfernung zum eigenen
+  Standort; Export/Import als JSON. Eigene Schublade, kein Cache
 - Verbindungsaufbau/-abbau, API-Key + Server-URL editierbar & in
   `localStorage` persistiert (mit Selbstheilung: bekannte, überholte
   Default-Werte werden beim Laden verworfen statt wiederhergestellt —

@@ -36,6 +36,14 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 0.75rem;
+    /* Die Detailansicht ist eine feste Leiste ganz rechts ueber die volle
+       Hoehe (z-index 1200) - genau dort, wo die Knoepfe der Kopfzeile sitzen.
+       Ohne eigenen Stapelplatz waren sie bei geoeffnetem Schiff nicht mehr
+       anklickbar. Unter den Schubladen (1300) und dem Abdunkler (1250) bleibt
+       die Kopfzeile dagegen bewusst: Die Schublade bringt ihr eigenes Kreuz
+       mit, und ein Kopfzeilenknopf ueber dem Abdunkler waere verwirrend. */
+    position: relative;
+    z-index: 1220;
   }
   header h1 {
     font-size: 1.15rem;
@@ -237,7 +245,11 @@
     background: var(--panel);
     border-left: 1px solid var(--border);
     box-shadow: -8px 0 24px rgba(0, 0, 0, 0.45);
-    padding: 1rem 1.1rem 2rem;
+    /* Die Leiste laeuft ueber die volle Hoehe und damit hinter die Kopfzeile,
+       die seit den zwei Schubladen darueber liegt. Der Inhalt beginnt deshalb
+       unterhalb der Kopfzeile - sonst waere das eigene Schliesskreuz
+       unerreichbar. --head-h setzt das Skript aus der echten Hoehe. */
+    padding: calc(var(--head-h, 64px) + 0.6rem) 1.1rem 2rem;
     overflow-y: auto;
     z-index: 1200;
     transform: translateX(100%);
@@ -527,13 +539,128 @@
   .filter-count b { color: var(--text); }
   #filterReset { all: unset; cursor: pointer; font-size: 0.74rem; color: var(--accent); }
   #filterReset[hidden] { display: none; }
+  /* Der Abdunkler lag frueher in der 1024px-Media-Query, weil nur #settings
+     eine Schublade war. Das Tagebuch ist auf jeder Breite eine - deshalb
+     gilt die Regel jetzt unbedingt. */
+  #settingsBackdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1250;
+  }
+  #settingsBackdrop[hidden] { display: none; }
+
+  /* --- Schiff-Spotter-Tagebuch ---------------------------------------- */
+
+  /* Anders als #settings ist das Tagebuch auf JEDER Breite eine Schublade -
+     im Raster gibt es keine Spalte dafuer, und der Nutzer hat es sich so
+     gewuenscht. Die Regeln stehen deshalb ausserhalb jeder Media Query. */
+  #diary {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: min(460px, 94vw);
+    z-index: 1300;
+    overflow-y: auto;
+    border-radius: 0;
+    border: none;
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
+    transform: translateX(100%);
+    transition: transform 0.2s ease-out;
+    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch;
+  }
+  #diary.open { transform: translateX(0); }
+  #diary .settings-head { display: flex; }
+  .diary-actions { display: flex; gap: 0.4rem; margin: 0.6rem 0 0.9rem; }
+  .diary-actions button { flex: 1 1 0; width: auto; }
+  .diary-summary { font-size: 0.78rem; color: var(--muted); }
+  .diary-empty {
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.5;
+    padding: 1.2rem 0;
+  }
+  .diary-entry {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.7rem;
+    margin-bottom: 0.6rem;
+    background: var(--panel-2);
+  }
+  .diary-entry .head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .diary-entry .ship { font-weight: 600; font-size: 0.9rem; min-width: 0; }
+  .diary-entry .when {
+    flex: 0 0 auto;
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .diary-entry .facts {
+    font-size: 0.76rem;
+    color: var(--muted);
+    line-height: 1.45;
+    margin-top: 0.35rem;
+  }
+  .diary-entry .facts b { color: var(--text); font-weight: 600; }
+  .diary-entry img {
+    width: 100%;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    margin-top: 0.5rem;
+    display: block;
+  }
+  .diary-entry textarea {
+    width: 100%;
+    margin-top: 0.5rem;
+    min-height: 2.4rem;
+    resize: vertical;
+    padding: 0.4rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    /* textarea steht nicht in der globalen Feldregel weiter oben - ohne das
+       hier kaeme ein weisses Systemfeld mitten in die dunkle Oberflaeche. */
+    background: var(--panel);
+    color: var(--text);
+    /* 16px verhindert den Zoom-Sprung beim Fokus auf iOS. */
+    font-size: 16px;
+    font-family: inherit;
+    line-height: 1.35;
+  }
+  .diary-entry textarea::placeholder { color: var(--muted); }
+  .diary-entry .row-end {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.4rem;
+  }
+  .diary-entry .del {
+    /* Ohne flex:0 0 auto zieht die globale button-Regel (flex: 1) den Knopf
+       auf die volle Breite - eine Loeschflaeche ueber die ganze Karte ist
+       auf dem Telefon zu leicht getroffen. */
+    flex: 0 0 auto;
+    width: auto;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.72rem;
+    min-height: 0;
+  }
+  .diary-entry .del.armed { border-color: var(--err); color: var(--err); }
+  #diaryFile { display: none; }
+
   /* --- iPhone / iPad -------------------------------------------------- */
 
   html { -webkit-text-size-adjust: 100%; }
   body { -webkit-tap-highlight-color: rgba(63, 169, 255, 0.25); }
 
   .headright { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-  #settingsToggle {
+  #settingsToggle, #diaryToggle {
     flex: 0 0 auto;
     width: auto;
     padding: 0.4rem 0.7rem;
@@ -546,7 +673,7 @@
     gap: 0.5rem;
     margin-bottom: 0.75rem;
   }
-  #settingsClose { flex: 0 0 auto; width: 34px; padding: 0.2rem; font-size: 1.1rem; line-height: 1; }
+  #settingsClose, #diaryClose { flex: 0 0 auto; width: 34px; padding: 0.2rem; font-size: 1.1rem; line-height: 1; }
   th.c-age, td.c-age { text-align: right; }
   .age { font-variant-numeric: tabular-nums; color: var(--muted); }
   .age.age-mid { color: var(--text); }
@@ -590,13 +717,6 @@
       -webkit-overflow-scrolling: touch;
     }
     #settings.open { transform: translateX(0); }
-    #settingsBackdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-      z-index: 1250;
-    }
-    #settingsBackdrop[hidden] { display: none; }
     #map { height: 42vh; min-height: 260px; }
     .table-wrap { max-height: none; }
   }
@@ -613,11 +733,11 @@
     /* Auf dem Telefon volle Breite: bei 92vw blieben 32px Hintergrund
        uebrig - als "danebentippen zum Schliessen" unbrauchbar. Hier
        schliessen Kreuz und Esc, wie bei einem iOS-Sheet ueblich. */
-    #settings { width: 100%; border-left: none; }
+    #settings, #diary { width: 100%; border-left: none; }
     header h1 { font-size: 0.92rem; }
     header h1 span { display: none; }
     .headright { gap: 0.5rem; }
-    #settingsToggle { padding: 0.35rem 0.55rem; font-size: 0.74rem; }
+    #settingsToggle, #diaryToggle { padding: 0.35rem 0.55rem; font-size: 0.74rem; }
     .status { font-size: 0.75rem; }
     /* Der Zusatz "Zeile anklicken fuer Details" kostet auf dem Telefon zwei
        Zeilen und sagt nichts, was die Karten nicht schon zeigen. */
@@ -738,6 +858,9 @@
       <span class="dot" id="statusDot"></span>
       <span id="statusText">nicht verbunden</span>
     </div>
+    <button type="button" id="diaryToggle" aria-expanded="false" aria-controls="diary">
+      <span aria-hidden="true">📖</span> Tagebuch <span id="diaryCount">(0)</span>
+    </button>
     <button type="button" id="settingsToggle" aria-expanded="false" aria-controls="settings">
       <span aria-hidden="true">⚙</span> Verbindung &amp; Technik
     </button>
@@ -873,6 +996,8 @@
       danach werden sie verworfen. Wie alt ein Wert ist, steht in der Tabelle
       hinter dem Namen. Registerdaten und Schiffsfotos werden ebenfalls lokal
       gehalten, Fotos als Miniatur im Cache-Speicher des Browsers.
+      Das <strong>Tagebuch</strong> bleibt vom Leeren unberührt: Es ist kein
+      Zwischenspeicher, sondern von dir erfasst.
     </p>
 
     <div class="stats">
@@ -941,6 +1066,20 @@
   </section>
 </main>
 
+<aside class="panel" id="diary" aria-label="Schiff-Spotter-Tagebuch" aria-hidden="true">
+  <div class="settings-head">
+    <h2 style="margin:0">Schiff-Spotter-Tagebuch</h2>
+    <button type="button" id="diaryClose" title="Schließen">&times;</button>
+  </div>
+  <div class="diary-summary" id="diarySummary"></div>
+  <div class="diary-actions">
+    <button type="button" id="diaryExport">Exportieren</button>
+    <button type="button" id="diaryImport">Importieren</button>
+  </div>
+  <input type="file" id="diaryFile" accept="application/json,.json" />
+  <div id="diaryList"></div>
+</aside>
+
 <aside id="detail" aria-hidden="true">
   <div class="detail-head">
     <h3 id="detailTitle">&ndash;</h3>
@@ -953,6 +1092,7 @@
   <div id="detailMedia"></div>
   <div id="detailBody"></div>
   <div class="detail-actions">
+    <button type="button" id="detailDiary">Ins Tagebuch</button>
     <button type="button" id="detailCenter">Auf Karte zentrieren</button>
     <button type="button" id="detailTrack">Track anzeigen</button>
     <button type="button" id="detailLookup">Bei openwaters nachschlagen</button>
@@ -1196,6 +1336,9 @@
   var detailSub = document.getElementById("detailSub");
   var detailBody = document.getElementById("detailBody");
   var detailMedia = document.getElementById("detailMedia");
+  var diaryListEl = document.getElementById("diaryList");
+  var diarySummaryEl = document.getElementById("diarySummary");
+  var diaryCountEl = document.getElementById("diaryCount");
   var detailRaw = document.getElementById("detailRaw");
   var detailLinks = document.getElementById("detailLinks");
 
@@ -3095,6 +3238,395 @@
       .catch(function () { return 0; });
   }
 
+
+  /* --- Schiff-Spotter-Tagebuch ----------------------------------------- */
+
+  // Die erste Datenmenge in dieser App, die der Nutzer selbst erzeugt. Daraus
+  // folgt alles Weitere: Das Tagebuch ist KEIN Cache. Es verfaellt nicht, es
+  // wird von "Zwischenspeicher leeren" nicht angefasst, und bei Platzmangel
+  // wird es nicht gekuerzt, sondern gemeldet. Ein Cache darf seinen Bestand
+  // wegwerfen, hier waere derselbe Reflex Datenverlust.
+  var DIARY_KEY = "aisstream_diary";
+  var DIARY_VERSION = 1;
+  var DIARY_PHOTO_CACHE = "aisstream-diary-photos-v1";
+  // Felder des Schiffszustands, die eingefroren werden. Bewusst dieselben
+  // Namen wie im Live-Datensatz: Damit laufen shipTypeLabel(), typeCategory()
+  // und capacityEstimate() unveraendert auf dem gespeicherten Objekt, statt
+  // fertig formatierte Texte einzufrieren. Eine spaetere Verbesserung der
+  // Schaetzung wirkt so auch auf alte Eintraege.
+  var DIARY_SHIP_FIELDS = ["name", "callSign", "imo", "typeCode", "typeLabel",
+    "typeDetail", "size", "dim", "draught", "aisClass", "station", "inland",
+    "persons", "destination", "eta"];
+  var DIARY_ENRICH_FIELDS = ["typeLabel", "image", "imageCredit", "sources",
+    "gt", "nt", "loa", "beam", "built", "owner", "operator", "builder",
+    "flag", "homeport", "shipClass", "entity"];
+
+  var diary = [];
+  var diaryObjUrls = [];
+
+  function loadDiary() {
+    try {
+      var raw = localStorage.getItem(DIARY_KEY);
+      if (!raw) return;
+      var parsed = JSON.parse(raw);
+      // Eine unbekannte Version wird NICHT verworfen. Beim Cache ist das der
+      // richtige Reflex, hier waere es der Verlust von Sichtungen, die sich
+      // nicht wiederherstellen lassen.
+      var list = parsed && parsed.entries;
+      if (Object.prototype.toString.call(list) === "[object Array]") diary = list;
+    } catch (e) {}
+  }
+
+  function saveDiary() {
+    var payload = JSON.stringify({ v: DIARY_VERSION, entries: diary });
+    var written = false;
+    // Nur setItem im try: Stuende hier auch das Aufraeumen danach, gaelte
+    // jeder beliebige Fehler daraus als Platzproblem - derselbe Fehler, der
+    // den AIS-Cache einmal komplett geloescht hat.
+    try {
+      localStorage.setItem(DIARY_KEY, payload);
+      written = true;
+    } catch (e) {}
+    if (!written) {
+      // Erst den Platz zurueckholen, der ohnehin tot ist.
+      pruneEnrichCache(true);
+      try {
+        localStorage.setItem(DIARY_KEY, payload);
+        written = true;
+      } catch (e2) {}
+    }
+    if (!written) {
+      log("Tagebuch konnte nicht gespeichert werden - der lokale Speicher ist voll. " +
+        "Bitte exportieren und den Zwischenspeicher leeren.");
+    }
+    return written;
+  }
+
+  function diaryCountFor(mmsi) {
+    var n = 0, last = 0;
+    diary.forEach(function (s) {
+      if (s.mmsi !== String(mmsi)) return;
+      n++;
+      if (s.at > last) last = s.at;
+    });
+    return { count: n, last: last };
+  }
+
+  // Friert den Zustand ein. Das Schiff ist eine halbe Stunde spaeter aus
+  // `ships` verschwunden (pruneStaleShips), der Eintrag muss also fuer sich
+  // allein stehen koennen.
+  function addSighting(entry) {
+    if (!entry) return null;
+    var ship = {};
+    DIARY_SHIP_FIELDS.forEach(function (f) {
+      if (entry[f] != null && entry[f] !== "") ship[f] = entry[f];
+    });
+    if (entry.enrich) {
+      var reg = {};
+      DIARY_ENRICH_FIELDS.forEach(function (f) {
+        if (entry.enrich[f] != null && entry.enrich[f] !== "") reg[f] = entry.enrich[f];
+      });
+      if (Object.keys(reg).length) ship.enrich = reg;
+    }
+
+    var at = Date.now();
+    var sighting = { id: at + "-" + entry.mmsi, at: at, note: "", mmsi: entry.mmsi, ship: ship };
+
+    if (entry.lat != null) {
+      sighting.pos = { lat: entry.lat, lon: entry.lon, time: entry.time || null };
+      ["speed", "course", "heading", "navStatus"].forEach(function (f) {
+        if (entry[f] != null) sighting.pos[f] = entry[f];
+      });
+      if (ownPos) {
+        sighting.own = {
+          lat: ownPos.lat, lon: ownPos.lon,
+          km: haversineKm(ownPos.lat, ownPos.lon, entry.lat, entry.lon),
+          brg: bearingDeg(ownPos.lat, ownPos.lon, entry.lat, entry.lon)
+        };
+      }
+    }
+
+    diary.unshift(sighting);
+    saveDiary();
+    keepDiaryPhoto(ship.enrich && ship.enrich.image);
+    renderDiary();
+    log("Ins Tagebuch: " + (ship.name || "MMSI " + entry.mmsi) + ".");
+    return sighting;
+  }
+
+  function removeSighting(id) {
+    var gone = null;
+    diary = diary.filter(function (s) {
+      if (s.id !== id) return true;
+      gone = s;
+      return false;
+    });
+    if (!gone) return;
+    saveDiary();
+    dropDiaryPhoto(gone.ship && gone.ship.enrich && gone.ship.enrich.image);
+    renderDiary();
+    if (selectedMmsi && ships.has(selectedMmsi)) renderDetail(ships.get(selectedMmsi));
+  }
+
+  function setSightingNote(id, text) {
+    for (var i = 0; i < diary.length; i++) {
+      if (diary[i].id !== id) continue;
+      if (diary[i].note === text) return;
+      diary[i].note = text;
+      saveDiary();
+      return;
+    }
+  }
+
+  /* --- Fotos: eigener Topf, der nie beschnitten wird ------------------- */
+
+  // prunePhotoCache() wirft im normalen Bildspeicher alles ueber PHOTO_MAX
+  // weg. Ein Tagebuchfoto gehoert zu einem Eintrag, den der Nutzer behalten
+  // will - es bekommt deshalb einen eigenen Topf ohne Obergrenze.
+  function keepDiaryPhoto(url) {
+    if (!url || typeof caches === "undefined") return Promise.resolve();
+    return caches.open(DIARY_PHOTO_CACHE).then(function (target) {
+      return target.match(url).then(function (have) {
+        if (have) return null;
+        return caches.open(PHOTO_CACHE).then(function (src) {
+          return src.match(url);
+        }).then(function (hit) {
+          if (hit) return target.put(url, hit.clone());
+          return fetchWithTimeout(url, 15000).then(function (res) {
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            return target.put(url, res.clone());
+          });
+        });
+      });
+    }).catch(function () {});
+  }
+
+  function dropDiaryPhoto(url) {
+    if (!url || typeof caches === "undefined") return Promise.resolve();
+    // Dasselbe Schiff darf mehrfach im Tagebuch stehen - das Bild nur dann
+    // wegwerfen, wenn kein Eintrag mehr darauf zeigt.
+    var stillUsed = diary.some(function (s) {
+      return s.ship && s.ship.enrich && s.ship.enrich.image === url;
+    });
+    if (stillUsed) return Promise.resolve();
+    return caches.open(DIARY_PHOTO_CACHE)
+      .then(function (c) { return c.delete(url); })
+      .catch(function () {});
+  }
+
+  function diaryPhoto(url) {
+    if (!url) return Promise.resolve("");
+    if (typeof caches === "undefined") return Promise.resolve(url);
+    return caches.open(DIARY_PHOTO_CACHE).then(function (c) {
+      return c.match(url);
+    }).then(function (hit) {
+      if (hit) return hit.blob().then(function (b) { return URL.createObjectURL(b); });
+      return cachedPhoto(url);
+    }).catch(function () { return url; });
+  }
+
+  /* --- Anzeige --------------------------------------------------------- */
+
+  function releaseDiaryUrls() {
+    diaryObjUrls.forEach(function (u) {
+      try { URL.revokeObjectURL(u); } catch (e) {}
+    });
+    diaryObjUrls = [];
+  }
+
+  function stamp(ms) {
+    var d = new Date(ms);
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return p(d.getDate()) + "." + p(d.getMonth() + 1) + "." + d.getFullYear() +
+      " " + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+
+  function sightingFacts(s) {
+    var ship = s.ship || {};
+    var rows = [];
+    var typ = ship.typeDetail || ship.typeLabel || shipTypeLabel(ship.typeCode);
+    if (typ) rows.push("<b>" + esc(typ) + "</b>");
+    if (ship.size) rows.push(esc(ship.size) + " m");
+    if (ship.imo) rows.push("IMO " + esc(ship.imo));
+    if (ship.callSign) rows.push(esc(ship.callSign));
+    var out = rows.length ? "<div>" + rows.join(" · ") + "</div>" : "";
+
+    // Dieselbe Rechnung wie in der Detailansicht - inklusive Containerzahl.
+    var est = capacityEstimate(ship);
+    var cap = [];
+    if (est.sizeClass) cap.push(esc(est.sizeClass));
+    if (est.teu) cap.push("<b>" + esc(est.teu) + "</b>");
+    if (est.deadweight) cap.push("Tragfähigkeit ≈ " + esc(est.deadweight));
+    if (cap.length) out += "<div>" + cap.join(" · ") + "</div>";
+
+    if (s.pos) {
+      var fahrt = [s.pos.lat.toFixed(4) + ", " + s.pos.lon.toFixed(4)];
+      if (s.pos.speed != null) fahrt.push(s.pos.speed.toFixed(1) + " kn");
+      if (s.pos.course != null) {
+        fahrt.push(s.pos.course.toFixed(0) + "° " + compass(s.pos.course));
+      }
+      if (s.pos.navStatus != null) {
+        var st = navStatusLabel(s.pos.navStatus);
+        if (st) fahrt.push(esc(st));
+      }
+      out += "<div>" + fahrt.join(" · ") + "</div>";
+    }
+    if (ship.destination) out += "<div>Ziel: " + esc(ship.destination) + "</div>";
+    if (s.own && s.own.km != null) {
+      out += "<div>" + esc(formatKm(s.own.km)) + " · " +
+        s.own.brg.toFixed(0) + "° (" + compass(s.own.brg) + ") von deinem Standort</div>";
+    }
+    return out;
+  }
+
+  function renderDiary() {
+    if (!diaryListEl) return;
+    releaseDiaryUrls();
+    diaryCountEl.textContent = "(" + diary.length + ")";
+
+    var schiffe = {};
+    diary.forEach(function (s) { schiffe[s.mmsi] = 1; });
+    var aeltester = diary.length ? diary[diary.length - 1].at : 0;
+    diarySummaryEl.textContent = diary.length
+      ? diary.length + (diary.length === 1 ? " Sichtung" : " Sichtungen") + " · " +
+        Object.keys(schiffe).length + " verschiedene Schiffe · erste am " + stamp(aeltester)
+      : "";
+
+    if (!diary.length) {
+      diaryListEl.innerHTML = '<div class="diary-empty">Noch keine Sichtung eingetragen.<br />' +
+        'Ein Schiff in der Tabelle oder auf der Karte anklicken und in der ' +
+        'Detailansicht auf „Ins Tagebuch" tippen. Die Angaben werden mit dem ' +
+        'Zeitpunkt der Sichtung eingefroren und bleiben erhalten, auch wenn das ' +
+        'Schiff längst aus der Live-Ansicht verschwunden ist.</div>';
+      return;
+    }
+
+    diaryListEl.innerHTML = "";
+    diary.forEach(function (s) {
+      var ship = s.ship || {};
+      var info = decodeMmsi(s.mmsi) || {};
+      var cat = typeCategory(ship);
+      var el = document.createElement("div");
+      el.className = "diary-entry";
+      el.dataset.id = s.id;
+      el.innerHTML =
+        '<div class="head"><span class="ship"><span class="row-dot" style="background:' +
+          (cat ? TYPE_COLOR_MAP[cat] : NEUTRAL_COLOR) + '"></span>' +
+          (info.flag ? '<span class="flag">' + info.flag + "</span> " : "") +
+          esc(ship.name || "MMSI " + s.mmsi) + "</span>" +
+          '<span class="when">' + esc(stamp(s.at)) + "<br />" + esc(relativeTime(s.at)) + "</span></div>" +
+        '<div class="facts">' + sightingFacts(s) + "</div>" +
+        '<div class="media"></div>' +
+        '<textarea rows="1" placeholder="Notiz (optional)">' + esc(s.note || "") + "</textarea>" +
+        '<div class="row-end"><button type="button" class="del">Löschen</button></div>';
+
+      var bild = ship.enrich && ship.enrich.image;
+      if (bild) {
+        diaryPhoto(bild).then(function (src) {
+          if (!src || !el.isConnected) return;
+          if (src.slice(0, 5) === "blob:") diaryObjUrls.push(src);
+          el.querySelector(".media").innerHTML = '<img src="' + esc(src) + '" alt="" />';
+        });
+      }
+
+      var note = el.querySelector("textarea");
+      // Mitwachsen statt scrollen: Auf dem Telefon ist der Ziehgriff einer
+      // textarea kaum zu treffen, und eine zweizeilige Notiz war abgeschnitten.
+      var autoGrow = function () {
+        note.style.height = "auto";
+        note.style.height = Math.max(note.scrollHeight, 34) + "px";
+      };
+      note.addEventListener("input", autoGrow);
+      note.addEventListener("change", function () { setSightingNote(s.id, note.value); });
+      note.addEventListener("blur", function () { setSightingNote(s.id, note.value); });
+
+      // Zweistufig statt confirm(): Eine Sichtung laesst sich nicht
+      // wiederherstellen, ein Fehlgriff auf dem Telefon aber leicht tun.
+      var del = el.querySelector(".del");
+      var timer = null;
+      del.addEventListener("click", function () {
+        if (del.classList.contains("armed")) {
+          clearTimeout(timer);
+          removeSighting(s.id);
+          return;
+        }
+        del.classList.add("armed");
+        del.textContent = "Wirklich?";
+        timer = setTimeout(function () {
+          del.classList.remove("armed");
+          del.textContent = "Löschen";
+        }, 4000);
+      });
+
+      diaryListEl.appendChild(el);
+      // Erst im Dokument liefert scrollHeight einen brauchbaren Wert.
+      autoGrow();
+    });
+  }
+
+  /* --- Export / Import -------------------------------------------------- */
+
+  function exportDiary() {
+    if (!diary.length) { log("Das Tagebuch ist leer - nichts zu exportieren."); return; }
+    var d = new Date();
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    var name = "schiff-spotter-tagebuch-" + d.getFullYear() + "-" +
+      p(d.getMonth() + 1) + "-" + p(d.getDate()) + ".json";
+    // Fotos stecken bewusst NICHT in der Datei, nur ihre URLs - sonst waere
+    // sie um Groessenordnungen groesser. Nach dem Import wird ein Bild bei
+    // Bedarf neu geladen.
+    var blob = new Blob([JSON.stringify({ v: DIARY_VERSION, entries: diary }, null, 2)],
+      { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    log(diary.length + " Sichtung(en) als " + name + " exportiert.");
+  }
+
+  function importDiary(text) {
+    var parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      log("Import abgebrochen: Die Datei ist kein gültiges JSON.");
+      return;
+    }
+    var list = parsed && parsed.entries;
+    if (Object.prototype.toString.call(list) !== "[object Array]") {
+      log("Import abgebrochen: Die Datei enthält kein Tagebuch.");
+      return;
+    }
+    var bekannt = {};
+    diary.forEach(function (s) { bekannt[s.id] = 1; });
+    var neu = 0, doppelt = 0, unbrauchbar = 0;
+    list.forEach(function (s) {
+      if (!s || !s.id || !s.mmsi || !s.at) { unbrauchbar++; return; }
+      if (bekannt[s.id]) { doppelt++; return; }
+      bekannt[s.id] = 1;
+      diary.push(s);
+      neu++;
+    });
+    if (!neu) {
+      log("Import: nichts Neues dabei (" + doppelt + " bereits vorhanden" +
+        (unbrauchbar ? ", " + unbrauchbar + " unbrauchbar" : "") + ").");
+      return;
+    }
+    diary.sort(function (a, b) { return b.at - a.at; });
+    saveDiary();
+    diary.forEach(function (s) {
+      keepDiaryPhoto(s.ship && s.ship.enrich && s.ship.enrich.image);
+    });
+    renderDiary();
+    log("Import: " + neu + " Sichtung(en) übernommen" +
+      (doppelt ? ", " + doppelt + " waren schon da" : "") +
+      (unbrauchbar ? ", " + unbrauchbar + " unbrauchbar" : "") + ".");
+  }
+
   /* --- Anreicherung aus Schiffsregistern ------------------------------ */
 
   // Two keyless, CORS-enabled sources, queried in a chain: Digitraffic
@@ -3828,11 +4360,18 @@
     var stale = entry.updatedAt && (Date.now() - entry.updatedAt) > STALE_AFTER_MS;
 
     detailTitle.textContent = displayName(entry);
+    // Hinweis, wenn das Schiff schon im Tagebuch steht: Ohne den erzeugt ein
+    // zweiter Klick unbemerkt einen zweiten Eintrag.
+    var imTagebuch = diaryCountFor(entry.mmsi);
     detailSub.innerHTML =
       '<span class="badge ' + (stale ? "stale" : "live") + '">' +
       (stale ? "veraltet" : "aktuell") + "</span> " +
       esc(info.flag + " " + (info.country || "")) + " &middot; " +
-      esc(entry.station || (entry.aisClass ? "AIS-Klasse " + entry.aisClass : info.category));
+      esc(entry.station || (entry.aisClass ? "AIS-Klasse " + entry.aisClass : info.category)) +
+      (imTagebuch.count
+        ? ' &middot; <span class="badge">📖 ' + imTagebuch.count + "&times; im Tagebuch, zuletzt " +
+          esc(relativeTime(imTagebuch.last)) + "</span>"
+        : "");
 
     var counts = Object.keys(entry.counts).sort().map(function (k) {
       return k + ": " + entry.counts[k];
@@ -4322,30 +4861,111 @@
   /* --- Einstellungs-Schublade (nur auf schmalen Displays sichtbar) ----- */
 
   var settingsEl = document.getElementById("settings");
+  // Hoehe der Kopfzeile als CSS-Variable: Die Detailleiste braucht sie, um
+  // ihren Inhalt darunter beginnen zu lassen. Sie aendert sich mit der
+  // Breite (umbrechende Knoepfe) und bei Drehung des Geraets.
+  function measureHeader() {
+    var head = document.querySelector("header");
+    if (!head) return;
+    document.documentElement.style.setProperty("--head-h", head.offsetHeight + "px");
+  }
+  measureHeader();
+  window.addEventListener("resize", measureHeader);
+  window.addEventListener("orientationchange", measureHeader);
+
   var settingsToggle = document.getElementById("settingsToggle");
   var settingsBackdrop = document.getElementById("settingsBackdrop");
+  var diaryEl = document.getElementById("diary");
+  var diaryToggle = document.getElementById("diaryToggle");
 
-  function setSettingsOpen(open) {
-    settingsEl.classList.toggle("open", open);
-    settingsBackdrop.hidden = !open;
-    settingsToggle.setAttribute("aria-expanded", open ? "true" : "false");
-    // Hintergrund nicht mitscrollen lassen, solange die Schublade offen ist.
-    document.body.style.overflow = open ? "hidden" : "";
-    if (open) settingsEl.scrollTop = 0;
+  // Zwei Schubladen, ein Abdunkler. Beide gleichzeitig offen zu lassen waere
+  // der Fehler: Das Schliessen der einen nimmt dann den Hintergrund unter der
+  // anderen weg. Deshalb schliesst das Oeffnen der einen immer die andere.
+  //
+  // "immer" unterscheidet die beiden: Das Tagebuch ist auf jeder Breite eine
+  // Schublade, die Technik erst unter 1024px - darueber ist sie eine ganz
+  // normale Spalte. Ohne diese Unterscheidung legte sich der Abdunkler am
+  // Desktop ueber genau die Spalte, die er freigeben soll.
+  var DRAWERS = [
+    { el: settingsEl, toggle: settingsToggle, immer: false },
+    { el: diaryEl, toggle: diaryToggle, immer: true }
+  ];
+
+  function istSchublade(d) {
+    return d.immer || window.innerWidth <= 1024;
   }
 
+  function setDrawerOpen(el, open) {
+    DRAWERS.forEach(function (d) {
+      var soll = d.el === el ? open : false;
+      d.el.classList.toggle("open", soll);
+      d.el.setAttribute("aria-hidden", soll ? "false" : "true");
+      if (d.toggle) d.toggle.setAttribute("aria-expanded", soll ? "true" : "false");
+      if (soll) d.el.scrollTop = 0;
+    });
+    var verdeckt = DRAWERS.some(function (d) {
+      return d.el.classList.contains("open") && istSchublade(d);
+    });
+    settingsBackdrop.hidden = !verdeckt;
+    // Hintergrund nicht mitscrollen lassen, solange eine Schublade offen ist.
+    document.body.style.overflow = verdeckt ? "hidden" : "";
+    if (el === diaryEl && open) renderDiary();
+    if (el === diaryEl && !open) releaseDiaryUrls();
+  }
+
+  function setSettingsOpen(open) { setDrawerOpen(settingsEl, open); }
+
   settingsToggle.addEventListener("click", function () {
-    setSettingsOpen(!settingsEl.classList.contains("open"));
+    setDrawerOpen(settingsEl, !settingsEl.classList.contains("open"));
   });
   document.getElementById("settingsClose").addEventListener("click", function () {
-    setSettingsOpen(false);
+    setDrawerOpen(settingsEl, false);
   });
-  settingsBackdrop.addEventListener("click", function () { setSettingsOpen(false); });
+  diaryToggle.addEventListener("click", function () {
+    setDrawerOpen(diaryEl, !diaryEl.classList.contains("open"));
+  });
+  document.getElementById("diaryClose").addEventListener("click", function () {
+    setDrawerOpen(diaryEl, false);
+  });
+  settingsBackdrop.addEventListener("click", function () {
+    DRAWERS.forEach(function (d) { setDrawerOpen(d.el, false); });
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    DRAWERS.forEach(function (d) {
+      if (d.el.classList.contains("open")) setDrawerOpen(d.el, false);
+    });
+  });
 
   // Wechselt das Gerät zurück auf die Breitdarstellung, muss der
-  // Sperrzustand weg - sonst bleibt die Seite unscrollbar.
+  // Sperrzustand weg - sonst bleibt die Seite unscrollbar. Das Tagebuch ist
+  // auf jeder Breite eine Schublade und bleibt davon unberührt.
   window.addEventListener("resize", function () {
-    if (window.innerWidth > 1024 && settingsEl.classList.contains("open")) setSettingsOpen(false);
+    if (window.innerWidth > 1024 && settingsEl.classList.contains("open")) {
+      setDrawerOpen(settingsEl, false);
+    }
+  });
+
+  document.getElementById("detailDiary").addEventListener("click", function () {
+    var entry = selectedMmsi && ships.get(selectedMmsi);
+    if (!entry) return;
+    addSighting(entry);
+    renderDetail(entry);
+  });
+
+  document.getElementById("diaryExport").addEventListener("click", exportDiary);
+  document.getElementById("diaryImport").addEventListener("click", function () {
+    document.getElementById("diaryFile").click();
+  });
+  document.getElementById("diaryFile").addEventListener("change", function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () { importDiary(String(reader.result)); };
+    reader.onerror = function () { log("Import: Datei konnte nicht gelesen werden."); };
+    reader.readAsText(file);
+    // Zuruecksetzen, sonst loest dieselbe Datei kein zweites change-Ereignis aus.
+    e.target.value = "";
   });
 
   // Leaflet kennt die Kartenhöhe erst nach dem Layout; bei vh-Höhen und
@@ -4439,6 +5059,11 @@
   // Ganz bewusst hier unten und nicht oben bei den anderen Cache-Aufrufen:
   // loadAisCache legt ueber setPosition Marker an und braucht damit alles,
   // was weiter oben per var initialisiert wird (TYPE_COLORS, Filter, ...).
+  // Muss nach den var-Initialisierungen stehen: renderDiary() greift auf
+  // TYPE_COLOR_MAP und decodeMmsi zu.
+  loadDiary();
+  renderDiary();
+
   // Vor dem Wiederherstellen aufraeumen: schafft Platz fuer den AIS-Cache,
   // bevor der erste Speichervorgang gegen ein volles Kontingent laeuft.
   var enrichDropped = pruneEnrichCache(false);
