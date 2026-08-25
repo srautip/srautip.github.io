@@ -1148,6 +1148,7 @@ zuerst, Technik weg.**
 | Breite | Verhalten |
 |---|---|
 | jede | Einspaltig, Technik als Schublade von rechts |
+| ≥ 900 px | Die Detailsicht ist eine **Spalte**, kein Overlay (s. u.) |
 | ≤ 1024 px (iPad hoch, iPhone quer) | Zusätzlich: Karte 42 vh, Tabelle ohne Höhendeckel |
 | ≤ 700 px (iPhone) | Zusätzlich: Tabelle als Kartenliste, Filterleiste als Scrollzeilen, Schublade voll breit, Karte 38 vh |
 
@@ -1173,6 +1174,98 @@ einziges Schiff sichtbar wurde. Jetzt hängt es hinter dem Knopf
 „Verbindung & Technik" in der Kopfzeile (`#settings`, Schließen per Kreuz,
 `Esc` oder Tipp daneben; auf dem Telefon voll breit, weil bei 92 vw nur
 32 px Hintergrund übrig blieben — als Tippziel unbrauchbar).
+
+### Detailsicht ab 900 px: Spalte statt Overlay
+
+Gemeldet: *„Auf dem iPad in Queransicht funktioniert die Selektion eines
+anderen Schiffes in der Karte nicht, wenn schon die Detailsicht zu einem
+Schiff geöffnet ist."*
+
+**Was es *nicht* war** — beides nachgemessen, bevor irgendetwas geändert
+wurde:
+
+- *Verdeckte Marker.* Im geprüften Ausschnitt lag `ship-mark` ganz oben,
+  `elementFromPoint` bestätigt es.
+- *Tipptoleranz.* Mit echten Touch-Ereignissen über CDP liegt die
+  Driftschwelle bei **~13 px — mit und ohne offene Leiste identisch**. Ein
+  erster Lauf hatte 16 px gegen 20 px gemeldet und sah nach einem Befund aus.
+  Erst drei Wiederholungen je Schritt zeigten, dass das Rauschen war.
+  **Merke: eine einzelne Driftmessung ist keine Messung.**
+
+**Es war schlicht Fläche.** `#detail` ist 380 px breit und lag als Overlay
+über der Karte, von der Kopfzeile bis zum Seitenende:
+
+| Gerät | Karte | Leiste verdeckt | Legende | zusammen |
+|---|---|---|---|---|
+| iPad Mini quer (1024) | 992 × 323 | 37 % | 14 % | **51 %** |
+| iPad Pro 11 quer (1194) | 1146 × 420 | 31 % | 14 % | **45 %** |
+| Desktop 1440 | 1392 × 420 | 26 % | 11 % | 37 % |
+
+Auf dem iPad quer war also rund die halbe sichtbare Karte nicht antippbar,
+sobald ein Schiff offen war. Nebenbei lagen auch die rechten Tabellenspalten
+darunter.
+
+**Jetzt:** Ab 900 px hält `main` den Platz frei, statt ihn herzugeben.
+
+- `--detail-breite: 380px` steht einmal in `:root`; `#detail` und die
+  Media Query benutzen dieselbe Zahl. Liefen die beiden auseinander, bliebe
+  genau der Streifen verdeckt, um den es geht.
+- `main { padding-right: calc(1.5rem + var(--detail-w, 0px)) }`,
+  `@media (min-width: 900px) { body.detail-spalte { --detail-w: … } }`.
+- `updateScrollLock()` heißt jetzt `updateBodyState()` und **leitet** die
+  Klasse `detail-spalte` aus dem tatsächlichen Zustand ab, wie schon die
+  Scroll-Sperre. `openDetail()`/`closeDetail()` setzen sie nicht selbst —
+  sonst wiederholt sich der alte Fehler, dass das Schließen einer Schublade
+  eine Sperre wegnimmt, die noch jemand anders braucht. Der alte Name bleibt
+  als einzeiliger Weiterleiter stehen.
+
+**Warum 900 und nicht 1025:** Der schlimmste Fall ist ausgerechnet das iPad
+**Mini** quer mit 1024 px. Eine Grenze darüber hätte genau ihn ausgelassen.
+Bei 900 px bleiben nach Abzug der Leiste noch ≥ 520 px Karte (gemessen:
+612 px auf dem Mini). iPad hochkant (768/834) bleibt bewusst Overlay, dort
+blieben sonst unter 460 px übrig.
+
+#### Zwei Stellen, die der Test gefunden hat und Nachdenken nicht
+
+- **`@media (max-width: 1024px) { main { padding: 0.75rem 1rem 2rem } }`
+  überschrieb die Kurzform komplett** und nahm den freigehaltenen Platz
+  wieder weg — bei *genau* 1024 px, also beim iPad Mini quer, dem Fall, um
+  den es ging. Die Regel trägt den `--detail-w`-Anteil jetzt mit. Wer eine
+  weitere `padding`-Kurzform für `main` schreibt, muss ihn ebenfalls
+  mitnehmen.
+- **`map.invalidateSize()` braucht das Panning (Leaflet-Standard),
+  `{pan: false}` reicht nicht.** Gemessen am gemeldeten Fall: Schiff B lag
+  bei x = 871, die geschrumpfte Karte endet bei x = 790. Mit Panning bleibt
+  der geografische Mittelpunkt, der Inhalt rückt 190 px nach links, B landet
+  bei x = 681 und ist antippbar. Mit `{pan: false}` bleibt B bei 871 —
+  außerhalb der Karte, und der Test meldet wieder den ursprünglichen Fehler.
+  Der Aufruf kommt **nach** der 0,18-s-Einblendung (`setTimeout` 220 ms),
+  sonst misst er die Zwischengröße; und nur beim Öffnen und Schließen, nicht
+  in `renderDetail()`, das bei jeder Nachricht läuft.
+
+`invalidateSize()` feuert `moveend`, und daran hängen `sendSubscription()`,
+`maybeLoadSnapshot()` und `refreshVisibleShips()`. Das ist richtig, der
+Ausschnitt ändert sich ja wirklich — und die Abdeckungsprüfung in
+`maybeLoadSnapshot()` erkennt den *kleineren* Ausschnitt als bereits gedeckt:
+zehnmal öffnen und schließen ergibt **0 zusätzliche Snapshot-Anfragen**
+(gemessen, auf allen vier Profilen).
+
+#### Testfalle: `td.c-time` ist der falsche Maßstab
+
+Die Prüfung „liegt die rechte Tabellenspalte links von der Leiste?" schlug
+zunächst überall fehl, auch am Desktop mit reichlich Platz. `.table-wrap` hat
+`overflow: auto` — die Zelle ragt als *Layoutkasten* weit über den sichtbaren
+Rand hinaus und wird dort abgeschnitten. Gemessen gehört der sichtbare
+Kasten (`.table-wrap`), plus eine `elementFromPoint`-Kontrolle direkt hinter
+der Leistenkante.
+
+`scratchpad/detailspalte.js` sucht Schiff B nicht auf einer festen Koordinate,
+sondern **kalibriert sich selbst**: zwei Marker messen, daraus Pixel je Grad
+ableiten, dann B in den Streifen setzen, den die Leiste belegt. So läuft der
+Test bei jedem Zoom und auf jedem Gerät. Gegenprobe per
+`addStyleTag('body.detail-spalte { --detail-w: 0px !important }')` — das
+stellt exakt das alte Overlay wieder her, und Probe 1 meldet dann den
+gemeldeten Fehler.
 
 ### Tabelle → Kartenliste, ohne zweiten Render-Pfad
 

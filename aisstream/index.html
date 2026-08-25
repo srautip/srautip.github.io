@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <style>
   :root {
+    --detail-breite: 380px;
     --bg: #0f1420;
     --panel: #171e2e;
     --panel-2: #1e2740;
@@ -76,7 +77,13 @@
        ueberall hinter dem Knopf "Verbindung & Technik", wie auf dem iPhone. */
     grid-template-columns: 1fr;
     gap: 1rem;
-    padding: 1rem 1.5rem 2rem;
+    /* --detail-w ist normalerweise 0. Ab 900px Breite setzt die Media Query
+       weiter unten die Leistenbreite ein, sobald ein Schiff offen ist: Karte
+       und Tabelle schrumpfen dann, statt von der Leiste VERDECKT zu werden.
+       Gemeldet als "auf dem iPad quer laesst sich kein anderes Schiff
+       anwaehlen" - gemessen lagen dort 37 % der Karte hinter der Leiste. */
+    padding: 1rem calc(1.5rem + var(--detail-w, 0px)) 2rem 1.5rem;
+    transition: padding-right 0.18s ease;
   }
   /* Ohne min-width:0 waechst ein Grid-Kind auf die Mindestbreite seines
      Inhalts - die 13-spaltige Tabelle hat das Dokument auf 1678px
@@ -255,7 +262,10 @@
     top: var(--head-h, 64px);
     bottom: 0;
     right: 0;
-    width: 380px;
+    /* Dieselbe Zahl wie der Platz, den main freihaelt - sie steht deshalb nur
+       einmal (--detail-breite). Liefen die beiden auseinander, bliebe genau
+       der Streifen verdeckt, um den es hier geht. */
+    width: var(--detail-breite, 380px);
     max-width: 100%;
     background: var(--panel);
     border-left: 1px solid var(--border);
@@ -373,6 +383,15 @@
     white-space: pre-wrap;
     word-break: break-all;
     color: var(--muted);
+  }
+  /* Ab dieser Breite ist die Detailsicht eine SPALTE statt eines Overlays.
+     900 px, nicht 1025: Der schlimmste gemessene Fall war ausgerechnet das
+     iPad Mini quer mit 1024 px (51 % der Karte verdeckt) - eine Grenze
+     darueber haette genau ihn ausgelassen. Nach Abzug der Leiste bleiben hier
+     noch mindestens 520 px Karte. iPad hochkant (768/834) bleibt bewusst
+     Overlay, dort blieben sonst unter 460 px uebrig. */
+  @media (min-width: 900px) {
+    body.detail-spalte { --detail-w: var(--detail-breite, 380px); }
   }
   @media (max-width: 640px) {
     #detail { width: 100%; }
@@ -809,7 +828,12 @@
   @media (max-width: 1024px) {
     header { padding: 0.85rem 1rem; }
     header h1 { font-size: 1rem; }
-    main { padding: 0.75rem 1rem 2rem; }
+    /* Der --detail-w-Anteil muss hier mit: Diese Regel greift bei GENAU
+       1024 px - dem iPad Mini quer, dem schlimmsten gemessenen Fall (51 %
+       der Karte verdeckt). Ein schlichtes "padding: 0.75rem 1rem 2rem"
+       ueberschreibt die Kurzform komplett und nimmt den freigehaltenen
+       Platz wieder weg. Genau das hat der Test gemeldet. */
+    main { padding: 0.75rem calc(1rem + var(--detail-w, 0px)) 2rem 1rem; }
     #map { height: 42vh; min-height: 260px; }
     .table-wrap { max-height: none; }
   }
@@ -5245,7 +5269,8 @@
     detailEl.classList.add("open");
     detailEl.setAttribute("aria-hidden", "false");
     detailEl.scrollTop = 0;
-    updateScrollLock();
+    updateBodyState();
+    kartengroesseNachziehen();
     renderDetail(ships.get(mmsi));
     refreshVisibleShips();
     if (autoEnrichInput.checked) enrichShip(mmsi, false);
@@ -5257,7 +5282,8 @@
     markiereAuswahl(vorher);
     detailEl.classList.remove("open");
     detailEl.setAttribute("aria-hidden", "true");
-    updateScrollLock();
+    updateBodyState();
+    kartengroesseNachziehen();
     if (trackLayer) { map.removeLayer(trackLayer); trackLayer = null; }
     refreshVisibleShips();
   }
@@ -5579,16 +5605,40 @@
   // obwohl darunter noch die Detailleiste offen stand.
   // Die 640px sind dieselbe Grenze, ab der #detail die Seite voll verdeckt -
   // am Desktop soll der Hintergrund weiter scrollen.
-  function updateScrollLock() {
+  // Leitet den Zustand des <body> aus dem tatsaechlichen Zustand AB, statt ihn
+  // zu setzen. Beides hier, weil beides denselben Besitzer braucht: Wuerde
+  // openDetail()/closeDetail() direkt schreiben, naehme das Schliessen einer
+  // Schublade eine Sperre weg, die noch jemand anders braucht - genau der
+  // Fehler, den die Scroll-Sperre schon einmal hatte.
+  function updateBodyState() {
     // DRAWERS wird erst im Verdrahtungsblock am Ende gesetzt; openDetail()
     // steht weiter oben. Ohne den Waechter waere das die naechste Auflage der
     // Ladereihenfolge-Falle.
     var offeneSchublade = typeof DRAWERS !== "undefined" && DRAWERS
       ? DRAWERS.some(function (d) { return d.el.classList.contains("open"); })
       : false;
-    var sperrt = offeneSchublade ||
-      (detailEl.classList.contains("open") && window.innerWidth <= 640);
+    var detailOffen = detailEl.classList.contains("open");
+    var sperrt = offeneSchublade || (detailOffen && window.innerWidth <= 640);
     document.body.style.overflow = sperrt ? "hidden" : "";
+    // Die Klasse allein schaltet nichts - erst die Media Query ab 900 px macht
+    // daraus die Spaltenbreite. Darunter bleibt die Leiste ein Overlay.
+    document.body.classList.toggle("detail-spalte", detailOffen);
+  }
+
+  // Alter Name, damit vorhandene Aufrufer weiterlaufen.
+  function updateScrollLock() { updateBodyState(); }
+
+  // Leaflet rechnet sonst weiter mit der alten Breite: Die Marker saessen an
+  // falschen Bildschirmpunkten und Klicks gingen ins Leere. Erst NACH der
+  // 0,18-s-Einblendung messen, sonst trifft es die Zwischengroesse.
+  // Mit Panning (Leaflet-Standard): Der geografische Mittelpunkt bleibt, die
+  // Karte rueckt nach - Schiffe, die vorher hinter der Leiste lagen, kommen
+  // dadurch ins Bild. Mit {pan:false} fielen sie stattdessen ganz heraus.
+  var spaltenTimer = null;
+  function kartengroesseNachziehen() {
+    if (!mapAvailable) return;
+    clearTimeout(spaltenTimer);
+    spaltenTimer = setTimeout(function () { map.invalidateSize(); }, 220);
   }
 
   function setSettingsOpen(open) { setDrawerOpen(settingsEl, open); }
