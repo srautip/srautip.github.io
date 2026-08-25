@@ -1064,6 +1064,16 @@
       sonst wird es beim Laden übersprungen, ohne zu stören.
     </p>
 
+    <h2 style="margin-top:1.2rem">Laufend auffrischen</h2>
+    <div class="checkboxes">
+      <label><input type="checkbox" id="autoRefresh" checked /> Snapshot alle 60 s neu holen</label>
+    </div>
+    <p class="hint" style="margin-top:0.35rem">
+      Hält die Karte auch <b>ohne API-Key</b> lebendig. Gemessen ändern in 60 s rund
+      <b>46 %</b> der Schiffe ihre Position (10 s: 10 %, 120 s: 64 %). Pausiert, solange
+      der Tab im Hintergrund liegt, und bei sehr weit herausgezoomter Karte.
+    </p>
+
     <h2 style="margin-top:1.2rem">Schiffsregister</h2>
     <div class="checkboxes">
       <label><input type="checkbox" id="autoEnrich" checked /> Beim Öffnen eines Schiffs automatisch abfragen</label>
@@ -1431,6 +1441,7 @@
   var showLabelsInput = document.getElementById("showLabels");
   var ownPosInput = document.getElementById("ownPos");
   var autoSnapshotInput = document.getElementById("autoSnapshot");
+  var autoRefreshInput = document.getElementById("autoRefresh");
   var autoConnectInput = document.getElementById("autoConnect");
   var staticCacheCountEl = document.getElementById("staticCacheCount");
   var aisCacheCountEl = document.getElementById("aisCacheCount");
@@ -1460,6 +1471,7 @@
   if (localStorage.getItem("aisstream_show_labels") === "0") showLabelsInput.checked = false;
   if (localStorage.getItem("aisstream_own_pos") === "0") ownPosInput.checked = false;
   if (localStorage.getItem("aisstream_auto_snapshot") === "0") autoSnapshotInput.checked = false;
+  if (localStorage.getItem("aisstream_auto_refresh") === "0") autoRefreshInput.checked = false;
   if (localStorage.getItem("aisstream_auto_connect") === "0") autoConnectInput.checked = false;
 
   // Server URLs shipped as the default in a previous version - if that's
@@ -1507,11 +1519,17 @@
     });
   }
 
+  // Der Log wuchs unbegrenzt. In einer langen Sitzung ist das ein stiller
+  // Speicherfresser, und mit dem 60-s-Takt kaeme es sicher dazu. Aeltestes
+  // zuerst raus - oben steht ohnehin nur der Verbindungsaufbau.
+  var LOG_MAX = 400;
+
   function log(msg) {
     var line = document.createElement("div");
     var t = new Date().toLocaleTimeString();
     line.textContent = "[" + t + "] " + msg;
     logEl.appendChild(line);
+    while (logEl.childElementCount > LOG_MAX) logEl.removeChild(logEl.firstChild);
     logEl.scrollTop = logEl.scrollHeight;
   }
 
@@ -4460,6 +4478,12 @@
   var snapshotCtrl = null;
   var SNAPSHOT_TIMEOUT_MS = 15000;
   var snapshotAutoOffLogged = false;
+  // Laufendes Auffrischen. 60 s ist ein Kompromiss, kein technischer Takt:
+  // Stromaufwaerts laufen die Daten kontinuierlich nach, gemessen aendern in
+  // 10 s rund 10 % der Schiffe ihre Position, in 30 s 30 %, in 60 s 46 % und
+  // in 120 s 64 %. Schneller zu fragen holt also wenig und kostet viel.
+  var SNAPSHOT_REFRESH_MS = 60000;
+  var snapshotTickFehler = false;
 
   function boxCovers(outer, inner) {
     return !!outer && !!inner &&
@@ -4518,9 +4542,13 @@
     return true;
   }
 
-  // `auto` = vom Kartenschwenk ausgeloest: knapperes Log, und ein Abbruch
-  // durch den naechsten Schwenk ist keine Fehlermeldung wert.
-  function loadSnapshot(auto) {
+  // Drei Auslöser, drei Lautstaerken:
+  //   "knopf" (oder nichts) - der Nutzer hat gefragt, also volle Auskunft
+  //   "schwenk"             - eine Zeile, sonst floetet jeder Schwenk zweimal
+  //   "takt"                - schweigt; 1440 Zeilen am Tag waeren kein Log mehr
+  function loadSnapshot(modus) {
+    var leise = modus === "schwenk" || modus === "takt";
+    var stumm = modus === "takt";
     var base = vesselsApiBase();
     if (!base) {
       log("Snapshot gibt es nur für openwaters-Server (/v1/vessels). Aktuelle Server-URL passt nicht.");
@@ -4549,7 +4577,7 @@
     var frist = ctrl ? setTimeout(function () { ctrl.abort(); }, SNAPSHOT_TIMEOUT_MS) : null;
 
     snapshotBtn.disabled = true;
-    if (!auto) log("Lade Snapshot: BBox " + boxLabel(box) + "…");
+    if (!leise) log("Lade Snapshot: BBox " + boxLabel(box) + "…");
     fetch(url, ctrl ? { signal: ctrl.signal } : undefined)
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
@@ -4570,7 +4598,10 @@
         snapshotBox = box;
         snapshotAt = Date.now();
         refreshVisibleShips();
-        if (auto) {
+        // Nach einem Erfolg darf ein spaeterer Fehler wieder gemeldet werden.
+        snapshotTickFehler = false;
+        if (stumm) return;
+        if (leise) {
           log("Snapshot zum neuen Ausschnitt: " + inView + " von " + added +
             " Schiffen im Bild (" + ships.size + " MMSIs bekannt).");
           return;
@@ -4589,6 +4620,15 @@
         // Ein Abbruch ist die Regel, nicht der Fehlerfall: Er bedeutet, dass
         // der Nutzer weitergeschwenkt hat.
         if (e && e.name === "AbortError") return;
+        // Ein dauerhaft gestoerter Takt darf den Log nicht minutenweise
+        // zumauern - einmal melden, dann bis zum naechsten Erfolg schweigen.
+        if (stumm) {
+          if (snapshotTickFehler) return;
+          snapshotTickFehler = true;
+          log("Auffrischen fehlgeschlagen: " + e.message +
+            " – der Takt läuft weiter, meldet sich aber erst wieder bei Erfolg.");
+          return;
+        }
         log("Snapshot fehlgeschlagen: " + e.message);
       })
       .finally(function () {
@@ -4625,7 +4665,40 @@
     // Der 50-km-Rand der letzten Abfrage deckt kleine Schwenke ab.
     if (boxCovers(snapshotBox, sicht) && Date.now() - snapshotAt < SNAPSHOT_MAX_AGE_MS) return;
 
-    loadSnapshot(true);
+    loadSnapshot("schwenk");
+  }
+
+  // Dieselben Ausstiege wie beim Schwenk, ohne den Abdeckungstest: Genau die
+  // schon abgedeckte Box soll ja aufgefrischt werden. Begrenzt wird der Takt
+  // durch sein Intervall, nicht durch die Abdeckung.
+  function snapshotTauglich() {
+    if (!vesselsApiBase()) return null;
+    if (!mapAvailable) return null;
+    var b = map.getBounds();
+    var sicht = { latMin: b.getSouth(), lonMin: b.getWest(),
+                  latMax: b.getNorth(), lonMax: b.getEast() };
+    return boxArea(sicht) > SNAPSHOT_MAX_AUTO_SQDEG ? null : sicht;
+  }
+
+  function snapshotTick() {
+    if (!autoRefreshInput.checked) return;
+    // Ein Tab im Hintergrund schaut niemand an. Ohne diese Zeile fragt ein
+    // vergessenes Fenster tagelang jede Minute weiter.
+    if (document.hidden) return;
+    // Laeuft schon eine Abfrage (Schwenk, Knopf, voriger Takt), ist eine
+    // zweite reine Verschwendung - die Antwort waere dieselbe.
+    if (snapshotCtrl) return;
+    if (!snapshotTauglich()) return;
+    loadSnapshot("takt");
+  }
+
+  // Beim Zurueckkommen nicht bis zum naechsten Tick warten: Wer den Tab
+  // wechselt, sieht sonst bis zu 60 s lang eine eingefrorene Karte.
+  function snapshotSichtbarWieder() {
+    if (document.hidden) return;
+    if (!autoRefreshInput.checked) return;
+    if (Date.now() - snapshotAt < SNAPSHOT_REFRESH_MS) return;
+    snapshotTick();
   }
 
   // Single-MMSI lookup for the detail drawer. The endpoint answers from a
@@ -5484,7 +5557,7 @@
   // Nicht loadSnapshot direkt haengen: Der Listener reicht das MouseEvent als
   // erstes Argument durch, und ein Event ist truthy - der Knopf liefe damit im
   // "auto"-Modus samt Abdeckungslogik.
-  snapshotBtn.addEventListener("click", function () { loadSnapshot(false); });
+  snapshotBtn.addEventListener("click", function () { loadSnapshot("knopf"); });
   document.getElementById("clearCacheBtn").addEventListener("click", clearAllCaches);
   autoEnrichInput.addEventListener("change", function () {
     localStorage.setItem("aisstream_auto_enrich", autoEnrichInput.checked ? "1" : "0");
@@ -5545,12 +5618,24 @@
   });
   if (mapAvailable) map.on("zoomend", refreshAllLabels);
 
-  [["aisstream_auto_snapshot", autoSnapshotInput], ["aisstream_auto_connect", autoConnectInput]]
+  [["aisstream_auto_snapshot", autoSnapshotInput], ["aisstream_auto_connect", autoConnectInput],
+   ["aisstream_auto_refresh", autoRefreshInput]]
     .forEach(function (pair) {
       pair[1].addEventListener("change", function () {
         localStorage.setItem(pair[0], pair[1].checked ? "1" : "0");
       });
     });
+
+  // Der Takt laeuft immer; ob er etwas tut, entscheidet snapshotTick(). Ein
+  // Intervall, das je nach Schalter an- und abgemeldet wird, geht schneller
+  // verloren, als es spart - der Timer selbst kostet nichts.
+  setInterval(snapshotTick, SNAPSHOT_REFRESH_MS);
+  document.addEventListener("visibilitychange", snapshotSichtbarWieder);
+  // Ein abgeschalteter Takt darf seine alte Fehlermeldung nicht mitschleppen.
+  autoRefreshInput.addEventListener("change", function () {
+    snapshotTickFehler = false;
+    if (autoRefreshInput.checked) snapshotSichtbarWieder();
+  });
 
   // Keeps the "zuletzt gesehen" / stale badge honest while nothing arrives.
   setInterval(function () {

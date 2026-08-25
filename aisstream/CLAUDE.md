@@ -908,6 +908,82 @@ reicht das `MouseEvent` als erstes Argument durch. Ein Event ist truthy, der
 Knopf liefe damit im `auto`-Modus samt Abdeckungslogik. Deshalb steht dort ein
 Wrapper mit `loadSnapshot(false)`.
 
+#### Laufendes Auffrischen alle 60 s
+
+Schalter „Snapshot alle 60 s neu holen" (`aisstream_auto_refresh`, standardmäßig
+**an**). Hält die Karte auch **ohne API-Key** lebendig — der Snapshot bündelt
+mehrere Quellen (`aishub`, `aisstream`, `kystverket`, `digitraffic`) und kennt
+damit Schiffe, die ein einzelner Stream nicht liefert.
+
+**Warum 60 s.** Stromaufwärts gibt es keinen festen Takt, die Daten laufen
+kontinuierlich nach. Gemessen an derselben Box über wachsende Pausen:
+
+| Pause | Schiffe mit neuer Position |
+|---|---|
+| 10 s | 60 von 617 (10 %) |
+| 30 s | 183 (30 %) |
+| 60 s | 281 (46 %) |
+| 120 s | 397 (64 %) |
+
+Also ein Kompromiss, keine technische Grenze: 60 s frischt knapp die Hälfte auf.
+Schneller zu fragen holt wenig und kostet viel.
+
+`snapshotTick()` hat vier Ausstiege — **ohne** den Abdeckungstest des Schwenks,
+denn genau die schon abgedeckte Box soll ja aufgefrischt werden:
+
+| Ausstieg | warum |
+|---|---|
+| Schalter aus | der Ausschalter |
+| `document.hidden` | ein vergessener Tab fragt sonst tagelang weiter |
+| `snapshotCtrl` gesetzt | eine Abfrage läuft schon — siehe unten |
+| Fläche > `SNAPSHOT_MAX_AUTO_SQDEG` / kein openwaters | wie beim Schwenk |
+
+**Die `snapshotCtrl`-Sperre ist nicht bloß Sparsamkeit.** `loadSnapshot()`
+bricht eine laufende Abfrage ab, bevor es eine neue startet. Ohne die Sperre
+würde ein Takt, der in eine laufende **Nutzer**-Abfrage fällt, genau diese
+abschießen.
+
+**Beim Zurückkommen sofort, nicht erst zum nächsten Takt**
+(`snapshotSichtbarWieder()` an `visibilitychange`): Wer den Tab wechselt, sähe
+sonst bis zu 60 s lang eine eingefrorene Karte.
+
+**Drei Lautstärken statt eines `auto`-Flags.** `loadSnapshot(modus)`:
+`"knopf"` (oder nichts) volle Auskunft · `"schwenk"` eine Zeile · `"takt"`
+schweigt. 1440 Logzeilen am Tag wären kein Log mehr. Ein **dauerhaft gestörter**
+Takt meldet sich genau **einmal** und dann erst wieder nach einem Erfolg
+(`snapshotTickFehler`) — dasselbe Muster wie `ownPosErrLogged` beim eigenen
+Standort.
+
+**Der Log hatte keine Obergrenze** und wuchs unbegrenzt — in einer langen
+Sitzung ein stiller Speicherfresser, mit dem Takt eine Gewissheit. Jetzt
+`LOG_MAX` = 400 Zeilen, älteste zuerst raus.
+
+**Das Intervall wird nicht an- und abgemeldet.** `setInterval(snapshotTick, …)`
+läuft immer; ob er etwas tut, entscheidet `snapshotTick()`. Ein Timer, der je
+nach Schalter neu registriert wird, geht schneller verloren, als er spart — und
+der Timer selbst kostet nichts.
+
+##### Zwei Testfallen, beide haben den Test erst grün gelogen
+
+1. **Vorgestellte Uhr macht die Antwort veraltet.** `page.clock.install()` +
+   `fastForward` verschieben `Date.now()` in der Seite. Die `seen`-Zeitstempel
+   einer in Node gebauten Fake-Antwort liegen dann in der **Vergangenheit** der
+   Seite, und `applySnapshotFeature()` verwirft sie völlig zu Recht
+   (Zeitstempelvergleich). Die Positionen bewegen sich nie, der Test prüft
+   nichts. Der Mock muss die Zeit **aus der Seite** holen
+   (`page.evaluate(() => Date.now())` im Route-Handler).
+2. **`runFor(60000)` springt über die 15-s-Frist.** Um die
+   `snapshotCtrl`-Sperre zu prüfen, muss eine Abfrage laufen, *wenn* der Takt
+   fällt. Ein 60-s-Sprung feuert aber erst die Abbruchfrist und dann den Takt —
+   die Anfrage ist längst weg, der Takt darf feuern, und der Test meldet grün,
+   ohne die Sperre je berührt zu haben. `scratchpad/snapshottakt.js` sucht
+   deshalb erst die **Taktphase** (in 1-s-Schritten vorstellen, bis eine
+   Anfrage rausgeht), stellt dann bis kurz davor und startet dort eine bewusst
+   langsame Antwort.
+
+Gegenprobe gemacht: Mit auskommentierter `snapshotCtrl`-Sperre meldet die Probe
+`FEHL … (1 zusaetzlich)`. Sie prüft also wirklich etwas.
+
 #### Parallele kleine Teilboxen bringen nichts (gemessen, nicht vermutet)
 
 Naheliegende Idee: die Box in vier Teile schneiden und parallel abfragen.
@@ -1114,7 +1190,7 @@ Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
 
 | Schlüssel | Inhalt | TTL |
 |---|---|---|
-| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_own_pos`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_filters` | Einstellungen & Filterauswahl | unbegrenzt |
+| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_own_pos`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_auto_refresh`, `aisstream_filters` | Einstellungen & Filterauswahl | unbegrenzt |
 | `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss, max. `ENRICH_MAX` = 400 |
 | `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d, max. 2000 |
 | `aisstream_ais` | **eine** JSON-Map MMSI → Position, Fahrtdaten, Personen an Bord, Binnenangaben | **30 min**, max. 1500 |
@@ -1806,6 +1882,9 @@ verifiziert:
   zeigen immer dieselbe Auswahl, Zustand wird gemerkt
 - **Autostart**: Snapshot laden und verbinden beim Seitenaufruf, beides
   abschaltbar; Verbinden nur mit bereits gespeichertem Key
+- **Laufendes Auffrischen** alle 60 s für den aktuellen Ausschnitt, abschaltbar
+  (siehe eigenen Abschnitt oben): hält die Karte auch ganz ohne API-Key
+  lebendig, pausiert im Hintergrundtab und bei weit herausgezoomter Karte
 - **Alter der Daten** in Sekunden, rechtsbündig direkt hinter dem Namen,
   sekündlich mitlaufend und ab 600 s farblich markiert
 - **Lokale Zwischenspeicher**: Schiffsstatik (60 d), AIS-Daten inklusive
