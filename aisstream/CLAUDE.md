@@ -416,8 +416,8 @@ Feldern.
 **Form** trennt die Entitätsklassen, ohne eine Farbe zu verbrauchen: Kreis =
 Schiff, Raute = Seezeichen, Quadrat = Landstation.
 
-**Fahrtrichtung** kommt als kleines Dreieck am Punktrand dazu (siehe unten) —
-außerhalb des Punktes, damit Farbe und Durchmesser unangetastet bleiben.
+**Fahrtrichtung** kommt als kleiner Pfeil **im** Punkt dazu (siehe unten) —
+im Inneren, damit Durchmesser und farbiger Rand unangetastet bleiben.
 
 Drei Punkte, die aus dem Anti-Pattern-Katalog der Skill kamen:
 - **Klickziel:** Ein 8-px-Punkt ist ein mieses Ziel. Der Marker sitzt deshalb
@@ -444,35 +444,48 @@ Fehlertyp wie bei `loadStaticCache()`.
 nicht. Alles, was auf die Konstanten weiter unten zugreift, gehört in den
 Verdrahtungsblock am Ende der IIFE, nicht in den Init oben.
 
-### Fahrtrichtung: kleines Dreieck am Punktrand
+### Fahrtrichtung: kleiner Pfeil im Punkt
 
 Die vierte Kodierung am Marker, nach Farbe (Typ), Durchmesser (Länge) und Form
-(Entitätsklasse). Ein gefülltes Dreieck **innerhalb** des Punktes, Spitze in
+(Entitätsklasse). Ein gefüllter **Pfeil innerhalb** des Punktes, Spitze in
 Fahrtrichtung. Der Punkt behält damit seinen Umriss: Durchmesser (Größe) und
 farbiger Rand (Typ) bleiben vollständig lesbar, die Richtung sitzt im Inneren.
 
+**Pfeil, nicht Dreieck.** Ein gleichschenkliges Dreieck hat an *beiden* Enden
+eine markante Kante — die breite Grundseite drängt sich optisch vor die Spitze,
+und man liest die Richtung falsch herum (mir selbst passiert, siehe unten).
+Der Pfeil ist nur an einem Ende bewehrt, seine Leserichtung ist eindeutig.
+Nebenbei verdeckt der schmale Schaft **weniger** Innenfläche als das Dreieck,
+die Typfarbe bleibt also besser sichtbar, nicht schlechter.
+
 Geometrie relativ zum Innenradius `r = px/2 − Randbreite` (1,5 px beim gefüllten
-Punkt, 3 px beim Ring-Marker): Spitze `0,80·r`, Heck `0,42·r`, Halbbreite
-`0,62·r`. So bleibt zu jeder Größenstufe ein farbiger Rand stehen; beim
-kleinsten 8-px-Punkt deckt das Dreieck rund ein Viertel der Innenfläche ab.
+Punkt, 3 px beim Ring-Marker): halbe Länge `0,92·r`, Kopflänge `0,78·r`, halbe
+Kopfbreite `0,60·r`, halbe Schaftbreite `0,20·r` — **mit Untergrenze 0,55 px**,
+weil der Schaft beim 8-px-Punkt sonst unter einem halben Pixel bliebe und im
+Antialiasing verschwände. So bleibt zu jeder Größenstufe ein farbiger Rand
+stehen.
+
+**Der erste Punkt des Pfads ist die Spitze.** Darauf baut die Winkelprobe in
+`scratchpad/spitze.js` auf (`getPointAtLength(0)`) — wer den Pfad umschreibt,
+muss das erhalten oder die Probe mitziehen.
 
 **Zwei Füllfarben, aus einem Grund:** Auf der gefüllten Scheibe trägt **Weiß**
 den Kontrast, im hohlen Ring-Marker („Länge unbekannt") ist der Kern weiß —
 dort die **Typfarbe**. Beide Varianten bleiben sichtbar, ohne die Typfarbe zu
-ersetzen. Ein Dreieck in einer eigenen Farbe würde eine zweite, konkurrierende
+ersetzen. Ein Pfeil in einer eigenen Farbe würde eine zweite, konkurrierende
 Kodierung aufmachen.
 
-**Wann es erscheint** (`travelCourse()`):
+**Wann er erscheint** (`travelCourse()`):
 
 1. `entry.course` (COG) — die Richtung, in die das Schiff **fährt**.
 2. sonst `entry.heading` (Bugrichtung) als Rückfall — nachrangig, denn ein quer
    versetztes Schiff zeigt woanders hin, als es fährt.
-3. sonst `null` → **kein Dreieck**. Die Abwesenheit einer Angabe darf nicht wie
+3. sonst `null` → **kein Pfeil**. Die Abwesenheit einer Angabe darf nicht wie
    „fährt nach Norden" aussehen.
 
-Dazu eine Fahrtschwelle: **unter 0,5 kn kein Dreieck** (`DIR_MIN_SOG`). Ein
+Dazu eine Fahrtschwelle: **unter 0,5 kn kein Pfeil** (`DIR_MIN_SOG`). Ein
 festgemachtes Schiff sendet weiter einen Kurs, der sich zufällig dreht — ohne
-die Schwelle stünde eine Reede voll zappelnder Dreiecke. Fehlt die
+die Schwelle stünde eine Reede voll zappelnder Pfeile. Fehlt die
 Geschwindigkeit ganz, entscheidet allein der Kurs.
 
 Beide Quellen sind schon am Eingang von ihren Sentinels befreit
@@ -486,7 +499,7 @@ Der Kurs ändert sich mit **jeder** Positionsmeldung. Stünde der Winkel im
 baute das Marker-DOM neu — bei 400 Schiffen und 100 Nachrichten/s genau die Art
 Dauerlast, die man nicht einbaut. Deshalb dreigeteilt:
 
-- **`iconKey()` trägt nur, OB ein Dreieck da ist** (`"dir"` / `"-"`).
+- **`iconKey()` trägt nur, OB ein Pfeil da ist** (`"dir"` / `"-"`).
   Erscheinen und Verschwinden sind selten und rechtfertigen einen Neubau.
 - **Der Winkel läuft über die CSS-Variable `--dir`** am vorhandenen Element
   (`refreshMarkerDirection()`, aufgerufen aus `syncMarker()`): ein
@@ -494,15 +507,17 @@ Dauerlast, die man nicht einbaut. Deshalb dreigeteilt:
 - **Der Winkel steht zusätzlich inline im Icon-HTML.** Leaflet erzeugt das
   Element bei `setIcon()` und bei **jedem** `addLayer` neu, und
   `applyMapFilter()` hängt Marker beim Verschieben der Karte laufend ab und
-  wieder an. Ohne den Wert im HTML stünde das Dreieck danach auf 0° (Norden).
+  wieder an. Ohne den Wert im HTML stünde der Pfeil danach auf 0° (Norden).
 
 Gemessen (`scratchpad/richtung.js`): Kurswechsel 90° → 180° zieht nach, dabei
 **null** `setIcon`-Aufrufe; die Latenz unter Dauerlast bleibt bei rund 50 ms
 (vorher 46 ms, `markerlast.js`).
 
-**Richtung nachmessen, nicht auf dem Screenshot beurteilen.** Beim Umbau nach
-innen sah das Dreieck auf dem Bild verdreht aus — tatsächlich dominiert die
-breite Grundseite optisch, und ich hatte sie für die Spitze gehalten.
+**Richtung nachmessen, nicht auf dem Screenshot beurteilen.** Beim Umbau des
+Dreiecks nach innen sah es auf dem Bild verdreht aus — tatsächlich dominierte
+die breite Grundseite optisch, und ich hatte sie für die Spitze gehalten. Genau
+diese Verwechselbarkeit hat dann den Wechsel zum Pfeil ausgelöst; sie war also
+kein reiner Lesefehler von mir, sondern eine echte Schwäche der Form.
 `scratchpad/spitze.js` rechnet den Bildschirmwinkel der **Spitze** relativ zur
 Punktmitte zurück (`getPointAtLength(0)` + `getScreenCTM()`) und zeigt für
 0/45/90/180/270° exakt dieselben Werte. Ein Test, der nur die CSS-Matrix des
@@ -696,6 +711,44 @@ neuen Text, dazu das aktuell/veraltet-Abzeichen. Ein voller Neuaufbau im
 Sekundentakt wäre der falsche Weg — er nimmt markierten Text weg und würde das
 Foto anfassen (siehe oben). Wer ein Zeitfeld ergänzt: dritter Eintrag in der
 `section()`-Zeile ist der Zeitstempel, mehr braucht es nicht.
+
+### Tabellenordnung: groß nach klein, Unbekanntes ans Ende
+
+`refreshVisibleShips()` sortiert **zweimal, mit Absicht** — die beiden
+Sortierungen beantworten verschiedene Fragen:
+
+1. `entries.sort()` nach `updatedAt` absteigend entscheidet, **welche** Schiffe
+   die Tabelle zeigt, bevor `slice(0, MAX_TABLE_ROWS)` bei 200 Zeilen kappt.
+2. `shown.sort(byLengthDesc)` entscheidet, **in welcher Reihenfolge** sie
+   erscheinen: große Schiffe zuerst, Unbekanntes ganz ans Ende.
+
+**Warum nicht einfach nach Größe sortieren und dann kappen?** Dann würde die
+200er-Grenze bei vollem Ausschnitt *jedes* kleine Boot restlos aus der Liste
+werfen — und das ausgewählte Schiff könnte mitsamt seiner markierten Zeile
+verschwinden. Gekappt wird deshalb weiter nach Alter (die ältesten Meldungen
+fallen raus), wie vor der Änderung.
+
+`byLengthDesc()` zieht die Länge aus `shipLengthMeters()` — **derselben**
+Quelle wie der Markerdurchmesser, damit Liste und Karte dieselbe Rangfolge
+zeigen. Zwei Feinheiten:
+
+- **Gleich lange Schiffe stehen nach Aktualität.** Ohne diesen Stichentscheid
+  spränge die Liste bei jeder eintreffenden Nachricht durcheinander.
+- **Das Sentinel `Dimension {A:0,B:0,C:0,D:0}` landet bei den Unbekannten**,
+  nicht als „Länge 0" ganz vorn — `shipLengthMeters()` gibt dafür `null`
+  zurück (`if (l) return l`), nicht 0. Der Sentinel ist in dieser Datei schon
+  mehrfach zur Falle geworden, deshalb prüft `scratchpad/sortierung.js` ihn
+  ausdrücklich mit.
+
+Der Spaltenkopf trägt ein `▼`, damit die Ordnung ablesbar ist. Sie ist fest,
+nicht klickbar sortierbar.
+
+Gemessen (`scratchpad/tabellenlast.js`, 400 Schiffe / 200 Zeilen): Der
+Tabellenaufbau kostet mit Sortierung 163,5 ms, ohne 163,0 ms — davon sind
+150 ms die Entprellung des Sucheingangs. Die Sortierung selbst liegt bei rund
+**0,5 ms** und damit im Rauschen. Der Kontrolllauf ohne `shown.sort()` meldet
+`sortiert: false`; das ist der Beleg, dass die Probe die Ordnung wirklich prüft
+und nicht bloß immer „grün" sagt.
 
 ### Und die Tabelle
 

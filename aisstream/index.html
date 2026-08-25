@@ -469,7 +469,7 @@
     transform: rotate(var(--dir, 0deg));
     transform-origin: 50% 50%;
   }
-  /* Kein Umriss noetig: Das Dreieck liegt innerhalb des Punktes, also auf
+  /* Kein Umriss noetig: Der Pfeil liegt innerhalb des Punktes, also auf
      einer Flaeche, deren Farbe wir selbst gesetzt haben. */
   .ship-mark {
     border-radius: 50%;
@@ -1152,7 +1152,7 @@
               <th>Rufz.</th>
               <th>Typ</th>
               <th>Status</th>
-              <th>Größe (L×B, m)</th>
+              <th>Größe (L×B, m) ▼</th>
               <th>Ziel</th>
               <th>Lat</th>
               <th>Lon</th>
@@ -1610,10 +1610,10 @@
 
   // Unterhalb dieser Fahrt ist der gemeldete Kurs Rauschen: Ein festgemachtes
   // Schiff sendet weiter einen Wert, der sich zufaellig dreht. Ohne die
-  // Schwelle stuende eine Reede voll zappelnder Dreiecke.
+  // Schwelle stuende eine Reede voll zappelnder Pfeile.
   var DIR_MIN_SOG = 0.5;
 
-  // Fahrtrichtung fuer den Marker, oder null - dann bleibt das Dreieck weg.
+  // Fahrtrichtung fuer den Marker, oder null - dann bleibt der Pfeil weg.
   // Beide Quellen sind bereits am Eingang von ihren Sentinels befreit
   // (normalizeCog verwirft 360, normalizeHeading die 511), hier also nur noch
   // auf null pruefen.
@@ -1625,6 +1625,19 @@
     if (entry.course != null) return entry.course;
     if (entry.heading != null) return entry.heading;
     return null;
+  }
+
+  // Tabellenordnung: gross nach klein, Unbekanntes ans Ende. Die Laenge kommt
+  // aus derselben Quelle wie der Markerdurchmesser, damit Liste und Karte
+  // dieselbe Rangfolge zeigen. Gleich lange Schiffe stehen nach Aktualitaet,
+  // sonst spraenge die Liste bei jeder Nachricht durcheinander.
+  function byLengthDesc(a, b) {
+    var la = shipLengthMeters(a);
+    var lb = shipLengthMeters(b);
+    if (la == null && lb != null) return 1;
+    if (lb == null && la != null) return -1;
+    if (la != null && lb != null && la !== lb) return lb - la;
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
   }
 
   function sizeStep(entry) {
@@ -1642,7 +1655,7 @@
     var step = sizeStep(entry);
     // Die Auswahl gehoert in den Schluessel, sonst merkt refreshMarkerIcon()
     // den Wechsel nicht und das Fadenkreuz bleibt beim alten Schiff stehen.
-    // Nur OB ein Richtungsdreieck da ist, nicht wohin es zeigt. Der Winkel
+    // Nur OB ein Richtungspfeil da ist, nicht wohin er zeigt. Der Winkel
     // aendert sich mit jeder Positionsmeldung - stuende er hier, baute
     // refreshMarkerIcon() bei jeder Nachricht das Marker-DOM neu auf.
     return [typeCategory(entry) || "-", step ? step.key : "?",
@@ -1697,34 +1710,51 @@
         '" fill="none" stroke-linecap="round">' +
         '<path class="halo" d="' + d + '"/><path class="bar" d="' + d + '"/></svg>';
     }
-    // Kleines Dreieck INNERHALB des Punktes, Spitze in Fahrtrichtung. Der
-    // Punkt behaelt damit seinen Umriss: Durchmesser (Groesse) und der
-    // farbige Rand (Typ) bleiben vollstaendig lesbar, die Richtung sitzt im
-    // Inneren.
-    var dreieck = "";
+    // Kleiner Pfeil INNERHALB des Punktes, Spitze in Fahrtrichtung. Der Punkt
+    // behaelt damit seinen Umriss: Durchmesser (Groesse) und der farbige Rand
+    // (Typ) bleiben vollstaendig lesbar, die Richtung sitzt im Inneren.
+    // Pfeil statt Dreieck, weil ein gleichschenkliges Dreieck an beiden Enden
+    // eine markante Kante hat - die breite Basis draengt sich optisch vor die
+    // Spitze, und man liest die Richtung falsch herum. Der Schaft ist nur an
+    // einem Ende bewehrt, damit ist die Leserichtung eindeutig. Nebenbei
+    // verdeckt er weniger Flaeche als das Dreieck, die Typfarbe bleibt besser
+    // sichtbar.
+    var pfeil = "";
     var kurs = travelCourse(entry);
     if (kurs != null) {
       var m = box / 2;
       // Radius der Innenflaeche: der weisse Ring (1,5 px) bzw. die farbige
       // Kontur (3 px beim Ring-Marker) bleibt frei.
       var r = px / 2 - (step ? 1.5 : 3);
-      var spitze = r * 0.80;
-      var heck = r * 0.42;
-      var halb = r * 0.62;
-      var tri = "M" + m + " " + (m - spitze) +
-        "L" + (m + halb) + " " + (m + heck) +
-        "L" + (m - halb) + " " + (m + heck) + "Z";
+      var halbLang = r * 0.92;          // halbe Pfeillaenge
+      var kopf = r * 0.78;              // Laenge der Spitze
+      var breit = r * 0.60;             // halbe Breite der Spitze
+      // Beim 8-px-Punkt waere ein rein proportionaler Schaft unter einem
+      // halben Pixel breit und verschwaende im Antialiasing.
+      var schaft = Math.max(r * 0.20, 0.55);
+      var y0 = m - halbLang;            // Spitze
+      var y1 = y0 + kopf;               // Uebergang Spitze -> Schaft
+      var y2 = m + halbLang;            // Ende des Schafts
+      // Erster Punkt ist die Spitze - darauf baut die Winkelprobe in
+      // scratchpad/spitze.js (getPointAtLength(0)) auf.
+      var arrow = "M" + m + " " + y0 +
+        "L" + (m + breit) + " " + y1 +
+        "L" + (m + schaft) + " " + y1 +
+        "L" + (m + schaft) + " " + y2 +
+        "L" + (m - schaft) + " " + y2 +
+        "L" + (m - schaft) + " " + y1 +
+        "L" + (m - breit) + " " + y1 + "Z";
       // Auf der gefuellten Scheibe traegt Weiss den Kontrast, im hohlen
-      // Ring-Marker ist der Kern weiss - dort die Typfarbe. So bleibt das
-      // Dreieck bei jeder Variante sichtbar, ohne die Typfarbe zu ersetzen.
-      dreieck = '<svg class="dir" width="' + box + '" height="' + box +
+      // Ring-Marker ist der Kern weiss - dort die Typfarbe. So bleibt der
+      // Pfeil bei jeder Variante sichtbar, ohne die Typfarbe zu ersetzen.
+      pfeil = '<svg class="dir" width="' + box + '" height="' + box +
         '" style="--dir:' + kurs.toFixed(0) + 'deg">' +
-        '<path fill="' + (step ? "#ffffff" : color) + '" d="' + tri + '"/></svg>';
+        '<path fill="' + (step ? "#ffffff" : color) + '" d="' + arrow + '"/></svg>';
     }
     return L.divIcon({
       className: "",
       html: '<div class="ship-hit" style="width:' + box + "px;height:" + box + 'px;">' +
-        kreuz + dreieck +
+        kreuz + pfeil +
         '<div class="ship-mark' + shape + hollow + '" style="width:' + px + "px;height:" + px +
         "px;" + (step ? "background:" + color : "border-color:" + color) + ';"></div></div>',
       iconSize: [box, box],
@@ -1821,7 +1851,7 @@
         '<svg width="13" height="13">' +
         '<circle cx="6.5" cy="6.5" r="5.5" fill="' + NEUTRAL_COLOR +
         '" stroke="#ffffff" stroke-width="1.5"/>' +
-        '<path fill="#ffffff" d="M6.5 3L9 8.5H4Z"/></svg>' +
+        '<path fill="#ffffff" d="M6.5 2.8L8.9 5.9H7.3V10.2H5.7V5.9H4.1Z"/></svg>' +
         "</span>Fahrtrichtung (ab 0,5 kn)</div>";
 
       div.innerHTML =
@@ -3115,8 +3145,14 @@
       if (!matchesSearch(entry, needle)) { hiddenBySearch++; return; }
       entries.push(entry);
     });
+    // Zwei getrennte Ordnungen, mit Absicht: WELCHE Schiffe die Tabelle zeigt,
+    // entscheidet weiter die Aktualitaet - sonst wuerde die 200er-Grenze bei
+    // vollem Ausschnitt jedes kleine Boot restlos aus der Liste werfen, statt
+    // nur die aeltesten Meldungen. In welcher REIHENFOLGE sie erscheinen,
+    // entscheidet dann die Groesse.
     entries.sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
     var shown = entries.slice(0, MAX_TABLE_ROWS);
+    shown.sort(byLengthDesc);
 
     tableBody.innerHTML = "";
     shown.forEach(function (entry) {
