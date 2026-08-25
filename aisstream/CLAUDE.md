@@ -1191,7 +1191,7 @@ Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
 | Schlüssel | Inhalt | TTL |
 |---|---|---|
 | `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_own_pos`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_auto_refresh`, `aisstream_filters` | Einstellungen & Filterauswahl | unbegrenzt |
-| `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss, max. `ENRICH_MAX` = 400 |
+| `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss / **10 min unvollständig** (ohne IMO gelaufen), max. `ENRICH_MAX` = 400 |
 | `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d, max. 2000 |
 | `aisstream_ais` | **eine** JSON-Map MMSI → Position, Fahrtdaten, Personen an Bord, Binnenangaben | **30 min**, max. 1500 |
 | `aisstream_diary` | Schiff-Spotter-Tagebuch: Sichtungen mit eingefrorenem Schiffszustand | **kein Cache** — läuft nie ab, wird nie gekürzt |
@@ -1309,6 +1309,147 @@ läuft aber selbst schon in einem `throttled("commons")`-Platz. Ein `throttled()
 darin würde auf den eigenen Platz warten und die Warteschlange **dauerhaft**
 blockieren — kein Timeout greift, weil die Anfrage nie startet. Der Abstand
 zwischen den Teilabrufen wird deshalb von Hand eingelegt (`afterGap()`).
+
+### Der Cache sperrte Commons aus, wenn die IMO zu spät kam
+
+Der größte Hebel für mehr Bilder war **kein neuer Dienst**, sondern ein Fehler
+im Zusammenspiel von Kette und Cache. Nachgestellt und bestätigt (Playwright,
+Digitraffic antwortet ohne IMO, Wikidata leer, Commons-Anfragen mitgezählt):
+
+```
+1) Erste Anreicherung OHNE IMO  -> Commons-Anfragen: 0
+   Cache-Eintrag: {"found":true,"quellen":["Digitraffic"]}   -> 30 Tage
+2) IMO trifft per Msg 5 ein     -> im Datensatz sichtbar: true
+3) Wiederöffnen MIT IMO         -> zusätzliche Commons-Anfragen: 0
+```
+
+Drei Stellen wirkten zusammen:
+
+- `if (merged.image || !imo) return …` — ohne IMO wurde Commons übersprungen.
+- `enrichCacheSet(mmsi, data, !!data)` — das Ergebnis wurde trotzdem gecacht.
+  Hatte Digitraffic geantwortet (Name, Rufzeichen, nur eben keine IMO), galt es
+  als **Treffer** und lag **30 Tage** fest; sonst 3 Tage.
+- `enrichCacheGet()` lieferte beim nächsten Öffnen den Eintrag, und
+  `enrichShip()` stieg aus, bevor Commons je gefragt wurde.
+
+**Das trifft die Mehrheit der Schiffe.** Die IMO kommt aus `ShipStaticData`
+(Msg 5), und Class A sendet die nur alle sechs Minuten — nach 5 Minuten
+Livestream hatten [gemessen 19 %](#warum-so-viele-schiffe-unbekannt-sind-gemessen)
+der Schiffe eine Statiknachricht. Wer ein frisch aufgetauchtes Schiff anklickt,
+der Normalfall, sperrte es damit für 3 bis 30 Tage vom Bilderdienst aus.
+
+**Die Lösung hat drei Teile:**
+
+1. **Unvollständig statt fertig.** Lief der Durchlauf ohne IMO und fand kein
+   Bild, trägt der Cache-Eintrag `teil: true` und hält nur
+   `ENRICH_TTL_TEIL` = **10 Minuten** — er wartet ohnehin bloß darauf, dass die
+   IMO nachkommt.
+2. **Nicht auf das nächste Öffnen warten.** `imoNachzug(entry)` hängt im
+   Msg-5-Zweig: Liegt die IMO jetzt vor und ist ein `teil`-Eintrag da, läuft die
+   Anreicherung erneut. Das Foto erscheint in der offenen Detailansicht **ohne**
+   erneutes Anklicken.
+3. **`ENRICH_VERSION` auf 3.** Ohne die Erhöhung wirkte der Fix bei bestehenden
+   Nutzern bis zu 30 Tage lang nicht — genau bei den Einträgen, die ihn brauchen.
+
+**Msg 5 wiederholt sich alle sechs Minuten**, deshalb merkt `imoNachgezogen`
+je MMSI, dass der Nachzug gelaufen ist. Ohne diese Liste fragte der Client
+Commons im Sechsminutentakt für jedes Schiff auf der Karte. Die Liste wird bei
+„Zwischenspeicher leeren" zurückgesetzt, sonst bliebe der Nachzug für den Rest
+der Sitzung gesperrt.
+
+Gegenprobe gemacht: Mit auskommentiertem `imoNachzug()` meldet die Probe
+`0 neue Commons-Anfragen` und fünf `FEHL`. Sie prüft also wirklich etwas
+(`scratchpad/imonachzug.js`, 13 Prüfungen).
+
+### Zweiter Identifikator: die MMSI, bestätigt durch den Namen
+
+**Die IMO ist der Flaschenhals, nicht Commons.** An 24 zufälligen Schiffen aus
+dem Feed war für **7 (29 %)** überhaupt eine IMO beschaffbar; wo eine vorlag,
+fand die Kategorie bei 4 von 7 ein Foto.
+
+*(Korrektur zu den „24 von 25" weiter oben: Diese Stichprobe bestand aus
+Schiffen, deren IMO **aus Wikidata** kam — also bekannten Schiffen. An
+zufälligen Schiffen aus dem Feed sind es 57 %.)*
+
+Ein Lotsenboot, ein Arbeitsschiff oder eine Yacht hat **gar keine IMO** — zu
+klein für SOLAS. Für diese ganze Klasse war der Client grundsätzlich blind.
+
+`commonsByMmsi(mmsi, name)` schließt die Lücke, aber **nur mit
+Bestätigungsregel**: Die Datei muss die MMSI im Text führen **und** ein
+unterscheidungskräftiges Wort des Schiffsnamens im **Titel** tragen. Die Kennung
+liefert die Identität, der Name bestätigt sie.
+
+**Warum die MMSI allein nicht reicht** — die drei Rohtreffer einer Stichprobe:
+
+| MMSI | Schiff | Rohtreffer | mit Regel |
+|---|---|---|---|
+| 211324470 | PILOTVESSEL HANSE | `Pilot vessel Hanse (1).jpg` | ✅ bleibt |
+| 304734000 | HAV MARLIN | `US Marines … Operation Jackstay` | ❌ raus |
+| 355948000 | VEGA LEADER | `Bremerhaven, Überseehafen…` | ❌ raus |
+
+Eine neunstellige Zahl kommt auch zufällig in Beschreibungstexten vor — das
+Vietnamkriegsfoto ist der Beleg.
+
+Drei Feinheiten, jede aus einem Fehlschlag:
+
+- **Wortgrenzen, keine Teilzeichenkette.** „Marines" darf „Marlin" nicht
+  erfüllen. Genau daran hängt die Abweisung.
+- **Umlaute falten, beide Seiten.** AIS sendet ASCII, Commons schreibt richtig:
+  STORSKAR fiel gegen `Storskär` durch, obwohl es dasselbe Schiff ist. `faltUm()`
+  normalisiert ä/æ/å → a, ö/ø → o, ü → u, ß → ss plus NFD-Zerlegung.
+- **Ein reiner Titeltest reicht nicht.** Er allein hätte auch den *richtigen*
+  Treffer verworfen — im Titel `Pilot vessel Hanse (1).jpg` steht keine MMSI.
+  Erst MMSI-im-Text **plus** Name-im-Titel trägt.
+
+`NAME_STOPP` wirft Namensbestandteile ohne Trennkraft weg (`pilot`, `vessel`,
+`ship`, `tug`, …), dazu fallen Wörter unter vier Zeichen, reine Zahlen und
+römische Ziffern raus — sonst passt jedes Lotsenboot auf jedes andere.
+
+**Trefferquote ehrlich:** An 44 Schiffen aus vier Revieren fand der MMSI-Weg
+**2**, beide richtig, bei **0** Fehlzuordnungen — und die Rohtreffer-Obergrenze
+lag ebenfalls bei 2, die Regel wirft also nichts Richtiges weg. Das sind ~5 %,
+gegenüber ~11 % für den IMO-Weg. Klein, aber es sind Schiffe, die sonst
+**grundsätzlich** kein Bild bekommen. An den fünf Fällen mit bekannter Wahrheit
+(oben plus STORSKAR und HAGLAND PROGRESS) verhält sich die Regel exakt wie
+entworfen.
+
+**Reihenfolge in `fetchCommonsPhoto(imo, mmsi, name)`:** IMO-Kategorie →
+IMO-Volltext → MMSI + Name. Ohne IMO fängt die Kette direkt bei der MMSI an.
+Die kuratierte Kategorie bleibt zuerst, weil sie ohne Ratequote arbeitet.
+
+### Was für Bilder NICHT funktioniert (gemessen, nicht vermutet)
+
+Damit die Frage nicht ein zweites Mal untersucht wird:
+
+- **Google Custom Search.** CORS ist offen, die API wäre aus dem Browser
+  aufrufbar. Aber: Der API-Schlüssel stünde im Quelltext (kein Backend), die
+  Nutzungsbedingungen beschränken das Zwischenspeichern von Ergebnissen, und
+  über die IMO findet Google nur, was Commons auch führt.
+- **Die MMSI als Suchbegriff** ist der falsche Schlüssel: `IMO 9321483` liefert
+  auf Commons 70 Treffer, `MMSI 220417000` vier. ~12 137 Dateien tragen eine
+  IMO im Text, ~790 eine MMSI. Als **Kennung** trägt die MMSI trotzdem (siehe
+  oben) — nur nicht als Suchwort ins Blaue.
+- **Suche über den Schiffsnamen.** Sieht mit 42 % doppelt so gut aus wie der
+  IMO-Weg, ist aber Raten: NORDSEE → ein Strand, RUBECULA → ein Vogel, TINTIN →
+  ein Fluss, LADY → „Lady Elizabeth (ship, 1879)", SOFIA → „St Sofia (funnel)".
+  Schiffsnamen sind Alltagswörter. Der Name taugt nur als **Bestätigung** einer
+  Kennung, nie als Sucheinstieg.
+- **Openverse** (CC-Suche über Flickr, Museen, Commons): Bei IMO-Suchen liefert
+  es ausschließlich `wikimedia` — dieselbe Quelle, die der Client schon abfragt.
+- **`Category:MMSI <nr>`** gibt es (zwei Schreibweisen, `MMSI 201100098` und
+  `MMSI: 226008110`), ist aber zu dünn besetzt: 0 Treffer in 18 Schiffen.
+- **Strukturierte Daten** (`haswbstatement:P587=<mmsi>` / `P458=<imo>`) wären
+  von Bauart her präzise, liefern aber **0 Treffer** — auch für die Emma Mærsk.
+  Commons pflegt diese Kennungen nicht als Aussagen.
+- **Schwesterschiff über die Wikidata-Schiffsklasse (P289):** Von fünf Schiffen
+  mit IMO hatte eines überhaupt eine Klasse hinterlegt — und das hatte bereits
+  ein eigenes Foto.
+
+**Die naheliegende Erweiterung, die noch offen ist:** eigene Fotos aufnehmen
+(`<input type="file" accept="image/*" capture="environment">`) und im
+vorhandenen Tagebuch-Bildspeicher ablegen. Einzige Quelle mit 100 % Treffer und
+null Fehlzuordnungen. Der Export müsste sie dann als Data-URL mittragen — bisher
+enthält er nur URLs, weil Registerfotos jederzeit nachladbar sind.
 
 ### Cache-Version: alte Fehltreffer festhalten wäre schlimmer als kein Cache
 
@@ -1923,8 +2064,11 @@ verifiziert:
   - Passagierzahlen werden **bewusst nicht geschätzt** — Fähre und
     Kreuzfahrtschiff gleicher Länge liegen um eine Größenordnung
     auseinander. Echte Zahlen gibt es nur über FI 55
-- **Schiffsfotos** aus Wikidata `P18`, ersatzweise über die IMO-Suche auf
-  Wikimedia Commons, mit Urheber- und Lizenzangabe
+- **Schiffsfotos** aus Wikidata `P18`, ersatzweise über Wikimedia Commons —
+  IMO-Kategorie, IMO-Volltext und zuletzt **MMSI mit Namensbestätigung**, was
+  auch Schiffe ohne IMO-Nummer erreicht (Lotsen- und Arbeitsboote). Mit
+  Urheber- und Lizenzangabe. Reicht Msg 5 die IMO nach, wird das Bild
+  automatisch nachgeholt (siehe eigenen Abschnitt)
 - **Registeranreicherung je MMSI** (siehe eigenen Abschnitt oben): Digitraffic
   liefert IMO, Rufzeichen, Ziel, ETA, Tiefgang und Maße, Wikidata
   Bruttoraumzahl, Schiffsklasse, Eigner, Betreiber, Werft, Baujahr,

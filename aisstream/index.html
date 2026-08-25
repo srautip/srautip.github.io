@@ -2702,6 +2702,9 @@
   // anything still in the session was legitimately received.
   function clearAllCaches() {
     cacheGeneration++;
+    // Sonst bliebe der Nachzug fuer diese Sitzung gesperrt, obwohl die
+    // Eintraege, gegen die er lief, gerade geloescht wurden.
+    imoNachgezogen = {};
     clearStaticCache();
     try {
       var keys = [];
@@ -3362,6 +3365,9 @@
       entry.fixType = msg.FixType != null ? msg.FixType : (msg.Fixtype != null ? msg.Fixtype : entry.fixType);
       entry.staticFromCache = null;
       rememberStatic(entry);
+      // Die IMO ist gerade erst eingetroffen - jetzt kann der ergiebigste
+      // Bildweg laufen, ohne dass der Nutzer das Schiff neu anklickt.
+      imoNachzug(entry);
       syncMarker(entry);
       refreshVisibleShips();
     } else if (type === "StaticDataReport" && msg) {
@@ -3923,9 +3929,15 @@
   var WIKIDATA_SPARQL = "https://query.wikidata.org/sparql";
   var ENRICH_TTL_HIT = 30 * 24 * 3600 * 1000;
   var ENRICH_TTL_MISS = 3 * 24 * 3600 * 1000;
+  // Ohne IMO gelaufen: kurz halten, die IMO kann jede Minute eintreffen.
+  var ENRICH_TTL_TEIL = 10 * 60 * 1000;
   var ENRICH_MAX = 400;
   // 2: IMO auch aus Wikidata, Commons ueber die IMO-Kategorie statt Volltext.
-  var ENRICH_VERSION = 2;
+  // 3: Commons laeuft auch ohne IMO (MMSI + Namensbestaetigung), und ein
+  //    Durchlauf ohne IMO wird als unvollstaendig vermerkt statt eingefroren.
+  //    Ohne die Erhoehung wirkte der Fix bei bestehenden Nutzern bis zu
+  //    30 Tage lang nicht - genau die Eintraege, die ihn brauchen.
+  var ENRICH_VERSION = 3;
   var ENRICH_GAP_MS = 350;
 
   // Alle Registerabfragen laufen serialisiert durch eine Warteschlange.
@@ -3983,7 +3995,10 @@
         localStorage.removeItem("aisstream_enrich_" + mmsi);
         return null;
       }
-      var ttl = entry.found ? ENRICH_TTL_HIT : ENRICH_TTL_MISS;
+      // Ein unvollstaendiger Durchlauf haelt nur kurz: Er wartet ohnehin
+      // darauf, dass die IMO nachkommt, und die kommt per Msg 5 in Minuten.
+      var ttl = entry.teil ? ENRICH_TTL_TEIL
+        : entry.found ? ENRICH_TTL_HIT : ENRICH_TTL_MISS;
       if (Date.now() - entry.at > ttl) {
         localStorage.removeItem("aisstream_enrich_" + mmsi);
         return null;
@@ -3994,9 +4009,10 @@
     }
   }
 
-  function enrichCacheSet(mmsi, data, found) {
+  function enrichCacheSet(mmsi, data, found, teil) {
     var key = "aisstream_enrich_" + mmsi;
-    var payload = JSON.stringify({ v: ENRICH_VERSION, at: Date.now(), found: found, data: data });
+    var payload = JSON.stringify({ v: ENRICH_VERSION, at: Date.now(), found: found,
+      teil: !!teil, data: data });
     try {
       localStorage.setItem(key, payload);
       return;
@@ -4281,15 +4297,91 @@
     });
   }
 
-  function fetchCommonsPhoto(imo) {
-    if (!imo) return Promise.resolve(null);
-    return commonsByCategory(imo).catch(function () { return null; })
-      .then(function (hit) {
-        if (hit) return hit;
-        return afterGap()
-          .then(function () { return commonsBySearch(imo); })
-          .catch(function () { return null; });
+  // --- Zweiter Identifikator: die MMSI, bestaetigt durch den Namen --------
+  //
+  // Warum ueberhaupt: Die IMO ist der Identifikator, unter dem Schiffsfotos
+  // abgelegt werden (gemessen ~12 100 Commons-Dateien mit IMO gegen ~790 mit
+  // MMSI). Aber ein Lotsenboot, ein Arbeitsschiff oder eine Yacht hat gar
+  // keine IMO - zu klein fuer SOLAS. Fuer diese ganze Klasse ist die MMSI die
+  // einzige Kennung, und ohne diesen Weg bleiben sie grundsaetzlich ohne Bild.
+  //
+  // Warum die MMSI allein NICHT reicht: Eine neunstellige Zahl kommt auch
+  // zufaellig in Beschreibungstexten vor. Gemessen lieferte die rohe Suche
+  // fuer HAV MARLIN (304734000) ein Foto aus dem Vietnamkrieg ("US Marines in
+  // small boats during Operation Jackstay"). Deshalb muss ein
+  // unterscheidungskraeftiges Wort des Schiffsnamens im DATEITITEL stehen:
+  // Die Kennung liefert die Identitaet, der Name bestaetigt sie.
+
+  // Namensbestandteile ohne Trennkraft - ohne diese Liste passt jedes
+  // Lotsenboot auf jedes andere.
+  var NAME_STOPP = ["pilotvessel", "pilot", "vessel", "ship", "boat", "tug",
+    "supply", "the", "of", "van", "der", "den"];
+
+  // AIS sendet ASCII, Commons schreibt richtig: STORSKAR gegen "Storskär"
+  // fiel sonst durch, obwohl es dasselbe Schiff ist. Beide Seiten falten.
+  function faltUm(s) {
+    return String(s || "").toLowerCase()
+      .replace(/ä|æ|å/g, "a").replace(/ö|ø|œ/g, "o").replace(/ü/g, "u")
+      .replace(/ß/g, "ss")
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  function nameWorte(name) {
+    return faltUm(name).split(/[^a-z0-9]+/).filter(function (w) {
+      if (w.length < 4) return false;             // zu kurz = zu unspezifisch
+      if (NAME_STOPP.indexOf(w) >= 0) return false;
+      if (/^\d+$/.test(w)) return false;          // reine Zahlen
+      if (/^[ivxlcdm]+$/.test(w)) return false;   // roemische Ziffern
+      return true;
+    });
+  }
+
+  // Wortgrenzen, nicht Teilzeichenkette: "Marines" darf "Marlin" nicht
+  // erfuellen - genau daran haengt die Abweisung des Vietnamfotos.
+  function titelBestaetigt(titel, worte) {
+    var t = faltUm(titel);
+    for (var i = 0; i < worte.length; i++) {
+      if (new RegExp("(^|[^a-z0-9])" + worte[i] + "($|[^a-z0-9])").test(t)) return true;
+    }
+    return false;
+  }
+
+  function commonsByMmsi(mmsi, name) {
+    var worte = nameWorte(name);
+    if (!mmsi || !worte.length) return Promise.resolve(null);
+    // Die MMSI in Anfuehrungszeichen, gefiltert wird hier. Ein serverseitiges
+    // UND mit den Namensworten war gemessen enger, nicht praeziser.
+    return commonsQuery("action=query&generator=search&gsrsearch=" +
+      encodeURIComponent('"' + mmsi + '"') + "&gsrnamespace=6&gsrlimit=15" + COMMONS_II
+    ).then(function (json) {
+      var pages = json && json.query && json.query.pages;
+      var streng = {};
+      Object.keys(pages || {}).forEach(function (k) {
+        if (pages[k].title && titelBestaetigt(pages[k].title, worte)) streng[k] = pages[k];
       });
+      return commonsPick(streng, mmsi);
+    });
+  }
+
+  // Reihenfolge: kuratierte IMO-Kategorie zuerst (keine Ratequote), dann der
+  // IMO-Volltext, zuletzt die MMSI mit Namensbestaetigung. Ohne IMO faengt die
+  // Kette direkt bei der MMSI an - frueher gab es dort ueberhaupt kein Bild.
+  function fetchCommonsPhoto(imo, mmsi, name) {
+    var kette = imo
+      ? commonsByCategory(imo).catch(function () { return null; })
+        .then(function (hit) {
+          if (hit) return hit;
+          return afterGap()
+            .then(function () { return commonsBySearch(imo); })
+            .catch(function () { return null; });
+        })
+      : Promise.resolve(null);
+    return kette.then(function (hit) {
+      if (hit) return hit;
+      return afterGap()
+        .then(function () { return commonsByMmsi(mmsi, name); })
+        .catch(function () { return null; });
+    });
   }
 
   function wikidataByMmsi(mmsi) {
@@ -4337,6 +4429,24 @@
 
   // Runs the provider chain for one MMSI. Cached results - including misses -
   // are reused so reopening a ship costs nothing.
+  // Msg 5 wiederholt sich alle sechs Minuten. Ohne diese Merkliste fragte der
+  // Client Commons im Sechsminutentakt fuer jedes Schiff auf der Karte.
+  var imoNachgezogen = {};
+
+  // Reicht Msg 5 die IMO nach, ist ein frueher ohne sie entstandener
+  // Cache-Eintrag ueberholt. Der Nachzug laeuft genau einmal je MMSI und nur
+  // fuer Schiffe, die der Nutzer ohnehin schon angesehen hat - nie fuer die
+  // ganze Tabelle.
+  function imoNachzug(entry) {
+    if (!autoEnrichInput.checked) return;
+    if (!entry.imo) return;
+    if (imoNachgezogen[entry.mmsi]) return;
+    var cached = enrichCacheGet(entry.mmsi);
+    if (!cached || !cached.teil) return;      // nichts Unvollstaendiges da
+    imoNachgezogen[entry.mmsi] = true;
+    enrichShip(entry.mmsi, true);
+  }
+
   function enrichShip(mmsi, force) {
     mmsi = String(mmsi);
     var entry = ships.get(mmsi);
@@ -4344,6 +4454,11 @@
 
     if (!force) {
       var cached = enrichCacheGet(mmsi);
+      // Ein Eintrag, der ohne IMO entstanden ist, hat den ergiebigsten
+      // Bildweg nie gesehen. Liegt die IMO inzwischen vor (Msg 5 kommt alle
+      // sechs Minuten), ist er ueberholt - sonst haelt er das schlechtere
+      // Ergebnis 3 bis 30 Tage fest.
+      if (cached && cached.teil && entry.imo) cached = null;
       if (cached) {
         applyEnrichment(entry, cached.data);
         entry.enrichState = cached.found ? "done" : "empty";
@@ -4361,6 +4476,8 @@
     if (selectedMmsi === mmsi) renderDetail(entry);
 
     var generation = cacheGeneration;
+    // Wird gesetzt, wenn der Durchlauf ohne IMO lief und kein Bild fand.
+    var unvollstaendig = false;
     var soft = function (e) {
       entry.enrichError = e.message;
       return null;
@@ -4409,25 +4526,31 @@
       }
       // Nur ergaenzend: Wikidatas eigenes Foto hat Vorrang, es ist dem
       // Schiff eindeutig zugeordnet statt ueber eine Textsuche gefunden.
-      if (merged.image || !imo) return merged.sources.length ? merged : null;
-      // Commons ist eine eigenstaendige Quelle und braucht nur die IMO. Hier
-      // stand frueher ein Ausstieg, sobald weder Digitraffic noch Wikidata
-      // etwas hatten - damit blieb ein Schiff, das in keinem der beiden
-      // Register steht, ohne Bild, auch wenn Commons Fotos davon fuehrt.
+      if (merged.image) return merged.sources.length ? merged : null;
+      // Ohne IMO bleibt der Durchlauf UNVOLLSTAENDIG - der Commons-Weg ueber
+      // die IMO-Kategorie ist der ergiebigste, und die IMO kommt erst mit
+      // Msg 5 (alle sechs Minuten). Wird das nicht vermerkt, friert der Cache
+      // das schlechtere Ergebnis 3 bis 30 Tage ein; siehe enrichCacheGet().
+      if (!imo) unvollstaendig = true;
+      // Commons ist eine eigenstaendige Quelle. Sie laeuft jetzt AUCH OHNE
+      // IMO, weil der MMSI-Weg mit Namensbestaetigung Schiffe erreicht, die
+      // gar keine IMO haben - Lotsen- und Arbeitsboote etwa.
       return throttled("commons", function () {
-        return fetchCommonsPhoto(imo).catch(function () { return null; });
+        return fetchCommonsPhoto(imo, mmsi, entry.name).catch(function () { return null; });
       }).then(function (photo) {
         if (photo) {
           merged.image = photo.image;
           merged.imageCredit = photo.imageCredit;
           merged.sources.push("Commons");
+          unvollstaendig = false;     // Bild ist da, es fehlt nichts mehr
         }
         return merged.sources.length ? merged : null;
       });
     }).then(function (data) {
       applyEnrichment(entry, data);
       entry.enrichState = data ? "done" : "empty";
-      if (generation === cacheGeneration) enrichCacheSet(mmsi, data, !!data);
+      // Ein Durchlauf ohne IMO und ohne Bild ist kein fertiges Ergebnis.
+      if (generation === cacheGeneration) enrichCacheSet(mmsi, data, !!data, unvollstaendig);
       delete enrichInFlight[mmsi];
       refreshVisibleShips();
       if (selectedMmsi === mmsi) renderDetail(entry);
