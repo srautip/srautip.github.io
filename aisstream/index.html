@@ -3640,7 +3640,7 @@
 
     diary.unshift(sighting);
     saveDiary();
-    keepDiaryPhoto(ship.enrich && ship.enrich.image);
+    keepDiaryPhoto(diaryBild(ship));
     renderDiary();
     log("Ins Tagebuch: " + (ship.name || "MMSI " + entry.mmsi) + ".");
     return sighting;
@@ -3655,7 +3655,7 @@
     });
     if (!gone) return;
     saveDiary();
-    dropDiaryPhoto(gone.ship && gone.ship.enrich && gone.ship.enrich.image);
+    dropDiaryPhoto(diaryBild(gone.ship));
     renderDiary();
     if (selectedMmsi && ships.has(selectedMmsi)) renderDetail(ships.get(selectedMmsi));
   }
@@ -3675,7 +3675,24 @@
   // prunePhotoCache() wirft im normalen Bildspeicher alles ueber PHOTO_MAX
   // weg. Ein Tagebuchfoto gehoert zu einem Eintrag, den der Nutzer behalten
   // will - es bekommt deshalb einen eigenen Topf ohne Obergrenze.
-  function keepDiaryPhoto(url) {
+  // Die EINE Stelle, die aus einem Tagebucheintrag eine Bild-URL macht.
+  //
+  // Gemeldet als "im Tagebuch fehlt das Bild zur WANGEROOGE": Deren Foto kommt
+  // aus Wikidata P18, und das ist eine Special:FilePath-URL OHNE width. Ueberall
+  // sonst laeuft jede Bild-URL durch photoUrl() (https + width=480) - im
+  // Tagebuch lief die ROHE URL. Die Folgen waren gleich dreifach:
+  //   - der Treffer im normalen Bildspeicher wurde verfehlt (anderer Schluessel),
+  //   - der Ersatzabruf ging auf die URL ohne width, die statt eines Bildes eine
+  //     Umleitung bzw. das Original liefert,
+  //   - und das <img> im Eintrag bekam ebenfalls die rohe URL.
+  // Deshalb faltet jede Tagebuch-Bildfunktion die URL SELBST - so koennen die
+  // Aufrufer es nicht wieder auseinanderlaufen lassen.
+  function diaryBild(ship) {
+    return photoUrl(ship && ship.enrich && ship.enrich.image);
+  }
+
+  function keepDiaryPhoto(roh) {
+    var url = photoUrl(roh);
     if (!url || typeof caches === "undefined") return Promise.resolve();
     return caches.open(DIARY_PHOTO_CACHE).then(function (target) {
       return target.match(url).then(function (have) {
@@ -3693,12 +3710,15 @@
     }).catch(function () {});
   }
 
-  function dropDiaryPhoto(url) {
+  function dropDiaryPhoto(roh) {
+    var url = photoUrl(roh);
     if (!url || typeof caches === "undefined") return Promise.resolve();
     // Dasselbe Schiff darf mehrfach im Tagebuch stehen - das Bild nur dann
-    // wegwerfen, wenn kein Eintrag mehr darauf zeigt.
+    // wegwerfen, wenn kein Eintrag mehr darauf zeigt. BEIDE Seiten falten,
+    // sonst vergleicht man rohe mit gefalteten URLs und loescht ein Bild, das
+    // noch gebraucht wird.
     var stillUsed = diary.some(function (s) {
-      return s.ship && s.ship.enrich && s.ship.enrich.image === url;
+      return diaryBild(s.ship) === url;
     });
     if (stillUsed) return Promise.resolve();
     return caches.open(DIARY_PHOTO_CACHE)
@@ -3706,7 +3726,8 @@
       .catch(function () {});
   }
 
-  function diaryPhoto(url) {
+  function diaryPhoto(roh) {
+    var url = photoUrl(roh);
     if (!url) return Promise.resolve("");
     if (typeof caches === "undefined") return Promise.resolve(url);
     return caches.open(DIARY_PHOTO_CACHE).then(function (c) {
@@ -3812,7 +3833,7 @@
         '<textarea rows="1" placeholder="Notiz (optional)">' + esc(s.note || "") + "</textarea>" +
         '<div class="row-end"><button type="button" class="del">Löschen</button></div>';
 
-      var bild = ship.enrich && ship.enrich.image;
+      var bild = diaryBild(ship);
       if (bild) {
         diaryPhoto(bild).then(function (src) {
           if (!src || !el.isConnected) return;
@@ -3911,7 +3932,7 @@
     diary.sort(function (a, b) { return b.at - a.at; });
     saveDiary();
     diary.forEach(function (s) {
-      keepDiaryPhoto(s.ship && s.ship.enrich && s.ship.enrich.image);
+      keepDiaryPhoto(diaryBild(s.ship));
     });
     renderDiary();
     log("Import: " + neu + " Sichtung(en) übernommen" +

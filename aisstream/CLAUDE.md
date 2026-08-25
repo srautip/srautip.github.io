@@ -1812,6 +1812,58 @@ Der Export enthält nur die Bild-**URLs**, nicht die Bilddaten; sonst wäre die
 Datei um Größenordnungen größer. Nach einem Import wird ein Foto bei Bedarf neu
 geladen.
 
+#### Die rohe URL war der Fehler: „im Tagebuch fehlt das Bild zur WANGEROOGE"
+
+Gemeldeter Fall. Deren Foto kommt aus **Wikidata `P18`**, und das ist eine
+`Special:FilePath`-URL **ohne** `width`-Parameter. Überall sonst läuft jede
+Bild-URL durch `photoUrl()` (http→https, plus `?width=480`) — **im Tagebuch lief
+die rohe URL**. Das schlug gleich dreifach durch:
+
+| Stelle | Folge |
+|---|---|
+| `keepDiaryPhoto()` | `PHOTO_CACHE.match(roh)` verfehlt den längst vorhandenen Blob — **anderer Schlüssel** |
+| dessen Ersatzabruf | geht auf die URL ohne `width`, die kein Bild liefert (siehe „`?width=480` ist Pflicht") |
+| `renderDiary()` → `diaryPhoto()` | setzt die rohe URL als `<img src>` — `naturalWidth` bleibt 0 |
+
+Gemessen (`scratchpad/tagebuchbild.js`): Die Detailansicht fragte
+`…Harle%20Gatt.JPG?width=480` und zeigte das Bild; das Tagebuch fragte
+dieselbe Datei **dreimal ohne** `width` und blieb leer.
+
+**Warum es bei Commons-Fotos nie auffiel:** Deren URLs kommen fertig aus der
+API (`info.thumburl`, schon `https` auf `upload.wikimedia.org`). Für die ist
+`photoUrl()` die Identität, roh und gefaltet sind gleich. Nur bei
+**Wikidata-P18-URLs** gehen sie auseinander — und genau diese Quelle hat die
+WANGEROOGE.
+
+**Behoben an einer Stelle statt an vier:** `diaryBild(ship)` liefert die URL,
+und `keepDiaryPhoto()`, `dropDiaryPhoto()` und `diaryPhoto()` falten zusätzlich
+**selbst** (`photoUrl()` ist idempotent). So können die Aufrufer es nicht wieder
+auseinanderlaufen lassen. Bei `dropDiaryPhoto()` müssen **beide** Seiten des
+`stillUsed`-Vergleichs gefaltet sein — sonst vergleicht man rohe mit gefalteten
+URLs und löscht ein Bild, das noch ein anderer Eintrag braucht.
+
+**Bestehende Einträge heilen sich selbst:** `renderDiary()` faltet beim Lesen,
+findet den Blob im normalen Bildspeicher und legt ihn im Tagebuchtopf ab. Der
+Nutzer muss nichts neu eintragen — im Test ausdrücklich mit einem alten Eintrag
+samt roher `http://`-URL geprüft.
+
+Netter Nebeneffekt: Nach dem Fix macht `keepDiaryPhoto()` **null**
+Netzanfragen — der Blob liegt schon unter demselben Schlüssel, den die
+Detailansicht benutzt hat.
+
+**Merke:** Jede Bild-URL in dieser App gehört durch `photoUrl()`. Wer einen
+neuen Anzeigeort ergänzt, faltet dort ebenfalls — die Funktion ist idempotent,
+doppeltes Falten schadet nicht, fehlendes schon.
+
+**Zwei Testfallen dabei**, beide haben die Probe erst nichts messen lassen:
+
+- **Ein selbstgebasteltes JPEG-Bytemuster lädt der Browser nicht**
+  (`naturalWidth` bleibt 0) — die Probe wäre auch nach dem Fix rot geblieben.
+  Es braucht ein wirklich dekodierbares Bild.
+- **`addInitScript(() => localStorage.clear())` läuft bei JEDEM Laden**, also
+  auch beim `reload` — und löscht den gerade gesetzten Testeintrag wieder.
+  Deshalb ein Merker (`__behalten`), der das Leeren einmalig überspringt.
+
 ### Zwei Schubladen, ein Abdunkler
 
 `#settings` ist erst unter 1024 px eine Schublade und darüber eine Spalte;
