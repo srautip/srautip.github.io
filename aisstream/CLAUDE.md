@@ -841,6 +841,105 @@ Details:
 - Der Log schreibt die tatsächlich gesendete Box samt „(+50 km Rand)", damit
   nicht verwirrt, dass die Bbox-Felder etwas anderes zeigen.
 
+### Snapshot beim Verschieben, und warum nicht parallel
+
+`loadSnapshot()` lief lange **nur beim Seitenstart** und beim Knopfdruck. Der
+`moveend`-Handler zog Bbox-Felder und Subscription nach, holte aber keinen
+Snapshot. Wer in ein neues Gebiet schwenkte, sah:
+
+- **mit** Verbindung: Positionen nach Sekunden, Name, Typ und Maße aber erst mit
+  der nächsten `ShipStaticData` — bei Class A alle sechs Minuten.
+- **ohne** API-Key: **gar nichts, dauerhaft.** `sendSubscription()` steigt ohne
+  Socket sofort aus, `refreshVisibleShips()` filtert nur den Bestand.
+
+`maybeLoadSnapshot()` hängt jetzt im `moveend`-Handler. Vier Ausstiege, jeder
+mit eigenem Grund:
+
+| Ausstieg | warum |
+|---|---|
+| `autoSnapshot` aus | der Ausschalter für den Nutzer, Beschriftung passt schon |
+| kein openwaters-Server | `/v1/vessels` gibt es nur dort |
+| Sicht liegt in `snapshotBox` **und** jünger als `SNAPSHOT_MAX_AGE_MS` (60 s) | der 50-km-Rand deckt kleine Schwenke ab |
+| Sichtfläche > `SNAPSHOT_MAX_AUTO_SQDEG` (15) | siehe unten |
+
+**Der Rand ist größer, als man denkt.** Bei Zoomstufe „Deutsche Bucht" sind die
+50 km rund **0,76° Länge je Seite** — über eine Bildschirmbreite. Gemessen
+(`scratchpad/snapshotpan.js`): 120 px Schwenk kosten keine Anfrage, eine Reise
+von 2600 px kostet zwei. Ein Test, der nach einem großen Schwenk *genau eine*
+Anfrage erwartet, hat also die falsche Erwartung.
+
+**Flächengrenze nur für den automatischen Weg.** `applyMapFilter()` hat keinen
+Deckel — jedes Schiff in der Sicht bekommt eine eigene Leaflet-Ebene. Gemessen
+(`scratchpad/markerlimit.js`, echte Snapshot-Antworten wachsender Größe):
+
+| Schiffe | Marker in Sicht | Snapshot einarbeiten | **Schwenk** |
+|---|---|---|---|
+| 600 | 90 | 106 ms | 224 ms |
+| 1500 | 230 | 203 ms | 244 ms |
+| 3000 | 429 | 482 ms | **366 ms** |
+| 6000 | 893 | 523 ms | 582 ms |
+| 12 900 | 1863 | 1144 ms | 1865 ms |
+
+Bei rund 3000 Schiffen kippt es. Dichte europäischer Küstengewässer, ebenfalls
+gemessen: Deutsche Bucht 600 Schiffe / 2,5 sq°, Nordsee 12 900 / 91 sq° — also
+140–240 je Quadratgrad. 3000 / 200 ≈ **15 Quadratgrad**. Von Hand bleibt jede
+Größe möglich, und die Grenze **meldet sich im Log** statt still zu greifen;
+stilles Weglassen sieht wie ein Fehler aus.
+
+> **Messfalle:** Ein früherer Versuch schickte N Einzelnachrichten durch den
+> WebSocket. Das ist über `refreshVisibleShips()` O(n²) und ergab 200 s für
+> 12 900 Schiffe — gegenüber 1,1 s auf dem echten Snapshot-Weg. Wer die Grenze
+> nachprüft: über eine Snapshot-**Antwort** messen, nicht über Einzelmeldungen.
+
+**Abbruch statt Auflaufen.** `loadSnapshot(auto)` hat einen eigenen
+`AbortController`; ein neuer Schwenk bricht die vorige Abfrage ab, und ein
+`AbortError` landet **nicht** als „Snapshot fehlgeschlagen" im Log. Dazu eine
+Frist von 15 s — vorher lief die Abfrage mit nacktem `fetch`, und eine hängende
+Antwort ließ `snapshotBtn` **dauerhaft** deaktiviert, weil `finally` nie lief.
+Ein bestehender kleiner Fehler, den das Auslösen bei jedem Schwenk viel
+wahrscheinlicher gemacht hätte.
+
+**`snapshotBox` wird erst nach dem Erfolg gesetzt** — sonst gälte eine
+abgebrochene oder fehlgeschlagene Abfrage als abgedeckt und blockierte den
+Nachschlag.
+
+**Falle beim Verdrahten:** `snapshotBtn.addEventListener("click", loadSnapshot)`
+reicht das `MouseEvent` als erstes Argument durch. Ein Event ist truthy, der
+Knopf liefe damit im `auto`-Modus samt Abdeckungslogik. Deshalb steht dort ein
+Wrapper mit `loadSnapshot(false)`.
+
+#### Parallele kleine Teilboxen bringen nichts (gemessen, nicht vermutet)
+
+Naheliegende Idee: die Box in vier Teile schneiden und parallel abfragen.
+Gemessen gegen die echte API, warme Verbindung, Deutsche Bucht — Median über
+fünf Läufe **302 ms für eine Vollbox gegen 318 ms für vier parallele Viertel**,
+bei identischer Schiffszahl (599). Nie schneller, mit Ausreißern bis 681 ms.
+
+Drei Messungen erklären das:
+
+1. **Fester Boden von ~172 ms.** Eine *leere* Antwort — 43 Bytes, mitten im
+   Atlantik, null Schiffe — braucht warm 172 ms, die volle Bucht mit 600
+   Schiffen 197 ms. Der Umlauf dominiert, die Boxgröße kaum. Jede Teilanfrage
+   zahlt diesen Boden erneut.
+2. **Auch bei großen Boxen nicht.** Nordsee, 12 900 Schiffe, 583 KB gzip: eine
+   Anfrage 512/616/602 ms, vier parallel 826/622/799 ms, neun parallel
+   818/842/551 ms. Die Übertragung ist bandbreitenbegrenzt, Aufteilen ändert
+   die Gesamtbytes nicht.
+3. **Kein Trefferdeckel, den man umgehen könnte.** Das war der eigentliche
+   Verdacht — schneidet der Server bei einer Anfrage still ab, brächte
+   Aufteilen *mehr Daten*, was wichtiger wäre als Tempo. Gegenprobe: dieselbe
+   Nordseefläche einmal am Stück und einmal als vier Teile → **12 884 gegen
+   12 885 MMSIs**, der eine Unterschied ist ein Schiff, das in den Sekunden
+   dazwischen auftauchte. Eine Box von ~800 Quadratgrad lieferte 28 913
+   Schiffe in *einer* Antwort.
+
+Nebenbefund: Der `area: 400`-Deckel des Tokens gilt für die
+**WebSocket-Subscription**, nicht für die schlüssellose REST-Abfrage — die nahm
+800 Quadratgrad anstandslos an. `expandBox()` ist für den Snapshot also
+überkorrekt. **Trotzdem nicht ändern:** Dieselbe Funktion bedient die
+Subscription, wo der Deckel real ist, und über 400 Quadratgrad ist ein
+50-km-Rand ohnehin bedeutungslos.
+
 **Marker folgen der Sicht, nicht der Abfragebox.** Ohne das lagen bei 20
 sichtbaren Schiffen 610 Marker im DOM — unnötige Last, gerade auf dem
 Telefon. `markerInView()` nimmt sie mit `getBounds().pad(0.25)` von der
@@ -891,7 +990,9 @@ Zwei Schalter, beide vorbelegt und in `aisstream_auto_snapshot` /
 `aisstream_auto_connect` gemerkt:
 
 1. **Snapshot zuerst** — braucht keinen Key, antwortet in einer Anfrage und
-   füllt die Karte sofort, während der Stream nur langsam eintröpfelt.
+   füllt die Karte sofort, während der Stream nur langsam eintröpfelt. Derselbe
+   Schalter steuert auch das Nachladen beim Verschieben der Karte (siehe
+   „Snapshot beim Verschieben").
 2. **Dann verbinden** — aber **nur, wenn schon ein Key gespeichert ist**.
    Sonst würde `connect()` bei *jedem* Seitenaufruf ein `alert()` werfen;
    stattdessen gibt es eine Zeile im Log und sonst nichts.
@@ -1718,7 +1819,9 @@ verifiziert:
   und OpenStreetMap
 - **Snapshot-Button**: holt `GET /v1/vessels?bbox=…` für den aktuellen
   Ausschnitt und füllt Karte und Tabelle — ohne WebSocket-Verbindung und
-  ohne API-Key. Warnt, wenn kein geladenes Schiff im Kartenausschnitt liegt
+  ohne API-Key. **Beim Verschieben der Karte passiert das automatisch**, sofern
+  der Ausschnitt den 50-km-Rand der letzten Abfrage verlässt und nicht größer
+  als 15 Quadratgrad ist (siehe eigenen Abschnitt oben). Warnt, wenn kein geladenes Schiff im Kartenausschnitt liegt
   (passiert, wenn die Box von Hand abweichend gesetzt wurde)
 - **„Bei openwaters nachschlagen"** in der Detailansicht: Einzelabfrage per
   `?mmsi=`, ergänzt fehlende Felder und weist die Quelle aus. Beides nur

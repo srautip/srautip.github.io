@@ -1499,6 +1499,9 @@
       mapMoveTimer = setTimeout(function () {
         updateBboxFieldsFromMap();
         sendSubscription();
+        // Ohne das bleibt ein neu angefahrenes Gebiet minutenlang leer - und
+        // ohne API-Key dauerhaft. Siehe maybeLoadSnapshot().
+        maybeLoadSnapshot();
         refreshVisibleShips();
       }, 400);
     });
@@ -4436,6 +4439,34 @@
     return "https://" + host + "/v1/vessels";
   }
 
+  // Was die letzte Snapshot-Abfrage abgedeckt hat, und wann. Kleine Schwenke
+  // bleiben innerhalb des 50-km-Randes aus expandBox() und kosten dann gar
+  // keine Anfrage - genau dafuer ist der Rand da.
+  var snapshotBox = null;
+  var snapshotAt = 0;
+  // Auch innerhalb der abgedeckten Box irgendwann neu holen: Wer nach einer
+  // Viertelstunde zurueckschwenkt, soll keine Karteileichen sehen. Nur beim
+  // Schwenken, kein Hintergrundtakt.
+  var SNAPSHOT_MAX_AGE_MS = 60000;
+  // Obergrenze fuer den AUTOMATISCHEN Weg. Gemessen (scratchpad/markerlimit.js,
+  // Snapshot-Antworten wachsender Groesse): bis 1500 Schiffe bleibt ein Schwenk
+  // bei ~240 ms, bei 3000 sind es 366 ms, bei 6000 schon 582 ms und bei 12 900
+  // 1865 ms. applyMapFilter() hat naemlich keinen Deckel - jedes Schiff in der
+  // Sicht bekommt eine eigene Leaflet-Ebene. Bei rund 200 Schiffen je
+  // Quadratgrad (Deutsche Bucht 600/2,5, Nordsee 12 900/91) liegen 3000 Schiffe
+  // bei etwa 15 Quadratgrad. Von Hand bleibt jede Groesse moeglich.
+  var SNAPSHOT_MAX_AUTO_SQDEG = 15;
+  // Laufende Abfrage, damit ein neuer Schwenk die alte abbrechen kann.
+  var snapshotCtrl = null;
+  var SNAPSHOT_TIMEOUT_MS = 15000;
+  var snapshotAutoOffLogged = false;
+
+  function boxCovers(outer, inner) {
+    return !!outer && !!inner &&
+      inner.latMin >= outer.latMin && inner.latMax <= outer.latMax &&
+      inner.lonMin >= outer.lonMin && inner.lonMax <= outer.lonMax;
+  }
+
   // One GeoJSON feature -> the same ship record the WebSocket path builds,
   // so snapshot and live data land in one table.
   function applySnapshotFeature(feature) {
@@ -4487,7 +4518,9 @@
     return true;
   }
 
-  function loadSnapshot() {
+  // `auto` = vom Kartenschwenk ausgeloest: knapperes Log, und ein Abbruch
+  // durch den naechsten Schwenk ist keine Fehlermeldung wert.
+  function loadSnapshot(auto) {
     var base = vesselsApiBase();
     if (!base) {
       log("Snapshot gibt es nur für openwaters-Server (/v1/vessels). Aktuelle Server-URL passt nicht.");
@@ -4502,9 +4535,22 @@
     // Same corner order as the WebSocket subscription: latitude first.
     var box = expandBox(latMin, lonMin, latMax, lonMax);
     var url = base + "?bbox=" + [box.latMin, box.lonMin, box.latMax, box.lonMax].join(",");
+
+    // Der vorige Schwenk ist ueberholt, sobald ein neuer da ist. Ohne Abbruch
+    // laufen bei schneller Bedienung mehrere Antworten ein, die sich
+    // gegenseitig nichts nuetzen.
+    if (snapshotCtrl) snapshotCtrl.abort();
+    // Eigener Controller statt fetchWithTimeout(): Dort bleibt er intern, hier
+    // muss er von aussen erreichbar sein. Die Frist ist trotzdem Pflicht - ohne
+    // sie laesst eine haengende Antwort snapshotBtn dauerhaft deaktiviert,
+    // weil finally nie laeuft.
+    var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+    snapshotCtrl = ctrl;
+    var frist = ctrl ? setTimeout(function () { ctrl.abort(); }, SNAPSHOT_TIMEOUT_MS) : null;
+
     snapshotBtn.disabled = true;
-    log("Lade Snapshot: BBox " + boxLabel(box) + "…");
-    fetch(url)
+    if (!auto) log("Lade Snapshot: BBox " + boxLabel(box) + "…");
+    fetch(url, ctrl ? { signal: ctrl.signal } : undefined)
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
@@ -4519,22 +4565,67 @@
           var c = f.geometry.coordinates;
           if (!mapAvailable || map.getBounds().contains([c[1], c[0]])) inView++;
         });
+        // Erst nach dem Erfolg merken - sonst gilt eine abgebrochene oder
+        // fehlgeschlagene Abfrage als abgedeckt und blockiert den Nachschlag.
+        snapshotBox = box;
+        snapshotAt = Date.now();
         refreshVisibleShips();
+        if (auto) {
+          log("Snapshot zum neuen Ausschnitt: " + inView + " von " + added +
+            " Schiffen im Bild (" + ships.size + " MMSIs bekannt).");
+          return;
+        }
         log("Snapshot: " + added + " Schiffe übernommen, " + inView +
           " davon im Kartenausschnitt (" + ships.size + " MMSIs bekannt).");
         // The table only shows what is inside the map view. If the box was
         // edited by hand the snapshot can land entirely off-screen, so say
-        // so rather than leaving an apparently empty result.
+        // so rather than leaving an apparently empty result. Beim
+        // Kartenschwenk kann das nicht passieren - die Box kommt ja von dort.
         if (added > 0 && inView === 0 && mapAvailable) {
           log("Keines davon liegt im aktuellen Kartenausschnitt – Karte auf die Bounding Box verschieben.");
         }
       })
       .catch(function (e) {
+        // Ein Abbruch ist die Regel, nicht der Fehlerfall: Er bedeutet, dass
+        // der Nutzer weitergeschwenkt hat.
+        if (e && e.name === "AbortError") return;
         log("Snapshot fehlgeschlagen: " + e.message);
       })
       .finally(function () {
+        if (frist) clearTimeout(frist);
+        if (snapshotCtrl === ctrl) snapshotCtrl = null;
         snapshotBtn.disabled = false;
       });
+  }
+
+  // Nach jedem Kartenschwenk (400 ms entprellt). Vier Ausstiege, jeder mit
+  // eigenem Grund - siehe die Konstanten oben.
+  function maybeLoadSnapshot() {
+    if (!autoSnapshotInput.checked) return;
+    if (!vesselsApiBase()) return;
+    if (!mapAvailable) return;
+
+    var b = map.getBounds();
+    var sicht = { latMin: b.getSouth(), lonMin: b.getWest(),
+                  latMax: b.getNorth(), lonMax: b.getEast() };
+
+    if (boxArea(sicht) > SNAPSHOT_MAX_AUTO_SQDEG) {
+      // Einmal sagen, nicht bei jedem Schwenk - und nicht stillschweigend
+      // weglassen, das saehe wie ein Fehler aus.
+      if (!snapshotAutoOffLogged) {
+        snapshotAutoOffLogged = true;
+        log("Ausschnitt zu groß für den automatischen Snapshot (" +
+          boxArea(sicht).toFixed(0) + " von höchstens " + SNAPSHOT_MAX_AUTO_SQDEG +
+          " Quadratgrad). Näher heranzoomen oder den Knopf benutzen.");
+      }
+      return;
+    }
+    snapshotAutoOffLogged = false;
+
+    // Der 50-km-Rand der letzten Abfrage deckt kleine Schwenke ab.
+    if (boxCovers(snapshotBox, sicht) && Date.now() - snapshotAt < SNAPSHOT_MAX_AGE_MS) return;
+
+    loadSnapshot(true);
   }
 
   // Single-MMSI lookup for the detail drawer. The endpoint answers from a
@@ -5390,7 +5481,10 @@
     setTimeout(function () { map.invalidateSize(); }, 300);
   }
 
-  snapshotBtn.addEventListener("click", loadSnapshot);
+  // Nicht loadSnapshot direkt haengen: Der Listener reicht das MouseEvent als
+  // erstes Argument durch, und ein Event ist truthy - der Knopf liefe damit im
+  // "auto"-Modus samt Abdeckungslogik.
+  snapshotBtn.addEventListener("click", function () { loadSnapshot(false); });
   document.getElementById("clearCacheBtn").addEventListener("click", clearAllCaches);
   autoEnrichInput.addEventListener("change", function () {
     localStorage.setItem("aisstream_auto_enrich", autoEnrichInput.checked ? "1" : "0");
