@@ -69,7 +69,12 @@
   .dot.error { background: var(--err); box-shadow: 0 0 6px var(--err); }
   main {
     display: grid;
-    grid-template-columns: 320px 1fr;
+    /* Einspaltig auf JEDER Breite. Frueher stand hier eine feste 320px-Spalte
+       fuer die Technik - am Desktop und auf dem iPad quer lagen API-Key,
+       Bounding Box, Nachrichtentypen und Log damit dauerhaft neben der Karte,
+       obwohl man sie im Betrieb praktisch nie braucht. Sie sitzt jetzt
+       ueberall hinter dem Knopf "Verbindung & Technik", wie auf dem iPhone. */
+    grid-template-columns: 1fr;
     gap: 1rem;
     padding: 1rem 1.5rem 2rem;
   }
@@ -435,7 +440,23 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
   }
+  /* Fadenkreuz um das gerade geoeffnete Schiff. Bewusst ein Kreuz und kein
+     Ring: Die Kreisflaeche ist in dieser Karte vollstaendig fuer Schiffstypen
+     vergeben, ein zusaetzlicher Ring waere als Typ lesbar. Und bewusst ein
+     "+" statt eines "x" - das schwarze x gehoert schon dem eigenen Standort,
+     zwei gleich geformte Kreuze nebeneinander waeren verwechselbar.
+     Der dunkle Umriss zuerst, darueber das Gelb: Reines Gelb auf hellen
+     Landkacheln (#f2efe9) traegt sonst zu wenig Kontrast. */
+  .sel-x {
+    position: absolute;
+    left: 0; top: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .sel-x .halo { stroke: #0b0b0b; stroke-width: 4.5; opacity: 0.8; }
+  .sel-x .bar { stroke: #ffd21e; stroke-width: 2.5; }
   .ship-mark {
     border-radius: 50%;
     box-sizing: border-box;
@@ -746,33 +767,35 @@
 
   /* Auf dem iPad hochkant ist eine 320px-Spalte plus Karte zu eng:
      Technik wandert dort schon in die Schublade. */
+  /* Technik als Schublade, auf jeder Breite - sonst schiebt sich die
+     komplette Technik neben oder ueber Karte und Tabelle, und man liest an
+     API-Key, Bounding Box und Log vorbei, bevor ein einziges Schiff sichtbar
+     wird. Gilt jetzt auch fuer Desktop und iPad quer; vorher endete das
+     bei 1024px. */
+  .settings-head { display: flex; }
+  #settings {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: min(420px, 92vw);
+    z-index: 1300;
+    overflow-y: auto;
+    border-radius: 0;
+    border: none;
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
+    transform: translateX(100%);
+    transition: transform 0.2s ease-out;
+    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch;
+  }
+  #settings.open { transform: translateX(0); }
+
   @media (max-width: 1024px) {
     header { padding: 0.85rem 1rem; }
     header h1 { font-size: 1rem; }
-    main { grid-template-columns: 1fr; padding: 0.75rem 1rem 2rem; }
-    .settings-head { display: flex; }
-
-    /* Schublade statt Spalte - sonst schiebt sich die komplette Technik
-       ueber Karte und Tabelle, und man scrollt an API-Key und Log vorbei,
-       bevor ein einziges Schiff sichtbar wird. */
-    #settings {
-      position: fixed;
-      top: 0; right: 0; bottom: 0;
-      width: min(420px, 92vw);
-      z-index: 1300;
-      overflow-y: auto;
-      border-radius: 0;
-      border: none;
-      border-left: 1px solid var(--border);
-      box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
-      transform: translateX(100%);
-      transition: transform 0.2s ease-out;
-      padding-top: max(1rem, env(safe-area-inset-top));
-      padding-right: max(1rem, env(safe-area-inset-right));
-      padding-bottom: max(2rem, env(safe-area-inset-bottom));
-      -webkit-overflow-scrolling: touch;
-    }
-    #settings.open { transform: translateX(0); }
+    main { padding: 0.75rem 1rem 2rem; }
     #map { height: 42vh; min-height: 260px; }
     .table-wrap { max-height: none; }
   }
@@ -1584,8 +1607,10 @@
   // encoding actually changed, not on every position update.
   function iconKey(entry) {
     var step = sizeStep(entry);
+    // Die Auswahl gehoert in den Schluessel, sonst merkt refreshMarkerIcon()
+    // den Wechsel nicht und das Fadenkreuz bleibt beim alten Schiff stehen.
     return [typeCategory(entry) || "-", step ? step.key : "?",
-      entry.station || "ship"].join("|");
+      entry.station || "ship", entry.mmsi === selectedMmsi ? "sel" : "-"].join("|");
   }
 
   function shipIcon(entry) {
@@ -1602,9 +1627,31 @@
     // target. The mark sits centred inside a transparent 24px box so the hit
     // area stays comfortable without changing what is drawn.
     var box = Math.max(px, MARKER_HIT_PX);
+    // Das gerade geoeffnete Schiff bekommt ein Fadenkreuz. Es sitzt HINTER
+    // dem Punkt und greift ueber ihn hinaus, damit Typfarbe und Groesse
+    // unveraendert lesbar bleiben - die Markierung ist ein Zustand, keine
+    // weitere Kodierung.
+    var kreuz = "";
+    if (entry.mmsi === selectedMmsi) {
+      var mid = box / 2;
+      var arm = Math.round(box / 2) + 7;
+      // Vier Arme mit freier Mitte, kein durchgehendes Kreuz: Ein 7 px breiter
+      // Balken (Umriss mitgerechnet) quer durch einen 8-px-Punkt haette die
+      // Typfarbe fast vollstaendig verdeckt - genau der Fehler, der die Karte
+      // schon einmal einfarbig gemacht hat. Die Luecke waechst mit dem Punkt.
+      var frei = px / 2 + 3;
+      var d = "M" + (mid - arm) + " " + mid + "H" + (mid - frei) +
+        "M" + (mid + frei) + " " + mid + "H" + (mid + arm) +
+        "M" + mid + " " + (mid - arm) + "V" + (mid - frei) +
+        "M" + mid + " " + (mid + frei) + "V" + (mid + arm);
+      kreuz = '<svg class="sel-x" width="' + box + '" height="' + box +
+        '" fill="none" stroke-linecap="round">' +
+        '<path class="halo" d="' + d + '"/><path class="bar" d="' + d + '"/></svg>';
+    }
     return L.divIcon({
       className: "",
       html: '<div class="ship-hit" style="width:' + box + "px;height:" + box + 'px;">' +
+        kreuz +
         '<div class="ship-mark' + shape + hollow + '" style="width:' + px + "px;height:" + px +
         "px;" + (step ? "background:" + color : "border-color:" + color) + ';"></div></div>',
       iconSize: [box, box],
@@ -1690,7 +1737,12 @@
         '<div class="row"><span class="sw square" style="background:' + NEUTRAL_COLOR + '"></span>Landstation</div>' +
         '<div class="row"><span class="sw cross">' +
         '<svg width="11" height="11" fill="none" stroke="#0b0b0b" stroke-width="2" stroke-linecap="round">' +
-        '<path d="M2 2L9 9M9 2L2 9"/></svg></span>Eigener Standort</div>';
+        '<path d="M2 2L9 9M9 2L2 9"/></svg></span>Eigener Standort</div>' +
+        '<div class="row"><span class="sw cross">' +
+        '<svg width="13" height="13" fill="none" stroke-linecap="round">' +
+        '<path d="M1 6.5H12M6.5 1V12" stroke="#0b0b0b" stroke-width="4" opacity="0.8"/>' +
+        '<path d="M1 6.5H12M6.5 1V12" stroke="#ffd21e" stroke-width="2"/></svg>' +
+        "</span>Ausgewähltes Schiff</div>";
 
       div.innerHTML =
         '<button type="button" class="legend-head" aria-expanded="true">' +
@@ -4733,13 +4785,27 @@
     detailMedia.innerHTML = "";
   }
 
+  // Nur die beiden betroffenen Marker neu zeichnen, nicht alle: Das
+  // Fadenkreuz haengt am ausgewaehlten Schiff, also verliert es genau einer
+  // und genau einer bekommt es.
+  function markiereAuswahl(vorher) {
+    if (!mapAvailable) return;
+    [vorher, selectedMmsi].forEach(function (m) {
+      if (!m) return;
+      var e = ships.get(m);
+      if (e) syncMarker(e);
+    });
+  }
+
   function openDetail(mmsi) {
     mmsi = String(mmsi);
     if (!ships.has(mmsi)) return;
     // Beim Schiffswechsel muss das alte Bild weg, sonst haengt es am neuen
     // Schiff, bis dessen Registerabfrage durch ist.
     if (selectedMmsi !== mmsi) releaseDetailPhoto();
+    var vorher = selectedMmsi;
     selectedMmsi = mmsi;
+    markiereAuswahl(vorher);
     detailEl.classList.add("open");
     detailEl.setAttribute("aria-hidden", "false");
     detailEl.scrollTop = 0;
@@ -4750,7 +4816,9 @@
   }
 
   function closeDetail() {
+    var vorher = selectedMmsi;
     selectedMmsi = null;
+    markiereAuswahl(vorher);
     detailEl.classList.remove("open");
     detailEl.setAttribute("aria-hidden", "true");
     updateScrollLock();
@@ -5045,14 +5113,13 @@
   // Schublade, die Technik erst unter 1024px - darueber ist sie eine ganz
   // normale Spalte. Ohne diese Unterscheidung legte sich der Abdunkler am
   // Desktop ueber genau die Spalte, die er freigeben soll.
+  // Beide sind jetzt auf jeder Breite Schubladen. Frueher stand hier ein
+  // `immer`-Flag, weil die Technik oberhalb von 1024px eine Spalte war und
+  // der Abdunkler sich dann ueber genau diese Spalte gelegt haette.
   var DRAWERS = [
-    { el: settingsEl, toggle: settingsToggle, immer: false },
-    { el: diaryEl, toggle: diaryToggle, immer: true }
+    { el: settingsEl, toggle: settingsToggle },
+    { el: diaryEl, toggle: diaryToggle }
   ];
-
-  function istSchublade(d) {
-    return d.immer || window.innerWidth <= 1024;
-  }
 
   function setDrawerOpen(el, open) {
     DRAWERS.forEach(function (d) {
@@ -5063,7 +5130,7 @@
       if (soll) d.el.scrollTop = 0;
     });
     var verdeckt = DRAWERS.some(function (d) {
-      return d.el.classList.contains("open") && istSchublade(d);
+      return d.el.classList.contains("open");
     });
     settingsBackdrop.hidden = !verdeckt;
     updateScrollLock();
@@ -5081,9 +5148,7 @@
     // steht weiter oben. Ohne den Waechter waere das die naechste Auflage der
     // Ladereihenfolge-Falle.
     var offeneSchublade = typeof DRAWERS !== "undefined" && DRAWERS
-      ? DRAWERS.some(function (d) {
-          return d.el.classList.contains("open") && istSchublade(d);
-        })
+      ? DRAWERS.some(function (d) { return d.el.classList.contains("open"); })
       : false;
     var sperrt = offeneSchublade ||
       (detailEl.classList.contains("open") && window.innerWidth <= 640);
@@ -5114,17 +5179,11 @@
     });
   });
 
-  // Wechselt das Gerät zurück auf die Breitdarstellung, muss der
-  // Sperrzustand weg - sonst bleibt die Seite unscrollbar. Das Tagebuch ist
-  // auf jeder Breite eine Schublade und bleibt davon unberührt.
-  window.addEventListener("resize", function () {
-    if (window.innerWidth > 1024 && settingsEl.classList.contains("open")) {
-      setDrawerOpen(settingsEl, false);
-    }
-    // Die Sperre haengt an der Breite (640px-Grenze der Detailleiste) und
-    // muss beim Drehen des Geraets neu bewertet werden.
-    updateScrollLock();
-  });
+  // Die Sperre haengt an der Breite (640px-Grenze der Detailleiste) und muss
+  // beim Drehen des Geraets neu bewertet werden. Ein Schliessen der Technik
+  // oberhalb von 1024px braucht es nicht mehr - sie ist jetzt ueberall eine
+  // Schublade.
+  window.addEventListener("resize", updateScrollLock);
 
   // Chromium/iOS erzeugen aus einem Tipp nur dann einen Klick, wenn der Finger
   // dabei kaum wandert - gemessen: ab 20 px Zugweg kommt keiner mehr an. Mit
