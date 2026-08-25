@@ -441,6 +441,35 @@ Fehlertyp wie bei `loadStaticCache()`.
 nicht. Alles, was auf die Konstanten weiter unten zugreift, gehört in den
 Verdrahtungsblock am Ende der IIFE, nicht in den Init oben.
 
+### Ausgewähltes Schiff: gelbes Fadenkreuz mit freier Mitte
+
+Das in der Detailansicht geöffnete Schiff bekommt auf der Karte ein gelbes
+Fadenkreuz (`#ffd21e`) mit dunklem Umriss.
+
+Drei Entscheidungen, die zusammengehören:
+
+- **Kreuz, kein Ring.** Die Kreisfläche ist in dieser Karte vollständig für
+  Schiffstypen vergeben; ein zusätzlicher Ring wäre als Typ lesbar.
+- **„+", nicht „✕".** Das schwarze ✕ gehört schon dem eigenen Standort. Zwei
+  gleich geformte Kreuze nebeneinander wären verwechselbar, die Farbe allein
+  trägt das nicht.
+- **Freie Mitte.** Erste Fassung zog zwei durchgehende Balken durch den Punkt.
+  Mit Umriss sind das 7 px — bei einem 8-px-S-Punkt bleibt davon nichts übrig,
+  und die Typfarbe wäre weg. Genau der Fehler, der die Karte schon einmal
+  einfarbig gemacht hat (siehe direkt darunter). Jetzt sind es vier Arme mit
+  einer Lücke von `px/2 + 3` — sie wächst mit dem Punkt, der bleibt bei jeder
+  Größe vollständig sichtbar.
+
+**Die Auswahl gehört in `iconKey()`.** Sonst merkt `refreshMarkerIcon()` den
+Wechsel nicht und das Fadenkreuz bleibt beim alten Schiff stehen. `openDetail()`
+und `closeDetail()` zeichnen über `markiereAuswahl(vorher)` genau **zwei**
+Marker neu — einer verliert das Kreuz, einer bekommt es. Ein voller Durchlauf
+über alle Marker wäre dafür Verschwendung.
+
+Geprüft: Kreuz und Punkt sind bei 11, 15 und 20 px exakt konzentrisch
+(dx = dy = 0, `scratchpad/kreuzmitte.js`), Typfarbe und Größe bleiben
+unverändert (`scratchpad/auswahlkreuz.js`).
+
 ### Eigener Standort: schwarzes ✕, eigener Layer
 
 Ein kleines schwarzes Kreuz mit hellem Umriss, `OWN_POS_PX` = 18 px.
@@ -764,9 +793,25 @@ zuerst, Technik weg.**
 
 | Breite | Verhalten |
 |---|---|
-| > 1024 px | Zweispaltig wie bisher, Technik als feste Seitenspalte |
-| ≤ 1024 px (iPad hoch, iPhone quer) | Technik wird zur Schublade von rechts, Inhalt einspaltig, Karte 42 vh |
+| jede | Einspaltig, Technik als Schublade von rechts |
+| ≤ 1024 px (iPad hoch, iPhone quer) | Zusätzlich: Karte 42 vh, Tabelle ohne Höhendeckel |
 | ≤ 700 px (iPhone) | Zusätzlich: Tabelle als Kartenliste, Filterleiste als Scrollzeilen, Schublade voll breit, Karte 38 vh |
+
+**Die Schublade gilt seit dem Nutzerhinweis auf jeder Breite**, nicht mehr nur
+bis 1024 px. Am Desktop und auf dem iPad quer lagen Verbindungs- und Debugdaten
+sonst dauerhaft in einer 320-px-Spalte neben der Karte, obwohl man sie im
+Betrieb praktisch nie braucht. Die Karte gewinnt dadurch die volle Breite
+(gemessen 1392 von 1440 px). Damit entfällt auch die Sonderbehandlung im
+Skript: `istSchublade()` und das `immer`-Flag der `DRAWERS` sind weg, beide
+Schubladen verhalten sich gleich.
+
+**Folge für Testskripte:** Bedienelemente in `#settings` (API-Key,
+`connectBtn`, `snapshotBtn`, die Checkboxen, `clearCacheBtn`) liegen jetzt auch
+am Desktop hinter der geschlossenen Schublade — ein `page.click()` /
+`page.fill()` läuft dort in einen Timeout, weil Playwright ein fest
+positioniertes, weggeschobenes Element nicht ins Bild scrollen kann. In den
+Skripten deshalb direkt über das DOM auslösen:
+`page.evaluate(() => document.getElementById('connectBtn').click())`.
 
 Vorher rutschte bei ≤ 900 px das komplette Technikpanel **über** Karte und
 Tabelle — man scrollte an API-Key, Bounding Box und Log vorbei, bevor ein
