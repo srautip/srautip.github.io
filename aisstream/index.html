@@ -469,9 +469,8 @@
     transform: rotate(var(--dir, 0deg));
     transform-origin: 50% 50%;
   }
-  /* Weisser Umriss wie am Punkt selbst - sonst verschwindet die Spitze auf
-     gleichfarbigen Kacheln. */
-  .dir .halo { stroke: #ffffff; stroke-width: 3; stroke-linejoin: round; }
+  /* Kein Umriss noetig: Das Dreieck liegt innerhalb des Punktes, also auf
+     einer Flaeche, deren Farbe wir selbst gesetzt haben. */
   .ship-mark {
     border-radius: 50%;
     box-sizing: border-box;
@@ -1698,23 +1697,29 @@
         '" fill="none" stroke-linecap="round">' +
         '<path class="halo" d="' + d + '"/><path class="bar" d="' + d + '"/></svg>';
     }
-    // Kleines Dreieck am Rand des Punktes, Spitze in Fahrtrichtung. Es sitzt
-    // AUSSERHALB des Punktes und laesst Farbe und Durchmesser unangetastet -
-    // Typ und Groesse bleiben die Kodierung, die Richtung kommt hinzu.
+    // Kleines Dreieck INNERHALB des Punktes, Spitze in Fahrtrichtung. Der
+    // Punkt behaelt damit seinen Umriss: Durchmesser (Groesse) und der
+    // farbige Rand (Typ) bleiben vollstaendig lesbar, die Richtung sitzt im
+    // Inneren.
     var dreieck = "";
     var kurs = travelCourse(entry);
     if (kurs != null) {
       var m = box / 2;
-      var nah = px / 2 + 3;          // wie die Luecke im Fadenkreuz
-      var fern = nah + 6;
-      var halb = 3.5;
-      var tri = "M" + m + " " + (m - fern) +
-        "L" + (m + halb) + " " + (m - nah) +
-        "L" + (m - halb) + " " + (m - nah) + "Z";
+      // Radius der Innenflaeche: der weisse Ring (1,5 px) bzw. die farbige
+      // Kontur (3 px beim Ring-Marker) bleibt frei.
+      var r = px / 2 - (step ? 1.5 : 3);
+      var spitze = r * 0.80;
+      var heck = r * 0.42;
+      var halb = r * 0.62;
+      var tri = "M" + m + " " + (m - spitze) +
+        "L" + (m + halb) + " " + (m + heck) +
+        "L" + (m - halb) + " " + (m + heck) + "Z";
+      // Auf der gefuellten Scheibe traegt Weiss den Kontrast, im hohlen
+      // Ring-Marker ist der Kern weiss - dort die Typfarbe. So bleibt das
+      // Dreieck bei jeder Variante sichtbar, ohne die Typfarbe zu ersetzen.
       dreieck = '<svg class="dir" width="' + box + '" height="' + box +
         '" style="--dir:' + kurs.toFixed(0) + 'deg">' +
-        '<path class="halo" fill="none" d="' + tri + '"/>' +
-        '<path fill="' + color + '" d="' + tri + '"/></svg>';
+        '<path fill="' + (step ? "#ffffff" : color) + '" d="' + tri + '"/></svg>';
     }
     return L.divIcon({
       className: "",
@@ -1813,8 +1818,10 @@
         '<path d="M1 6.5H12M6.5 1V12" stroke="#ffd21e" stroke-width="2"/></svg>' +
         "</span>Ausgewähltes Schiff</div>" +
         '<div class="row"><span class="sw cross">' +
-        '<svg width="13" height="13"><path fill="' + NEUTRAL_COLOR +
-        '" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" d="M6.5 1L10 8H3Z"/></svg>' +
+        '<svg width="13" height="13">' +
+        '<circle cx="6.5" cy="6.5" r="5.5" fill="' + NEUTRAL_COLOR +
+        '" stroke="#ffffff" stroke-width="1.5"/>' +
+        '<path fill="#ffffff" d="M6.5 3L9 8.5H4Z"/></svg>' +
         "</span>Fahrtrichtung (ab 0,5 kn)</div>";
 
       div.innerHTML =

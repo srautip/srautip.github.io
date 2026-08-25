@@ -447,11 +447,20 @@ Verdrahtungsblock am Ende der IIFE, nicht in den Init oben.
 ### Fahrtrichtung: kleines Dreieck am Punktrand
 
 Die vierte Kodierung am Marker, nach Farbe (Typ), Durchmesser (Länge) und Form
-(Entitätsklasse). Ein gefülltes Dreieck **außerhalb** des Punktes, Spitze in
-Fahrtrichtung, Abstand `px/2 + 3` von der Mitte — dieselbe Formel wie die Lücke
-im Fadenkreuz, damit sich beide bei jeder Punktgröße vertragen. Farbe = Typfarbe
-des Schiffs mit weißem Umriss; ein andersfarbiges Dreieck würde eine zweite,
-konkurrierende Kodierung aufmachen.
+(Entitätsklasse). Ein gefülltes Dreieck **innerhalb** des Punktes, Spitze in
+Fahrtrichtung. Der Punkt behält damit seinen Umriss: Durchmesser (Größe) und
+farbiger Rand (Typ) bleiben vollständig lesbar, die Richtung sitzt im Inneren.
+
+Geometrie relativ zum Innenradius `r = px/2 − Randbreite` (1,5 px beim gefüllten
+Punkt, 3 px beim Ring-Marker): Spitze `0,80·r`, Heck `0,42·r`, Halbbreite
+`0,62·r`. So bleibt zu jeder Größenstufe ein farbiger Rand stehen; beim
+kleinsten 8-px-Punkt deckt das Dreieck rund ein Viertel der Innenfläche ab.
+
+**Zwei Füllfarben, aus einem Grund:** Auf der gefüllten Scheibe trägt **Weiß**
+den Kontrast, im hohlen Ring-Marker („Länge unbekannt") ist der Kern weiß —
+dort die **Typfarbe**. Beide Varianten bleiben sichtbar, ohne die Typfarbe zu
+ersetzen. Ein Dreieck in einer eigenen Farbe würde eine zweite, konkurrierende
+Kodierung aufmachen.
 
 **Wann es erscheint** (`travelCourse()`):
 
@@ -488,8 +497,16 @@ Dauerlast, die man nicht einbaut. Deshalb dreigeteilt:
   wieder an. Ohne den Wert im HTML stünde das Dreieck danach auf 0° (Norden).
 
 Gemessen (`scratchpad/richtung.js`): Kurswechsel 90° → 180° zieht nach, dabei
-**null** `setIcon`-Aufrufe; die Latenz unter Dauerlast bleibt bei 48 ms
+**null** `setIcon`-Aufrufe; die Latenz unter Dauerlast bleibt bei rund 50 ms
 (vorher 46 ms, `markerlast.js`).
+
+**Richtung nachmessen, nicht auf dem Screenshot beurteilen.** Beim Umbau nach
+innen sah das Dreieck auf dem Bild verdreht aus — tatsächlich dominiert die
+breite Grundseite optisch, und ich hatte sie für die Spitze gehalten.
+`scratchpad/spitze.js` rechnet den Bildschirmwinkel der **Spitze** relativ zur
+Punktmitte zurück (`getPointAtLength(0)` + `getScreenCTM()`) und zeigt für
+0/45/90/180/270° exakt dieselben Werte. Ein Test, der nur die CSS-Matrix des
+`.dir`-Elements prüft, würde eine verdrehte Pfadgeometrie nicht bemerken.
 
 ### Ausgewähltes Schiff: gelbes Fadenkreuz mit freier Mitte
 
