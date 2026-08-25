@@ -237,20 +237,33 @@
   .badge.stale { border-color: var(--err); color: var(--err); }
   #detail {
     position: fixed;
-    top: 0;
+    /* Die Leiste beginnt UNTER der Kopfzeile, statt hinter ihr durchzulaufen.
+       Die Kopfzeile liegt seit den zwei Schubladen darueber (z-index 1220) -
+       eine ueberlappende Leiste haette ihr eigenes Schliesskreuz darunter.
+       Vorher stand hier ein Innenabstand von --head-h; den hat die
+       700px-Media-Query weiter unten ueberschrieben, und auf dem iPhone war
+       das Kreuz genau deshalb nicht antippbar. Ueber `top` kann keine
+       Abstandsregel das mehr kaputt machen.
+       top/bottom statt height:100% bindet die Hoehe zugleich an den wirklich
+       sichtbaren Bereich - auf iOS passt height:100% nicht, sobald Safari
+       seine Leisten ein- oder ausblendet. */
+    top: var(--head-h, 64px);
+    bottom: 0;
     right: 0;
     width: 380px;
     max-width: 100%;
-    height: 100%;
     background: var(--panel);
     border-left: 1px solid var(--border);
     box-shadow: -8px 0 24px rgba(0, 0, 0, 0.45);
-    /* Die Leiste laeuft ueber die volle Hoehe und damit hinter die Kopfzeile,
-       die seit den zwei Schubladen darueber liegt. Der Inhalt beginnt deshalb
-       unterhalb der Kopfzeile - sonst waere das eigene Schliesskreuz
-       unerreichbar. --head-h setzt das Skript aus der echten Hoehe. */
-    padding: calc(var(--head-h, 64px) + 0.6rem) 1.1rem 2rem;
+    /* Oben KEIN Innenabstand: Der gehoert auf .detail-head. Sonst bleibt ueber
+       dem klebenden Kopf ein Streifen offen, durch den der gescrollte Inhalt
+       sichtbar durchlaeuft. */
+    padding: 0 1.1rem 2rem;
     overflow-y: auto;
+    /* Ohne das reicht iOS das Scrollen an die Seite dahinter weiter - genau
+       das sah wie zwei senkrechte Bildlaufleisten aus. */
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     z-index: 1200;
     transform: translateX(100%);
     transition: transform 0.18s ease-out;
@@ -262,6 +275,14 @@
     justify-content: space-between;
     gap: 0.5rem;
     margin-bottom: 0.25rem;
+    /* Bleibt beim Scrollen stehen: In einer langen Detailansicht war das
+       Kreuz nach ein paar Wischern schlicht aus dem Bild. */
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+    padding-top: 1rem;
+    padding-bottom: 0.4rem;
+    z-index: 1;
   }
   .detail-head h3 {
     margin: 0;
@@ -276,6 +297,12 @@
     padding: 0.1rem;
     line-height: 1;
     font-size: 1rem;
+  }
+  /* Am Finger ist ein 28-px-Ziel in der Ecke zu klein. Die Datei setzt fuer
+     Kartenmarker schon 24 px als Untergrenze; ein Schliessknopf verdient die
+     ueblichen 44. */
+  @media (pointer: coarse) {
+    #detailClose { width: 44px; min-height: 44px; font-size: 1.2rem; }
   }
   #detail h4 {
     font-size: 0.72rem;
@@ -573,6 +600,10 @@
     -webkit-overflow-scrolling: touch;
   }
   #diary.open { transform: translateX(0); }
+  /* Beide Schubladen und die Detailleiste sind eigene Scrollbereiche ueber
+     einer scrollenden Seite. Ohne `contain` reicht iOS den Wisch nach hinten
+     durch, und es sieht nach zwei Bildlaufleisten aus. */
+  #settings, #diary { overscroll-behavior: contain; }
   #diary .settings-head { display: flex; }
   .diary-actions { display: flex; gap: 0.4rem; margin: 0.6rem 0 0.9rem; }
   .diary-actions button { flex: 1 1 0; width: auto; }
@@ -839,7 +870,16 @@
     tbody td.c-lat, tbody td.c-lon, tbody td.c-time, tbody td.c-call { display: none; }
     tbody td.c-mmsi { color: var(--muted); font-size: 0.72rem; }
 
-    #detail { padding-top: max(1rem, env(safe-area-inset-top)); padding-bottom: max(2rem, env(safe-area-inset-bottom)); }
+    /* KEIN padding-top mehr: Die obere Sicherheitszone gehoert der Kopfzeile,
+       die sie bereits beruecksichtigt - die Leiste beginnt ohnehin erst
+       darunter (`top: var(--head-h)`). Genau diese Zeile hat frueher den
+       Abstand ueberschrieben und das Schliesskreuz unter die Kopfzeile
+       geschoben. Der rechte Rand ist neu: im Querformat mit Notch lag das
+       Kreuz sonst in der abgerundeten Ecke. */
+    #detail {
+      padding-right: max(1.1rem, env(safe-area-inset-right));
+      padding-bottom: max(2rem, env(safe-area-inset-bottom));
+    }
     .map-legend { max-width: 46vw; font-size: 0.65rem; }
   }
 
@@ -4596,6 +4636,8 @@
     selectedMmsi = mmsi;
     detailEl.classList.add("open");
     detailEl.setAttribute("aria-hidden", "false");
+    detailEl.scrollTop = 0;
+    updateScrollLock();
     renderDetail(ships.get(mmsi));
     refreshVisibleShips();
     if (autoEnrichInput.checked) enrichShip(mmsi, false);
@@ -4605,6 +4647,7 @@
     selectedMmsi = null;
     detailEl.classList.remove("open");
     detailEl.setAttribute("aria-hidden", "true");
+    updateScrollLock();
     if (trackLayer) { map.removeLayer(trackLayer); trackLayer = null; }
     refreshVisibleShips();
   }
@@ -4870,6 +4913,14 @@
     document.documentElement.style.setProperty("--head-h", head.offsetHeight + "px");
   }
   measureHeader();
+  // resize allein genuegt nicht: .headright bricht um, wenn die Beschriftung
+  // waechst ("Tagebuch (0)" -> "Tagebuch (128)"), und dabei feuert kein
+  // resize. Ein zu kleiner Wert schoebe die Detailleiste wieder unter die
+  // Kopfzeile - genau der gemeldete Fehler.
+  if (typeof ResizeObserver === "function") {
+    var headEl = document.querySelector("header");
+    if (headEl) new ResizeObserver(measureHeader).observe(headEl);
+  }
   window.addEventListener("resize", measureHeader);
   window.addEventListener("orientationchange", measureHeader);
 
@@ -4907,10 +4958,28 @@
       return d.el.classList.contains("open") && istSchublade(d);
     });
     settingsBackdrop.hidden = !verdeckt;
-    // Hintergrund nicht mitscrollen lassen, solange eine Schublade offen ist.
-    document.body.style.overflow = verdeckt ? "hidden" : "";
+    updateScrollLock();
     if (el === diaryEl && open) renderDiary();
     if (el === diaryEl && !open) releaseDiaryUrls();
+  }
+
+  // Eine Stelle besitzt die Sperre, und sie LEITET den Zustand ab, statt ihn
+  // zu setzen. Sonst hob das Schliessen einer Schublade die Sperre auf,
+  // obwohl darunter noch die Detailleiste offen stand.
+  // Die 640px sind dieselbe Grenze, ab der #detail die Seite voll verdeckt -
+  // am Desktop soll der Hintergrund weiter scrollen.
+  function updateScrollLock() {
+    // DRAWERS wird erst im Verdrahtungsblock am Ende gesetzt; openDetail()
+    // steht weiter oben. Ohne den Waechter waere das die naechste Auflage der
+    // Ladereihenfolge-Falle.
+    var offeneSchublade = typeof DRAWERS !== "undefined" && DRAWERS
+      ? DRAWERS.some(function (d) {
+          return d.el.classList.contains("open") && istSchublade(d);
+        })
+      : false;
+    var sperrt = offeneSchublade ||
+      (detailEl.classList.contains("open") && window.innerWidth <= 640);
+    document.body.style.overflow = sperrt ? "hidden" : "";
   }
 
   function setSettingsOpen(open) { setDrawerOpen(settingsEl, open); }
@@ -4944,6 +5013,9 @@
     if (window.innerWidth > 1024 && settingsEl.classList.contains("open")) {
       setDrawerOpen(settingsEl, false);
     }
+    // Die Sperre haengt an der Breite (640px-Grenze der Detailleiste) und
+    // muss beim Drehen des Geraets neu bewertet werden.
+    updateScrollLock();
   });
 
   document.getElementById("detailDiary").addEventListener("click", function () {

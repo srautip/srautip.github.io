@@ -1199,11 +1199,79 @@ man ihn gerade dann braucht.
 
 Die Ordnung ist jetzt: `#detail` 1200 · **Kopfzeile 1220** · Abdunkler 1250 ·
 Schubladen 1300. Die Kopfzeile liegt über der Detailleiste (Knöpfe erreichbar),
-aber unter den Schubladen (die bringen ihr eigenes Kreuz mit). Damit die
-Detailleiste dabei nicht ihr **eigenes** Schließkreuz unter die Kopfzeile
-schiebt, beginnt ihr Inhalt bei `--head-h` — einer CSS-Variablen, die das Skript
-aus der echten Kopfzeilenhöhe setzt und bei `resize`/`orientationchange`
-nachführt (die Höhe ändert sich mit umbrechenden Knöpfen).
+aber unter den Schubladen (die bringen ihr eigenes Kreuz mit).
+
+### Und prompt war das Schließkreuz der Leiste selbst unerreichbar
+
+Aus dem Betrieb gemeldet: „Schließen mit Klick auf das Kreuz funktioniert oft
+nicht", dazu „auf dem iPhone teilweise zwei senkrechte Bildlaufleisten".
+
+Erste Fassung ließ die Detailleiste über die volle Höhe laufen und gab ihr
+`padding-top: calc(var(--head-h) + 0.6rem)`, damit der Inhalt unter der
+Kopfzeile beginnt. **Diese Zeile wird auf dem Telefon überschrieben** — in
+`@media (max-width: 700px)` stand seit langem
+`#detail { padding-top: max(1rem, env(safe-area-inset-top)); … }`. Auf jedem
+iPhone im Hochformat gewann die Media Query, der Abstand fiel weg, und das
+Kreuz lag hinter der jetzt darüberliegenden Kopfzeile. Daher „oft" und nicht
+„immer": Am Desktop und auf dem iPad quer griff der Abstand.
+
+**Die Lehre:** Ein Abstand ist die falsche Zurückhaltung. Die Leiste beginnt
+jetzt per **`top: var(--head-h)`** unter der Kopfzeile und endet bei
+`bottom: 0` — sie überlappt gar nicht mehr, und keine Abstandsregel kann das
+noch kippen. `top`/`bottom` statt `height: 100%` bindet die Höhe nebenbei an
+den wirklich sichtbaren Bereich; auf iOS passt `height: 100%` nicht, sobald
+Safari seine Leisten ein- oder ausblendet.
+
+Dazu drei Ergänzungen:
+
+- **`.detail-head` klebt** (`position: sticky; top: 0`), sonst ist das Kreuz in
+  einer langen Detailansicht nach ein paar Wischern aus dem Bild. Der obere
+  Innenabstand gehört dabei auf **den Kopf**, nicht auf den Container — sonst
+  bleibt über dem klebenden Kopf ein Streifen offen, durch den der gescrollte
+  Inhalt sichtbar durchläuft.
+- **`--head-h` hängt an einem `ResizeObserver`** auf `<header>`. `resize` allein
+  genügt nicht: `.headright` bricht um, wenn die Beschriftung wächst
+  („Tagebuch (0)" → „Tagebuch (128)"), und dabei feuert kein `resize`.
+- **`#detailClose` ist unter `@media (pointer: coarse)` 44 × 44 px.** 28 px in
+  der Ecke sind am Finger zu wenig.
+
+### Zwei Bildlaufleisten: `overscroll-behavior` und ein Besitzer für die Sperre
+
+`#detail` ist ein fester Scrollbereich **über** einer Seite, die selbst scrollt.
+Ohne `overscroll-behavior: contain` reicht iOS den Wisch nach hinten durch —
+genau das sieht wie zwei Bildlaufleisten aus. Die Regel haben jetzt `#detail`,
+`#settings` und `#diary`.
+
+Zusätzlich sperrt die Detailleiste unter 640 px die Seite (dieselbe Grenze, ab
+der sie voll verdeckt; am Desktop soll der Hintergrund weiter scrollen). Die
+Sperre hat dafür **einen Besitzer**: `updateScrollLock()` **leitet** sie aus dem
+tatsächlichen Zustand ab, statt sie zu setzen. Vorher schrieb `setDrawerOpen()`
+direkt in `document.body.style.overflow` — damit hätte das Schließen einer
+Schublade die Sperre aufgehoben, obwohl darunter noch die Leiste offen stand.
+
+**Test-Hinweis:** `window.scrollBy()` taugt als Probe **nicht**.
+`overflow: hidden` verhindert das Scrollen durch den Nutzer, nicht das
+programmatische — der Test lief damit grün ins Leere. Gemessen wird stattdessen
+das, was der Finger tut: über der Leiste weiterwischen, wenn sie am Ende ist
+(`page.mouse.wheel` über dem Element), und prüfen, dass die Seite dahinter
+stehen bleibt.
+
+### Warum die Tests das nicht gefangen haben
+
+`viztest.js` klickt das Kreuz — aber nur bei **Desktop-Breite**, wo der Abstand
+griff. `mobiletest.js` prüft die Telefonbreiten, öffnete dort aber nie eine
+Detailansicht. Die Lücke lag genau dazwischen.
+
+`mobiletest.js` hat deshalb jetzt eine **Dauerprobe**: Detailansicht öffnen und
+per `elementFromPoint` auf der Kreuzmitte nachsehen, was dort wirklich liegt.
+Gegen den alten Stand meldet sie `VERDECKT von <header>` — und zwar nur im
+iPhone-Profil, genau wie im Betrieb. Dazu `scratchpad/detailtouch.js` mit
+32 Prüfungen über vier Geräteprofile.
+
+**Beim Messen die Einblendung abwarten:** Die Leiste fährt mit
+`transform`/`transition` in 0,18 s herein. Wer im selben synchronen
+`evaluate()` klickt und misst, bekommt `elementFromPoint === null`, weil sie
+noch außerhalb des Viewports liegt.
 
 ### Test
 
