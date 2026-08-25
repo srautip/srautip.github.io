@@ -4256,21 +4256,38 @@
       entry.typeLabel = entry.typeLabel || shipTypeLabel(props.type);
       entry.typeDetail = entry.typeDetail || shipTypeDetail(props.type);
     }
-    if (props.sog != null && entry.speed == null) entry.speed = normalizeSog(props.sog);
-    if (props.cog != null && entry.course == null) entry.course = normalizeCog(props.cog);
-    if (props.heading != null && entry.heading == null) entry.heading = normalizeHeading(props.heading);
-    if (props.nav_status != null && entry.navStatus == null) entry.navStatus = props.nav_status;
     if (props.kind === "aton") entry.station = entry.station || "Seezeichen";
     if (props.kind === "base") entry.station = entry.station || "Landstation";
     rememberStatic(entry);
     entry.snapshotSource = props.source || props.station || "openwaters";
     entry.snapshotSeen = props.seen;
+
     // The snapshot carries its own timestamp; using it (rather than "now")
     // keeps sorting and the stale badge honest for ships nobody has heard
     // from in a while.
     var seenAt = props.seen ? Date.parse(props.seen) : NaN;
+    var stand = isNaN(seenAt) ? Date.now() : seenAt;
+
+    // Ein Snapshot ist KEIN Register, sondern eine Positionsmeldung ueber
+    // einen anderen Weg - also dieselbe Datenklasse wie der Stream. Frueher
+    // standen hier Fuell-Regeln (`&& entry.speed == null`): Hatte ein Schiff
+    // einmal eine Geschwindigkeit, konnte kein spaeterer Snapshot sie mehr
+    // aktualisieren. Die Position wurde dagegen bedingungslos gesetzt - die
+    // Karte bewegte sich also, waehrend Fahrtdaten und Status auf dem allerersten
+    // Wert festhingen. Genau daher der Eindruck, es brauche eine Neuauswahl.
+    //
+    // Richtig ist der Vergleich der Zeitstempel: Neueres uebernehmen,
+    // Aelteres ignorieren - auch fuer die Position, die sonst hinter einen
+    // frischeren Livewert zurueckspringt.
+    if (entry.updatedAt && stand < entry.updatedAt) return true;
+
+    if (props.sog != null) entry.speed = normalizeSog(props.sog);
+    if (props.cog != null) entry.course = normalizeCog(props.cog);
+    if (props.heading != null) entry.heading = normalizeHeading(props.heading);
+    if (props.nav_status != null) entry.navStatus = props.nav_status;
+
     setPosition(entry, coords[1], coords[0], props.seen);
-    entry.updatedAt = isNaN(seenAt) ? Date.now() : seenAt;
+    entry.updatedAt = stand;
     if (!entry.firstSeen || entry.updatedAt < entry.firstSeen) entry.firstSeen = entry.updatedAt;
     return true;
   }
@@ -4374,9 +4391,40 @@
     if (!visible.length) return "";
     var html = "<h4>" + esc(title) + "</h4><dl class=\"kv\">";
     visible.forEach(function (r) {
-      html += "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>";
+      // Ein dritter Eintrag markiert einen Zeitwert: Er bekommt einen
+      // Zeitstempel mit und wird vom Sekundentakt nachgezogen, statt bis zum
+      // naechsten kompletten Neuaufbau einzufrieren.
+      var dd = r[2]
+        ? '<dd class="d-rel" data-at="' + r[2] + '">' + esc(r[1]) + "</dd>"
+        : "<dd>" + esc(r[1]) + "</dd>";
+      html += "<dt>" + esc(r[0]) + "</dt>" + dd;
     });
     return html + "</dl>";
+  }
+
+  // Die Tabelle fuehrt ihr Alter im Sekundentakt (tickAges), die
+  // Detailansicht baute sich dagegen nur alle 15 s neu auf. Wer sie offen
+  // liess, sah "gerade eben" stehen, waehrend die Tabelle daneben schon
+  // "11 s" zeigte - und ein erneutes Anklicken brachte den Sprung. Hier
+  // werden nur die Zeitfelder angefasst, kein Neuaufbau: Das Foto bliebe
+  // sonst nicht stehen und markierter Text ginge verloren.
+  function tickDetailTimes() {
+    if (!selectedMmsi || !detailEl.classList.contains("open")) return;
+    var felder = detailBody.querySelectorAll(".d-rel");
+    for (var i = 0; i < felder.length; i++) {
+      var at = Number(felder[i].dataset.at);
+      if (at) felder[i].textContent = relativeTime(at);
+    }
+    var entry = ships.get(selectedMmsi);
+    if (!entry) return;
+    var stale = entry.updatedAt && (Date.now() - entry.updatedAt) > STALE_AFTER_MS;
+    var badge = detailSub.querySelector(".badge");
+    if (!badge) return;
+    var soll = stale ? "veraltet" : "aktuell";
+    if (badge.textContent !== soll) {
+      badge.textContent = soll;
+      badge.className = "badge " + (stale ? "stale" : "live");
+    }
   }
 
   // Everything here is derived from the hull dimensions AIS already gives
@@ -4567,12 +4615,12 @@
         ["Registerhafen", reg.homeport]
       ]) +
       section("Empfang", [
-        ["Zuletzt gesehen", relativeTime(entry.updatedAt)],
+        ["Zuletzt gesehen", relativeTime(entry.updatedAt), entry.updatedAt],
         ["Statik aus Zwischenspeicher", entry.staticFromCache
           ? "ja, " + relativeTime(entry.staticFromCache) + " gespeichert" : null],
         ["openwaters-Quelle", entry.snapshotSource],
         ["Zeitstempel (UTC)", entry.time],
-        ["Erstmals gesehen", relativeTime(entry.firstSeen)],
+        ["Erstmals gesehen", relativeTime(entry.firstSeen), entry.firstSeen],
         ["Nachrichten gesamt", entry.total],
         ["Nach Typ", counts],
         ["Letzter Typ", entry.lastMessageType],
@@ -5233,7 +5281,10 @@
 
   if (ownPosInput.checked) startOwnPos();
 
-  setInterval(tickAges, 1000);
+  setInterval(function () {
+    tickAges();
+    tickDetailTimes();
+  }, 1000);
   setInterval(pruneStaleShips, 60000);
   window.addEventListener("pagehide", saveAisCache);
 

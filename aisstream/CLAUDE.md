@@ -520,6 +520,49 @@ nur bei echter Änderung neu. Leaflets `bindPopup` ruft intern `setContent`,
 ein **bereits geöffnetes** Popup aktualisiert sich damit sofort, ohne Klick —
 getestet.
 
+### „Manchmal muss man das Schiff neu anwählen, damit sich etwas tut"
+
+Gemeldet für die Kartenansicht. Nachgemessen (`scratchpad/detailupdate.js`,
+`popupupdate.js`): **Solange eine eigene Nachricht des Schiffs hereinkommt, ist
+alles in Ordnung** — Detailansicht und offenes Kartenpopup ziehen ohne Klick
+nach, auch wenn das Schiff aus dem Kartenausschnitt fährt oder ausgefiltert
+wird. Der Fehler steckte in den beiden Fällen, in denen **keine** eigene
+Nachricht kommt:
+
+**1. Der Snapshot füllte nur Lücken, statt zu aktualisieren.** In
+`applySnapshotFeature()` stand für die Fahrtdaten `&& entry.speed == null`:
+
+```js
+if (props.sog != null && entry.speed == null) entry.speed = normalizeSog(props.sog);
+```
+
+Hatte ein Schiff einmal eine Geschwindigkeit, konnte kein späterer Snapshot sie
+mehr ändern — Kurs, Heading und Status genauso. Die **Position** wurde
+gleichzeitig bedingungslos gesetzt. Die Karte bewegte sich also, während
+Fahrtdaten und Status auf dem allerersten Wert festhingen. Gemessen: neuer
+Snapshot mit 27,7 kn, Anzeige blieb bei 9,9 kn.
+
+Die Füll-Regel ist für das **Register** richtig (der Stream ist aktuell, das
+Register kann Jahre alt sein) — für den Snapshot ist sie falsch. Ein Snapshot
+ist eine Positionsmeldung über einen anderen Weg, also dieselbe Datenklasse wie
+der Stream. Richtig ist der **Zeitstempelvergleich**: Neueres übernehmen,
+Älteres ignorieren — auch für die Position, die sonst hinter einen frischeren
+Livewert zurückspringt. Beide Richtungen sind in `scratchpad/snapshotalter.js`
+festgehalten.
+
+**2. Die Zeitfelder der Detailansicht hingen bis zu 15 s hinterher.** Die
+Tabelle führt ihr Alter im Sekundentakt (`tickAges`), die Detailansicht baute
+sich nur alle 15 s komplett neu auf. Gemessen: Die Tabelle zeigte „11 s",
+während daneben in der Detailansicht noch „gerade eben" stand — und ein
+erneutes Anklicken brachte den Sprung. Genau der gemeldete Eindruck.
+
+`tickDetailTimes()` hängt jetzt am selben Sekundentakt und fasst **nur die
+Zeitfelder** an, kein Neuaufbau: Ein `<dd class="d-rel" data-at="…">` bekommt
+neuen Text, dazu das aktuell/veraltet-Abzeichen. Ein voller Neuaufbau im
+Sekundentakt wäre der falsche Weg — er nimmt markierten Text weg und würde das
+Foto anfassen (siehe oben). Wer ein Zeitfeld ergänzt: dritter Eintrag in der
+`section()`-Zeile ist der Zeitstempel, mehr braucht es nicht.
+
 ### Und die Tabelle
 
 Die Tabelle wird bei jedem `refreshVisibleShips()` komplett neu gebaut, sie
