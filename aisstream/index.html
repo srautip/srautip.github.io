@@ -298,12 +298,37 @@
     line-height: 1;
     font-size: 1rem;
   }
+  #detailDiaryTop {
+    flex: 0 0 auto;
+    width: auto;
+    padding: 0.15rem 0.5rem;
+    line-height: 1.1;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+  #detailDiaryTop.done { border-color: var(--ok); color: var(--ok); }
   /* Am Finger ist ein 28-px-Ziel in der Ecke zu klein. Die Datei setzt fuer
      Kartenmarker schon 24 px als Untergrenze; ein Schliessknopf verdient die
      ueblichen 44. */
   @media (pointer: coarse) {
     #detailClose { width: 44px; min-height: 44px; font-size: 1.2rem; }
+    #detailDiaryTop { min-height: 44px; padding: 0.15rem 0.6rem; }
+    /* Nicht nur bequemer: Ausgeloest wird, wenn der Finger auf dem Knopf
+       loslaesst. Ein 34-px-Knopf ist bei 20 px Fingerdrift schon verlassen,
+       ein 44er nicht. */
+    .detail-actions button { min-height: 44px; }
   }
+  /* `none` statt `manipulation`, und das ist der Kern der Sache: Die Knoepfe
+     liegen in einem senkrecht scrollbaren Bereich (#detail). Damit gilt jeder
+     Zug auf ihnen als moegliche Wischbewegung - der Browser schickt
+     pointerdown (der Knopf faerbt sich), entscheidet sich dann fuer Scrollen
+     und verwirft den Klick per pointercancel. Gemessen: ab 20 px Zugweg kam
+     kein Klick mehr an, der Knopf blinkte aber jedes Mal.
+     `manipulation` nimmt nur die Doppeltipp-Wartezeit, nicht diese Uebernahme.
+     `none` nimmt die Flaeche aus dem Scrollen heraus: Von einem Knopf aus
+     laesst sich die Leiste nicht mehr scrollen - bei Bedienelementen ist das
+     richtig so, gescrollt wird ueberall sonst. */
+  .detail-head button, .detail-actions button { touch-action: none; }
   #detail h4 {
     font-size: 0.72rem;
     text-transform: uppercase;
@@ -1123,6 +1148,12 @@
 <aside id="detail" aria-hidden="true">
   <div class="detail-head">
     <h3 id="detailTitle">&ndash;</h3>
+    <!-- Im klebenden Kopf, nicht nur unten in der Knopfleiste: Dort unten
+         erreicht man ihn nur nach dem Scrollen, und ein Tipp direkt im
+         Anschluss an eine Wischbewegung wird vom Browser als Scrollen
+         gewertet und verworfen. -->
+    <button type="button" id="detailDiaryTop" title="Ins Tagebuch eintragen"
+            aria-label="Ins Tagebuch eintragen">📖<span aria-hidden="true">+</span></button>
     <button type="button" id="detailClose" title="Schließen">&times;</button>
   </div>
   <div class="detail-sub" id="detailSub"></div>
@@ -4872,7 +4903,9 @@
     sendSubscription();
   });
 
-  document.getElementById("detailClose").addEventListener("click", closeDetail);
+  // tippfest ist eine Funktionsdeklaration und damit gehoistet - sie steht
+  // weiter unten, ist hier aber schon nutzbar.
+  tippfest(document.getElementById("detailClose"), closeDetail);
 
   document.getElementById("detailCenter").addEventListener("click", function () {
     var entry = selectedMmsi && ships.get(selectedMmsi);
@@ -5018,12 +5051,66 @@
     updateScrollLock();
   });
 
-  document.getElementById("detailDiary").addEventListener("click", function () {
+  // Chromium/iOS erzeugen aus einem Tipp nur dann einen Klick, wenn der Finger
+  // dabei kaum wandert - gemessen: ab 20 px Zugweg kommt keiner mehr an. Mit
+  // `touch-action: none` (siehe CSS) scrollt die Leiste von einem Knopf aus
+  // nicht mehr, es gibt also keine konkurrierende Geste mehr, die der Zug
+  // bedeuten koennte. Damit ist die naheliegende Semantik auch die sichere:
+  // gedrueckt auf dem Knopf, losgelassen auf dem Knopf = ausgeloest, so wie
+  // ein Knopf sich immer verhaelt.
+  function tippfest(el, fn) {
+    if (!el) return;
+    var aufMir = false;
+    el.addEventListener("touchstart", function () { aufMir = true; }, { passive: true });
+    el.addEventListener("touchcancel", function () { aufMir = false; }, { passive: true });
+    el.addEventListener("touchend", function (e) {
+      if (!aufMir) return;
+      aufMir = false;
+      var t = e.changedTouches && e.changedTouches[0];
+      if (!t) return;
+      var r = el.getBoundingClientRect();
+      if (t.clientX < r.left || t.clientX > r.right ||
+          t.clientY < r.top || t.clientY > r.bottom) return;
+      // Der Browser schickt gleich vielleicht doch noch einen Klick
+      // hinterher - der darf die Aktion nicht ein zweites Mal ausloesen.
+      el.__perTipp = Date.now();
+      e.preventDefault();
+      fn();
+    });
+    el.addEventListener("click", function () {
+      if (el.__perTipp && Date.now() - el.__perTipp < 700) return;
+      fn();
+    });
+  }
+
+  // Ohne sichtbare Bestaetigung sehen "Tipp verworfen" und "Tipp angekommen"
+  // identisch aus - der Knopf beschriftet sich vorher wie nachher gleich, und
+  // der Zaehler in der Kopfzeile liegt bei offener Leiste dahinter. Genau
+  // deshalb kam die Meldung "faerbt sich kurz, aber nichts passiert".
+  function quittung(btn, text) {
+    if (!btn) return;
+    if (btn.dataset.vorher == null) btn.dataset.vorher = btn.innerHTML;
+    clearTimeout(btn.__quittung);
+    btn.innerHTML = text;
+    btn.classList.add("done");
+    btn.__quittung = setTimeout(function () {
+      btn.innerHTML = btn.dataset.vorher;
+      btn.classList.remove("done");
+    }, 1800);
+  }
+
+  function sichtungEintragen() {
     var entry = selectedMmsi && ships.get(selectedMmsi);
     if (!entry) return;
-    addSighting(entry);
+    var s = addSighting(entry);
     renderDetail(entry);
-  });
+    if (!s) return;
+    quittung(document.getElementById("detailDiaryTop"), "✓");
+    quittung(document.getElementById("detailDiary"), "✓ Eingetragen");
+  }
+
+  tippfest(document.getElementById("detailDiary"), sichtungEintragen);
+  tippfest(document.getElementById("detailDiaryTop"), sichtungEintragen);
 
   document.getElementById("diaryExport").addEventListener("click", exportDiary);
   document.getElementById("diaryImport").addEventListener("click", function () {

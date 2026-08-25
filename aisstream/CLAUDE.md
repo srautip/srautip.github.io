@@ -1256,6 +1256,61 @@ das, was der Finger tut: über der Leiste weiterwischen, wenn sie am Ende ist
 (`page.mouse.wheel` über dem Element), und prüfen, dass die Seite dahinter
 stehen bleibt.
 
+### „Ins Tagebuch" färbte sich kurz und trug nichts ein
+
+Gemeldet kurz nach dem Kreuz-Fix, und es ist **dieselbe Familie**: ein
+Bedienelement in einem senkrecht scrollbaren Bereich.
+
+Playwrights `tap()` trifft punktgenau und reproduziert das nie. Mit echten
+Touch-Ereignissen per CDP (`scratchpad/touchslop.js`, Wischweg in Schritten
+gestellt) fällt es sofort auf:
+
+| Wischweg | Klick | Leiste gescrollt | Ereignisse am Knopf |
+|---|---|---|---|
+| 0–12 px | ✅ | 0 px | `pointerdown … click` |
+| **20 px** | ❌ | 9 px | `pointerdown, touchstart, touchmove, **pointercancel**, touchend` |
+| 40 px | ❌ | 39 px | dito |
+
+`pointerdown` kommt an — **daher der kurze Farbwechsel** — dann entscheidet der
+Browser, dass die Geste ein Scrollen ist, und verwirft den Klick per
+`pointercancel`. Auf dem Telefon passiert das ständig, weil man zur Knopfleiste
+am Ende der Leiste erst scrollen muss und unmittelbar danach tippt.
+
+**Was nicht hilft:** `touch-action: manipulation` nimmt nur die
+Doppeltipp-Wartezeit. Und eine „großzügige" eigene Tipperkennung wäre gefährlich
+gewesen, solange die Leiste dabei wirklich scrollt (9 px bei 20 px Zugweg) —
+dann hätte sie beim Scrollen Sichtungen eingetragen.
+
+**Was hilft, in dieser Reihenfolge:**
+
+1. **`touch-action: none` auf den Knöpfen** in `.detail-head` und
+   `.detail-actions`. Damit ist die Fläche kein Scrollbereich mehr: `pointercancel`
+   bleibt aus, die Leiste scrollt von einem Knopf aus nicht mehr (gemessen 0 px).
+   Von einem Bedienelement aus zu scrollen entfällt — bei Knöpfen richtig so.
+2. **Erst dadurch wird eine eigene Tipperkennung sicher** (`tippfest()`): Es gibt
+   keine konkurrierende Geste mehr, die der Zug bedeuten könnte. Die Regel ist
+   die eines jeden Knopfes — gedrückt auf dem Knopf, losgelassen auf dem Knopf =
+   ausgelöst. `preventDefault()` im `touchend` plus ein 700-ms-Fenster
+   verhindern, dass ein nachgereichter Klick die Aktion ein zweites Mal auslöst.
+   Chromium erzeugt oberhalb seiner eigenen Schwelle **auch ohne** Scrollen
+   keinen Klick mehr — ohne diesen Schritt blieben 20 px weiterhin wirkungslos.
+3. **44 px Mindesthöhe** für die Knöpfe unter `pointer: coarse`. Nicht Kosmetik:
+   Ausgelöst wird beim Loslassen *auf* dem Knopf, und ein 34-px-Knopf ist bei
+   20 px Fingerdrift schon verlassen.
+4. **Ein zweiter Knopf im klebenden Kopf** (`#detailDiaryTop`, „📖+"), damit die
+   Hauptaktion **ohne vorheriges Scrollen** erreichbar ist — die Situation, in
+   der es schiefging, entsteht damit gar nicht erst.
+
+Ergebnis derselben Messung nach dem Umbau: 20 px tragen ein, 40 px nicht — und
+das ist korrekt, dort hat der Finger den Knopf verlassen.
+
+**Und die halbe Miete war Rückmeldung.** Vorher sahen „Tipp verworfen" und
+„Tipp angekommen" identisch aus: gleiche Beschriftung vorher wie nachher, und
+der Zähler in der Kopfzeile liegt bei offener Leiste dahinter. Jetzt quittiert
+der Knopf mit grünem ✓ (`quittung()`), die Unterzeile zeigt „📖 1× im Tagebuch,
+zuletzt gerade eben", und im Log steht eine Zeile. Wer eine Aktion ergänzt, die
+in einen unsichtbaren Bereich schreibt: genauso quittieren.
+
 ### Warum die Tests das nicht gefangen haben
 
 `viztest.js` klickt das Kreuz — aber nur bei **Desktop-Breite**, wo der Abstand
