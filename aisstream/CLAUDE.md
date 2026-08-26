@@ -644,6 +644,60 @@ Geprüft: Kreuz und Punkt sind bei 11, 15 und 20 px exakt konzentrisch
 (dx = dy = 0, `scratchpad/kreuzmitte.js`), Typfarbe und Größe bleiben
 unverändert (`scratchpad/auswahlkreuz.js`).
 
+### Spuren aller sichtbaren Schiffe, solange es wenige sind
+
+Sind **weniger als 50 Schiffe** im Kartenausschnitt zu sehen, zeichnet
+`zeichneAutoTracks()` deren Tracks als sehr dünne Linie (`weight: 1`,
+`opacity: 0.55`) **in der Typfarbe des Schiffs** — dieselbe Farbe wie sein
+Marker, damit man bei sich kreuzenden Spuren erkennt, wozu welche gehört.
+Bei voller Nordsee wäre das ein Wollknäuel und teuer zu zeichnen; darunter
+erzählen die Linien etwas.
+
+**Was „sichtbar" heißt:** die Liste aus `applyMapFilter()` — also die
+Schiffe, deren Marker wirklich auf der Karte stehen. **Nicht** die
+Tabellenauswahl: Die filtert zusätzlich nach dem Suchfeld, die Karte nicht.
+
+**Beschränkung auf den Ausschnitt.** Gezeichnet wird nur, was im Bild liegt
+(`map.getBounds().pad(0.15)`). Ein Abschnitt zählt, sobald **ein** Ende
+drin liegt — sonst fehlte genau das Stück, das den Rand kreuzt, und die Spur
+endete sichtbar zu früh. Verlässt eine Spur das Bild und kommt zurück,
+entstehen zwei getrennte Stücke.
+
+**Eine Linie je Typfarbe, nicht je Schiff:** acht Ebenen statt fünfzig, und
+`setLatLngs()` auf einer bestehenden Ebene statt Abbau und Neuanlage.
+Gemessen kostet das Nachzeichnen beim Zoomen **9 bis 46 ms** — die Spuren
+sind kein Grund, die Karte langsamer zu machen.
+
+`interactive: false`, wie beim Sichtkreis: Linien dürfen keine Klicks auf
+die Marker abfangen. Das ausgewählte Schiff wird ausgelassen, wenn seine
+eigene, dickere Spur eingeschaltet ist — sonst lägen zwei übereinander.
+
+#### Hysterese, sonst flackert es
+
+An **50** gehen die Spuren an, aus erst wieder ab **55**. Ohne diesen
+Abstand flackerten sie an der Grenze im Sekundentakt, weil ständig ein
+Schiff den Ausschnitt betritt oder verlässt. `autotracks.js` fährt die Zahl
+deshalb **monoton** hoch und wieder herunter: 8 → 52 (bleibt an) → 58 (aus)
+→ 52 (bleibt aus) → 8 (wieder an).
+
+#### Drei Testfallen, alle drei auf einmal
+
+Der erste Lauf war grün, wo er es nicht sein durfte, und rot, wo alles
+stimmte:
+
+- **`#map path` fängt auch die Richtungspfeile der Marker ein.** Die haben
+  `stroke: none` und keine Breite; bei 60 Schiffen meldete der Test „66
+  Spuren", obwohl keine gezeichnet wurden. Richtig ist
+  `.leaflet-overlay-pane path` — dort und nur dort liegen Leaflets Vektoren.
+- **Leaflet setzt bei einer geleerten Linie `d="M0 0"`.** Ein
+  `d.split('M')` zählt das als ein Stück. Es zählen nur Stücke mit
+  mindestens zwei Punkten.
+- **Der Weg zum Messpunkt zählt mit.** Die Hysterese über den Typfilter
+  einzustellen ging schief: Der Filter setzt erst zurück und klickt dann
+  Chips einzeln, läuft also zwischendurch über acht sichtbare Schiffe und
+  schaltet die Spuren genau dort ein. Gemessen wurde damit nicht die
+  Hysterese, sondern der Umweg.
+
 ### Eigener Standort: schwarzes ✕, eigener Layer
 
 Ein kleines schwarzes Kreuz mit hellem Umriss, `OWN_POS_PX` = 18 px.
