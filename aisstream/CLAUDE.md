@@ -854,19 +854,52 @@ Der Bezugspunkt wird **einmal je Neuzeichnen** bestimmt, nicht je Zeile —
 Auf dem Telefon bleibt die Spalte **sichtbar** (anders als `Lat`, `Lon`,
 `Zeit`): „Wie weit ist das weg?" ist dort eher wichtiger als am Schreibtisch.
 
-Dazu auf der Karte ein **gestrichelter Kreis mit 45 km Radius** um den
-eigenen Standort (`SICHTLINIE_KM`) — grob die VHF-Funkreichweite eines
-Landempfängers, also der Ring, in dem eigener Empfang überhaupt zu erwarten
-ist. Zwei Dinge daran sind nicht verhandelbar:
+Dazu auf der Karte **zwei gestrichelte Ringe** um den eigenen Standort
+(`SICHTLINIEN`): 45 km in sehr hellem Grau (`#c9c9c9`) und 20 km in etwas
+dunklerem (`#8f8f8f`). 45 km ist grob die VHF-Funkreichweite eines
+Landempfängers — der Rand dessen, was überhaupt selbst zu empfangen ist;
+20 km gibt der Entfernung einen zweiten Anhaltspunkt, damit man nicht
+zwischen „dicht dran" und „am Rand" schätzen muss.
 
+Drei Dinge daran sind nicht verhandelbar:
+
+- **`fill: false`**, nicht `fillOpacity: 0`. Leaflet zeichnet dann gar kein
+  Füllelement statt eines unsichtbaren — und zwei übereinanderliegende
+  Scheiben würden die Kacheln doppelt einfärben.
 - **`interactive: false`.** Eine 45-km-Scheibe, die Klicks abfängt, wäre die
   größte Klickfalle der ganzen Karte.
 - Vektoren liegen in Leaflets `overlayPane`, Marker im `markerPane` darüber
-  — die Schiffe bleiben also obenauf. Der Test prüft beides ausdrücklich.
+  — die Schiffe bleiben also obenauf. Der Test prüft alle drei ausdrücklich.
 
-`SICHTLINIE_KM` steht **oberhalb** von `addMapLegend()`, obwohl es fachlich
-zum eigenen Standort gehört: Die Legende liest den Wert, und
-Funktionsdeklarationen werden hochgezogen, `var`-**Werte** nicht.
+Der **größere Ring wird zuerst angelegt**, damit der kleinere im DOM darüber
+liegt und an einer Kreuzung nicht vom helleren übermalt wird.
+
+`SICHTLINIEN` steht **oberhalb** von `addMapLegend()`, obwohl es fachlich
+zum eigenen Standort gehört: Die Legende liest die Werte, und
+Funktionsdeklarationen werden hochgezogen, `var`-**Werte** nicht. Der
+Symbolradius in der Legende folgt dem echten Verhältnis der Kilometer, statt
+fest verdrahtet zu sein.
+
+#### Wie gut sieht man die Ringe wirklich?
+
+Gemessen an den Bildpunkten eines Kartenausschnitts (Helligkeitsabstand
+Ring zu Umfeld, 180 Messpunkte rundherum, 0–255):
+
+| Ring | Median | oberes Viertel | Spitze |
+|---|---|---|---|
+| 20 km `#8f8f8f` | 4 | 19 | 51 |
+| 45 km `#c9c9c9` | 2 | 9 | 27 |
+
+**Der Median täuscht** — die Ringe sind gestrichelt, also fällt rund die
+Hälfte der Messpunkte in eine Lücke mit Abstand ~0. Aussagekräftig ist das
+obere Viertel, also dort, wo der Strich wirklich liegt: **19 und 9**.
+
+Neun Stufen von 255 sind auf den hellen OSM-Kacheln sehr wenig — der äußere
+Ring ist bewusst so zart gewünscht, steht damit aber am Rand der
+Wahrnehmbarkeit. Wer ihn kräftiger will, hat zwei Stellschrauben, die den
+Charakter nicht ändern: einen Ton dunkler, oder `weight` von 1 auf 1.5
+(bei `weight: 1` frisst das Kantenglätten auf 2×-Displays einen guten Teil
+des Tons).
 
 `scratchpad/entfernung.js` rechnet die drei Entfernungen **unabhängig nach**
 (eigene Haversine-Formel im Testskript, nicht die des Clients) — sonst
