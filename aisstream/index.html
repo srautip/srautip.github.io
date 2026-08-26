@@ -1516,16 +1516,27 @@
   // mmsi (string) -> accumulated record, see getShip()
   var ships = new Map();
   var selectedMmsi = null;
+  // Zwei Zustaende, nicht einer: selectedMmsi heisst "die Detailspalte zeigt
+  // dieses Schiff", markierteMmsi heisst "zuletzt gewaehlt". Frueher war das
+  // dasselbe, und mit dem Schliessen verschwand auch das Fadenkreuz - man
+  // musste den Punkt in der Karte wieder suchen. Die Markierung bleibt jetzt
+  // stehen, bis ein anderes Schiff gewaehlt wird.
+  //
+  // Warum nicht einfach selectedMmsi stehen lassen: An einem halben Dutzend
+  // Stellen steht "if (selectedMmsi && ships.has(...)) renderDetail(...)" ohne
+  // Pruefung, ob die Spalte ueberhaupt offen ist. Die zeichneten dann dauerhaft
+  // in eine unsichtbare Spalte, Bild- und Registerarbeit inklusive.
+  var markierteMmsi = null;
   var trackLayer = null;
 
   // Tracks aller sichtbaren Schiffe, solange es wenige sind. Bei voller
   // Nordsee waeren hunderte Spuren ein Wollknaeuel, in dem man nichts mehr
   // erkennt - und teuer zu zeichnen.
-  var TRACK_EIN_UNTER = 50;
+  var TRACK_EIN_UNTER = 100;
   // Und erst hier wieder aus. Ohne diesen Abstand flackerten die Spuren an
   // der Grenze im Sekundentakt an und aus, weil staendig ein Schiff den
   // Ausschnitt betritt oder verlaesst.
-  var TRACK_AUS_AB = 55;
+  var TRACK_AUS_AB = 105;
   var autoTracksAn = false;
   // Eine Linie je Typfarbe statt einer je Schiff: acht Ebenen statt fuenfzig,
   // und die Spur traegt dieselbe Farbe wie der Marker, zu dem sie gehoert.
@@ -1829,7 +1840,7 @@
     // aendert sich mit jeder Positionsmeldung - stuende er hier, baute
     // refreshMarkerIcon() bei jeder Nachricht das Marker-DOM neu auf.
     return [typeCategory(entry) || "-", step ? step.key : "?",
-      entry.station || "ship", entry.mmsi === selectedMmsi ? "sel" : "-",
+      entry.station || "ship", entry.mmsi === markierteMmsi ? "sel" : "-",
       travelCourse(entry) != null ? "dir" : "-"].join("|");
   }
 
@@ -1859,12 +1870,12 @@
     // target. The mark sits centred inside a transparent 24px box so the hit
     // area stays comfortable without changing what is drawn.
     var box = Math.max(px, MARKER_HIT_PX);
-    // Das gerade geoeffnete Schiff bekommt ein Fadenkreuz. Es sitzt HINTER
+    // Das zuletzt gewaehlte Schiff bekommt ein Fadenkreuz. Es sitzt HINTER
     // dem Punkt und greift ueber ihn hinaus, damit Typfarbe und Groesse
     // unveraendert lesbar bleiben - die Markierung ist ein Zustand, keine
     // weitere Kodierung.
     var kreuz = "";
-    if (entry.mmsi === selectedMmsi) {
+    if (entry.mmsi === markierteMmsi) {
       var mid = box / 2;
       var arm = Math.round(box / 2) + 7;
       // Vier Arme mit freier Mitte, kein durchgehendes Kreuz: Ein 7 px breiter
@@ -3112,6 +3123,9 @@
       ships.delete(mmsi);
       removed++;
       if (selectedMmsi === mmsi) closeDetail();
+      // Sonst truege dasselbe Schiff bei seiner Rueckkehr ein Fadenkreuz,
+      // das niemand gesetzt hat.
+      if (markierteMmsi === mmsi) markierteMmsi = null;
     });
     if (removed) {
       log(removed + " Schiff(e) seit über 30 Minuten ohne Meldung - aus der Ansicht entfernt.");
@@ -3613,7 +3627,7 @@
       var info = entry.mmsiInfo || {};
       var titel = info.country || "";
       if (z.tds[1].title !== titel) z.tds[1].title = titel;
-      var markiert = entry.mmsi === selectedMmsi;
+      var markiert = entry.mmsi === markierteMmsi;
       if (z.tr.classList.contains("selected") !== markiert) {
         z.tr.classList.toggle("selected", markiert);
       }
@@ -5718,7 +5732,7 @@
   // und genau einer bekommt es.
   function markiereAuswahl(vorher) {
     if (!mapAvailable) return;
-    [vorher, selectedMmsi].forEach(function (m) {
+    [vorher, markierteMmsi].forEach(function (m) {
       if (!m) return;
       var e = ships.get(m);
       if (e) syncMarker(e);
@@ -5731,8 +5745,9 @@
     // Beim Schiffswechsel muss das alte Bild weg, sonst haengt es am neuen
     // Schiff, bis dessen Registerabfrage durch ist.
     if (selectedMmsi !== mmsi) releaseDetailPhoto();
-    var vorher = selectedMmsi;
+    var vorher = markierteMmsi;
     selectedMmsi = mmsi;
+    markierteMmsi = mmsi;
     markiereAuswahl(vorher);
     detailEl.classList.add("open");
     detailEl.setAttribute("aria-hidden", "false");
@@ -5745,9 +5760,10 @@
   }
 
   function closeDetail() {
-    var vorher = selectedMmsi;
+    // markierteMmsi bleibt absichtlich stehen: Das Fadenkreuz ueberlebt das
+    // Schliessen, damit man den Punkt in der Karte nicht wieder suchen muss.
+    // Also gibt es hier auch nichts neu zu zeichnen.
     selectedMmsi = null;
-    markiereAuswahl(vorher);
     detailEl.classList.remove("open");
     detailEl.setAttribute("aria-hidden", "true");
     updateBodyState();
@@ -6312,6 +6328,14 @@
     if (evt.key !== "Escape") return;
     if (settingsEl.classList.contains("open")) setSettingsOpen(false);
     else if (selectedMmsi) closeDetail();
+    // Zweites Escape raeumt die Markierung ab. Ohne diesen Weg liesse sie
+    // sich nur auf ein anderes Schiff verschieben, nie loeschen.
+    else if (markierteMmsi) {
+      var alt = markierteMmsi;
+      markierteMmsi = null;
+      markiereAuswahl(alt);
+      refreshVisibleShips();
+    }
   });
 
   // pagehide fires on tab close and on mobile backgrounding, where a
