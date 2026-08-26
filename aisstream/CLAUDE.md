@@ -642,10 +642,10 @@ Punktmitte zurück (`getPointAtLength(0)` + `getScreenCTM()`) und zeigt für
 0/45/90/180/270° exakt dieselben Werte. Ein Test, der nur die CSS-Matrix des
 `.dir`-Elements prüft, würde eine verdrehte Pfadgeometrie nicht bemerken.
 
-### Ausgewähltes Schiff: gelbes Fadenkreuz mit freier Mitte
+### Zuletzt gewähltes Schiff: gelbes Fadenkreuz mit freier Mitte
 
-Das in der Detailansicht geöffnete Schiff bekommt auf der Karte ein gelbes
-Fadenkreuz (`#ffd21e`) mit dunklem Umriss.
+Das zuletzt gewählte Schiff bekommt auf der Karte ein gelbes Fadenkreuz
+(`#ffd21e`) mit dunklem Umriss.
 
 Drei Entscheidungen, die zusammengehören:
 
@@ -662,18 +662,60 @@ Drei Entscheidungen, die zusammengehören:
   Größe vollständig sichtbar.
 
 **Die Auswahl gehört in `iconKey()`.** Sonst merkt `refreshMarkerIcon()` den
-Wechsel nicht und das Fadenkreuz bleibt beim alten Schiff stehen. `openDetail()`
-und `closeDetail()` zeichnen über `markiereAuswahl(vorher)` genau **zwei**
-Marker neu — einer verliert das Kreuz, einer bekommt es. Ein voller Durchlauf
-über alle Marker wäre dafür Verschwendung.
+Wechsel nicht und das Fadenkreuz bleibt beim alten Schiff stehen.
+`openDetail()` zeichnet über `markiereAuswahl(vorher)` genau **zwei** Marker
+neu — einer verliert das Kreuz, einer bekommt es. Ein voller Durchlauf über
+alle Marker wäre dafür Verschwendung.
+
+#### Die Markierung überlebt das Schließen — zwei Zustände, nicht einer
+
+Gewünscht: *„Behalte die Markierung des zuletzt gewählten Schiffes in der
+Karte auch nach schließen der detailansicht."* Wer die Details gelesen und
+die Spalte geschlossen hatte, musste den Punkt sonst in der Karte wieder
+suchen.
+
+Dafür gibt es **zwei** Variablen, und das ist der Kern der Sache:
+
+| Variable | Bedeutung | endet mit |
+|---|---|---|
+| `selectedMmsi` | die Detailspalte zeigt dieses Schiff | `closeDetail()` |
+| `markierteMmsi` | zuletzt gewählt (Fadenkreuz, `tr.selected`) | Wahl eines anderen Schiffs, Escape, `pruneStaleShips()` |
+
+**Warum nicht einfach `selectedMmsi` stehen lassen:** An einem halben Dutzend
+Stellen steht `if (selectedMmsi && ships.has(selectedMmsi)) renderDetail(…)`
+ohne Prüfung, ob die Spalte überhaupt offen ist. Die zeichneten ab dann
+dauerhaft in eine unsichtbare Spalte — samt Bild- und Registerarbeit. Der
+Fehler wäre unsichtbar und teuer. Die zweite Variable kostet dagegen fünf
+berührte Zeilen, und alles, was heute an `selectedMmsi` hängt, bleibt
+unverändert.
+
+Drei Folgeentscheidungen:
+
+- **`closeDetail()` zeichnet gar nichts mehr neu.** Es ändert sich kein
+  Marker, also gibt es auch nichts nachzuführen.
+- **Escape ist der Weg zurück.** Erstes Escape schließt die Spalte, zweites
+  räumt die Markierung ab. Ohne diesen Zweig ließe sie sich nur verschieben,
+  nie löschen.
+- **`pruneStaleShips()` muss `markierteMmsi` freigeben.** Sonst trüge
+  dasselbe Schiff nach 30 Minuten Funkstille bei seiner Rückkehr wieder ein
+  Fadenkreuz, das niemand gesetzt hat.
+
+`zeichneAutoTracks()` prüft weiter auf `selectedMmsi`: Übersprungen wird dort
+das Schiff mit der **dicken** Spur, und die gibt es nur bei offener Spalte
+(`trackLayer` wird beim Schließen entfernt). Nach dem Schließen bekommt das
+markierte Schiff seine dünne Spur wie jedes andere.
 
 Geprüft: Kreuz und Punkt sind bei 11, 15 und 20 px exakt konzentrisch
 (dx = dy = 0, `scratchpad/kreuzmitte.js`), Typfarbe und Größe bleiben
-unverändert (`scratchpad/auswahlkreuz.js`).
+unverändert, und nach `#detailClose` steht **genau ein** Kreuz an derselben
+Bildschirmhöhe wie vorher (`scratchpad/auswahlkreuz.js`). Die Höhe ist der
+Beweis, dass es dasselbe Schiff ist — die beiden Testschiffe liegen 0,01°
+auseinander. Gegenprobe mit zurückgebautem `closeDetail()`: null Kreuze,
+sechs rote Proben.
 
 ### Spuren aller sichtbaren Schiffe, solange es wenige sind
 
-Sind **weniger als 50 Schiffe** im Kartenausschnitt zu sehen, zeichnet
+Sind **weniger als 100 Schiffe** im Kartenausschnitt zu sehen, zeichnet
 `zeichneAutoTracks()` deren Tracks als sehr dünne Linie (`weight: 1`,
 `opacity: 0.55`) **in der Typfarbe des Schiffs** — dieselbe Farbe wie sein
 Marker, damit man bei sich kreuzenden Spuren erkennt, wozu welche gehört.
@@ -690,10 +732,12 @@ drin liegt — sonst fehlte genau das Stück, das den Rand kreuzt, und die Spur
 endete sichtbar zu früh. Verlässt eine Spur das Bild und kommt zurück,
 entstehen zwei getrennte Stücke.
 
-**Eine Linie je Typfarbe, nicht je Schiff:** acht Ebenen statt fünfzig, und
+**Eine Linie je Typfarbe, nicht je Schiff:** acht Ebenen statt hundert, und
 `setLatLngs()` auf einer bestehenden Ebene statt Abbau und Neuanlage.
-Gemessen kostet das Nachzeichnen beim Zoomen **9 bis 46 ms** — die Spuren
-sind kein Grund, die Karte langsamer zu machen.
+Gemessen bei **98 Schiffen mit je sechs Spurpunkten** — dem teuersten Fall
+knapp unter der Grenze — kostet das Nachzeichnen beim Zoomen **höchstens
+21 ms** (Spitzen 21,1 / 20,5 / 16,7). Die Anhebung von 50 auf 100 kostet
+also nichts Spürbares; die Schranke der Probe bleibt bei 250 ms.
 
 `interactive: false`, wie beim Sichtkreis: Linien dürfen keine Klicks auf
 die Marker abfangen. Das ausgewählte Schiff wird ausgelassen, wenn seine
@@ -701,11 +745,25 @@ eigene, dickere Spur eingeschaltet ist — sonst lägen zwei übereinander.
 
 #### Hysterese, sonst flackert es
 
-An **50** gehen die Spuren an, aus erst wieder ab **55**. Ohne diesen
+An **100** gehen die Spuren an, aus erst wieder ab **105**. Ohne diesen
 Abstand flackerten sie an der Grenze im Sekundentakt, weil ständig ein
 Schiff den Ausschnitt betritt oder verlässt. `autotracks.js` fährt die Zahl
-deshalb **monoton** hoch und wieder herunter: 8 → 52 (bleibt an) → 58 (aus)
-→ 52 (bleibt aus) → 8 (wieder an).
+deshalb **monoton** hoch und wieder herunter: 20 → 102 (bleibt an) → 108
+(aus) → 102 (bleibt aus) → 20 (wieder an).
+
+**Das Raster in `flotte()` hängt an der Grenze mit.** Mit dem alten Raster
+(zehn Zeilen à 0,022°, Spalten à 0,055°) wären achtzig Schiffe seitlich aus
+dem Bild gelaufen, und die Probe „sichtbare Zahl wie geplant" hätte Unsinn
+gemessen. Der Startausschnitt reicht von 53,705 bis 53,885 und von 7,663 bis
+8,119 — an den bbox-Feldern abgelesen, weil die Leaflet-Karte in einem
+Closure steckt und im Test nicht greifbar ist. Zwölf Zeilen à 0,0127° und
+Spalten à 0,04° halten auch 108 Schiffe vollständig im Bild.
+
+**Und die Spuren müssen einen Knick haben.** Leaflet vereinfacht Linienzüge
+beim Zeichnen (`smoothFactor`): Eine exakt gerade Spur aus sechs Punkten kam
+als **zwei** Punkte im Pfad an — 98 Schiffe ergaben 196 statt 588 Punkte, und
+die Kostenmessung sah billiger aus, als sie mit echten Kursen ist. `flotte()`
+fährt deshalb Zickzack.
 
 #### Drei Testfallen, alle drei auf einmal
 
