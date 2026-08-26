@@ -839,6 +839,47 @@ zeigen. Zwei Feinheiten:
 Der Spaltenkopf trägt ein `▼`, damit die Ordnung ablesbar ist. Sie ist fest,
 nicht klickbar sortierbar.
 
+### Entfernungsspalte statt Rufzeichen, Sichtlinie auf der Karte
+
+Die Spalte **„Rufzeichen" ist aus der Tabelle verschwunden** — sie steht in
+der Detailansicht, und im Betrieb sucht man sie dort. An ihrer Stelle steht
+**„Entfernung"**: Luftlinie vom eigenen Standort, ersatzweise von der
+Kartenmitte, wenn keine Standortfreigabe vorliegt. Denselben Bezugspunkt
+benutzt die Detailansicht schon lange; der Spaltenkopf sagt ihn per `title`,
+denn eine Entfernung ohne Bezugspunkt wäre eine Zahl ohne Bedeutung.
+
+Der Bezugspunkt wird **einmal je Neuzeichnen** bestimmt, nicht je Zeile —
+`map.getCenter()` 200-mal zu rufen wäre reine Arbeit ohne Ertrag.
+
+Auf dem Telefon bleibt die Spalte **sichtbar** (anders als `Lat`, `Lon`,
+`Zeit`): „Wie weit ist das weg?" ist dort eher wichtiger als am Schreibtisch.
+
+Dazu auf der Karte ein **gestrichelter Kreis mit 45 km Radius** um den
+eigenen Standort (`SICHTLINIE_KM`) — grob die VHF-Funkreichweite eines
+Landempfängers, also der Ring, in dem eigener Empfang überhaupt zu erwarten
+ist. Zwei Dinge daran sind nicht verhandelbar:
+
+- **`interactive: false`.** Eine 45-km-Scheibe, die Klicks abfängt, wäre die
+  größte Klickfalle der ganzen Karte.
+- Vektoren liegen in Leaflets `overlayPane`, Marker im `markerPane` darüber
+  — die Schiffe bleiben also obenauf. Der Test prüft beides ausdrücklich.
+
+`SICHTLINIE_KM` steht **oberhalb** von `addMapLegend()`, obwohl es fachlich
+zum eigenen Standort gehört: Die Legende liest den Wert, und
+Funktionsdeklarationen werden hochgezogen, `var`-**Werte** nicht.
+
+`scratchpad/entfernung.js` rechnet die drei Entfernungen **unabhängig nach**
+(eigene Haversine-Formel im Testskript, nicht die des Clients) — sonst
+prüfte der Test nur, dass zwei Kopien derselben Formel übereinstimmen. Der
+Kreisradius wird in Bildschirmpixeln gegen die Markerabstände gehalten: zwei
+Schiffe innerhalb, eines außerhalb.
+
+**Eine Testfalle dabei:** Der erste Lauf meldete für zwei Schiffe „-". Die
+Ursache lag im Test, nicht im Code — bei der Voreinstellung ist die Karte
+nur rund 63 km breit und 23 km hoch, die beiden entfernten Schiffe lagen
+außerhalb der Bounds und damit weder auf der Karte noch in der Tabelle. Der
+Test zoomt jetzt erst heraus.
+
 ### Die Zeile, auf die man zielt, muss beim Klick noch dieselbe sein
 
 Gemeldet: *„Wenn die Detailseite zu einem Schiff geöffnet ist, funktioniert
@@ -885,6 +926,37 @@ springt:
 Denkpause von 600 ms, wie ein Mensch) und klicken; sechs Treffer. Die
 Gegenprobe stellt den `updatedAt`-Stichentscheid wieder her und meldet
 zuverlässig sechs Fehlgriffe — ohne sie prüfte der Test nichts.
+
+#### Nachtrag: „manchmal passiert gar nichts"
+
+Nach dem obigen Fix meldete der Nutzer, es sei „meist gut, aber manchmal
+immer noch keine Übernahme". Ein anderer Mechanismus, und ein härterer:
+
+**Wird die Zeile zwischen `mousedown` und `mouseup` zerstört, feuert gar
+kein `click`.** Der Browser hat kein Ziel mehr, dem er das Ereignis zustellen
+könnte — er verwirft es kommentarlos. Gemessen: **zehn von zehn Versuchen
+ohne jede Übernahme und ohne ein einziges angekommenes `click`-Ereignis.**
+Und `tableBody.innerHTML = ""` zerstörte bei jedem Neuzeichnen alle Zeilen.
+
+Deshalb werden Zeilen jetzt **wiederverwendet statt neu gebaut**
+(`zeilenCache`, `holeZeile()`, `zeilenWerte()`):
+
+- Je MMSI ein `<tr>` mit 14 festen `<td>`, die über die Lebensdauer stehen.
+- Geschrieben wird nur, was sich geändert hat — ein unverändertes
+  `innerHTML` neu zu setzen würde das `<td>` unter dem Finger ersetzen.
+- Umsortiert wird nur, wo die Zeile nicht ohnehin an der Reihe ist: Ein
+  `insertBefore` nimmt den Knoten heraus und wieder hinein und zerreißt
+  damit einen laufenden Klick genauso.
+
+Danach: null von zehn ohne Übernahme, und die Zeile ist nach dem
+Neuzeichnen nachweislich **derselbe DOM-Knoten**, während ihre Alterspalte
+weiterläuft.
+
+**Folge für `scratchpad/tabellenlast.js`: der Test hängt jetzt.** Er wartet
+auf zwölf `childList`-Mutationen an `#shipTableBody` und stößt sie über das
+Suchfeld an. Bei wiederverwendeten Zeilen gibt es diese Mutationen nicht
+mehr, das Versprechen löst nie ein. Der Test braucht einen anderen
+Messpunkt — die Renderdauer selbst statt der DOM-Umbauten. **Noch offen.**
 
 Gemessen (`scratchpad/tabellenlast.js`, 400 Schiffe / 200 Zeilen): Der
 Tabellenaufbau kostet mit Sortierung 163,5 ms, ohne 163,0 ms — davon sind
