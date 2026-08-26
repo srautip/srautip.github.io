@@ -715,7 +715,8 @@ sechs rote Proben.
 
 ### Spuren aller sichtbaren Schiffe, solange es wenige sind
 
-Sind **weniger als 100 Schiffe** im Kartenausschnitt zu sehen, zeichnet
+Sind **weniger als 100 Schiffe** (Voreinstellung, einstellbar) im
+Kartenausschnitt zu sehen, zeichnet
 `zeichneAutoTracks()` deren Tracks als sehr dünne Linie (`weight: 1`,
 `opacity: 0.55`) **in der Typfarbe des Schiffs** — dieselbe Farbe wie sein
 Marker, damit man bei sich kreuzenden Spuren erkennt, wozu welche gehört.
@@ -745,11 +746,37 @@ eigene, dickere Spur eingeschaltet ist — sonst lägen zwei übereinander.
 
 #### Hysterese, sonst flackert es
 
-An **100** gehen die Spuren an, aus erst wieder ab **105**. Ohne diesen
+An der Grenze (Voreinstellung **100**) gehen die Spuren an, aus erst wieder
+**fünf Schiffe darüber** (`TRACK_HYSTERESE`). Ohne diesen
 Abstand flackerten sie an der Grenze im Sekundentakt, weil ständig ein
 Schiff den Ausschnitt betritt oder verlässt. `autotracks.js` fährt die Zahl
 deshalb **monoton** hoch und wieder herunter: 20 → 102 (bleibt an) → 108
 (aus) → 102 (bleibt aus) → 20 (wieder an).
+
+#### Die Grenze steht auf der Technikseite
+
+Feld `#trackLimit` unter „Karte", Voreinstellung 100, gespeichert unter
+`aisstream_track_limit`. **0 schaltet die Spuren ganz ab**, 500 ist die
+Obergrenze.
+
+- **Eine Klammer für beide Wege hinein.** `trackGrenzeAus()` prüft Feld
+  **und** Speicher: leer → Voreinstellung (nicht 0! `Number("")` wäre 0
+  gewesen, also aus), unlesbar → Voreinstellung, sonst gerundet auf 0…500.
+  Der geklammerte Wert wird ins Feld zurückgeschrieben — es soll dort stehen,
+  was wirklich gilt.
+- **Die Änderung muss sofort wirken.** Der Handler setzt `autoTracksAn =
+  false` und ruft `applyMapFilter()`. Ohne das nimmt die Hysterese die neue
+  Grenze erst zur Kenntnis, wenn die Schiffszahl von selbst darüber
+  hinwegläuft — gegengeprüft: mit ausgebautem Aufruf bleibt die Anzeige aus,
+  obwohl die Grenze von 50 auf 200 gestellt wurde (Probe 7d rot).
+
+**Testfalle: `starte()` löscht bei _jeder_ Navigation `localStorage`.** Der
+`addInitScript`-Schuss läuft auch bei jedem `location.reload()` im Test. Die
+Probe „übersteht den Neustart" meldete deshalb einen Fehler, den es nicht
+gab — der Wert stand vor dem Neuladen im Speicher und war danach weg.
+Deshalb lädt sie eine **zweite Seite im selben Kontext** (`verdrahte(page)`
+ohne den Schuss); dort kommen auch die 98 Schiffe aus dem AIS-Cache zurück
+und bekommen bei Grenze 30 korrekt keine Spuren.
 
 **Das Raster in `flotte()` hängt an der Grenze mit.** Mit dem alten Raster
 (zehn Zeilen à 0,022°, Spalten à 0,055°) wären achtzig Schiffe seitlich aus
