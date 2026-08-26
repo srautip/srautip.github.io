@@ -34,7 +34,11 @@
                 BorderBrush="{StaticResource farbe-linie}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <Button Content="Prüfen" Click="AufPruefen" />
+                    <TextBlock x:Name="Speicherzustand" VerticalAlignment="Center" Margin="0,0,16,0"
+                               FontSize="{StaticResource grad-klein}" />
+                    <Button x:Name="SpeichernKnopf" Content="Speichern" Click="AufSpeichern"
+                            ToolTip="Strg+S" />
+                    <Button Content="Prüfen" Margin="8,0,0,0" Click="AufPruefen" />
                     <Button Content="Schließen" Margin="8,0,0,0" IsCancel="True"
                             Style="{StaticResource KnopfPrimaer}" />
                 </StackPanel>
@@ -93,11 +97,165 @@
                 </Grid>
             </TabItem>
 
-            <!-- ===== Gruppen, Balance, Wünsche, Fixierungen ===== -->
-            <TabItem Header="Regeln">
-                <ScrollViewer Margin="0,12,0,0">
-                    <StackPanel x:Name="Regeln" />
-                </ScrollViewer>
+            <!-- ===== 6.11: Gruppen ===== -->
+            <TabItem Header="Gruppen">
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="340" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <DockPanel Grid.Column="0">
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                            <Button x:Name="GruppeNeuKnopf" Content="Neu" Click="AufGruppeNeu" />
+                            <Button Content="Duplizieren" Margin="6,0,0,0" Click="AufGruppeDupl" />
+                            <Button Content="Löschen" Margin="6,0,0,0" Click="AufGruppeWeg" />
+                        </StackPanel>
+                        <ListBox x:Name="GruppenListe" SelectionChanged="AufGruppeAuswahl"
+                                 BorderBrush="{StaticResource farbe-linie}" BorderThickness="1" />
+                    </DockPanel>
+                    <ScrollViewer Grid.Column="1" Margin="16,0,0,0" VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="GruppeDetail" IsEnabled="False">
+                            <TextBlock Text="Kennung (Id)" Style="{StaticResource Feldbeschriftung}" />
+                            <TextBox x:Name="GruppeId" Width="260" HorizontalAlignment="Left" LostFocus="AufGruppeFeld" />
+                            <TextBlock Text="Kürzel (Badge im Board)" Style="{StaticResource Feldbeschriftung}" />
+                            <TextBox x:Name="GruppeKuerzel" Width="120" HorizontalAlignment="Left" LostFocus="AufGruppeFeld" />
+                            <TextBlock Text="Typ" Style="{StaticResource Feldbeschriftung}" />
+                            <ComboBox x:Name="GruppeTyp" Width="200" HorizontalAlignment="Left" SelectionChanged="AufGruppeFeld" />
+                            <TextBlock Text="Höchstens je Klasse (leer = ohne Grenze)" Style="{StaticResource Feldbeschriftung}" />
+                            <TextBox x:Name="GruppeMax" Width="90" HorizontalAlignment="Left" LostFocus="AufGruppeFeld" />
+                            <StackPanel Orientation="Horizontal">
+                                <StackPanel>
+                                    <TextBlock Text="Modus" Style="{StaticResource Feldbeschriftung}" />
+                                    <ComboBox x:Name="GruppeModus" Width="120" HorizontalAlignment="Left" SelectionChanged="AufGruppeFeld" />
+                                </StackPanel>
+                                <StackPanel Margin="16,0,0,0">
+                                    <TextBlock Text="Priorität (1–3)" Style="{StaticResource Feldbeschriftung}" />
+                                    <ComboBox x:Name="GruppePrio" Width="80" HorizontalAlignment="Left" SelectionChanged="AufGruppeFeld" />
+                                </StackPanel>
+                            </StackPanel>
+                            <TextBlock x:Name="GruppeMitgliederKopf" Style="{StaticResource Feldbeschriftung}" />
+                            <TextBox x:Name="GruppeSuche" Width="260" HorizontalAlignment="Left"
+                                     TextChanged="AufGruppeSuche" />
+                            <Border Margin="0,6,0,0" MaxHeight="260"
+                                    BorderBrush="{StaticResource farbe-linie}" BorderThickness="1"
+                                    CornerRadius="{StaticResource radius-m}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel x:Name="GruppeMitglieder" Margin="8" />
+                                </ScrollViewer>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+
+            <!-- ===== 6.11: Balance ===== -->
+            <TabItem Header="Balance">
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="340" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <DockPanel Grid.Column="0">
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                            <Button x:Name="BalanceNeuKnopf" Content="Neu" Click="AufBalanceNeu" />
+                            <Button Content="Duplizieren" Margin="6,0,0,0" Click="AufBalanceDupl" />
+                            <Button Content="Löschen" Margin="6,0,0,0" Click="AufBalanceWeg" />
+                        </StackPanel>
+                        <ListBox x:Name="BalanceListe" SelectionChanged="AufBalanceAuswahl"
+                                 BorderBrush="{StaticResource farbe-linie}" BorderThickness="1" />
+                    </DockPanel>
+                    <StackPanel Grid.Column="1" Margin="16,0,0,0">
+                        <TextBlock TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Left"
+                                   Foreground="{StaticResource farbe-text-2}"
+                                   FontSize="{StaticResource grad-klein}"
+                                   Text="Verteilt Kinder mit einem bestimmten Attributwert gleichmäßig über die Klassen. Attribut und Wert stammen aus dem Vokabular der Einschulungsliste – Freitext gibt es hier nicht, weil eine Balance auf ein Attribut, das kein Kind trägt, unbemerkt wirkungslos bliebe." />
+                        <StackPanel x:Name="BalanceDetail" IsEnabled="False">
+                            <TextBlock Text="Attribut" Style="{StaticResource Feldbeschriftung}" />
+                            <ComboBox x:Name="BalanceAttribut" Width="220" HorizontalAlignment="Left" SelectionChanged="AufBalanceAttribut" />
+                            <TextBlock Text="Wert" Style="{StaticResource Feldbeschriftung}" />
+                            <ComboBox x:Name="BalanceWert" Width="220" HorizontalAlignment="Left" SelectionChanged="AufBalanceFeld" />
+                            <TextBlock Text="Toleranz (erlaubte Abweichung je Klasse)" Style="{StaticResource Feldbeschriftung}" />
+                            <TextBox x:Name="BalanceToleranz" Width="90" HorizontalAlignment="Left" LostFocus="AufBalanceFeld" />
+                            <StackPanel Orientation="Horizontal">
+                                <StackPanel>
+                                    <TextBlock Text="Modus" Style="{StaticResource Feldbeschriftung}" />
+                                    <ComboBox x:Name="BalanceModus" Width="120" HorizontalAlignment="Left" SelectionChanged="AufBalanceFeld" />
+                                </StackPanel>
+                                <StackPanel Margin="16,0,0,0">
+                                    <TextBlock Text="Priorität (1–3)" Style="{StaticResource Feldbeschriftung}" />
+                                    <ComboBox x:Name="BalancePrio" Width="80" HorizontalAlignment="Left" SelectionChanged="AufBalanceFeld" />
+                                </StackPanel>
+                            </StackPanel>
+                            <TextBlock x:Name="BalanceBetroffen" Margin="0,12,0,0" TextWrapping="Wrap"
+                                       MaxWidth="480" HorizontalAlignment="Left"
+                                       Foreground="{StaticResource farbe-text-2}"
+                                       FontSize="{StaticResource grad-klein}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- ===== 6.11: Wünsche ===== -->
+            <TabItem Header="Wünsche">
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="340" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <DockPanel Grid.Column="0">
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                            <Button x:Name="WunschNeuKnopf" Content="Neu" Click="AufWunschNeu" />
+                            <Button Content="Duplizieren" Margin="6,0,0,0" Click="AufWunschDupl" />
+                            <Button Content="Löschen" Margin="6,0,0,0" Click="AufWunschWeg" />
+                        </StackPanel>
+                        <ListBox x:Name="WunschListe" SelectionChanged="AufWunschAuswahl"
+                                 BorderBrush="{StaticResource farbe-linie}" BorderThickness="1" />
+                    </DockPanel>
+                    <StackPanel Grid.Column="1" Margin="16,0,0,0">
+                        <TextBlock TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Left"
+                                   Foreground="{StaticResource farbe-text-2}"
+                                   FontSize="{StaticResource grad-klein}"
+                                   Text="Ein Wunsch verbindet genau zwei Kinder. Voreinstellung ist weich mit Priorität 1 – Wünsche wiegen leichter als Gruppen und Balance, so steht es auch im YAML." />
+                        <StackPanel x:Name="WunschDetail" IsEnabled="False">
+                            <TextBlock Text="Art" Style="{StaticResource Feldbeschriftung}" />
+                            <ComboBox x:Name="WunschTyp" Width="200" HorizontalAlignment="Left" SelectionChanged="AufWunschFeld" />
+                            <TextBlock Text="Erstes Kind" Style="{StaticResource Feldbeschriftung}" />
+                            <ComboBox x:Name="WunschKindA" Width="320" HorizontalAlignment="Left" SelectionChanged="AufWunschFeld" />
+                            <TextBlock Text="Zweites Kind" Style="{StaticResource Feldbeschriftung}" />
+                            <ComboBox x:Name="WunschKindB" Width="320" HorizontalAlignment="Left" SelectionChanged="AufWunschFeld" />
+                            <StackPanel Orientation="Horizontal">
+                                <StackPanel>
+                                    <TextBlock Text="Modus" Style="{StaticResource Feldbeschriftung}" />
+                                    <ComboBox x:Name="WunschModus" Width="120" HorizontalAlignment="Left" SelectionChanged="AufWunschFeld" />
+                                </StackPanel>
+                                <StackPanel Margin="16,0,0,0">
+                                    <TextBlock Text="Priorität (1–3)" Style="{StaticResource Feldbeschriftung}" />
+                                    <ComboBox x:Name="WunschPrio" Width="80" HorizontalAlignment="Left" SelectionChanged="AufWunschFeld" />
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- ===== 6.11: Fixierungen ===== -->
+            <TabItem Header="Fixierungen">
+                <DockPanel Margin="0,12,0,0">
+                    <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" MaxWidth="760"
+                               HorizontalAlignment="Left" Margin="0,0,0,4"
+                               Foreground="{StaticResource farbe-text-2}"
+                               FontSize="{StaticResource grad-klein}"
+                               Text="Fixierungen entstehen normalerweise am Board – per Pin oder Ziehen. Hier stehen sie zur Durchsicht und zum gezielten Lösen." />
+                    <TextBlock x:Name="FixHerkunft" DockPanel.Dock="Top" TextWrapping="Wrap" MaxWidth="760"
+                               HorizontalAlignment="Left" Margin="0,0,0,10"
+                               Foreground="{StaticResource farbe-text-3}"
+                               FontSize="{StaticResource grad-klein}" />
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+                        <Button x:Name="FixWegKnopf" Content="Fixierung lösen" Click="AufFixWeg" />
+                    </StackPanel>
+                    <ListBox x:Name="FixListe" SelectionChanged="AufFixAuswahl"
+                             BorderBrush="{StaticResource farbe-linie}" BorderThickness="1" />
+                </DockPanel>
             </TabItem>
 
             <!-- ===== 6.12 Solver ===== -->

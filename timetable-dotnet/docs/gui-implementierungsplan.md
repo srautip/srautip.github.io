@@ -300,6 +300,36 @@ schreibt und danach die passende `Validate*`-API grün sieht;
 Kaskaden-Umbenennung und Lösch-Konsequenzen als eigene Tests gegen ein
 Beispielprojekt.
 
+**Nachtrag zu F6 (Regeln der Klassenbildung).** F4 hatte Gruppen, Balance,
+Wünsche und Fixierungen nur ANGEZEIGT – und F wurde trotzdem als
+abgeschlossen gemeldet. Das war falsch: §6.11 führt die drei als
+„Listen-Dialoge nach Grundmuster“ auf, und wer Gruppen pflegen wollte,
+musste an der YAML-Datei vorbei – in einer Oberfläche, deren Zweck es ist,
+genau das zu ersparen. Aufgefallen ist es im manuellen Test
+(Nutzerhinweis 26.08.2026), nicht mir.
+
+Der Nur-Lese-Reiter *Regeln* ist durch vier bearbeitbare ersetzt. Drei
+Punkte, die dabei Entscheidungen verlangten:
+
+- **Nur die Gruppe hat einen Namen.** Balance, Wunsch und Fixierung sind
+  durch ihren Inhalt bestimmt; ihr Listentext ist abgeleitet und
+  `SetzeName` bewusst wirkungslos. Neu, Duplizieren, Löschen und Prüfen
+  funktionieren dadurch trotzdem einheitlich – genau dafür gibt es das
+  Grundmuster.
+- **Kein Freitext bei Balance.** Attribut und Wert stammen aus dem Vokabular
+  der Einschulungsliste. Eine Balance auf ein Attribut, das kein Kind trägt,
+  bliebe unbemerkt wirkungslos; die Maske nennt deshalb auch, wie viele
+  Kinder der gewählte Wert betrifft.
+- **Herkunft der Fixierungen ehrlich.** §6.11 verlangt sie „aus dem
+  Audit-Log“. Das Protokoll führt Board-Übernahmen aber als SAMMELZEILE,
+  nicht je Kind. Statt eine Herkunft je Zeile vorzugaukeln, steht über der
+  Liste die jüngste einschlägige Protokollzeile.
+
+Nebenbefund: der Negativtest zur Werteliste blieb grün, weil dieselbe
+Zeile zweimal stand – einmal in `AufBalanceAttribut`, einmal in
+`BalanceZeigen`. Die redundante ist entfernt; toter Code, der
+tragend aussieht, ist eine Falle für den nächsten Leser.
+
 **Nachtrag zu F5 (Projekt-Assistent).** Der Assistent nutzt die
 Scaffold-Logik als Motor, wie geplant – aber sie schrieb bisher nur Dateien.
 Deshalb ist `Scaffold.Run` in `Run` (Datei) und **`Scaffold.Baue`** (Bestand im

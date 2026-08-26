@@ -7,6 +7,7 @@ Class MainWindow
 
     Private ReadOnly _modell As HauptViewModel
     Private ReadOnly _host As ViewerHost
+    Private ReadOnly _speicherung As Speicherstand
 
     Public Sub New()
         InitializeComponent()
@@ -21,6 +22,7 @@ Class MainWindow
                                AddressOf _modell.VerarbeiteBrueckenNachricht,
                                AddressOf _modell.BrueckenStartSkript)
 
+        _speicherung = New Speicherstand(_modell)
         AddHandler _modell.PropertyChanged, AddressOf AufModellAenderung
 
         InputBindings.Add(New KeyBinding(_modell.SpeichernBefehl, Key.S, ModifierKeys.Control))
@@ -68,7 +70,7 @@ Class MainWindow
             Return
         End If
 
-        Dim f As New StammdatenFenster(_modell.Projekt, New WpfDialoge(Me)) With {.Owner = Me}
+        Dim f As New StammdatenFenster(_modell.Projekt, New WpfDialoge(Me), _speicherung) With {.Owner = Me}
         ' Jede Aenderung in den Masken macht das Projekt ungespeichert -
         ' Autosave ist ausdruecklich abgelehnt (Konzept 7), also muss der
         ' Indikator stimmen.
@@ -87,7 +89,7 @@ Class MainWindow
                             "Klassenbildung", MessageBoxButton.OK, MessageBoxImage.Information)
             Return
         End If
-        Dim f As New KlassenbildungFenster(_modell.Projekt, New WpfDialoge(Me)) With {.Owner = Me}
+        Dim f As New KlassenbildungFenster(_modell.Projekt, New WpfDialoge(Me), _speicherung) With {.Owner = Me}
         AddHandler f.Geaendert, Sub() _modell.Geaendert = True
         f.ShowDialog()
     End Sub
@@ -102,7 +104,7 @@ Class MainWindow
                             "Regeln", MessageBoxButton.OK, MessageBoxImage.Information)
             Return
         End If
-        Dim f As New RegelnFenster(_modell.Projekt, New WpfDialoge(Me)) With {.Owner = Me}
+        Dim f As New RegelnFenster(_modell.Projekt, New WpfDialoge(Me), _speicherung) With {.Owner = Me}
         AddHandler f.Geaendert, Sub() _modell.Geaendert = True
         f.ShowDialog()
     End Sub

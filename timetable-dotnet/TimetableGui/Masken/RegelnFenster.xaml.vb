@@ -24,7 +24,8 @@ Partial Class RegelnFenster
 
     Public Event Geaendert As EventHandler
 
-    Public Sub New(projekt As Projekt, dialoge As IDialoge)
+    Public Sub New(projekt As Projekt, dialoge As IDialoge,
+                   Optional speicherung As ISpeicherung = Nothing)
         InitializeComponent()
         _projekt = projekt
         _dialoge = dialoge
@@ -51,6 +52,7 @@ Partial Class RegelnFenster
         YamlEditor.Text = _modell.AlsYaml()
         MaskeLeeren()
         Aktualisieren()
+        SpeicherungVerdrahten(speicherung)
     End Sub
 
     ' ===============================================================
@@ -456,4 +458,48 @@ Partial Class RegelnFenster
         End If
     End Sub
 
+
+    ' ===============================================================
+    ' Speicherzustand (Nutzerhinweis 26.08.2026)
+    ' ===============================================================
+    '
+    ' Die Maske ist ein MODALES Fenster - solange sie offen ist, verdeckt
+    ' sie den Ungespeichert-Indikator im Titel des Hauptfensters, und
+    ' Strg+S hing bisher ausschliesslich dort. Man musste die Maske
+    ' schliessen, um ueberhaupt speichern zu koennen, ohne dass etwas das
+    ' gesagt haette. Deshalb beides hier: Zustand und Aktion.
+
+    Private _speicherung As ISpeicherung
+
+    Private Sub SpeicherungVerdrahten(speicherung As ISpeicherung)
+        _speicherung = speicherung
+        If _speicherung Is Nothing Then
+            ' Ohne Huelle (Tests) gibt es nichts zu speichern - dann den
+            ' Knopf ausblenden statt einen toten anzubieten.
+            SpeichernKnopf.Visibility = Visibility.Collapsed
+            Speicherzustand.Visibility = Visibility.Collapsed
+            Return
+        End If
+        AddHandler _speicherung.ZustandGeaendert, Sub() SpeicherzustandZeigen()
+        InputBindings.Add(New KeyBinding(New Befehl(Sub() Speichern()), Key.S, ModifierKeys.Control))
+        SpeicherzustandZeigen()
+    End Sub
+
+    Private Sub SpeicherzustandZeigen()
+        Speicherzustand.Text = Speicheranzeige.Zustandstext(_speicherung)
+        Speicherzustand.Foreground = CType(FindResource(Speicheranzeige.Zustandsfarbe(_speicherung)), Brush)
+        Speicherzustand.ToolTip = Speicheranzeige.Uebernahmehinweis
+        SpeichernKnopf.IsEnabled = _speicherung IsNot Nothing AndAlso
+                                   _speicherung.Moeglich AndAlso _speicherung.Ungespeichert
+    End Sub
+
+    Private Sub Speichern()
+        If _speicherung Is Nothing OrElse Not _speicherung.Moeglich Then Return
+        _speicherung.Speichern()
+        SpeicherzustandZeigen()
+    End Sub
+
+    Private Sub AufSpeichern(sender As Object, e As RoutedEventArgs)
+        Speichern()
+    End Sub
 End Class

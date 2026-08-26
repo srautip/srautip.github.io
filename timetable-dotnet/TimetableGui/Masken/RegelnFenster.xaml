@@ -22,7 +22,11 @@
                 BorderBrush="{StaticResource farbe-linie}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <Button Content="Prüfen" Click="AufPruefen" />
+                    <TextBlock x:Name="Speicherzustand" VerticalAlignment="Center" Margin="0,0,16,0"
+                               FontSize="{StaticResource grad-klein}" />
+                    <Button x:Name="SpeichernKnopf" Content="Speichern" Click="AufSpeichern"
+                            ToolTip="Strg+S" />
+                    <Button Content="Prüfen" Margin="8,0,0,0" Click="AufPruefen" />
                     <Button Content="Schließen" Margin="8,0,0,0" IsCancel="True"
                             Style="{StaticResource KnopfPrimaer}" />
                 </StackPanel>
