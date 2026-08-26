@@ -444,6 +444,18 @@
   }
   /* --- Anreicherung aus Schiffsregistern ----------------------------- */
   #detailMedia:not(:empty) { margin-bottom: 0.9rem; }
+  /* Gestrichelt, nicht gefuellt: ein leerer Platz, keine Fehlermeldung. */
+  #detailSuche { display: none; }
+  #detailSuche.an {
+    display: block;
+    margin-bottom: 0.9rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  #detailSuche a { color: var(--accent); }
   .enrich-photo {
     width: 100%;
     border-radius: 8px;
@@ -1332,6 +1344,10 @@
        leer stehen: renderDetail() laeuft bei jeder Nachricht, und ein neu
        erzeugtes <img> wuerde das Bild jedes Mal neu laden und flackern. -->
   <div id="detailMedia"></div>
+  <!-- Steht an der Stelle des Fotos und tritt an dessen Stelle, wenn keines
+       da ist: Die Register treffen nur bei rund einem Fuenftel der Schiffe,
+       der Platz bleibt also meistens leer. -->
+  <div id="detailSuche"></div>
   <div id="detailBody"></div>
   <div class="detail-actions">
     <button type="button" id="detailDiary">Ins Tagebuch</button>
@@ -1627,6 +1643,7 @@
   var diaryCountEl = document.getElementById("diaryCount");
   var detailRaw = document.getElementById("detailRaw");
   var detailLinks = document.getElementById("detailLinks");
+  var detailSuche = document.getElementById("detailSuche");
 
   var storedKey = localStorage.getItem("aisstream_api_key");
   if (storedKey) apiKeyInput.value = storedKey;
@@ -1697,6 +1714,25 @@
         ordnungEinfrieren(false);
         refreshVisibleShips();
       }, 400);
+    });
+
+    // Klick in den freien Kartenbereich hebt die Auswahl auf. Seit die
+    // Markierung das Schliessen der Detailspalte ueberlebt, waren ein anderes
+    // Schiff oder die Escape-Taste die einzigen Wege zurueck - und auf dem
+    // Telefon gibt es keine Escape-Taste.
+    map.on("click", function (evt) {
+      // Am DOM pruefen, worauf gezielt wurde. Gemessen ist die Zeile in
+      // Chromium nicht noetig - ein Markerklick landet auch ohne sie
+      // ausgewaehlt (Gegenprobe blieb gruen). Sie steht hier, damit das
+      // Ergebnis nicht davon abhaengt, in welcher Reihenfolge Leaflet
+      // Marker- und Kartenzuhoerer bedient: Liefe der Kartenzuhoerer nach
+      // openDetail(), hoebe derselbe Klick die Auswahl gleich wieder auf.
+      var ziel = evt.originalEvent && evt.originalEvent.target;
+      if (ziel && ziel.closest && ziel.closest(".leaflet-marker-icon")) return;
+      // Eine offene Detailspalte zu einem nicht mehr ausgewaehlten Schiff
+      // waere ein Widerspruch.
+      if (selectedMmsi) closeDetail();
+      auswahlAufheben();
     });
   }
 
@@ -5732,6 +5768,21 @@
       }
     }
 
+    // Der Platzhalter tritt an die Stelle des Fotos, wenn keines da ist.
+    // Umgeschrieben wird er nur beim Schiffswechsel: renderDetail() laeuft bei
+    // JEDER Nachricht, und ein ersetzter Knoten verschluckt einen laufenden
+    // Klick - dieselbe Falle wie bei den Tabellenzeilen.
+    if (detailSuche.dataset.mmsi !== entry.mmsi) {
+      detailSuche.dataset.mmsi = entry.mmsi;
+      // "Kein Foto vorhanden", nicht "kein Foto im Register": Der Platzhalter
+      // steht auch, solange die Registerabfrage noch laeuft oder gar nicht
+      // eingeschaltet ist - eine Aussage ueber das Register waere dann falsch.
+      detailSuche.innerHTML = "Kein Foto vorhanden. " +
+        '<a href="' + esc(bildersucheUrl(entry.mmsi)) + '" target="_blank" rel="noopener">' +
+        "Bildersuche bei Google: MMSI " + esc(entry.mmsi) + "</a>";
+    }
+    detailSuche.classList.toggle("an", !wantImage);
+
     var extra = "";
     if (reg.sources && reg.sources.length) {
       extra += '<div class="enrich-status">Quellen: ' + esc(reg.sources.join(" + ")) + "</div>";
@@ -5749,16 +5800,38 @@
 
     detailRaw.textContent = JSON.stringify(entry.raw, null, 2);
 
-    var mmsiQuery = encodeURIComponent(entry.mmsi);
-    detailLinks.innerHTML =
-      '<a href="https://www.marinetraffic.com/en/ais/details/ships/mmsi:' + mmsiQuery +
-        '" target="_blank" rel="noopener">MarineTraffic</a>' +
-      '<a href="https://www.vesselfinder.com/vessels?name=' + mmsiQuery +
-        '" target="_blank" rel="noopener">VesselFinder</a>' +
-      (entry.lat != null
-        ? '<a href="https://www.openstreetmap.org/?mlat=' + entry.lat + '&mlon=' + entry.lon +
-          '#map=12/' + entry.lat + '/' + entry.lon + '" target="_blank" rel="noopener">OpenStreetMap</a>'
-        : "");
+    // Auch hier: einmal je Schiff aufbauen, danach nur noch das eine href
+    // nachziehen, das sich bewegt. Frueher wurde der ganze Block bei jeder
+    // Positionsmeldung neu geschrieben - ein Tipp auf einen der Links konnte
+    // dabei ins Leere gehen, weil der Knoten zwischen Beruehren und Loslassen
+    // ausgetauscht wurde.
+    if (detailLinks.dataset.mmsi !== entry.mmsi) {
+      detailLinks.dataset.mmsi = entry.mmsi;
+      var mmsiQuery = encodeURIComponent(entry.mmsi);
+      detailLinks.innerHTML =
+        '<a href="https://www.marinetraffic.com/en/ais/details/ships/mmsi:' + mmsiQuery +
+          '" target="_blank" rel="noopener">MarineTraffic</a>' +
+        '<a href="https://www.vesselfinder.com/vessels?name=' + mmsiQuery +
+          '" target="_blank" rel="noopener">VesselFinder</a>' +
+        '<a class="l-bild" href="' + esc(bildersucheUrl(entry.mmsi)) +
+          '" target="_blank" rel="noopener">Bildersuche</a>' +
+        '<a class="l-osm" target="_blank" rel="noopener" hidden>OpenStreetMap</a>';
+    }
+    var osmLink = detailLinks.querySelector(".l-osm");
+    if (entry.lat != null) {
+      osmLink.href = "https://www.openstreetmap.org/?mlat=" + entry.lat + "&mlon=" + entry.lon +
+        "#map=12/" + entry.lat + "/" + entry.lon;
+      osmLink.hidden = false;
+    } else {
+      osmLink.hidden = true;
+    }
+  }
+
+  // "MMSI 211003001" als Suchbegriff, nicht der nackte Zahlenblock: Ohne das
+  // Wort davor liefert die Bildersuche zu jeder beliebigen neunstelligen Zahl
+  // irgendetwas.
+  function bildersucheUrl(mmsi) {
+    return "https://www.google.com/search?tbm=isch&q=" + encodeURIComponent("MMSI " + mmsi);
   }
 
   // Ein Blob-Object-URL bleibt bis zum Widerruf im Speicher liegen.
@@ -5774,6 +5847,16 @@
   // Nur die beiden betroffenen Marker neu zeichnen, nicht alle: Das
   // Fadenkreuz haengt am ausgewaehlten Schiff, also verliert es genau einer
   // und genau einer bekommt es.
+  // Die Markierung abraeumen - von der Escape-Taste und vom Klick in den
+  // freien Kartenbereich aus. Ohne offene Markierung passiert nichts.
+  function auswahlAufheben() {
+    if (!markierteMmsi) return;
+    var alt = markierteMmsi;
+    markierteMmsi = null;
+    markiereAuswahl(alt);
+    refreshVisibleShips();
+  }
+
   function markiereAuswahl(vorher) {
     if (!mapAvailable) return;
     [vorher, markierteMmsi].forEach(function (m) {
@@ -6374,12 +6457,7 @@
     else if (selectedMmsi) closeDetail();
     // Zweites Escape raeumt die Markierung ab. Ohne diesen Weg liesse sie
     // sich nur auf ein anderes Schiff verschieben, nie loeschen.
-    else if (markierteMmsi) {
-      var alt = markierteMmsi;
-      markierteMmsi = null;
-      markiereAuswahl(alt);
-      refreshVisibleShips();
-    }
+    else auswahlAufheben();
   });
 
   // pagehide fires on tab close and on mobile backgrounding, where a

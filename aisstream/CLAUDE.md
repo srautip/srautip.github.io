@@ -693,9 +693,13 @@ Drei Folgeentscheidungen:
 
 - **`closeDetail()` zeichnet gar nichts mehr neu.** Es ändert sich kein
   Marker, also gibt es auch nichts nachzuführen.
-- **Escape ist der Weg zurück.** Erstes Escape schließt die Spalte, zweites
-  räumt die Markierung ab. Ohne diesen Zweig ließe sie sich nur verschieben,
-  nie löschen.
+- **Zwei Wege zurück: Escape und der Klick ins Leere.** Erstes Escape
+  schließt die Spalte, zweites räumt die Markierung ab — aber ein Telefon hat
+  keine Escape-Taste. Deshalb hebt auch ein Klick in den freien
+  Kartenbereich die Auswahl auf (`map.on("click", …)`, direkt neben
+  `moveend`); beide Wege laufen über `auswahlAufheben()`. Deselektieren heißt
+  dabei **Markierung weg und Spalte zu**: Eine offene Detailspalte zu einem
+  nicht mehr ausgewählten Schiff wäre ein Widerspruch.
 - **`pruneStaleShips()` muss `markierteMmsi` freigeben.** Sonst trüge
   dasselbe Schiff nach 30 Minuten Funkstille bei seiner Rückkehr wieder ein
   Fadenkreuz, das niemand gesetzt hat.
@@ -712,6 +716,55 @@ Bildschirmhöhe wie vorher (`scratchpad/auswahlkreuz.js`). Die Höhe ist der
 Beweis, dass es dasselbe Schiff ist — die beiden Testschiffe liegen 0,01°
 auseinander. Gegenprobe mit zurückgebautem `closeDetail()`: null Kreuze,
 sechs rote Proben.
+
+#### Die Markerprüfung im Kartenklick ist Vorsorge, nicht Notwendigkeit
+
+Der Handler steigt aus, wenn das Klickziel in einer `.leaflet-marker-icon`
+liegt. **Gemessen braucht Chromium das nicht:** Mit ausgebauter Prüfung
+bleibt die Probe „Klick auf einen Marker wählt weiterhin aus" grün — Leaflet
+reicht den Markerklick entweder nicht bis zur Karte durch, oder der
+Kartenzuhörer läuft vor `openDetail()`. Genau das ist der Grund, die Zeile
+zu behalten: Das richtige Ergebnis hinge sonst an der Reihenfolge, in der
+Leaflet seine Zuhörer bedient, und die ist nichts, was hier zugesichert ist.
+
+**Testfalle bei der Leerstelle:** Der erste Anlauf zielte 40 px über den
+unteren Kartenrand — dort liegt die Legende, der Klick kam nie bei Leaflet
+an. `auswahlkreuz.js` sucht die Stelle deshalb unter mehreren Kandidaten und
+verlangt ausdrücklich, dass dort eine Leaflet-Kachel, -Ebene oder der
+Container selbst liegt.
+
+### Bildersuche-Quicklink in der Detailansicht
+
+`bildersucheUrl(mmsi)` baut
+`https://www.google.com/search?tbm=isch&q=MMSI%20<mmsi>`. Das Wort **MMSI**
+gehört in den Suchbegriff: Zu einer nackten neunstelligen Zahl liefert die
+Bildersuche beliebiges.
+
+Zwei Plätze, wie gewünscht:
+
+- **Unten in `#detailLinks`, immer** — direkt neben VesselFinder.
+- **Oben in `#detailSuche`, nur ohne Foto** — an genau der Stelle, an der
+  sonst das Bild steht. Gestrichelter Rahmen, kein gefüllter Kasten: Es ist
+  ein leerer Platz, keine Fehlermeldung. Der Text sagt „Kein Foto
+  vorhanden", nicht „kein Foto im Register" — der Platzhalter steht auch,
+  während die Registerabfrage noch läuft oder wenn sie abgeschaltet ist.
+
+**Beide Stellen entstehen einmal je Schiff, nicht je Nachricht.**
+`renderDetail()` läuft bei jeder eingehenden AIS-Nachricht; ein ersetzter
+Knoten verschluckt einen Klick, der zwischen Berühren und Loslassen läuft —
+dieselbe Falle wie bei den Tabellenzeilen. `#detailSuche` wird nur bei
+wechselnder `dataset.mmsi` neu geschrieben und über eine Klasse ein- und
+ausgeblendet; `#detailLinks` ebenso, und nur der OpenStreetMap-Link bekommt
+bei jeder Position ein neues `href`. Vorher wurde der ganze Linkblock bei
+jeder Meldung neu gesetzt — ein Tipp auf VesselFinder konnte ins Leere
+gehen.
+
+Geprüft in `scratchpad/bildersuche.js`: Schiff mit und ohne Foto (das Foto
+kommt aus einem gefälschten Wikidata-Treffer, Rezept aus `tagebuchbild.js`),
+Wechsel in beide Richtungen, und fünf Positionsmeldungen bei offener Spalte
+ohne einen einzigen Kindtausch — mit der Gegenprobe, dass der
+OpenStreetMap-Link in derselben Zeit sein `href` wirklich geändert hat,
+sonst hätte die Probe nichts gemessen.
 
 ### Spuren aller sichtbaren Schiffe, solange es wenige sind
 
