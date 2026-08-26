@@ -909,8 +909,8 @@ Auf dem Telefon bleibt die Spalte **sichtbar** (anders als `Lat`, `Lon`,
 `Zeit`): „Wie weit ist das weg?" ist dort eher wichtiger als am Schreibtisch.
 
 Dazu auf der Karte **zwei gestrichelte Ringe** um den eigenen Standort
-(`SICHTLINIEN`): 45 km in sehr hellem Grau (`#c9c9c9`) und 20 km in etwas
-dunklerem (`#8f8f8f`). 45 km ist grob die VHF-Funkreichweite eines
+(`SICHTLINIEN`): 45 km in `#9d9d9d` und 20 km in `#8f8f8f` — der äußere rund
+zehn Prozent heller als der innere (157 gegen 143). 45 km ist grob die VHF-Funkreichweite eines
 Landempfängers — der Rand dessen, was überhaupt selbst zu empfangen ist;
 20 km gibt der Entfernung einen zweiten Anhaltspunkt, damit man nicht
 zwischen „dicht dran" und „am Rand" schätzen muss.
@@ -939,21 +939,29 @@ fest verdrahtet zu sein.
 Gemessen an den Bildpunkten eines Kartenausschnitts (Helligkeitsabstand
 Ring zu Umfeld, 180 Messpunkte rundherum, 0–255):
 
-| Ring | Median | oberes Viertel | Spitze |
-|---|---|---|---|
-| 20 km `#8f8f8f` | 4 | 19 | 51 |
-| 45 km `#c9c9c9` | 2 | 9 | 27 |
+| Ring | oberes Viertel | Spitze |
+|---|---|---|
+| 20 km `#8f8f8f` | 15–19 | ~51 |
+| 45 km **vorher** `#c9c9c9` | **9** | 27 |
+| 45 km **jetzt** `#9d9d9d` | **27** | 48 |
 
-**Der Median täuscht** — die Ringe sind gestrichelt, also fällt rund die
-Hälfte der Messpunkte in eine Lücke mit Abstand ~0. Aussagekräftig ist das
-obere Viertel, also dort, wo der Strich wirklich liegt: **19 und 9**.
+**Der Median täuscht** und steht deshalb nicht in der Tabelle — die Ringe
+sind gestrichelt, also fällt rund die Hälfte der Messpunkte in eine Lücke
+mit Abstand ~0. Aussagekräftig ist das obere Viertel, also dort, wo der
+Strich wirklich liegt.
 
-Neun Stufen von 255 sind auf den hellen OSM-Kacheln sehr wenig — der äußere
-Ring ist bewusst so zart gewünscht, steht damit aber am Rand der
-Wahrnehmbarkeit. Wer ihn kräftiger will, hat zwei Stellschrauben, die den
-Charakter nicht ändern: einen Ton dunkler, oder `weight` von 1 auf 1.5
-(bei `weight: 1` frisst das Kantenglätten auf 2×-Displays einen guten Teil
-des Tons).
+Mit `#c9c9c9` blieben **neun Stufen von 255** — der Nutzer meldete den Ring
+als „kaum sichtbar", und die Messung hatte genau das vorher schon gesagt.
+Mit `#9d9d9d` sind es **27**, also das Dreifache, und der äußere bleibt
+erkennbar der hellere von beiden.
+
+Der Wert für den 20-km-Ring schwankt zwischen Messungen um ein paar Stufen
+(15 bis 19 bei **unveränderter** Farbe), weil er über anderen Kacheln
+liegt. Unterschiede unterhalb von etwa fünf Stufen sind damit kein Befund.
+
+Bliebe der Ring einmal zu blass, gibt es neben der Farbe noch `weight`:
+Bei `weight: 1` frisst das Kantenglätten auf 2×-Displays einen guten Teil
+des Tons.
 
 `scratchpad/entfernung.js` rechnet die drei Entfernungen **unabhängig nach**
 (eigene Haversine-Formel im Testskript, nicht die des Clients) — sonst
@@ -1712,6 +1720,14 @@ Breitengrenzen selbst** gilt `--voll`: Erst das iPad Mini quer mit genau
 Die fünf längsten: `zeilentreffer` 66 s, `groessecache` 64 s,
 `typkategorie` 47 s, `snapshotpan` 46 s, `mvtest` 38 s. Wer weiter drücken
 will, holt dort die festen Wartepausen heraus, nicht anderswo.
+
+**Der eine zeitempfindliche Test: `snapshotpan`.** Er ist unter vier
+parallelen Browsern einmal durchgefallen und lief allein wie im nächsten
+Gesamtlauf sauber durch. Kein Zufallsbefund zum Abhaken: Er prüft die
+15-Sekunden-Frist von `SNAPSHOT_TIMEOUT_MS` und mehrere 400-ms-Entprellungen
+mit festen Wartepausen — unter Last rutschen die aneinander. Fällt er im
+Parallellauf durch, **erst allein wiederholen**; nur wenn er dann auch rot
+ist, liegt es am Code.
 
 #### Zwei Fallen beim Einbau, beide vom Läufer aufgedeckt
 
