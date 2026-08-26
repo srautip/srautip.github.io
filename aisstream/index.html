@@ -1632,6 +1632,14 @@
         // Ohne das bleibt ein neu angefahrenes Gebiet minutenlang leer - und
         // ohne API-Key dauerhaft. Siehe maybeLoadSnapshot().
         maybeLoadSnapshot();
+        // Wer die Karte zoomt oder schwenkt, arbeitet an der KARTE, nicht an
+        // der Tabelle - und deren Inhalt aendert sich dabei zwangslaeufig.
+        // Eine Ordnung festzuhalten, die fuer einen anderen Ausschnitt
+        // aufgenommen wurde, ist in keinem Fall richtig: Die neu ins Bild
+        // kommenden Schiffe stehen darin nicht und landen deshalb alle
+        // hinten, unabhaengig von ihrer Groesse. Genau das war der gemeldete
+        // Fehler "Sortierung stimmt nach dem Zoomen nicht".
+        ordnungEinfrieren(false);
         refreshVisibleShips();
       }, 400);
     });
@@ -3462,9 +3470,25 @@
   var ordnungFest = false;
   var festeOrdnung = null;
 
+  // Sicherheitsfrist. Das Einfrieren soll nur so lange gelten, wie ein
+  // Finger oder Zeiger wirklich auf der Tabelle liegt - bleibt es haengen,
+  // sortiert die Tabelle nie wieder um. Welche Geste es auf iOS Safari
+  // haengen laesst, laesst sich hier nicht pruefen (getestet wird Chromium
+  // mit Touch-Nachbildung). Statt einen Pfad zu flicken, verfaellt der
+  // Zustand: Nach vier Sekunden ohne Zeigerereignis ist er weg, auf jedem
+  // Browser. Jedes pointermove setzt die Frist zurueck, wer die Tabelle also
+  // benutzt, merkt nichts davon.
+  var ORDNUNG_FRIST_MS = 4000;
+  var ordnungFrist = null;
+
   function ordnungEinfrieren(fest) {
+    clearTimeout(ordnungFrist);
+    ordnungFrist = null;
     ordnungFest = fest;
     if (!fest) { festeOrdnung = null; refreshVisibleShips(); return; }
+    ordnungFrist = setTimeout(function () {
+      if (ordnungFest) ordnungEinfrieren(false);
+    }, ORDNUNG_FRIST_MS);
     festeOrdnung = {};
     Array.prototype.forEach.call(tableBody.children, function (tr, i) {
       if (tr.dataset.mmsi) festeOrdnung[tr.dataset.mmsi] = i;
@@ -5938,11 +5962,24 @@
   if (tabellenBereich) {
     tabellenBereich.addEventListener("pointerenter", function () { ordnungEinfrieren(true); });
     tabellenBereich.addEventListener("pointerleave", function () { ordnungEinfrieren(false); });
+    // pointermove haelt die Sicherheitsfrist am Leben, solange die Tabelle
+    // wirklich benutzt wird - ordnungEinfrieren(true) setzt sie jedes Mal neu.
+    tabellenBereich.addEventListener("pointerdown", function () { ordnungEinfrieren(true); });
+    tabellenBereich.addEventListener("pointermove", function () {
+      if (ordnungFest) ordnungEinfrieren(true);
+    });
     // Nach dem Loslassen noch kurz festhalten: Ein Tipp erzeugt pointerup vor
     // dem click, und ein Neusortieren dazwischen zoege die Zeile wieder weg.
-    tabellenBereich.addEventListener("pointerup", function () {
+    //
+    // pointercancel gehoert dazu: Eine Wischgeste, die der Browser zum
+    // Scrollen uebernimmt, endet damit - und NICHT mit pointerup. Bisher
+    // fing das nur ein anschliessendes pointerleave auf, das Chromium
+    // schickt, aber nicht jeder Browser garantiert.
+    var loslassen = function () {
       setTimeout(function () { if (ordnungFest) ordnungEinfrieren(false); }, 400);
-    });
+    };
+    tabellenBereich.addEventListener("pointerup", loslassen);
+    tabellenBereich.addEventListener("pointercancel", loslassen);
   }
 
   // "Alle Details" link inside a Leaflet popup.
