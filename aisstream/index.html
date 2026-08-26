@@ -1013,7 +1013,10 @@
     }
     tbody td.c-age::before { content: none; }
     /* In der Detailansicht ohnehin vorhanden - hier nur Rauschen. */
-    tbody td.c-lat, tbody td.c-lon, tbody td.c-time, tbody td.c-call { display: none; }
+    /* c-dist bleibt bewusst sichtbar: "Wie weit ist das weg?" ist auf dem
+       Telefon eher wichtiger als am Schreibtisch. Das Rufzeichen ist dafuer
+       ganz aus der Tabelle verschwunden - es steht in der Detailansicht. */
+    tbody td.c-lat, tbody td.c-lon, tbody td.c-time { display: none; }
     tbody td.c-mmsi { color: var(--muted); font-size: 0.72rem; }
 
     /* KEIN padding-top mehr: Die obere Sicherheitszone gehoert der Kopfzeile,
@@ -1256,7 +1259,7 @@
               <th>Flagge</th>
               <th>Name</th>
               <th class="c-age">Alter</th>
-              <th>Rufz.</th>
+              <th title="Luftlinie vom eigenen Standort; ohne Standortfreigabe von der Kartenmitte">Entfernung</th>
               <th>Typ</th>
               <th>Status</th>
               <th>Größe (L×B, m) ▼</th>
@@ -1956,6 +1959,16 @@
 
   // Collapsible: the full key is roughly two thirds the height of a 420px
   // map, so leaving it permanently open hides the very marks it explains.
+  // Rund die VHF-Funkreichweite eines Landempfaengers - also der Ring, in dem
+  // eigener Empfang ueberhaupt zu erwarten ist. Schiffe weiter draussen
+  // kommen ueber fremde Quellen herein, nicht ueber die eigene Sichtlinie.
+  //
+  // Steht hier oben und nicht unten beim eigenen Standort, wo es fachlich
+  // hingehoerte: addMapLegend() liest den Wert, und Funktionsdeklarationen
+  // werden hochgezogen, var-WERTE nicht. Die Falle steht schon zweimal in
+  // CLAUDE.md.
+  var SICHTLINIE_KM = 45;
+
   function addMapLegend() {
     if (!mapAvailable) return;
     var legend = L.control({ position: "bottomleft" });
@@ -1983,6 +1996,11 @@
         '<div class="row"><span class="sw cross">' +
         '<svg width="11" height="11" fill="none" stroke="#0b0b0b" stroke-width="2" stroke-linecap="round">' +
         '<path d="M2 2L9 9M9 2L2 9"/></svg></span>Eigener Standort</div>' +
+        '<div class="row"><span class="sw cross">' +
+        '<svg width="13" height="13" fill="none">' +
+        '<circle cx="6.5" cy="6.5" r="5" stroke="#7aa2d8" stroke-width="1.2" ' +
+        'stroke-dasharray="3 2" fill="#7aa2d8" fill-opacity="0.12"/></svg></span>' +
+        'Sichtlinie ' + SICHTLINIE_KM + ' km</div>' +
         '<div class="row"><span class="sw cross">' +
         '<svg width="13" height="13" fill="none" stroke-linecap="round">' +
         '<path d="M1 6.5H12M6.5 1V12" stroke="#0b0b0b" stroke-width="4" opacity="0.8"/>' +
@@ -2080,6 +2098,8 @@
     return { lat: c.lat, lon: c.lng };
   }
 
+  var sichtKreis = null;
+
   function showOwnPos(lat, lon) {
     ownPos = { lat: lat, lon: lon };
     // Entfernung und Peilung in der offenen Detailansicht beziehen sich auf
@@ -2087,6 +2107,24 @@
     // Nachricht noch die Werte ab Kartenmitte.
     if (selectedMmsi && ships.has(selectedMmsi)) renderDetail(ships.get(selectedMmsi));
     if (!mapAvailable) return;
+    if (sichtKreis) {
+      sichtKreis.setLatLng([lat, lon]);
+    } else {
+      // interactive:false wie beim Standortmarker - eine 45-km-Scheibe, die
+      // Klicks abfaengt, waere die groesste Klickfalle der ganzen Karte.
+      // Vektoren liegen ohnehin unter den Markern (overlayPane vor
+      // markerPane), die Schiffe bleiben also obenauf.
+      sichtKreis = L.circle([lat, lon], {
+        radius: SICHTLINIE_KM * 1000,
+        interactive: false,
+        color: "#7aa2d8",
+        weight: 1,
+        opacity: 0.7,
+        dashArray: "6 5",
+        fillColor: "#7aa2d8",
+        fillOpacity: 0.05
+      }).addTo(map);
+    }
     if (ownPosMarker) {
       ownPosMarker.setLatLng([lat, lon]);
       return;
@@ -2104,6 +2142,8 @@
   function hideOwnPos() {
     if (ownPosMarker && mapAvailable) map.removeLayer(ownPosMarker);
     ownPosMarker = null;
+    if (sichtKreis && mapAvailable) map.removeLayer(sichtKreis);
+    sichtKreis = null;
     ownPos = null;
     if (selectedMmsi && ships.has(selectedMmsi)) renderDetail(ships.get(selectedMmsi));
   }
@@ -3377,6 +3417,63 @@
     });
   }
 
+  // data-label traegt die Spaltenueberschrift mit; auf schmalen Displays wird
+  // dieselbe Zeile per CSS zur Karte, ohne zweiten Render-Pfad. Die Liste
+  // steht jetzt an einer Stelle, weil Aufbau und Nachfuehren dieselbe
+  // Reihenfolge brauchen.
+  var SPALTEN = [
+    ["MMSI", "c-mmsi"], ["Flagge", "c-flag"], ["Name", "c-name"], ["Alter", "c-age"],
+    ["Entfernung", "c-dist"], ["Typ", "c-type"], ["Status", "c-status"], ["Größe", "c-size"],
+    ["Ziel", "c-dest"], ["Lat", "c-lat"], ["Lon", "c-lon"], ["Speed", "c-sog"],
+    ["Kurs", "c-cog"], ["Zeit (UTC)", "c-time"]
+  ];
+
+  var zeilenCache = {};
+
+  function holeZeile(mmsi) {
+    var z = zeilenCache[mmsi];
+    if (z) return z;
+    var tr = document.createElement("tr");
+    tr.dataset.mmsi = mmsi;
+    var tds = SPALTEN.map(function (s) {
+      var td = document.createElement("td");
+      td.setAttribute("data-label", s[0]);
+      td.className = s[1];
+      tr.appendChild(td);
+      return td;
+    });
+    z = { tr: tr, tds: tds, alt: [] };
+    zeilenCache[mmsi] = z;
+    return z;
+  }
+
+  function zeilenWerte(entry, ref) {
+    var info = entry.mmsiInfo || {};
+    var cat = typeCategory(entry);
+    // Derselbe Bezugspunkt wie in der Detailansicht: der eigene Standort,
+    // ersatzweise die Kartenmitte. Der Spaltenkopf sagt das per title, denn
+    // eine Entfernung ohne Bezugspunkt waere eine Zahl ohne Bedeutung.
+    var km = ref && entry.lat != null
+      ? formatKm(haversineKm(ref.lat, ref.lon, entry.lat, entry.lon)) : null;
+    return [
+      esc(entry.mmsi),
+      '<span class="flag">' + (info.flag || "") + "</span>" + esc(info.iso || ""),
+      '<span class="row-dot" style="background:' + (cat ? TYPE_COLOR_MAP[cat] : NEUTRAL_COLOR) +
+        '"></span>' + esc(entry.name || "-"),
+      ageCell(entry),
+      esc(km || "-"),
+      esc(entry.typeDetail || entry.typeLabel || "-"),
+      esc(navStatusLabel(entry.navStatus) || "-"),
+      esc(entry.size || "-"),
+      esc(entry.destination || "-"),
+      entry.lat.toFixed(4),
+      entry.lon.toFixed(4),
+      entry.speed != null ? esc(entry.speed.toFixed(1)) + " kn" : "-",
+      entry.course != null ? esc(entry.course.toFixed(0) + "° " + compass(entry.course)) : "-",
+      esc(entry.time || "-")
+    ];
+  }
+
   function renderVisibleShips() {
     var needle = searchInput.value.trim().toLowerCase();
     var entries = [];
@@ -3413,35 +3510,48 @@
       });
     }
 
-    tableBody.innerHTML = "";
+    // Zeilen werden WIEDERVERWENDET, nicht neu gebaut. Ein
+    // tableBody.innerHTML = "" zwischen mousedown und mouseup nimmt dem
+    // Browser das Ziel des Klicks - und dann feuert gar kein click-Ereignis
+    // mehr. Gemessen: zehn von zehn Versuchen ohne jede Uebernahme, ohne dass
+    // ueberhaupt ein click ankam. Genau das war "manchmal passiert nichts".
+    var gezeigt = {};
+    var vorherige = null;
+    // Einmal je Neuzeichnen, nicht je Zeile: map.getCenter() 200-mal zu rufen
+    // waere reine Arbeit ohne Ertrag.
+    var bezug = ownPos || (mapAvailable ? mapCenterAsRef() : null);
     shown.forEach(function (entry) {
+      var z = holeZeile(entry.mmsi);
+      gezeigt[entry.mmsi] = true;
+      var werte = zeilenWerte(entry, bezug);
+      for (var i = 0; i < werte.length; i++) {
+        // Nur schreiben, was sich wirklich geaendert hat: Ein unveraendertes
+        // innerHTML neu zu setzen wuerde das <td> unter dem Finger ersetzen.
+        if (z.alt[i] !== werte[i]) {
+          z.tds[i].innerHTML = werte[i];
+          z.alt[i] = werte[i];
+        }
+      }
       var info = entry.mmsiInfo || {};
-      var row = document.createElement("tr");
-      row.dataset.mmsi = entry.mmsi;
-      if (entry.mmsi === selectedMmsi) row.className = "selected";
-      // data-label traegt die Spaltenueberschrift mit; auf schmalen Displays
-      // wird dieselbe Zeile per CSS zur Karte, ohne zweiten Render-Pfad.
-      var cat = typeCategory(entry);
-      var dot = '<span class="row-dot" style="background:' +
-        (cat ? TYPE_COLOR_MAP[cat] : NEUTRAL_COLOR) + '"></span>';
-      row.innerHTML =
-        '<td data-label="MMSI" class="c-mmsi">' + esc(entry.mmsi) + "</td>" +
-        '<td data-label="Flagge" class="c-flag" title="' + esc(info.country || "") + '"><span class="flag">' +
-          (info.flag || "") + "</span>" + esc(info.iso || "") + "</td>" +
-        '<td data-label="Name" class="c-name">' + dot + esc(entry.name || "-") + "</td>" +
-        '<td data-label="Alter" class="c-age">' + ageCell(entry) + "</td>" +
-        '<td data-label="Rufzeichen" class="c-call">' + esc(entry.callSign || "-") + "</td>" +
-        '<td data-label="Typ" class="c-type">' + esc(entry.typeDetail || entry.typeLabel || "-") + "</td>" +
-        '<td data-label="Status" class="c-status">' + esc(navStatusLabel(entry.navStatus) || "-") + "</td>" +
-        '<td data-label="Größe" class="c-size">' + esc(entry.size || "-") + "</td>" +
-        '<td data-label="Ziel" class="c-dest">' + esc(entry.destination || "-") + "</td>" +
-        '<td data-label="Lat" class="c-lat">' + entry.lat.toFixed(4) + "</td>" +
-        '<td data-label="Lon" class="c-lon">' + entry.lon.toFixed(4) + "</td>" +
-        '<td data-label="Speed" class="c-sog">' + (entry.speed != null ? esc(entry.speed.toFixed(1)) + " kn" : "-") + "</td>" +
-        '<td data-label="Kurs" class="c-cog">' +
-          (entry.course != null ? esc(entry.course.toFixed(0) + "° " + compass(entry.course)) : "-") + "</td>" +
-        '<td data-label="Zeit (UTC)" class="c-time">' + esc(entry.time || "-") + "</td>";
-      tableBody.appendChild(row);
+      var titel = info.country || "";
+      if (z.tds[1].title !== titel) z.tds[1].title = titel;
+      var markiert = entry.mmsi === selectedMmsi;
+      if (z.tr.classList.contains("selected") !== markiert) {
+        z.tr.classList.toggle("selected", markiert);
+      }
+      // Nur einsetzen, wenn die Zeile nicht ohnehin schon an der Reihe ist -
+      // ein insertBefore nimmt den Knoten heraus und wieder hinein, und
+      // genau das zerreisst wieder einen laufenden Klick.
+      var soll = vorherige ? vorherige.nextSibling : tableBody.firstChild;
+      if (z.tr !== soll) tableBody.insertBefore(z.tr, soll);
+      vorherige = z.tr;
+    });
+    // Was nicht mehr dazugehoert, faellt hinten weg.
+    while (vorherige ? vorherige.nextSibling : tableBody.firstChild) {
+      tableBody.removeChild(vorherige ? vorherige.nextSibling : tableBody.firstChild);
+    }
+    Object.keys(zeilenCache).forEach(function (m) {
+      if (!gezeigt[m]) delete zeilenCache[m];
     });
     shipCountEl.textContent = shown.length;
     knownCountEl.textContent = ships.size;
