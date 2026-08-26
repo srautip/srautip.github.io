@@ -1959,15 +1959,22 @@
 
   // Collapsible: the full key is roughly two thirds the height of a 420px
   // map, so leaving it permanently open hides the very marks it explains.
-  // Rund die VHF-Funkreichweite eines Landempfaengers - also der Ring, in dem
-  // eigener Empfang ueberhaupt zu erwarten ist. Schiffe weiter draussen
-  // kommen ueber fremde Quellen herein, nicht ueber die eigene Sichtlinie.
+  // Zwei Ringe um den eigenen Standort: 45 km ist rund die VHF-Funkreichweite
+  // eines Landempfaengers - der Rand dessen, was ueberhaupt selbst zu
+  // empfangen ist. 20 km gibt der Entfernung einen zweiten Anhaltspunkt,
+  // damit man nicht zwischen "dicht dran" und "am Rand" schaetzen muss.
+  //
+  // Beide OHNE Fuellung: Die Karte darunter bleibt unverfaelscht, und zwei
+  // uebereinanderliegende Scheiben wuerden die Kacheln doppelt einfaerben.
   //
   // Steht hier oben und nicht unten beim eigenen Standort, wo es fachlich
-  // hingehoerte: addMapLegend() liest den Wert, und Funktionsdeklarationen
+  // hingehoerte: addMapLegend() liest die Werte, und Funktionsdeklarationen
   // werden hochgezogen, var-WERTE nicht. Die Falle steht schon zweimal in
   // CLAUDE.md.
-  var SICHTLINIE_KM = 45;
+  var SICHTLINIEN = [
+    { km: 45, farbe: "#c9c9c9", deckung: 0.85 },   // aussen, sehr hell
+    { km: 20, farbe: "#8f8f8f", deckung: 0.90 }    // innen, etwas dunkler
+  ];
 
   function addMapLegend() {
     if (!mapAvailable) return;
@@ -1996,11 +2003,20 @@
         '<div class="row"><span class="sw cross">' +
         '<svg width="11" height="11" fill="none" stroke="#0b0b0b" stroke-width="2" stroke-linecap="round">' +
         '<path d="M2 2L9 9M9 2L2 9"/></svg></span>Eigener Standort</div>' +
-        '<div class="row"><span class="sw cross">' +
-        '<svg width="13" height="13" fill="none">' +
-        '<circle cx="6.5" cy="6.5" r="5" stroke="#7aa2d8" stroke-width="1.2" ' +
-        'stroke-dasharray="3 2" fill="#7aa2d8" fill-opacity="0.12"/></svg></span>' +
-        'Sichtlinie ' + SICHTLINIE_KM + ' km</div>' +
+        // Von innen nach aussen gelesen, wie man sie auf der Karte sieht -
+        // und wie auf der Karte ohne Fuellung.
+        SICHTLINIEN.slice().reverse().map(function (s) {
+          // Der Symbolradius folgt dem echten Verhaeltnis, statt fest
+          // verdrahtet zu sein - wer die Kilometer aendert, bekommt die
+          // Legende von selbst richtig.
+          var groesster = Math.max.apply(null, SICHTLINIEN.map(function (x) { return x.km; }));
+          var r = (s.km / groesster) * 5;
+          return '<div class="row"><span class="sw cross">' +
+            '<svg width="13" height="13" fill="none">' +
+            '<circle cx="6.5" cy="6.5" r="' + r.toFixed(1) + '" stroke="' + s.farbe +
+            '" stroke-width="1.2" stroke-dasharray="3 2" fill="none"/></svg></span>' +
+            'Sichtlinie ' + s.km + ' km</div>';
+        }).join("") +
         '<div class="row"><span class="sw cross">' +
         '<svg width="13" height="13" fill="none" stroke-linecap="round">' +
         '<path d="M1 6.5H12M6.5 1V12" stroke="#0b0b0b" stroke-width="4" opacity="0.8"/>' +
@@ -2098,7 +2114,7 @@
     return { lat: c.lat, lon: c.lng };
   }
 
-  var sichtKreis = null;
+  var sichtKreise = [];
 
   function showOwnPos(lat, lon) {
     ownPos = { lat: lat, lon: lon };
@@ -2107,23 +2123,33 @@
     // Nachricht noch die Werte ab Kartenmitte.
     if (selectedMmsi && ships.has(selectedMmsi)) renderDetail(ships.get(selectedMmsi));
     if (!mapAvailable) return;
-    if (sichtKreis) {
-      sichtKreis.setLatLng([lat, lon]);
+    if (sichtKreise.length) {
+      sichtKreise.forEach(function (k) { k.setLatLng([lat, lon]); });
     } else {
       // interactive:false wie beim Standortmarker - eine 45-km-Scheibe, die
       // Klicks abfaengt, waere die groesste Klickfalle der ganzen Karte.
       // Vektoren liegen ohnehin unter den Markern (overlayPane vor
       // markerPane), die Schiffe bleiben also obenauf.
-      sichtKreis = L.circle([lat, lon], {
-        radius: SICHTLINIE_KM * 1000,
-        interactive: false,
-        color: "#7aa2d8",
-        weight: 1,
-        opacity: 0.7,
-        dashArray: "6 5",
-        fillColor: "#7aa2d8",
-        fillOpacity: 0.05
-      }).addTo(map);
+      //
+      // fill:false statt fillOpacity:0 - Leaflet zeichnet dann gar kein
+      // Fuellelement, statt eines unsichtbaren. Ein unsichtbares waere
+      // trotzdem da und laege ueber den Kacheln.
+      //
+      // Der groesste Ring zuerst: So liegt der kleinere im DOM darueber und
+      // wird an der Kreuzung nicht vom hellen aeusseren uebermalt.
+      sichtKreise = SICHTLINIEN.slice()
+        .sort(function (a, b) { return b.km - a.km; })
+        .map(function (s) {
+          return L.circle([lat, lon], {
+            radius: s.km * 1000,
+            interactive: false,
+            color: s.farbe,
+            weight: 1,
+            opacity: s.deckung,
+            dashArray: "6 5",
+            fill: false
+          }).addTo(map);
+        });
     }
     if (ownPosMarker) {
       ownPosMarker.setLatLng([lat, lon]);
@@ -2142,8 +2168,8 @@
   function hideOwnPos() {
     if (ownPosMarker && mapAvailable) map.removeLayer(ownPosMarker);
     ownPosMarker = null;
-    if (sichtKreis && mapAvailable) map.removeLayer(sichtKreis);
-    sichtKreis = null;
+    if (mapAvailable) sichtKreise.forEach(function (k) { map.removeLayer(k); });
+    sichtKreise = [];
     ownPos = null;
     if (selectedMmsi && ships.has(selectedMmsi)) renderDetail(ships.get(selectedMmsi));
   }
