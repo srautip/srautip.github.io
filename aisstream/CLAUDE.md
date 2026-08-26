@@ -824,8 +824,12 @@ fallen raus), wie vor der Änderung.
 Quelle wie der Markerdurchmesser, damit Liste und Karte dieselbe Rangfolge
 zeigen. Zwei Feinheiten:
 
-- **Gleich lange Schiffe stehen nach Aktualität.** Ohne diesen Stichentscheid
-  spränge die Liste bei jeder eintreffenden Nachricht durcheinander.
+- **Gleich lange Schiffe stehen nach MMSI**, nicht nach Aktualität. Hier
+  stand einmal das Gegenteil, mit der Begründung, ohne den
+  Aktualitäts-Stichentscheid spränge die Liste durcheinander. **Das war
+  genau verkehrt herum** — `updatedAt` ändert sich mit jeder
+  Positionsmeldung, also war er die Ursache des Springens, nicht das
+  Gegenmittel. Siehe „Die Zeile, auf die man zielt" weiter unten.
 - **Das Sentinel `Dimension {A:0,B:0,C:0,D:0}` landet bei den Unbekannten**,
   nicht als „Länge 0" ganz vorn — `shipLengthMeters()` gibt dafür `null`
   zurück (`if (l) return l`), nicht 0. Der Sentinel ist in dieser Datei schon
@@ -834,6 +838,53 @@ zeigen. Zwei Feinheiten:
 
 Der Spaltenkopf trägt ein `▼`, damit die Ordnung ablesbar ist. Sie ist fest,
 nicht klickbar sortierbar.
+
+### Die Zeile, auf die man zielt, muss beim Klick noch dieselbe sein
+
+Gemeldet: *„Wenn die Detailseite zu einem Schiff geöffnet ist, funktioniert
+die Selektion eines anderen Schiffes über die Tabelle nicht richtig, sondern
+führt zu einem Flackern zwischen Schiff in Detailansicht und neuer
+Selektion."*
+
+**Es war nicht der Klick.** Der delegierte Handler auf `#shipTableBody` traf
+in sechs von sechs Versuchen genau das Schiff, das im Moment des Klicks in
+der Zeile stand. Nur stand dort jedes Mal ein anderes: Zeile 5 hielt
+nacheinander D, G, J, A, D, G. Die Gegenprobe (alte Ordnung
+wiederhergestellt) zielt auf J und bekommt L, zielt auf E und bekommt G —
+**sechs von sechs daneben**.
+
+Zwei Ursachen, beide in `refreshVisibleShips()`:
+
+1. **Der Stichentscheid war `updatedAt`.** Schiffe ohne bekannte Maße liegen
+   alle in derselben Größenstufe — und das sind die meisten, bis Meldung 5
+   durch ist. Jede Positionsmeldung schob eines davon nach vorn, also
+   tauschten sie sekündlich die Plätze. Jetzt bricht die **MMSI** den
+   Gleichstand: eindeutig, unveränderlich, und die Reihenfolge steht still.
+2. **Der `<tbody>` wurde bei jeder Nachricht komplett neu gebaut** —
+   gemessen **8,9 ms je Meldung bei 84 Zeilen**, und in einem belebten
+   Ausschnitt kommen dutzende Meldungen je Sekunde. Jetzt wird gedrosselt:
+   `refreshVisibleShips()` zeichnet an der **Vorderkante** sofort (ein Klick
+   markiert also ohne Verzögerung) und fasst alles, was in den nächsten
+   200 ms nachkommt, zu einem Nachlauf zusammen. Gemessen 12 Neuaufbauten in
+   3 s statt einem je Nachricht.
+
+Dazu eine dritte Regel, weil auch eine stabile Ordnung sich ändert, sobald
+ein Schiff seine Maße nachreicht und aus der „unbekannt"-Gruppe nach oben
+springt:
+
+3. **Solange der Zeiger über der Tabelle steht, bleibt die Reihenfolge
+   stehen.** `pointerenter` auf `.table-wrap` friert sie ein (`festeOrdnung`
+   merkt sich die Ränge), `pointerleave` gibt sie frei. Die **Inhalte laufen
+   weiter** — Alter, Position, Fahrtdaten aktualisieren sich, nur der Platz
+   bleibt. Neu hinzukommende Schiffe hängen sich hinten an. Nach einem
+   `pointerup` wird noch 400 ms festgehalten: Am Finger kommt `pointerup`
+   vor dem `click`, und ein Neusortieren dazwischen zöge die Zeile wieder
+   weg.
+
+`scratchpad/zeilentreffer.js` misst genau das: sechs Mal zielen (mit einer
+Denkpause von 600 ms, wie ein Mensch) und klicken; sechs Treffer. Die
+Gegenprobe stellt den `updatedAt`-Stichentscheid wieder her und meldet
+zuverlässig sechs Fehlgriffe — ohne sie prüfte der Test nichts.
 
 Gemessen (`scratchpad/tabellenlast.js`, 400 Schiffe / 200 Zeilen): Der
 Tabellenaufbau kostet mit Sortierung 163,5 ms, ohne 163,0 ms — davon sind

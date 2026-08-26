@@ -1773,7 +1773,12 @@
     if (la == null && lb != null) return 1;
     if (lb == null && la != null) return -1;
     if (la != null && lb != null && la !== lb) return lb - la;
-    return (b.updatedAt || 0) - (a.updatedAt || 0);
+    // Gleichstand bricht die MMSI, NICHT updatedAt. Mit updatedAt aenderte
+    // sich die Reihenfolge bei jeder Positionsmeldung - und Schiffe ohne
+    // bekannte Masse sind alle in derselben Stufe, also tauschten sie
+    // sekuendlich die Plaetze. Wer eine Zeile anklickte, traf ein anderes
+    // Schiff als das, auf das er gezielt hatte.
+    return a.mmsi < b.mmsi ? -1 : a.mmsi > b.mmsi ? 1 : 0;
   }
 
   function sizeStep(entry) {
@@ -3326,7 +3331,53 @@
   // Rebuilds the table from `ships`, filtered to whatever is currently
   // inside the map's visible bounds (not just the subscribed area) and to
   // the free-text search box.
+  // Die Tabelle wurde bei JEDER Nachricht komplett neu gebaut - gemessen
+  // 8,9 ms je Meldung bei 84 Zeilen, und in einem belebten Ausschnitt kommen
+  // dutzende Meldungen je Sekunde. Zusammen mit der frueher wechselnden
+  // Reihenfolge war das der gemeldete Fehler: Die Zeile, auf die man zielte,
+  // gehoerte beim Klick schon einem anderen Schiff.
+  //
+  // Vorderkante: Der erste Aufruf zeichnet sofort, damit ein Klick ohne
+  // Verzoegerung markiert wird. Erst was in den naechsten 200 ms nachkommt,
+  // wird zu einem einzigen Nachlauf zusammengefasst.
+  var TABELLE_MIN_MS = 200;
+  var tabellenTimer = null;
+  var tabelleZuletzt = 0;
+
   function refreshVisibleShips() {
+    var jetzt = Date.now();
+    var wartezeit = TABELLE_MIN_MS - (jetzt - tabelleZuletzt);
+    if (wartezeit <= 0) {
+      if (tabellenTimer) { clearTimeout(tabellenTimer); tabellenTimer = null; }
+      tabelleZuletzt = jetzt;
+      renderVisibleShips();
+      return;
+    }
+    if (tabellenTimer) return;
+    tabellenTimer = setTimeout(function () {
+      tabellenTimer = null;
+      tabelleZuletzt = Date.now();
+      renderVisibleShips();
+    }, wartezeit);
+  }
+
+  // Solange der Zeiger ueber der Tabelle steht, bleibt die REIHENFOLGE
+  // stehen; die Inhalte (Alter, Position, Fahrtdaten) laufen weiter. Sonst
+  // ruecken Zeilen unter dem Finger weg, sobald ein Schiff seine Masse
+  // nachreicht und dadurch aus der "unbekannt"-Gruppe nach oben springt.
+  var ordnungFest = false;
+  var festeOrdnung = null;
+
+  function ordnungEinfrieren(fest) {
+    ordnungFest = fest;
+    if (!fest) { festeOrdnung = null; refreshVisibleShips(); return; }
+    festeOrdnung = {};
+    Array.prototype.forEach.call(tableBody.children, function (tr, i) {
+      if (tr.dataset.mmsi) festeOrdnung[tr.dataset.mmsi] = i;
+    });
+  }
+
+  function renderVisibleShips() {
     var needle = searchInput.value.trim().toLowerCase();
     var entries = [];
     var hiddenBySearch = 0;
@@ -3348,6 +3399,19 @@
     entries.sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
     var shown = entries.slice(0, MAX_TABLE_ROWS);
     shown.sort(byLengthDesc);
+    // Zeigt der Nutzer gerade auf die Tabelle, behalten die Schiffe ihren
+    // Platz; neu hinzugekommene haengen sich hinten an. Sortiert wird wieder,
+    // sobald der Zeiger die Tabelle verlaesst.
+    if (ordnungFest && festeOrdnung) {
+      var rang = festeOrdnung;
+      shown.sort(function (a, b) {
+        var ra = rang[a.mmsi], rb = rang[b.mmsi];
+        if (ra == null && rb == null) return byLengthDesc(a, b);
+        if (ra == null) return 1;
+        if (rb == null) return -1;
+        return ra - rb;
+      });
+    }
 
     tableBody.innerHTML = "";
     shown.forEach(function (entry) {
@@ -5640,6 +5704,20 @@
     var row = evt.target.closest("tr");
     if (row && row.dataset.mmsi) openDetail(row.dataset.mmsi);
   });
+
+  // pointerenter/-leave deckt Maus und Finger ab. Am Finger loest pointerdown
+  // das Einfrieren aus und pointerup/-cancel gibt es wieder frei - dort gibt
+  // es kein "Schweben", der Zeiger ist nur waehrend der Beruehrung da.
+  var tabellenBereich = document.querySelector(".table-wrap");
+  if (tabellenBereich) {
+    tabellenBereich.addEventListener("pointerenter", function () { ordnungEinfrieren(true); });
+    tabellenBereich.addEventListener("pointerleave", function () { ordnungEinfrieren(false); });
+    // Nach dem Loslassen noch kurz festhalten: Ein Tipp erzeugt pointerup vor
+    // dem click, und ein Neusortieren dazwischen zoege die Zeile wieder weg.
+    tabellenBereich.addEventListener("pointerup", function () {
+      setTimeout(function () { if (ordnungFest) ordnungEinfrieren(false); }, 400);
+    });
+  }
 
   // "Alle Details" link inside a Leaflet popup.
   document.addEventListener("click", function (evt) {
