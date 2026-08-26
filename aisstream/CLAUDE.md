@@ -1147,10 +1147,11 @@ zuerst, Technik weg.**
 
 | Breite | Verhalten |
 |---|---|
-| jede | Einspaltig, Technik als Schublade von rechts |
+| jede | Einspaltig, Technik als Schublade von rechts; Filter in der Kopfzeile |
+| ≥ 1100 px | Die Gruppenbeschriftungen „TYP" / „STATUS" sind eingeblendet |
 | ≥ 900 px | Die Detailsicht ist eine **Spalte**, kein Overlay (s. u.) |
-| ≤ 1024 px (iPad hoch, iPhone quer) | Zusätzlich: Karte 42 vh, Tabelle ohne Höhendeckel |
-| ≤ 700 px (iPhone) | Zusätzlich: Tabelle als Kartenliste, Filterleiste als Scrollzeilen, Schublade voll breit, Karte 38 vh |
+| ≤ 1024 px (iPad hoch, iPhone quer) | Zusätzlich: Tabelle ohne Höhendeckel |
+| ≤ 700 px (iPhone) | Zusätzlich: Tabelle als Kartenliste, Schublade voll breit, Karte 38 vh statt der 64-vh-Rechnung |
 
 **Die Schublade gilt seit dem Nutzerhinweis auf jeder Breite**, nicht mehr nur
 bis 1024 px. Am Desktop und auf dem iPad quer lagen Verbindungs- und Debugdaten
@@ -1174,6 +1175,113 @@ einziges Schiff sichtbar wurde. Jetzt hängt es hinter dem Knopf
 „Verbindung & Technik" in der Kopfzeile (`#settings`, Schließen per Kreuz,
 `Esc` oder Tipp daneben; auf dem Telefon voll breit, weil bei 92 vw nur
 32 px Hintergrund übrig blieben — als Tippziel unbrauchbar).
+
+### Filter in der Kopfzeile, Karte ganz nach oben
+
+Gewünscht war **in Summe mehr Platz für Karte und Tabelle**, mit drei
+vorgegebenen Ansatzpunkten: keine Überschrift mehr, Filterknöpfe kompakt in
+die Kopfzeile, Typfilter einzeilig (auf dem iPad quer brauchten sie zwei
+Zeilen), und für die Liste unter der Karte mindestens 30 % übrig.
+
+**Vorher — was der Karte im Weg stand:**
+
+| Gerät | Kopfzeile | Filterleiste | Karte begann bei | Karte | darunter |
+|---|---|---|---|---|---|
+| iPad Pro 11 quer (1194×834) | 71 | 74 | **177** (21 %) | 420 | 237 (**28 %**) |
+| iPad Mini quer (1024×768) | 58 | 101 (Typ **2 Zeilen**) | **187** (24 %) | 323 | 258 (34 %) |
+| iPad hoch (834×1194) | 58 | 101 (Typ **2 Zeilen**) | 187 | 501 | 505 (42 %) |
+| Desktop 1440×900 | 71 | 74 | 177 | 420 | 303 (34 %) |
+| iPhone 15 hoch | 58 | 101 | **281** | 250 | — |
+
+**Nachher — gemessen:**
+
+| Gerät | Kopfzeile | Karte beginnt bei | Karte | darunter |
+|---|---|---|---|---|
+| iPad Pro 11 quer | 74 | **90** | 460 (+40) | 284 (**34 %**) |
+| iPad Mini quer | 74 | **82** | 418 (+95) | 268 (35 %) |
+| iPad hoch | 74 | 82 | 690 (+189) | 422 (35 %) |
+| Desktop 1440 | 58 | 74 | 518 (+98) | 308 (34 %) |
+| iPhone 15 hoch | 107 | **116** | 252 | — |
+
+Auf dem iPhone hoch ist die Kopfzeile höher als vorher (zwei Chipzeilen mit
+34-px-Zielen), die Karte beginnt trotzdem 165 px weiter oben — die eigene
+Filterleiste war schlicht teurer.
+
+#### Der waagerechte Platz war die eigentliche Hürde
+
+| | iPad Pro quer | iPad 10 quer | iPad Mini quer | iPad hoch | Desktop |
+|---|---|---|---|---|---|
+| Kopfzeile innen | 1146 | 1032 | 992 | 802 | 1392 |
+| rechte Seite **vorher** | 419 | 419 | 419 | 419 | 419 |
+| rechte Seite **nur Symbole** | 128 | 128 | 128 | 128 | 128 |
+| Typchips **lang** | 916 | 916 | 916 | 916 | 916 |
+| Typchips **kurz** (heute) | 531 | 531 | 531 | 531 | 531 |
+
+Die rechte Seite allein kostete 419 px — Verbindungstext 114, „Tagebuch" 118,
+„Verbindung & Technik" 163. Erst als sie auf 📖 und ⚙ schrumpfte, war
+überhaupt Platz. Der Verbindungstext liegt weiterhin als `.sr-only` im DOM
+(`setStatus()` schreibt hinein) und zusätzlich im `title` des farbigen
+Punktes — sonst wäre „gelb" nicht mehr auflösbar.
+
+Heute bleiben auf dem iPad Mini quer 855 px Platz gegen 531 px Bedarf, also
+über 300 px Reserve gegen abweichende Schriftmetriken auf echtem iOS.
+
+#### Einzeilig ist Struktur, nicht Hoffnung
+
+Beide Gruppen sind `flex-wrap: nowrap` + `overflow-x: auto` — auf **jeder**
+Breite, nicht mehr erst unter 700 px. Damit kann aus zwei Zeilen keine dritte
+werden; wird es eng (iPhone hoch: 292 px Platz gegen 531 px Bedarf), wischt
+man. **`min-width: 0` ist dabei Pflicht** — ohne das wächst die Gruppe auf die
+Summe aller Chips statt zu scrollen und zieht die ganze Seite quer. Genau
+dieser Fehler steht in dieser Datei schon zweimal.
+
+Die Kurzform steht nur auf den Chips (`short` in `TYPE_COLORS` und
+`STATUS_GROUPS`), der volle Name im `title` und `aria-label`. `label` bleibt
+unangetastet, weil die **Kartenlegende** daraus die vollen Namen zieht — dort
+steht weiterhin „Schlepper & Arbeitsschiffe", auf dem Chip „Arbeit".
+
+#### Die Kartenhöhe ist eine Rechnung, kein Wert
+
+`#map { height: calc(64vh - var(--head-h, 64px)) }`. Kopfzeile plus Karte
+belegen zusammen 64 % der Fensterhöhe, für alles darunter bleiben rund 34 % —
+gefordert waren 30 %. Die Rechnung ist damit unabhängig davon, wie hoch die
+Kopfzeile mit ihren zwei Filterzeilen gerade wirklich ist.
+
+**`--head-h` hat dadurch zwei Abnehmer:** die Detailspalte (`top`) *und* die
+Karte. `measureHeader()` stößt deshalb `kartengroesseNachziehen()` an —
+ändert sich die Kopfzeile, ändert sich die Karte, und Leaflet erfährt davon
+nur, wenn man es sagt. Nur bei echter Änderung (`letzteKopfhoehe`), sonst
+dreht sich der `ResizeObserver` im Kreis.
+
+Der `42vh`-Wert im 1024er Block **musste weg**, nicht nur der 420-px-Wert:
+Eine spätere Regel hätte die Formel stillschweigend ausgehebelt, und zwar
+ausgerechnet auf dem iPad Mini quer.
+
+#### Drei Dinge, die erst die Messung gezeigt hat
+
+- **`all: unset` räumt auch spätere Wirkung ab.** Die Regel
+  `@media (pointer: coarse) { .chip { min-height: 30px } }` stand zunächst
+  *vor* `.chip { all: unset; … }`. `all: unset` setzt jede Eigenschaft
+  zurück, `min-height` eingeschlossen — der Test meldete unverändert 20 px.
+  Die Regel muss **nach** der `.chip`-Regel stehen.
+- **`all: unset` setzt auch `box-sizing` auf `content-box`.** Aus
+  `min-height: 30px` wurden dadurch gemessene 38 px (Polster und Rahmen oben
+  drauf) und die Kopfzeile wuchs auf 94 px. Mit `box-sizing: border-box`
+  sind es die gewollten 28 px.
+- **Ein langer Knopftext lässt die Kopfzeile nicht mehr wachsen.** Die zwei
+  Chipzeilen sind höher als jeder Knopf. Die `--head-h`-Probe in
+  `detailtouch.js` hat damit nichts mehr geprüft und war trotzdem grün —
+  sie braucht jetzt einen 160-px-Klotz und fordert echtes Wachstum.
+
+#### Was Testskripte davon merken
+
+- `.filterbar` gibt es nicht mehr; der Container heißt `.headfilter`.
+  **Auch im Zurücksetzen-Handler im Client** — mit dem alten Selektor bliebe
+  der Filter weg, die Chips aber sichtbar gedrückt.
+- Chiptexte sind kurz. `:has-text("Frachtschiff")` trifft nichts mehr;
+  `#typeFilter .chip[title="Frachtschiff"]` ist der stabile Weg.
+- Die Tabellenüberschrift steht in `.search-row`, nicht mehr in einer eigenen
+  Zeile.
 
 ### Detailsicht ab 900 px: Spalte statt Overlay
 
@@ -1312,11 +1420,14 @@ auf dem Desktop**, wo es jahrelang unbemerkt blieb:
 - **`main > * { min-width: 0 }`** — ohne das wächst ein Grid-Kind auf die
   *Mindestbreite seines Inhalts*. Die 13-spaltige Tabelle blies das Dokument
   auf 1678 px auf, obwohl sie in einem `overflow: auto`-Container steckt.
-- **Filterleiste auf dem Telefon als `display: block`, nicht Column-Flex.**
-  Als Flex-Item hat `.filtergroup` seine Cross-Achse nicht auf die
-  Containerbreite begrenzt und ist trotz `overflow-x: auto` und
-  `min-width: 0` auf 846 px aufgegangen. Als Blockelement füllt sie schlicht
-  die Breite und scrollt darin.
+- **Die Filtergruppe braucht einen Container, der ihre Breite begrenzt.**
+  In der alten `.filterbar` hat `.filtergroup` als Flex-*Item* seine
+  Cross-Achse nicht auf die Containerbreite begrenzt und ist trotz
+  `overflow-x: auto` und `min-width: 0` auf 846 px aufgegangen; die Leiste
+  musste dafür `display: block` werden. Heute liegen die Gruppen in
+  `.headfilter`, einer **Spalten**-Flexbox: Dort füllt jede Zeile schlicht
+  die Breite und scrollt darin — dieselbe Lösung, anderer Weg. `min-width: 0`
+  bleibt an beiden Stellen Pflicht.
 
 **Merke:** Bei „die Seite scrollt quer" nicht raten, sondern messen —
 Elemente nacheinander auf `display: none` setzen und `scrollWidth`

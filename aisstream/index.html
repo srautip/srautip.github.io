@@ -30,12 +30,17 @@
     color: var(--text);
   }
   header {
-    padding: 1.25rem 1.5rem;
+    /* Schmales Polster: Die Kopfzeile traegt jetzt die Filter, und jeder
+       Pixel hier geht der Karte und der Tabelle verloren. */
+    padding: 0.4rem 1.5rem;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
+    /* nowrap: Die Filtergruppen scrollen bei Enge in sich selbst. Wuerde die
+       Kopfzeile stattdessen umbrechen, waere die rechte Seite unter den
+       Filtern gelandet und die Karte wieder nach unten geschoben. */
+    flex-wrap: nowrap;
     gap: 0.75rem;
     /* Die Detailansicht ist eine feste Leiste ganz rechts ueber die volle
        Hoehe (z-index 1200) - genau dort, wo die Knoepfe der Kopfzeile sitzen.
@@ -46,12 +51,29 @@
     position: relative;
     z-index: 1220;
   }
-  header h1 {
-    font-size: 1.15rem;
-    margin: 0;
-    font-weight: 600;
+  /* Nur fuer Bildschirmleser: Text bleibt im Baum, belegt aber keinen Platz.
+     clip-path statt display:none - Vorgelesen wird nur, was noch gerendert
+     wird. */
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
-  header h1 span { color: var(--muted); font-weight: 400; }
+  /* Die beiden Filterzeilen. flex:1 nimmt den Platz, den die rechte Seite
+     uebrig laesst; min-width:0 ist Pflicht, sonst waechst die Spalte auf die
+     Summe ihrer Chips und zieht die ganze Seite quer. */
+  .headfilter {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .filterrow { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
   .status {
     display: flex;
     align-items: center;
@@ -169,7 +191,13 @@
   }
   .hint a { color: var(--accent); }
   #map {
-    height: 420px;
+    /* Kopfzeile plus Karte belegen zusammen 64 % der Fensterhoehe - fuer die
+       Liste darunter bleiben damit rund ein Drittel, gefordert waren
+       mindestens 30 %. Die Rechnung haengt an --head-h, das measureHeader()
+       ohnehin pflegt; sie ist deshalb unabhaengig davon, wie hoch die
+       Kopfzeile mit ihren zwei Filterzeilen gerade wirklich ist. */
+    height: calc(64vh - var(--head-h, 64px));
+    min-height: 240px;
     border-radius: 10px;
     border: 1px solid var(--border);
   }
@@ -222,6 +250,12 @@
     align-items: center;
     margin-bottom: 0.5rem;
   }
+  /* Die Ueberschrift steht in der Suchzeile statt in einer eigenen Zeile -
+     dieselbe Gliederung fuer Bildschirmleser, 27 px mehr fuer die Tabelle. */
+  .search-row h2 { margin: 0; flex: 0 0 auto; }
+  .h2-zusatz { font-weight: 400; text-transform: none; color: var(--muted); }
+  /* Der Zusatz ist Beiwerk: Unter 1200 px gehoert der Platz dem Suchfeld. */
+  @media (max-width: 1200px) { .h2-zusatz { display: none; } }
   .search-row input[type="search"] {
     flex: 1;
     padding: 0.4rem 0.55rem;
@@ -599,25 +633,46 @@
     font-size: 0.7rem;
     padding: 0.25rem 0.5rem;
   }
-  /* --- Filterleiste ---------------------------------------------------- */
-  .filterbar {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0.6rem 0.75rem;
-    margin-bottom: 1rem;
+  /* --- Filterstreifen in der Kopfzeile ---------------------------------- */
+  /* Frueher eine eigene Leiste ueber der Karte (74 bis 101 px hoch plus
+     Abstand). Sie liegt jetzt in der Kopfzeile - der Platz gehoert Karte
+     und Tabelle.
+     nowrap + overflow-x auf JEDER Breite, nicht erst unter 700 px: Damit ist
+     "einzeilig" keine Hoffnung, sondern Struktur. Wird es eng, wischt man;
+     eine dritte Zeile kann nicht entstehen.
+     min-width:0 ist dabei Pflicht - ohne das waechst die Gruppe auf die
+     Summe aller Chips statt zu scrollen und zieht die Seite quer. Genau
+     dieser Fehler steht schon zweimal in CLAUDE.md. */
+  .filtergroup {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 1.1rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    min-width: 0;
+    gap: 0.3rem;
+    scrollbar-width: none;
   }
-  .filtergroup { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem; }
+  .filtergroup::-webkit-scrollbar { display: none; }
   .filtergroup > .lbl {
     font-size: 0.68rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--muted);
     margin-right: 0.15rem;
+    /* Bleibt beim Scrollen stehen, damit man weiss, welche Gruppe man
+       gerade durchwischt. */
+    position: sticky;
+    left: 0;
+    background: var(--bg);
+    padding-right: 0.2rem;
+    z-index: 1;
+    flex: 0 0 auto;
+    /* Erst ab 1100 px eingeblendet: Bei 1024 px sind diese 35 px der
+       Unterschied zwischen "alle Chips sichtbar" und "wischen". */
+    display: none;
+  }
+  @media (min-width: 1100px) {
+    .filtergroup > .lbl { display: inline; }
   }
   .chip {
     all: unset;
@@ -625,13 +680,32 @@
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    font-size: 0.76rem;
-    padding: 0.2rem 0.5rem;
+    /* 0.72rem statt 0.76: schmaler, aber am Finger noch ~23 px hoch. Nicht
+       weiter herunter - unter 700 px gilt ohnehin min-height 34px. */
+    font-size: 0.72rem;
+    padding: 0.18rem 0.45rem;
     border-radius: 999px;
     border: 1px solid var(--border);
     background: var(--panel-2);
     color: var(--muted);
     white-space: nowrap;
+    flex: 0 0 auto;
+  }
+  /* Am Finger waeren 0.72rem nur 20 px hoch. Die Hoehe kostet 10 px
+     Kopfzeile, die nach dem Wegfall der eigenen Filterleiste reichlich
+     vorhanden sind; die BREITE bleibt unangetastet, denn davon haengt ab, ob
+     alle Chips ohne Wischen in die Zeile passen (iPad Mini quer: 855 px
+     Platz gegen 531 px Bedarf).
+     Muss NACH der .chip-Regel stehen: deren "all: unset" raeumt jede frueher
+     gesetzte Eigenschaft wieder ab, min-height eingeschlossen. In der
+     pointer-coarse-Gruppe weiter oben hatte die Regel deshalb keine
+     Wirkung - der Test hat weiter 20 px gemeldet. */
+  @media (pointer: coarse) {
+    /* box-sizing gehoert dazu: "all: unset" setzt es auf content-box zurueck,
+       und dann kommen Polster und Rahmen auf die min-height OBEN DRAUF - aus
+       30 gewuenschten wurden gemessene 38 px, und die Kopfzeile wuchs auf
+       94 px. */
+    .chip { box-sizing: border-box; min-height: 28px; }
   }
   .chip:hover { border-color: var(--accent); }
   .chip[aria-pressed="true"] { color: var(--text); border-color: var(--accent); background: #24365a; }
@@ -641,9 +715,9 @@
     flex: 0 0 auto;
     border: 1px solid rgba(255, 255, 255, 0.55);
   }
-  .filter-count { font-size: 0.75rem; color: var(--muted); margin-left: auto; }
+  .filter-count { font-size: 0.72rem; color: var(--muted); margin-left: auto; flex: 0 0 auto; }
   .filter-count b { color: var(--text); }
-  #filterReset { all: unset; cursor: pointer; font-size: 0.74rem; color: var(--accent); }
+  #filterReset { all: unset; cursor: pointer; font-size: 0.72rem; color: var(--accent); flex: 0 0 auto; }
   #filterReset[hidden] { display: none; }
   /* Der Abdunkler lag frueher in der 1024px-Media-Query, weil nur #settings
      eine Schublade war. Das Tagebuch ist auf jeder Breite eine - deshalb
@@ -826,15 +900,16 @@
   #settings.open { transform: translateX(0); }
 
   @media (max-width: 1024px) {
-    header { padding: 0.85rem 1rem; }
-    header h1 { font-size: 1rem; }
+    header { padding: 0.4rem 1rem; }
     /* Der --detail-w-Anteil muss hier mit: Diese Regel greift bei GENAU
        1024 px - dem iPad Mini quer, dem schlimmsten gemessenen Fall (51 %
-       der Karte verdeckt). Ein schlichtes "padding: 0.75rem 1rem 2rem"
+       der Karte verdeckt). Ein schlichtes "padding: 0.5rem 1rem 2rem"
        ueberschreibt die Kurzform komplett und nimmt den freigehaltenen
-       Platz wieder weg. Genau das hat der Test gemeldet. */
-    main { padding: 0.75rem calc(1rem + var(--detail-w, 0px)) 2rem 1rem; }
-    #map { height: 42vh; min-height: 260px; }
+       Platz wieder weg. Genau das hat der Test schon einmal gemeldet. */
+    main { padding: 0.5rem calc(1rem + var(--detail-w, 0px)) 2rem 1rem; }
+    /* Kein eigener Wert mehr fuer #map: Die 64vh-Rechnung der Grundregel
+       gilt hier genauso, und ein "42vh" haette sie stillschweigend
+       ausgehebelt - genau am iPad Mini quer. */
     .table-wrap { max-height: none; }
   }
 
@@ -843,48 +918,33 @@
   @media (max-width: 700px) {
     body { padding-bottom: env(safe-area-inset-bottom); }
     header {
-      padding: 0.7rem max(1rem, env(safe-area-inset-right)) 0.7rem max(1rem, env(safe-area-inset-left));
-      padding-top: max(0.7rem, env(safe-area-inset-top));
+      padding: 0.4rem max(1rem, env(safe-area-inset-right)) 0.4rem max(1rem, env(safe-area-inset-left));
+      padding-top: max(0.4rem, env(safe-area-inset-top));
     }
     main { padding: 0.6rem max(0.75rem, env(safe-area-inset-left)) 2rem max(0.75rem, env(safe-area-inset-right)); gap: 0.75rem; }
     /* Auf dem Telefon volle Breite: bei 92vw blieben 32px Hintergrund
        uebrig - als "danebentippen zum Schliessen" unbrauchbar. Hier
        schliessen Kreuz und Esc, wie bei einem iOS-Sheet ueblich. */
     #settings, #diary { width: 100%; border-left: none; }
-    header h1 { font-size: 0.92rem; }
-    header h1 span { display: none; }
     .headright { gap: 0.5rem; }
     #settingsToggle, #diaryToggle { padding: 0.35rem 0.55rem; font-size: 0.74rem; }
     .status { font-size: 0.75rem; }
     /* Der Zusatz "Zeile anklicken fuer Details" kostet auf dem Telefon zwei
        Zeilen und sagt nichts, was die Karten nicht schon zeigen. */
-    .panel h2 > span { display: none; }
-    .search-row { gap: 0.4rem; }
+    .h2-zusatz { display: none; }
+    .search-row { gap: 0.4rem; flex-wrap: wrap; }
+    #shipSearch { flex: 1 1 100%; }
+    /* Die Seite scrollt auf dem Telefon ohnehin - hier zaehlt, dass die
+       Karte gross genug fuer eine Uebersicht bleibt, nicht die 30-%-Teilung
+       der grossen Displays. */
     #map { height: 38vh; min-height: 220px; }
     .panel { padding: 0.75rem; }
     /* Umbrechende Chips haben auf 393px Breite sechs Zeilen erzeugt und die
-       Karte unter die Falz geschoben. Je Gruppe jetzt eine Zeile, die quer
-       scrollt. */
-    /* Blocklayout statt Column-Flex: als Flex-Item hat die Gruppe ihre
-       Cross-Achse nicht auf die Containerbreite begrenzt und ist trotz
-       overflow-x auf 846px aufgegangen. Als Blockelement fuellt sie
-       schlicht die Breite und scrollt darin. */
-    .filterbar { display: block; padding: 0.45rem 0.5rem; }
-    .filterbar > * + * { margin-top: 0.35rem; }
-    .filtergroup {
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      /* Ohne min-width:0 scrollt die Gruppe nicht, sondern waechst auf die
-         Breite aller Chips und zieht die ganze Seite mit. */
-      min-width: 0;
-      gap: 0.3rem;
-      padding-bottom: 0.1rem;
-      scrollbar-width: none;
-    }
-    .filtergroup::-webkit-scrollbar { display: none; }
-    .filtergroup > .lbl { position: sticky; left: 0; background: var(--panel); padding-right: 0.2rem; z-index: 1; }
-    .filter-count { margin-left: 0; width: 100%; font-size: 0.7rem; }
-    #filterReset { align-self: flex-start; }
+       Karte unter die Falz geschoben. Das Scrollen je Gruppe steht jetzt in
+       der Grundregel und gilt auf jeder Breite; hier bleibt nur, was
+       wirklich telefonspezifisch ist. */
+    .filtergroup { padding-bottom: 0.1rem; }
+    .filter-count { font-size: 0.7rem; }
 
     /* 16px verhindert, dass iOS beim Fokus in ein Feld hineinzoomt. */
     input[type="text"], input[type="password"], input[type="number"], input[type="search"] {
@@ -978,17 +1038,33 @@
 </head>
 <body>
 <header>
-  <h1>AISstream.io <span>Live-Client</span></h1>
+  <!-- Statt der Ueberschrift stehen hier die Filter: zwei kompakte Zeilen.
+       Jede Gruppe ist nowrap + overflow-x, damit aus zwei Zeilen nie drei
+       werden - auf dem iPad quer brauchten die Typchips vorher zwei. -->
+  <div class="headfilter">
+    <div class="filtergroup" id="typeFilter"><span class="lbl">Typ</span></div>
+    <div class="filterrow">
+      <div class="filtergroup" id="statusFilter"><span class="lbl">Status</span></div>
+      <button type="button" id="filterReset" hidden>Filter zurücksetzen</button>
+      <span class="filter-count" id="filterCount"></span>
+    </div>
+  </div>
   <div class="headright">
     <div class="status">
       <span class="dot" id="statusDot"></span>
-      <span id="statusText">nicht verbunden</span>
+      <!-- Bleibt im DOM: setStatus() schreibt hier hinein, Bildschirmleser
+           lesen es vor. Sichtbar traegt den Zustand der farbige Punkt samt
+           title - der Text kostete 114 der 419 px, die die rechte Seite
+           vorher belegte. -->
+      <span id="statusText" class="sr-only">nicht verbunden</span>
     </div>
-    <button type="button" id="diaryToggle" aria-expanded="false" aria-controls="diary">
-      <span aria-hidden="true">📖</span> Tagebuch <span id="diaryCount">(0)</span>
+    <button type="button" id="diaryToggle" aria-expanded="false" aria-controls="diary"
+            title="Tagebuch">
+      <span aria-hidden="true">📖</span><span class="sr-only">Tagebuch </span><span id="diaryCount">(0)</span>
     </button>
-    <button type="button" id="settingsToggle" aria-expanded="false" aria-controls="settings">
-      <span aria-hidden="true">⚙</span> Verbindung &amp; Technik
+    <button type="button" id="settingsToggle" aria-expanded="false" aria-controls="settings"
+            title="Verbindung &amp; Technik">
+      <span aria-hidden="true">⚙</span><span class="sr-only">Verbindung &amp; Technik</span>
     </button>
   </div>
 </header>
@@ -1162,16 +1238,13 @@
   </aside>
 
   <section id="content">
-    <div class="filterbar">
-      <div class="filtergroup" id="typeFilter"><span class="lbl">Typ</span></div>
-      <div class="filtergroup" id="statusFilter"><span class="lbl">Status</span></div>
-      <button type="button" id="filterReset" hidden>Filter zurücksetzen</button>
-      <span class="filter-count" id="filterCount"></span>
-    </div>
     <div id="map"></div>
     <div class="panel" style="margin-top:1rem">
-      <h2>Schiffe im aktuellen Kartenausschnitt <span style="font-weight:400;text-transform:none;color:var(--muted)">&ndash; Zeile anklicken für Details</span></h2>
+      <!-- Die Ueberschrift stand frueher in einer eigenen Zeile (15px Text
+           plus 12px Rand). Sie ist jetzt Teil der Suchzeile - dieselbe
+           Gliederung, 27px mehr fuer die Tabelle. -->
       <div class="search-row">
+        <h2>Schiffe im Ausschnitt<span class="h2-zusatz"> &ndash; Zeile anklicken für Details</span></h2>
         <input type="search" id="shipSearch" placeholder="Suche nach MMSI, Name, Rufzeichen, IMO oder Ziel…" autocomplete="off" />
         <span class="badge" id="searchHint">&nbsp;</span>
       </div>
@@ -1560,6 +1633,9 @@
   function setStatus(state, text) {
     statusDot.className = "dot" + (state ? " " + state : "");
     statusText.textContent = text;
+    // Sichtbar traegt nur noch der Punkt den Zustand - ohne title waere
+    // "gelb" nicht mehr aufloesbar.
+    statusDot.title = text;
   }
 
   function selectedMessageTypes() {
@@ -1575,19 +1651,22 @@
   // clears the strict gate against both the OSM land (#f2efe9) and water
   // (#aad3df) surfaces. Six is the measured maximum; a seventh hue cannot
   // hold the floors. Anything outside these six folds into neutral grey.
+  // "short" steht nur auf den Filterchips in der Kopfzeile, wo jeder Pixel
+  // zaehlt. "label" bleibt unangetastet - die Kartenlegende zieht die vollen
+  // Namen daraus, und dort ist Platz dafuer.
   var TYPE_COLORS = [
-    { key: "cargo", label: "Frachtschiff", color: "#2a78d6" },
-    { key: "tanker", label: "Tanker", color: "#ab2000" },
-    { key: "passenger", label: "Passagierschiff", color: "#77a400" },
-    { key: "fishing", label: "Fischerei", color: "#007a61" },
-    { key: "working", label: "Schlepper & Arbeitsschiffe", color: "#8c2c95" },
-    { key: "leisure", label: "Sport & Segel", color: "#ca7197" },
+    { key: "cargo", label: "Frachtschiff", short: "Fracht", color: "#2a78d6" },
+    { key: "tanker", label: "Tanker", short: "Tanker", color: "#ab2000" },
+    { key: "passenger", label: "Passagierschiff", short: "Passagier", color: "#77a400" },
+    { key: "fishing", label: "Fischerei", short: "Fischer", color: "#007a61" },
+    { key: "working", label: "Schlepper & Arbeitsschiffe", short: "Arbeit", color: "#8c2c95" },
+    { key: "leisure", label: "Sport & Segel", short: "Sport", color: "#ca7197" },
     // Siebter Platz, geprueft mit dem Validator der dataviz-Skill unter
     // --pairs all: Das schlechteste Paar der Palette bleibt #ca7197/#007a61
     // bei CVD ΔE 8,8 - die neue Farbe wird also nicht zum Engpass. Ihr
     // naechster Nachbar liegt bei CVD ΔE 11,4 (Arbeit) und Normalsicht 18,7
     // (Fracht), beides deutlich ueber Zielwert 8 und Schranke 15.
-    { key: "military", label: "Militär & Behörden", color: "#460fdb" }
+    { key: "military", label: "Militär & Behörden", short: "Militär", color: "#460fdb" }
   ];
   var TYPE_COLOR_MAP = (function () {
     var m = {};
@@ -3003,11 +3082,11 @@
   // Navigational status codes grouped into the distinctions a reader
   // actually makes. Anything not listed (incl. a missing status) is "other".
   var STATUS_GROUPS = [
-    { key: "underway", label: "In Fahrt", codes: [0, 8] },
-    { key: "moored", label: "Vor Anker / fest", codes: [1, 5] },
-    { key: "restricted", label: "Eingeschränkt", codes: [2, 3, 4, 6, 11, 12] },
-    { key: "fishing", label: "Fischerei", codes: [7] },
-    { key: "other", label: "Sonstige / unbekannt", codes: [] }
+    { key: "underway", label: "In Fahrt", short: "Fahrt", codes: [0, 8] },
+    { key: "moored", label: "Vor Anker / fest", short: "Anker", codes: [1, 5] },
+    { key: "restricted", label: "Eingeschränkt", short: "Eingeschr.", codes: [2, 3, 4, 6, 11, 12] },
+    { key: "fishing", label: "Fischerei", short: "Fischerei", codes: [7] },
+    { key: "other", label: "Sonstige / unbekannt", short: "Sonstige", codes: [] }
   ];
 
   function statusGroup(entry) {
@@ -3097,19 +3176,26 @@
     var typeBox = document.getElementById("typeFilter");
     var statusBox = document.getElementById("statusFilter");
 
-    var chip = function (label, active, swatch) {
+    // Sichtbar steht die Kurzform, der volle Name haengt als title daran -
+    // "Arbeit" allein saehe sonst wie eine eigene Kategorie aus statt wie
+    // "Schlepper & Arbeitsschiffe".
+    var chip = function (label, voll, active, swatch) {
       var b = document.createElement("button");
       b.type = "button";
       b.className = "chip";
       b.setAttribute("aria-pressed", active ? "true" : "false");
+      if (voll && voll !== label) {
+        b.title = voll;
+        b.setAttribute("aria-label", voll);
+      }
       b.innerHTML = (swatch ? '<span class="dot-sw" style="background:' + swatch + '"></span>' : "") +
         esc(label);
       return b;
     };
 
-    TYPE_COLORS.concat([{ key: "other", label: "Sonstige / unbekannt", color: NEUTRAL_COLOR }])
+    TYPE_COLORS.concat([{ key: "other", label: "Sonstige / unbekannt", short: "Sonstige", color: NEUTRAL_COLOR }])
       .forEach(function (t) {
-        var b = chip(t.label, !!filterTypes[t.key], t.color);
+        var b = chip(t.short || t.label, t.label, !!filterTypes[t.key], t.color);
         b.addEventListener("click", function () {
           filterTypes[t.key] = !filterTypes[t.key];
           b.setAttribute("aria-pressed", filterTypes[t.key] ? "true" : "false");
@@ -3120,7 +3206,7 @@
       });
 
     STATUS_GROUPS.forEach(function (g) {
-      var b = chip(g.label, !!filterStatuses[g.key], null);
+      var b = chip(g.short || g.label, g.label, !!filterStatuses[g.key], null);
       b.addEventListener("click", function () {
         filterStatuses[g.key] = !filterStatuses[g.key];
         b.setAttribute("aria-pressed", filterStatuses[g.key] ? "true" : "false");
@@ -3134,7 +3220,11 @@
       filterTypes = {};
       filterStatuses = {};
       saveFilters();
-      Array.prototype.forEach.call(document.querySelectorAll(".filterbar .chip"), function (b) {
+      // .headfilter, nicht mehr .filterbar: Die Leiste ist in die Kopfzeile
+      // gezogen. Bliebe der alte Selektor stehen, blieben nach
+      // "zurueckgesetzt" alle Chips sichtbar gedrueckt - der Filter waere
+      // weg, die Anzeige sagte das Gegenteil.
+      Array.prototype.forEach.call(document.querySelectorAll(".headfilter .chip"), function (b) {
         b.setAttribute("aria-pressed", "false");
       });
       refreshVisibleShips();
@@ -5545,10 +5635,20 @@
   // Hoehe der Kopfzeile als CSS-Variable: Die Detailleiste braucht sie, um
   // ihren Inhalt darunter beginnen zu lassen. Sie aendert sich mit der
   // Breite (umbrechende Knoepfe) und bei Drehung des Geraets.
+  // Seit die Karte ihre Hoehe aus calc(64vh - var(--head-h)) bezieht, hat
+  // diese Variable zwei Abnehmer: die Detailspalte (top) UND die Karte.
+  // Aendert sich die Kopfzeile, aendert sich die Karte - und Leaflet erfaehrt
+  // davon nur, wenn wir es sagen. Nur bei echter Aenderung, sonst dreht sich
+  // der ResizeObserver im Kreis.
+  var letzteKopfhoehe = null;
   function measureHeader() {
     var head = document.querySelector("header");
     if (!head) return;
-    document.documentElement.style.setProperty("--head-h", head.offsetHeight + "px");
+    var h = head.offsetHeight;
+    if (h === letzteKopfhoehe) return;
+    letzteKopfhoehe = h;
+    document.documentElement.style.setProperty("--head-h", h + "px");
+    kartengroesseNachziehen();
   }
   measureHeader();
   // resize allein genuegt nicht: .headright bricht um, wenn die Beschriftung
@@ -5634,6 +5734,9 @@
   // Mit Panning (Leaflet-Standard): Der geografische Mittelpunkt bleibt, die
   // Karte rueckt nach - Schiffe, die vorher hinter der Leiste lagen, kommen
   // dadurch ins Bild. Mit {pan:false} fielen sie stattdessen ganz heraus.
+  //
+  // Zweiter Aufrufer ist measureHeader(): Die Kartenhoehe haengt an
+  // --head-h, aendert sich die Kopfzeile, aendert sich die Karte.
   var spaltenTimer = null;
   function kartengroesseNachziehen() {
     if (!mapAvailable) return;
