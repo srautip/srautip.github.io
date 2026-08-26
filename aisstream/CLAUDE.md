@@ -36,6 +36,41 @@ Users, nicht nur für diesen Client:
   Bei Konflikt in `main` vorher `git fetch` + prüfen, was sich geändert hat,
   bevor irgendwas gemerged wird.
 
+### Auf `main` heißt nicht ausgeliefert
+
+**Ein Push auf `main` ist kein Deploy.** GitHub Pages baut daraus einen
+eigenen Lauf („pages build and deployment", GitHubs eingebauter Workflow —
+es gibt keine `.github/workflows`-Datei), und der kann scheitern. Einmal
+passiert und minutenlang unbemerkt geblieben:
+
+```
+Error: Failed to get ID Token.
+Error Message: Request timeout: /167//idtoken/…?api-version=2.0
+##[error]Ensure GITHUB_TOKEN has permission "id-token: write".
+```
+
+Eine Zeitüberschreitung beim OIDC-Token in `actions/deploy-pages@v5` — kein
+Rechteproblem (acht Läufe davor liefen mit derselben Konfiguration durch)
+und kein Codefehler; Bau und Upload waren grün, nur der Deploy-Schritt starb.
+Der Nutzer meldete daraufhin völlig zu Recht „nach dem Reload immer noch
+dasselbe Problem". Behoben mit `rerun_failed_jobs` auf den Lauf.
+
+**Deshalb nach jedem Deploy gegen die ausgelieferte Seite prüfen, nicht gegen
+die Arbeitskopie:**
+
+```
+curl -s https://srautip.github.io/aisstream/ | grep -c <neues-Merkmal>
+curl -sI https://srautip.github.io/aisstream/ | grep -i last-modified
+```
+
+`scratchpad/groessecache.js live` fährt denselben Test gegen die echte Seite
+statt gegen `localhost:8000`. Jede Prüfung lief bis dahin nur lokal — genau
+deshalb ist der geplatzte Deploy nicht aufgefallen.
+
+**Und beim Nachprüfen im Browser: harter Reload.** Pages liefert die Seite
+mit `cache-control: max-age=600` aus (dazu ein CDN-`age`), ein normales
+Neuladen kann also bis zu zehn Minuten die alte Datei zeigen.
+
 ## Server-Endpoint — aktueller Stand
 
 **Wichtig, zuerst prüfen:** Default ist aktuell
@@ -1697,6 +1732,25 @@ Verzeichnis.
 Die Regeln bleiben, wo sie waren: `enrichCacheGet()` prüft `ENRICH_VERSION`
 und TTL und räumt selbst auf. Es gibt keinen zweiten Regelsatz für den
 Ladeweg.
+
+#### Die Logzeile beim Laden ist die Diagnose
+
+```
+679 Schiff(e) aus dem 30-Minuten-Zwischenspeicher wiederhergestellt ·
+12 Registereinträge angewandt (Verzeichnis: 143).
+```
+
+Bewusst **„angewandt"** und nicht „mit Registerdaten": Gezählt wird jeder
+angewandte Eintrag, auch ein Leertreffer — „nichts gefunden" wird ebenfalls
+zwischengespeichert. Genau das ist die Diagnosefrage („hat der Weg
+gegriffen?"), und die Verzeichnisgröße daneben sagt, wie viel es überhaupt
+anzuwenden gab. Meldet ein Nutzer wieder eine fehlende Größe, steht die
+Antwort damit im Log statt in einer Vermutung.
+
+Beim Schreiben des Tests dazu war meine Erwartung falsch, nicht der Zähler:
+Ich hatte einen Treffer erwartet (nur das Wikidata-Schiff braucht den Weg),
+gemeldet wurden drei. Richtig so — auch die beiden anderen haben nach dem
+Anklicken einen Eintrag, bei einem davon einen Leertreffer.
 
 #### Die Tabelle sagte „unbekannt", während die Karte „L" zeigte
 

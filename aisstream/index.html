@@ -2872,6 +2872,10 @@
   // zugeschlagen. null bedeutet "noch nicht aufgebaut" - dann wird nichts
   // angewandt, und nichts geht kaputt.
   var enrichIndex = null;
+  // Zaehlt, wie oft der Weg wirklich gegriffen hat. Steht im Log beim Laden -
+  // damit ist "die Groesse fehlt nach dem Reload" beim naechsten Mal eine
+  // Messung statt einer Vermutung.
+  var enrichAusCache = 0;
 
   var AIS_CACHE_KEY = "aisstream_ais";
   var AIS_TTL = 30 * 60 * 1000;
@@ -3051,6 +3055,7 @@
     if (!enrichIndex || !enrichIndex.has(entry.mmsi)) return;
     var cached = enrichCacheGet(entry.mmsi);
     if (!cached) { enrichIndex.delete(entry.mmsi); return; }
+    enrichAusCache++;
     applyEnrichment(entry, cached.data);
     // Ohne das zeigt die Detailansicht beim Oeffnen "Registerabfrage laeuft"
     // oder "nichts gefunden", obwohl die Daten laengst dastehen.
@@ -6026,7 +6031,19 @@
   if (enrichDropped) log(enrichDropped + " veraltete Registereintraege aus dem Zwischenspeicher entfernt.");
 
   var restored = loadAisCache();
-  if (restored) log(restored + " Schiff(e) aus dem 30-Minuten-Zwischenspeicher wiederhergestellt.");
+  if (restored) {
+    // Die zweite Haelfte der Zeile ist Diagnose: Fehlt einem Schiff nach dem
+    // Reload die Groesse, steht hier schwarz auf weiss, ob der Registerweg
+    // ueberhaupt gegriffen hat - und ob es lokal etwas anzuwenden gab.
+    // "angewandt", nicht "mit Registerdaten": Gezaehlt wird jeder angewandte
+    // Eintrag, auch ein Leertreffer ("nichts gefunden" wird ebenfalls
+    // zwischengespeichert). Genau das ist die Diagnosefrage - hat der Weg
+    // gegriffen? -, und die Verzeichnisgroesse daneben sagt, wie viel es
+    // ueberhaupt anzuwenden gab.
+    log(restored + " Schiff(e) aus dem 30-Minuten-Zwischenspeicher wiederhergestellt · " +
+      enrichAusCache + " Registereinträge angewandt (Verzeichnis: " +
+      (enrichIndex ? enrichIndex.size : 0) + ").");
+  }
 
   if (ownPosInput.checked) startOwnPos();
 
