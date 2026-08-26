@@ -1639,6 +1639,95 @@ darin würde auf den eigenen Platz warten und die Warteschlange **dauerhaft**
 blockieren — kein Timeout greift, weil die Anfrage nie startet. Der Abstand
 zwischen den Teilabrufen wird deshalb von Hand eingelegt (`afterGap()`).
 
+### Registerdaten gelten ab dem Anlegen des Schiffs, nicht ab dem Anklicken
+
+Gemeldet: *„Nach dem Reload wird die ‚AS Claudia' mit unbekannter Größe in
+der Karte visualisiert. Sobald man sie selektiert, wird es sofort auf die
+richtige Größe aktualisiert."*
+
+**„Sofort" ist die Diagnose.** Kein Nachladen dauert null Millisekunden —
+das war ein Cache-Treffer. Wenn ein Klick etwas augenblicklich repariert,
+liegt die Antwort schon lokal und wird nur nicht gelesen.
+
+`shipLengthMeters()` kennt drei Quellen. Zwei überleben den Reload, eine
+nicht:
+
+| Länge kommt aus | Landet in | Marker nach Reload |
+|---|---|---|
+| AIS Msg 5 `Dimension` | `entry.dim` → Statik-Cache | 15 px, richtig |
+| Digitraffic `referencePointA..D` | `entry.dim` → Statik-Cache | 15 px, richtig |
+| **nur Wikidata `loa` (P2043)** | **`entry.enrich`, sonst nirgends** | **11 px, hohler Ring** |
+
+`entry.enrich` steht ausschließlich in `aisstream_enrich_<mmsi>`, und diesen
+Cache las bis dahin nur `enrichShip()` — also erst beim Öffnen.
+
+**Jetzt** wendet `getShip()` den Registereintrag direkt nach
+`applyStaticCache()` an (`applyEnrichCache()`). Das muss **vor**
+`setPosition()` geschehen, denn dort entsteht der Marker mit `shipIcon()`:
+So ist das Symbol beim ersten Bau richtig, statt neu gebaut zu werden.
+Erwünschter Nebeneffekt: Auch ein Schiff, das live oder per Snapshot neu
+auftaucht und früher schon nachgeschlagen wurde, hat seine Registerdaten
+sofort.
+
+#### Ein Verzeichnis statt eines Speicherzugriffs je Schiff
+
+`localStorage` je Schiff zu befragen wäre zu teuer — ein Snapshot legt bis zu
+12 900 Schiffe an. `enrichIndex` ist eine `Set` der MMSIs, für die überhaupt
+ein Eintrag existiert; sie fällt in `pruneEnrichCache()` als Nebenprodukt ab,
+das beim Start ohnehin über genau diese Schlüssel läuft.
+
+Gemessen (400 Einträge à 510 Byte, ~200 kB — `ENRICH_MAX` deckelt bei 400):
+
+| | |
+|---|---|
+| Verzeichnis aufbauen | 1,0 ms |
+| alle 400 Einträge lesen und parsen | 1,9 ms |
+| 12 900 × `Set.has()` | 4,6 ms |
+| **Aufschlag auf die Startdauer, ganze Seite** | **23 ms** (2408 gegen 2385) |
+
+`enrichIndex` ist absichtlich weit oben deklariert, obwohl es fachlich zu den
+Enrich-Konstanten gehört: `getShip()` steht in der Datei darüber, und die
+Ladereihenfolge-Falle (Deklarationen werden hochgezogen, `var`-**Werte**
+nicht) hat hier schon zweimal zugeschlagen. `null` heißt „noch nicht
+aufgebaut" — dann wird nichts angewandt und nichts geht kaputt.
+`enrichCacheSet()` trägt ein, `clearAllCaches()` leert, und ein von
+`enrichCacheGet()` als abgelaufen verworfener Eintrag fliegt auch aus dem
+Verzeichnis.
+
+Die Regeln bleiben, wo sie waren: `enrichCacheGet()` prüft `ENRICH_VERSION`
+und TTL und räumt selbst auf. Es gibt keinen zweiten Regelsatz für den
+Ladeweg.
+
+#### Die Tabelle sagte „unbekannt", während die Karte „L" zeigte
+
+Zweiter Befund derselben Ursache: `applyEnrichment()` leitete `entry.size`
+nur aus einem brauchbaren `dim` ab. Wikidata liefert Länge über alles und
+Breite (P2043/P2261), aber keine Antennenabstände — daraus lässt sich kein
+`dim` bilden, also blieb die Spalte leer, während der Marker längst die
+richtige Größe hatte. `entry.size` wird jetzt auch aus `loa`/`beam` gebildet.
+Ein Präzedenzfall war da: Digitraffic-Maße füllen die Spalte schon lange.
+
+Interessant an der Gegenprobe: Mit stillgelegtem Verzeichnis ist die
+**Tabelle** nach dem Reload trotzdem richtig — `size` steht in
+`STATIC_FIELDS` und überlebt. Nur der **Marker** fällt zurück. Wer also nur
+die Spalte repariert hätte, hätte den gemeldeten Fehler nicht angefasst.
+
+#### Was bewusst nicht passiert
+
+Schiffe, die **nie** angeklickt wurden, haben keinen Registereintrag und
+bleiben ohne Größe. Sie beim Laden alle nachzuschlagen hieße, Wikidata und
+Digitraffic mit hunderten Abfragen zu belegen — Wikimedia hat auf zu dichte
+Abfragen schon mit 429 geantwortet. Der Weg holt heraus, was lokal liegt; er
+fragt nichts Neues. `groessecache.js` prüft das: **null** Netzanfragen beim
+Laden.
+
+#### Der Registername darf den Livenamen nicht überholen
+
+`applyEnrichment()` füllt `name` nur, wenn das Feld leer ist, und alle
+Live-Pfade schreiben `entry.name` bedingungslos. Das muss so bleiben — sonst
+zeigt ein umbenanntes Schiff wieder seinen alten Registernamen (Fall
+BON VIVANT, siehe unten). Der Test hält das fest.
+
 ### Der Cache sperrte Commons aus, wenn die IMO zu spät kam
 
 Der größte Hebel für mehr Bilder war **kein neuer Dienst**, sondern ein Fehler

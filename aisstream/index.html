@@ -2830,6 +2830,9 @@
       keys.forEach(function (k) { localStorage.removeItem(k); });
       localStorage.removeItem(AIS_CACHE_KEY);
     } catch (e) {}
+    // Sonst zeigt das Verzeichnis auf gerade geloeschte Schluessel, und jedes
+    // neu auftauchende Schiff liefe in einen Fehlgriff.
+    if (enrichIndex) enrichIndex.clear();
     aisDirty = false;
     releaseDetailPhoto();
     if (typeof caches !== "undefined") {
@@ -2857,6 +2860,19 @@
   // veraltet: Position, Fahrtdaten, Ziel, ETA, Tiefgang. 30 Minuten ist die
   // Grenze, ab der ein Datensatz verworfen wird - und weil die Tabelle das
   // Alter in Sekunden mitführt, ist jederzeit sichtbar, wie alt ein Wert ist.
+  // Welche MMSIs ueberhaupt einen Registereintrag im localStorage haben.
+  // Ohne dieses Verzeichnis muesste getShip() je Schiff einmal in den
+  // Speicher greifen - ein Snapshot legt bis zu 12 900 Schiffe an. Gemessen:
+  // Verzeichnis aufbauen 1,0 ms, 400 Eintraege lesen und parsen 1,9 ms,
+  // 12 900 Set.has() 4,6 ms.
+  //
+  // Steht hier oben und nicht bei den Enrich-Konstanten: getShip() liegt
+  // weiter oben in der Datei, und die Ladereihenfolge-Falle (Deklarationen
+  // werden hochgezogen, var-WERTE nicht) hat in dieser Datei schon zweimal
+  // zugeschlagen. null bedeutet "noch nicht aufgebaut" - dann wird nichts
+  // angewandt, und nichts geht kaputt.
+  var enrichIndex = null;
+
   var AIS_CACHE_KEY = "aisstream_ais";
   var AIS_TTL = 30 * 60 * 1000;
   var AIS_MAX = 1500;
@@ -3013,8 +3029,32 @@
       };
       applyStaticCache(entry);
       ships.set(mmsi, entry);
+      // Registerdaten gelten ab jetzt, nicht erst ab dem Anklicken. Frueher
+      // lag die Laenge eines Schiffes, die nur das Register kennt (Wikidata
+      // loa), ausschliesslich im Enrich-Cache - und den las nur enrichShip().
+      // Nach einem Reload stand so ein Schiff mit dem hohlen
+      // "Groesse unbekannt"-Ring auf der Karte, bis man es anfasste.
+      //
+      // Muss VOR setPosition() wirken, das der Aufrufer gleich anstoesst:
+      // Dort entsteht der Marker mit shipIcon(entry), und der ist damit von
+      // Anfang an richtig statt neu gebaut.
+      applyEnrichCache(entry);
     }
     return entry;
+  }
+
+  // Liest den Registereintrag zu einem Schiff aus dem localStorage und wendet
+  // ihn an - nur, wenn ueberhaupt einer existiert. enrichCacheGet() bringt
+  // Versions- und TTL-Pruefung samt Aufraeumen mit; hier gelten also dieselben
+  // Regeln wie beim Oeffnen, es gibt keinen zweiten Regelsatz.
+  function applyEnrichCache(entry) {
+    if (!enrichIndex || !enrichIndex.has(entry.mmsi)) return;
+    var cached = enrichCacheGet(entry.mmsi);
+    if (!cached) { enrichIndex.delete(entry.mmsi); return; }
+    applyEnrichment(entry, cached.data);
+    // Ohne das zeigt die Detailansicht beim Oeffnen "Registerabfrage laeuft"
+    // oder "nichts gefunden", obwohl die Daten laengst dastehen.
+    entry.enrichState = cached.found ? "done" : "empty";
   }
 
   function recordMessage(entry, type, msg) {
@@ -4162,11 +4202,15 @@
       teil: !!teil, data: data });
     try {
       localStorage.setItem(key, payload);
+      if (enrichIndex) enrichIndex.add(String(mmsi));
       return;
     } catch (e) {}
     // Kontingent voll: aufraeumen und einmal erneut versuchen.
     pruneEnrichCache(true);
-    try { localStorage.setItem(key, payload); } catch (e2) {}
+    try {
+      localStorage.setItem(key, payload);
+      if (enrichIndex) enrichIndex.add(String(mmsi));
+    } catch (e2) {}
   }
 
   // Der Anreicherungs-Cache legt einen Schluessel je nachgeschlagener MMSI an
@@ -4198,6 +4242,11 @@
     var now = Date.now();
     var live = [];
     var removed = 0;
+    // Das Verzeichnis faellt hier als Nebenprodukt ab: Diese Schleife laeuft
+    // beim Start ohnehin ueber genau diese Schluessel, eine zweite Runde
+    // waere geschenkte Arbeit. Erst hier gesetzt, damit ein Abbruch im
+    // try-Block oben kein halbes Verzeichnis hinterlaesst.
+    var index = new Set();
     var drop = function (it) {
       try { localStorage.removeItem(it.key); removed++; } catch (e) {}
     };
@@ -4209,7 +4258,10 @@
     if (live.length > cap) {
       live.sort(function (a, b) { return a.at - b.at; });
       live.slice(0, live.length - cap).forEach(drop);
+      live = live.slice(live.length - cap);
     }
+    live.forEach(function (it) { index.add(it.key.slice("aisstream_enrich_".length)); });
+    enrichIndex = index;
     return removed;
   }
 
@@ -4564,6 +4616,13 @@
     if (dimReg && !entry.dim) {
       entry.dim = dimReg;
       entry.size = shipSize(dimReg) || entry.size;
+    }
+    // Wikidata kennt Laenge ueber alles und Breite (P2043/P2261), aber keine
+    // Antennenabstaende - daraus laesst sich kein dim bilden. Der Marker las
+    // enrich.loa schon immer; die Tabellenspalte blieb dagegen leer. Die
+    // Karte sagte "L", die Tabelle "unbekannt".
+    if (!entry.size && data.loa && data.beam) {
+      entry.size = Math.round(data.loa) + "×" + Math.round(data.beam);
     }
     if (dt.typeCode != null && entry.typeCode == null) {
       entry.typeCode = dt.typeCode;
