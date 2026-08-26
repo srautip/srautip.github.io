@@ -952,11 +952,10 @@ Danach: null von zehn ohne Übernahme, und die Zeile ist nach dem
 Neuzeichnen nachweislich **derselbe DOM-Knoten**, während ihre Alterspalte
 weiterläuft.
 
-**Folge für `scratchpad/tabellenlast.js`: der Test hängt jetzt.** Er wartet
-auf zwölf `childList`-Mutationen an `#shipTableBody` und stößt sie über das
-Suchfeld an. Bei wiederverwendeten Zeilen gibt es diese Mutationen nicht
-mehr, das Versprechen löst nie ein. Der Test braucht einen anderen
-Messpunkt — die Renderdauer selbst statt der DOM-Umbauten. **Noch offen.**
+**Folge für `scratchpad/tabellenlast.js`:** Der Test hing danach, weil er auf
+`childList`-Mutationen an `#shipTableBody` wartete, die es bei
+wiederverwendeten Zeilen nicht mehr gibt. Umgebaut auf einen Beacon an
+`#shipCount` und einen Taktgeber — siehe „Lasttests".
 
 Gemessen (`scratchpad/tabellenlast.js`, 400 Schiffe / 200 Zeilen): Der
 Tabellenaufbau kostet mit Sortierung 163,5 ms, ohne 163,0 ms — davon sind
@@ -1591,6 +1590,95 @@ auf dem Desktop**, wo es jahrelang unbemerkt blieb:
 Elemente nacheinander auf `display: none` setzen und `scrollWidth`
 beobachten. Ein Detektor über Bounding-Rects liefert Fehltreffer, weil er
 geclippte Kinder (Leaflet-Kacheln, Off-Canvas-Schubladen) mitzählt.
+
+### Die Regression laufen lassen
+
+```
+node lauf.js                 gepflegter Satz, 4 Arbeiter, 2 Geräteprofile   ~2:51 min
+node lauf.js --voll          alle Geräteprofile (für Layoutarbeit)
+node lauf.js --live          gegen die ausgelieferte Seite statt localhost
+node lauf.js sortierung ...  nur diese Tests
+```
+
+25 gepflegte Tests, seriell 586 s. **Parallel ist der große Hebel** — und
+zwar aus einem messbaren Grund: Ein Seitenaufbau kostet 624 ms (ohne Kacheln
+255 ms), die Laufzeit steckt fast vollständig in festen Wartepausen, und die
+kosten keine CPU.
+
+| Arbeiter | Gesamt | Faktor |
+|---|---|---|
+| 1 (seriell) | 586 s | — |
+| 3 | 213 s | 2,7 |
+| **4** | **171 s** | **3,4** |
+
+Vier Arbeiter auf vier Kernen drängeln sich **nicht**: Die Einzellaufzeiten
+sind unverändert (12,8 gegen 12,6 s usw.). Deshalb ist 4 die Voreinstellung.
+Der Läufer startet die längsten Tests zuerst, sonst wartet am Ende ein
+Arbeiter allein auf den längsten und die anderen stehen still.
+
+**Zwei Geräteprofile statt sieben.** `AIS_GERAETE=schmal` (Voreinstellung)
+lässt je ein Telefon hochkant und ein Tablet quer durch — die beiden
+Layoutwelten (Kartenliste und breite Tabelle). Für Arbeit **an den
+Breitengrenzen selbst** gilt `--voll`: Erst das iPad Mini quer mit genau
+1024 px hat den Fehler mit der überschriebenen `padding`-Kurzform gezeigt.
+
+Die fünf längsten: `zeilentreffer` 66 s, `groessecache` 64 s,
+`typkategorie` 47 s, `snapshotpan` 46 s, `mvtest` 38 s. Wer weiter drücken
+will, holt dort die festen Wartepausen heraus, nicht anderswo.
+
+#### Zwei Fallen beim Einbau, beide vom Läufer aufgedeckt
+
+- **Feste Indizes auf die Geräteliste.** `GERAETE[2][1]` gab es nach dem
+  Filtern nicht mehr, `kopfzeile` stürzte ab. Proben, die ein *bestimmtes*
+  Profil brauchen (die 1024-px-Grenze!), greifen jetzt über `profil('iPad
+  Mini quer')` auf die **volle** Liste zu, nicht auf die gefilterte.
+- **Ein zu gieriges Fehlermuster.** Der Läufer wertete jedes
+  „fehlgeschlagen" im Text als Fehler — und traf damit die Beschriftung
+  einer Probe (`kein "Snapshot fehlgeschlagen" durch den Abbruch`). Nur die
+  Schlusszeile zählt.
+
+Dazu ein echter Befund: `richtung` nahm an, „das frisch gemeldete Schiff
+steht in der Tabelle oben (nach `updatedAt` sortiert)". Genau diese Annahme
+ist mit dem MMSI-Stichentscheid weggefallen. Der Test sucht jetzt nach
+`data-mmsi` statt nach Position.
+
+### Lasttests
+
+| Test | Misst | Dauer |
+|---|---|---|
+| `tabellenlast` | Blockade des Hauptstrangs beim Neuzeichnen, 400 Schiffe | 15 s |
+| `markerlast` | Wie schnell zeigt ein Marker neue Maße unter Last? | ~12 s |
+| `markerlimit` | Ab welcher Schiffszahl hängt die Karte? Setzt `SNAPSHOT_MAX_AUTO_SQDEG` | ~12 s |
+| `diaryquota` | Wann läuft `localStorage` über? | ~9 s |
+
+**`tabellenlast` misst jetzt zwei Fälle getrennt** (200 Zeilen):
+
+| | Median |
+|---|---|
+| Nachführen (Zeilenmenge bleibt gleich — der Alltag) | **21 ms** |
+| Umbauen (halbe Tabelle raus und wieder rein) | **63 ms** |
+
+Der Messpunkt hat **zweimal** nicht zur Umsetzung gepasst, und beide Male
+war das Ergebnis wertlos:
+
+1. Erst ein synchroner Zeitnehmer um das `input`-Ereignis — der Sucheingang
+   ist 150 ms entprellt, gemessen wurden **0 ms**.
+2. Dann das Warten auf `childList`-Mutationen an `#shipTableBody`. Seit die
+   Zeilen wiederverwendet werden, gibt es die nicht mehr: Der Test **hing**
+   bis zum Abbruch und hat ein Zehn-Minuten-Budget gesprengt.
+
+Jetzt getrennt: **Beacon** — `refreshVisibleShips()` schreibt bei jedem
+Durchlauf `shipCountEl.textContent`, und ein `textContent`-Setzen ersetzt
+den Textknoten *immer*, auch bei gleichem Wert. Eine `childList`-Mutation an
+`#shipCount` heißt also „ein Neuzeichnen ist gelaufen", unabhängig davon, ob
+sich in der Tabelle etwas geändert hat. **Dauer** — ein 4-ms-Taktgeber misst
+die Lücken im Hauptstrang. Und die Schleife ist **begrenzt**: feste Runden,
+feste Pausen, kein Warten auf ein Ereignis, das ausbleiben kann.
+
+Die Zahl ist **nicht** mit dem früheren „163 ms" vergleichbar — der enthielt
+die 150 ms Entprellung. Und sie ist nicht die reine Laufzeit von
+`renderVisibleShips()`: In derselben Blockade steckt auch `applyMapFilter()`
+samt Leaflet.
 
 ### Testen
 
