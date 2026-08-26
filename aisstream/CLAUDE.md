@@ -71,6 +71,33 @@ deshalb ist der geplatzte Deploy nicht aufgefallen.
 mit `cache-control: max-age=600` aus (dazu ein CDN-`age`), ein normales
 Neuladen kann also bis zu zehn Minuten die alte Datei zeigen.
 
+#### Wie lange ein Deploy wirklich dauert
+
+Gemessen über zwölf Läufe (`created_at` bis `updated_at` des Pages-Workflows):
+
+| | |
+|---|---|
+| Median | **51 s** |
+| schnellster | 41 s |
+| langsamster (erfolgreich) | 158 s |
+| der eine Ausreißer | 2,5 h — der Lauf, dessen Deploy-Schritt am OIDC-Token starb und von Hand neu gestartet werden musste |
+
+**Ein Deploy dauert also rund eine Minute, nicht mehrere.** Wenn es sich
+länger anfühlte, lag es nicht an GitHub:
+
+- **Zu grobes Nachfragen.** Mit 40-Sekunden-Pausen wird ein 51-Sekunden-Bau
+  erst beim zweiten oder dritten Versuch bemerkt — aus einer Minute werden
+  gemessen zwei bis drei.
+- **Der Live-Test danach.** `entfernung.js live` kostet noch einmal 30 bis
+  60 s, ein `lauf.js --live` drei Minuten. Das ist Prüfen, nicht Warten, und
+  gehört getrennt gezählt.
+
+**Regel: höchstens 3 Minuten auf einen Deploy warten**, dabei alle 10 s
+nachfragen. Ist die Seite dann nicht draußen, ist Warten der falsche Zug —
+dann den Workflow-Lauf ansehen (`actions_list` → `conclusion`), denn genau
+das war der einzige Fall, in dem es wirklich lange dauerte. Ein
+fehlgeschlagener Lauf wird nicht von selbst besser.
+
 ## Server-Endpoint — aktueller Stand
 
 **Wichtig, zuerst prüfen:** Default ist aktuell
