@@ -1044,6 +1044,52 @@ springt:
    vor dem `click`, und ein Neusortieren dazwischen zöge die Zeile wieder
    weg.
 
+#### Das Einfrieren darf nicht hängen bleiben
+
+Gemeldet: *„In der iPhone-Ansicht funktioniert die Sortierung nach Änderung
+Zoom in der Karte nicht zuverlässig."* Genau der Satz „neu hinzukommende
+Schiffe hängen sich hinten an" ist beim Zoomen der Schaden: Beim
+Herauszoomen sind **alle** neu ins Bild kommenden Schiffe „unbekannt" und
+landen unten, unabhängig von der Größe. Nachgemessen mit erzwungenem
+Einfrieren:
+
+```
+vorher:   nah150(150) > nah120(120) > nah90(90)
+nachher:  nah150 > nah120 > nah90 > FERN400 > FERN300 > FERN200
+```
+
+Ein 400-m-Schiff unter einem 90-m-Boot. Drei Auflösungswege, damit das nicht
+mehr vorkommen kann:
+
+- **Der Kartenzoom gibt immer frei.** Im `moveend`-Handler steht
+  `ordnungEinfrieren(false)` vor dem Neuzeichnen. Begründung ist inhaltlich,
+  nicht technisch: Wer die Karte bewegt, arbeitet an der Karte, und der
+  Inhalt der Tabelle ändert sich dabei zwangsläufig — eine Ordnung
+  festzuhalten, die für einen anderen Ausschnitt aufgenommen wurde, ist in
+  keinem Fall richtig.
+- **`pointercancel`** wird behandelt. Eine Wischgeste, die der Browser zum
+  Scrollen übernimmt, endet damit und **nicht** mit `pointerup`. Bisher fing
+  das nur ein anschließendes `pointerleave` auf, das Chromium schickt, aber
+  nicht jeder Browser garantiert.
+- **Der Zustand verfällt** nach 4 s ohne Zeigerereignis
+  (`ORDNUNG_FRIST_MS`). Jedes `pointermove` stellt die Frist zurück, wer die
+  Tabelle benutzt, merkt also nichts.
+
+**Warum drei Wege und nicht einer:** Welche Geste den Zustand auf echtem iOS
+Safari hängen lässt, ist hier **nicht prüfbar** — getestet wird Chromium mit
+Touch-Nachbildung, und dort löst er sich sauber (Tippen →
+`pointerenter, pointerdown, pointerup`; Wischen → `…, pointercancel,
+pointerout, pointerleave`). Statt einen Pfad zu flicken, den man nicht
+messen kann, wird die Fehlerklasse beseitigt.
+
+**Testfalle dabei:** Die erste Gegenprobe fror alle 120 ms neu ein, um „ohne
+Freigabe" nachzustellen — der Schnappschuss nimmt dann die bereits richtig
+sortierte Tabelle auf, und die Probe war grün, ohne etwas zu prüfen.
+`ordnungzoom.js` isoliert den `moveend`-Weg stattdessen sauber: Während des
+Zoomens läuft alle 500 ms ein `pointermove`, das die Sicherheitsfrist
+zurückstellt. Gibt die Ordnung trotzdem frei, kann das nur `moveend` gewesen
+sein.
+
 `scratchpad/zeilentreffer.js` misst genau das: sechs Mal zielen (mit einer
 Denkpause von 600 ms, wie ein Mensch) und klicken; sechs Treffer. Die
 Gegenprobe stellt den `updatedAt`-Stichentscheid wieder her und meldet
