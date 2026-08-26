@@ -1518,6 +1518,24 @@
   var selectedMmsi = null;
   var trackLayer = null;
 
+  // Tracks aller sichtbaren Schiffe, solange es wenige sind. Bei voller
+  // Nordsee waeren hunderte Spuren ein Wollknaeuel, in dem man nichts mehr
+  // erkennt - und teuer zu zeichnen.
+  var TRACK_EIN_UNTER = 50;
+  // Und erst hier wieder aus. Ohne diesen Abstand flackerten die Spuren an
+  // der Grenze im Sekundentakt an und aus, weil staendig ein Schiff den
+  // Ausschnitt betritt oder verlaesst.
+  var TRACK_AUS_AB = 55;
+  var autoTracksAn = false;
+  // Eine Linie je Typfarbe statt einer je Schiff: acht Ebenen statt fuenfzig,
+  // und die Spur traegt dieselbe Farbe wie der Marker, zu dem sie gehoert.
+  //
+  // Steht hier oben, obwohl es zu zeichneAutoTracks() weiter unten gehoert:
+  // applyMapFilter() ruft die Funktion, und Funktionsdeklarationen werden
+  // hochgezogen, var-WERTE nicht. Ein undefiniertes autoTracks haette beim
+  // ersten Aufruf geworfen. Die Falle steht schon dreimal in CLAUDE.md.
+  var autoTracks = {};
+
   var statusDot = document.getElementById("statusDot");
   var statusText = document.getElementById("statusText");
   var connectBtn = document.getElementById("connectBtn");
@@ -3278,14 +3296,20 @@
   // leave the map, not just the table.
   function applyMapFilter() {
     if (!mapAvailable) return;
+    var gezeigt = [];
     ships.forEach(function (entry) {
       if (!entry.marker) return;
       var show = passesFilters(entry) && markerInView(entry);
+      if (show) gezeigt.push(entry);
       if (show === entry.markerShown) return;
       entry.markerShown = show;
       if (show) map.addLayer(entry.marker);
       else map.removeLayer(entry.marker);
     });
+    // Genau die Schiffe, deren Marker jetzt auf der Karte stehen - nicht die
+    // Tabellenauswahl. Die Tabelle filtert zusaetzlich nach dem Suchfeld, die
+    // Karte nicht; "was man sieht" ist also diese Liste.
+    zeichneAutoTracks(gezeigt);
   }
 
   function buildFilterChips() {
@@ -5277,6 +5301,68 @@
     trackLayer = L.polyline(entry.track.map(function (p) { return [p.lat, p.lon]; }), {
       color: "#3fa9ff", weight: 2, opacity: 0.8
     }).addTo(map);
+  }
+
+  /* --- Tracks aller sichtbaren Schiffe, solange es wenige sind ---------- */
+
+  function zeichneAutoTracks(sichtbare) {
+    if (!mapAvailable) return;
+    if (!autoTracksAn && sichtbare.length < TRACK_EIN_UNTER) autoTracksAn = true;
+    else if (autoTracksAn && sichtbare.length >= TRACK_AUS_AB) autoTracksAn = false;
+
+    if (!autoTracksAn) {
+      Object.keys(autoTracks).forEach(function (f) { autoTracks[f].setLatLngs([]); });
+      return;
+    }
+
+    // Auf den sichtbaren Ausschnitt beschraenken: Ein Track kann weit aus dem
+    // Bild hinauslaufen, gezeichnet wird nur, was hier zu sehen ist. Der
+    // Rand bekommt etwas Zugabe, damit die Linien nicht sichtbar an der
+    // Kante abgeschnitten wirken.
+    var box = map.getBounds().pad(0.15);
+    var nachFarbe = {};
+    sichtbare.forEach(function (entry) {
+      // Das ausgewaehlte Schiff hat seine eigene, dickere Spur, wenn der
+      // Nutzer sie eingeschaltet hat - keine zweite darunterlegen.
+      if (trackLayer && entry.mmsi === selectedMmsi) return;
+      var pts = entry.track;
+      if (!pts || pts.length < 2) return;
+      var cat = typeCategory(entry);
+      var farbe = cat ? TYPE_COLOR_MAP[cat] : NEUTRAL_COLOR;
+      var stuecke = nachFarbe[farbe] || (nachFarbe[farbe] = []);
+      // Ein Abschnitt zaehlt, sobald EIN Ende im Bild liegt - sonst fehlte
+      // genau das Stueck, das den Rand kreuzt, und die Spur endete zu frueh.
+      // Verlaesst sie das Bild und kommt zurueck, entstehen zwei Stuecke.
+      var lauf = null;
+      for (var i = 1; i < pts.length; i++) {
+        var a = pts[i - 1], b = pts[i];
+        if (box.contains([a.lat, a.lon]) || box.contains([b.lat, b.lon])) {
+          if (!lauf) { lauf = [[a.lat, a.lon]]; stuecke.push(lauf); }
+          lauf.push([b.lat, b.lon]);
+        } else {
+          lauf = null;
+        }
+      }
+    });
+
+    Object.keys(nachFarbe).forEach(function (farbe) {
+      if (!autoTracks[farbe]) {
+        autoTracks[farbe] = L.polyline([], {
+          color: farbe,
+          weight: 1,
+          opacity: 0.55,
+          // Wie beim Sichtkreis: Linien duerfen keine Klicks auf die Marker
+          // abfangen. Und sie liegen im overlayPane, also unter den Schiffen.
+          interactive: false
+        }).addTo(map);
+      }
+      autoTracks[farbe].setLatLngs(nachFarbe[farbe]);
+    });
+    // Farben ohne Spuren in dieser Runde leeren, statt die Ebene abzubauen -
+    // ein setLatLngs([]) ist billiger als removeLayer plus Neuanlage.
+    Object.keys(autoTracks).forEach(function (farbe) {
+      if (!nachFarbe[farbe]) autoTracks[farbe].setLatLngs([]);
+    });
   }
 
   function section(title, rows) {
