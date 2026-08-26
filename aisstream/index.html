@@ -1989,9 +1989,13 @@
   // hingehoerte: addMapLegend() liest die Werte, und Funktionsdeklarationen
   // werden hochgezogen, var-WERTE nicht. Die Falle steht schon zweimal in
   // CLAUDE.md.
+  // Der aeussere Ring war mit #c9c9c9 (Helligkeit 201) auf den hellen
+  // OSM-Kacheln kaum auszumachen - gemessen nur neun Helligkeitsstufen von
+  // 255 Abstand zum Untergrund. Jetzt liegt er rund zehn Prozent ueber dem
+  // inneren (143 -> 157) und bleibt damit erkennbar der hellere von beiden.
   var SICHTLINIEN = [
-    { km: 45, farbe: "#c9c9c9", deckung: 0.85 },   // aussen, sehr hell
-    { km: 20, farbe: "#8f8f8f", deckung: 0.90 }    // innen, etwas dunkler
+    { km: 45, farbe: "#9d9d9d", deckung: 0.85 },   // aussen, etwas heller
+    { km: 20, farbe: "#8f8f8f", deckung: 0.90 }    // innen, dunkler
   ];
 
   function addMapLegend() {
