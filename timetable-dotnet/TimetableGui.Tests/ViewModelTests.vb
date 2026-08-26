@@ -59,6 +59,18 @@ Friend NotInheritable Class TestDialoge
             .Pfad = SpeichernPfad, .Passwort = Passwort}
     End Function
 
+    ''' <summary>Was der Freigabe-Dialog antworten soll. Vorgabe ist
+    ''' ABBRUCH - eine Attrappe, die stillschweigend bestaetigt, wuerde
+    ''' genau das Durchwinken einbauen, das die Freigabe ausschliessen soll.</summary>
+    Public Property FreigabeAntwort As Freigabebestaetigung
+    Public ReadOnly Property FreigabeVorlagen As New List(Of Freigabevorlage)
+
+    Public Function FreigabeBestaetigen(vorlage As Freigabevorlage) As Freigabebestaetigung _
+        Implements IDialoge.FreigabeBestaetigen
+        FreigabeVorlagen.Add(vorlage)
+        Return FreigabeAntwort
+    End Function
+
     Public Sub Hinweis(titel As String, text As String) Implements IDialoge.Hinweis
         Hinweise.Add($"{titel}: {text}")
     End Sub

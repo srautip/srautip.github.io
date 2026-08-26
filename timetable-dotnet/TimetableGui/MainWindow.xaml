@@ -203,12 +203,48 @@
                                                Foreground="{StaticResource farbe-text-3}" />
                                 </StackPanel>
                                 <TextBlock Style="{StaticResource SchrittText}" Margin="26,2,0,0"
-                                           Text="Bestätigung mit Substanz, geschützter Freigabe-Stand, Klarnamen-Export – noch nicht umgesetzt (Stufe G)." />
+                                           Text="Über den Bereich Läufe: Stand freigeben mit aktiver Bestätigung, danach geschützt gegen Löschen und Verdrängen. Klarnamen-Export folgt in Stufe G5." />
                             </StackPanel>
                         </Border>
 
                     </StackPanel>
                 </ScrollViewer>
+
+                <!-- Bereich "Laeufe" (Konzept 6.13): die Historie der
+                     gesicherten Staende. Der AKTIVE Lauf hat seine
+                     Anzeige weiterhin in der Statusleiste - hier geht es
+                     um das, was danach uebrig bleibt. -->
+                <DockPanel x:Name="Laeufe" Visibility="Collapsed"
+                           Background="{StaticResource farbe-flaeche}"
+                           Margin="{StaticResource pad-platte}">
+                    <TextBlock DockPanel.Dock="Top" Text="Läufe und Stände"
+                               FontSize="{StaticResource grad-titel}" FontWeight="SemiBold" />
+                    <TextBlock DockPanel.Dock="Top" Margin="0,2,0,12" TextWrapping="Wrap"
+                               MaxWidth="720" HorizontalAlignment="Left"
+                               FontSize="{StaticResource grad-klein}"
+                               Foreground="{StaticResource farbe-text-2}"
+                               Text="Jeder Lauf hinterlässt einen Stand. Ältere werden verdrängt, sobald die Obergrenze erreicht ist – freigegebene und geschützte nie." />
+
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,12,0,0">
+                        <Button x:Name="StandAnsehen" Content="Ansehen" Click="AufStandAnsehen"
+                                Style="{StaticResource KnopfPrimaer}" />
+                        <Button x:Name="StandUmbenennen" Content="Umbenennen…" Margin="8,0,0,0"
+                                Click="AufStandUmbenennen" />
+                        <Button x:Name="StandLoeschen" Content="Löschen" Margin="8,0,0,0"
+                                Click="AufStandLoeschen" />
+                        <Button x:Name="StandFreigeben" Content="Als Freigabe markieren…" Margin="24,0,0,0"
+                                Click="AufStandFreigeben" />
+                    </StackPanel>
+
+                    <TextBlock x:Name="StandInfo" DockPanel.Dock="Bottom" Margin="0,10,0,0"
+                               TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left"
+                               FontSize="{StaticResource grad-klein}"
+                               Foreground="{StaticResource farbe-text-2}" />
+
+                    <ListBox x:Name="Standliste" SelectionChanged="AufStandAuswahl"
+                             BorderBrush="{StaticResource farbe-linie}" BorderThickness="1"
+                             DisplayMemberPath="Anzeige" />
+                </DockPanel>
             </Grid>
         </Grid>
     </DockPanel>

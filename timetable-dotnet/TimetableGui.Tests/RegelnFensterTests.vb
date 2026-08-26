@@ -78,6 +78,11 @@ Public Class RegelnFensterTests
             Throw New InvalidOperationException("unerwartet")
         End Function
 
+        Public Function FreigabeBestaetigen(vorlage As Freigabevorlage) As Freigabebestaetigung _
+            Implements IDialoge.FreigabeBestaetigen
+            Throw New InvalidOperationException("unerwartet")
+        End Function
+
         Public Sub Hinweis(titel As String, text As String) Implements IDialoge.Hinweis
             Throw New InvalidOperationException($"Unerwarteter Hinweis: {titel} - {text}")
         End Sub

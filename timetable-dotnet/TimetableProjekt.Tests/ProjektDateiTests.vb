@@ -320,4 +320,56 @@ Public Class ProjektDateiTests
         Assert.AreEqual("GS Musterstadt", erneut.Manifest.SchulName)
     End Sub
 
+
+    ''' <summary>Die Stand-Id ist zugleich der Ordnername im Container.
+    ''' Zwei Staende mit derselben Id ueberschreiben sich beim Speichern -
+    ''' und weil die Aufrufer die Id sekundengenau aus dem Zeitstempel
+    ''' bilden, sind zwei kurze Laeufe in derselben Sekunde nichts
+    ''' Besonderes.
+    '''
+    ''' Live entdeckt: ein Test mit fester Uhr erzeugte zweimal dieselbe
+    ''' Id, und die Freigabe traf danach immer den ersten Stand - beide
+    ''' Wege sahen gruen aus, obwohl einer falsch war.</summary>
+    <TestMethod>
+    Public Sub StaendeMitGleicherIdWerdenEindeutigGemacht()
+        Dim p As New Projekt()
+        Dim a As New ProjektStand With {.Id = "2026-08-26-120000-stundenplan", .Label = "A"}
+        Dim b As New ProjektStand With {.Id = "2026-08-26-120000-stundenplan", .Label = "B"}
+        Dim c As New ProjektStand With {.Id = "2026-08-26-120000-stundenplan", .Label = "C"}
+
+        p.StandHinzufuegen(a)
+        p.StandHinzufuegen(b)
+        p.StandHinzufuegen(c)
+
+        Assert.AreEqual(3, p.Staende.Select(Function(s) s.Id).Distinct().Count(),
+                        "zwei Staende mit derselben Id ueberschreiben sich beim Speichern")
+        Assert.AreEqual("2026-08-26-120000-stundenplan", a.Id, "der erste behaelt seine Id")
+        Assert.AreEqual("2026-08-26-120000-stundenplan-2", b.Id)
+        Assert.AreEqual("2026-08-26-120000-stundenplan-3", c.Id)
+    End Sub
+
+    ''' <summary>Der Nachweis, warum das ueberhaupt zaehlt: mit doppelter
+    ''' Id ueberlebt nur EIN Stand das Speichern.</summary>
+    <TestMethod>
+    Public Sub BeideStaendeUeberlebenDasSpeichern()
+        Dim ordner = IO.Path.Combine(IO.Path.GetTempPath(), "ttid-" & Guid.NewGuid().ToString("N"))
+        IO.Directory.CreateDirectory(ordner)
+        Try
+            Dim p As New Projekt()
+            p.StandHinzufuegen(New ProjektStand With {.Id = "gleich", .Label = "A"})
+            p.StandHinzufuegen(New ProjektStand With {.Id = "gleich", .Label = "B"})
+
+            Dim pfad = IO.Path.Combine(ordner, "p.splanx")
+            ProjektDatei.Speichern(p, pfad, "geheim12")
+            Dim erneut = ProjektDatei.Laden(pfad, "geheim12")
+
+            Assert.AreEqual(2, erneut.Staende.Count, "ein Stand ist beim Speichern verlorengegangen")
+            CollectionAssert.AreEquivalent(New List(Of String) From {"A", "B"},
+                                           erneut.Staende.Select(Function(s) s.Label).ToList())
+        Finally
+            IO.Directory.Delete(ordner, recursive:=True)
+        End Try
+    End Sub
+
 End Class
+

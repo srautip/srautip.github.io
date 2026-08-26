@@ -1932,6 +1932,26 @@
           reset2.textContent = 'Alle Pins loesen';
           reset2.addEventListener('click', allePinsLoesen);
           c.appendChild(reset2);
+
+          // Freigabe direkt aus dem Board (Nutzerwunsch 26.08.2026).
+          // Sie sitzt NEBEN "Neu rechnen", weil beides denselben Stand
+          // meint: den, der gerade angezeigt wird. Das Board entscheidet
+          // nichts - Abweichungen, Begruendungspflicht und Nachweis
+          // liegen im Host.
+          var frei = document.createElement('button');
+          frei.id = 'freigeben';
+          frei.style.marginLeft = '0.6rem';
+          var bereitsFrei = window.__freigabe;
+          frei.textContent = bereitsFrei ? 'Erneut freigeben\u2026' : 'Freigeben\u2026';
+          if (bereitsFrei) {
+            frei.title = 'Freigegeben von ' + (bereitsFrei.person || '?') +
+                         ' am ' + (bereitsFrei.zeitpunkt || '').slice(0, 10);
+          }
+          frei.addEventListener('click', function () {
+            sende('freigabe', {});
+          });
+          c.appendChild(frei);
+
           return;
         }
 

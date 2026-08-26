@@ -188,4 +188,40 @@ Public Class BridgeTests
                              $"erwartet wurde eine reine Id, angezeigt wird '{ersteKarte}'")
     End Function
 
+
+    ' ---------------------------------------------------------------
+    ' Freigabe aus dem Board (Nutzerwunsch 26.08.2026)
+    ' ---------------------------------------------------------------
+
+    <TestMethod>
+    Public Async Function DasBoardMeldetDieFreigabeAnDenHost() As Task
+        Await SeiteOeffnenAsync(KlassenbildungSeite(), HostStub())
+
+        Await Seite.Locator("#freigeben").ClickAsync()
+
+        Dim nachrichten = Await NachrichtenAsync()
+        Assert.AreEqual(1, nachrichten.Count)
+        Assert.AreEqual("freigabe", nachrichten(0)("typ").GetValue(Of String)())
+    End Function
+
+    ''' <summary>Der Doppelklick-Betrieb bleibt unberuehrt: ohne Host gibt
+    ''' es dort weder Neurechnen noch Freigabe, sondern den YAML-Block.
+    ''' Das ist eine dokumentierte Zusage (arc42 8.10).</summary>
+    <TestMethod>
+    Public Async Function OhneHostGibtEsImBoardKeineFreigabe() As Task
+        Await SeiteOeffnenAsync(KlassenbildungSeite())
+
+        Assert.AreEqual(0, Await Seite.Locator("#freigeben").CountAsync())
+        Assert.AreEqual(1, Await Seite.Locator("#yaml-export").CountAsync())
+    End Function
+
+    <TestMethod>
+    Public Async Function EinFreigegebenerStandZeigtSichImBoard() As Task
+        Await SeiteOeffnenAsync(KlassenbildungSeite(), HostStub() & "
+            window.__freigabe = { person: 'Frau Meier', zeitpunkt: '2026-08-26T10:00:00+00:00' };")
+
+        StringAssert.Contains(Await Seite.Locator("#freigeben").InnerTextAsync(), "Erneut")
+    End Function
+
 End Class
+

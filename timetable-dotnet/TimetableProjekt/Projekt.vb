@@ -137,6 +137,7 @@ Public NotInheritable Class Projekt
     ''' verdraengten Stand-Ids - die Oberflaeche kann sie melden, statt
     ''' still zu loeschen.</summary>
     Public Function StandHinzufuegen(stand As ProjektStand) As List(Of String)
+        stand.Id = EindeutigeStandId(stand.Id)
         Staende.Add(stand)
         Dim verdraengt As New List(Of String)
         Dim grenze = Math.Max(Manifest.MaxStaende, 1)
@@ -156,6 +157,24 @@ Public NotInheritable Class Projekt
     ''' <summary>Loescht einen Stand. Geschuetzte Staende (Freigabe,
     ''' Bestand) bleiben stehen und liefern False. Die zugehoerige
     ''' Audit-Log-Zeile bleibt in JEDEM Fall erhalten (Konzept 7.3).</summary>
+    ''' <summary>Macht die Id eindeutig. Sie ist zugleich der ORDNERNAME
+    ''' im Container (ergebnisse/<id>/lauf.json) - zwei Staende mit
+    ''' derselben Id ueberschreiben sich beim Speichern gegenseitig, und
+    ''' das faellt erst beim Laden auf.
+    '''
+    ''' Passieren kann das leicht: die Aufrufer bilden die Id
+    ''' sekundengenau aus dem Zeitstempel, und zwei kurze Laeufe in
+    ''' derselben Sekunde sind nichts Besonderes.</summary>
+    Private Function EindeutigeStandId(basis As String) As String
+        If String.IsNullOrWhiteSpace(basis) Then basis = "stand"
+        If Not Staende.Any(Function(s) s.Id = basis) Then Return basis
+        Dim n = 2
+        While Staende.Any(Function(s) s.Id = $"{basis}-{n}")
+            n += 1
+        End While
+        Return $"{basis}-{n}"
+    End Function
+
     Public Function StandLoeschen(id As String) As Boolean
         Dim stand = Staende.FirstOrDefault(Function(s) s.Id = id)
         If stand Is Nothing OrElse stand.Geschuetzt Then Return False

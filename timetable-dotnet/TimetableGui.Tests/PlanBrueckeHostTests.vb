@@ -89,7 +89,7 @@ Public Class PlanBrueckeHostTests
     ' Der Host
     ' ===============================================================
 
-    Private Function MiniProjekt() As HauptViewModel
+    Private Function MiniProjekt() As (Modell As HauptViewModel, Dialoge As TestDialoge)
         Dim entwurf As New ProjektEntwurf With {
             .Bestand = Scaffold.Baue("BW", "Grundschule", 1, 4, 1, "Minischule"),
             .Pfad = IO.Path.Combine(_ordner, "mini.splanx"),
@@ -100,7 +100,7 @@ Public Class PlanBrueckeHostTests
         m.Projekt.Config = New RunConfig With {
             .LehrereinsatzTimeLimitS = 30.0, .SolveTimeLimitS = 30.0,
             .MaxSolutions = 1, .NumWorkers = 1, .Seed = 42}
-        Return m
+        Return (m, d)
     End Function
 
     ''' <summary>"Markiert die Loesung im Projekt (Audit-Eintrag) und macht
@@ -110,7 +110,7 @@ Public Class PlanBrueckeHostTests
     ''' muss. Genau das prueft dieser Test bis zur Datei und zurueck.</summary>
     <TestMethod>
     Public Async Function UebernommeneLoesungUeberlebtSpeichernUndLaden() As Task
-        Dim m = MiniProjekt()
+        Dim m = MiniProjekt().Modell
         Await m.StundenplanRechnenAsync()
         Assert.IsTrue(m.Projekt.Staende.Any(Function(s) s.Stundenplan IsNot Nothing), m.Meldung)
 
@@ -154,7 +154,7 @@ Public Class PlanBrueckeHostTests
     ''' danach etwas anderes an als gerechnet wurde.</summary>
     <TestMethod>
     Public Async Function NeuRechnenUebernimmtDieParameterInDieConfig() As Task
-        Dim m = MiniProjekt()
+        Dim m = MiniProjekt().Modell
         Await m.PlanNeuRechnenAsync(Nutzlast("{""zeitbudget_s"": 25, ""max_loesungen"": 2}"))
 
         Assert.AreEqual(25.0, m.Projekt.Config.SolveTimeLimitS)
@@ -163,4 +163,89 @@ Public Class PlanBrueckeHostTests
         Assert.IsTrue(m.Auslieferung.SeitenGroesse > 0, "es wurde nicht gerechnet: " & m.Meldung)
     End Function
 
+
+    ' ===============================================================
+    ' Freigabe aus der Sicht (Nutzerwunsch 26.08.2026)
+    ' ===============================================================
+
+    ''' <summary>Freigegeben wird der Stand, den DIESE Sicht zeigt - nicht
+    ''' der letzte Lauf. Der Unterschied wird sichtbar, sobald jemand
+    ''' einen aelteren Stand angesehen hat.</summary>
+    <TestMethod>
+    Public Async Function DieSichtGibtIhrenEigenenStandFreiNichtDenLetzten() As Task
+        Dim mini = MiniProjekt()
+        Dim m = mini.Modell
+        mini.Dialoge.FreigabeAntwort = New Freigabebestaetigung With {
+            .Person = "Frau Meier", .Bestaetigt = True}
+        Await m.StundenplanRechnenAsync()
+        Dim erster = m.Projekt.Staende.Last()
+
+        Await m.StundenplanRechnenAsync()
+        Assert.AreEqual(2, m.Projekt.Staende.Count, "Testgrundlage: es braucht zwei Staende")
+
+        ' Zurueck auf den ERSTEN - das Dashboard zeigt jetzt ihn.
+        m.StandAnzeigen(erster)
+
+        m.VerarbeiteBrueckenNachricht("{""v"":1,""typ"":""freigabe"",""nutzlast"":{}}")
+
+        Assert.IsTrue(LaeufeViewModel.IstFreigabe(erster), "der angezeigte Stand wurde nicht freigegeben")
+        Assert.IsFalse(LaeufeViewModel.IstFreigabe(m.Projekt.Staende.Last()),
+                       "der LETZTE Stand wurde freigegeben - die Sicht wurde ignoriert")
+    End Function
+
+    ''' <summary>Der Weg durch die Sicht ist derselbe wie im Bereich
+    ''' Laeufe: Dialog mit Abweichungen, Begruendungspflicht, Nachweis.
+    ''' Eine bequemere Abkuerzung waere genau das, was den Nachweis
+    ''' entwertet.</summary>
+    <TestMethod>
+    Public Async Function DieSichtNutztDenselbenDialogUndDieselbePflicht() As Task
+        Dim mini = MiniProjekt()
+        Dim m = mini.Modell
+        Await m.StundenplanRechnenAsync()
+
+        ' Vorgabe der Attrappe ist Abbruch - also passiert nichts.
+        m.VerarbeiteBrueckenNachricht("{""v"":1,""typ"":""freigabe"",""nutzlast"":{}}")
+        Assert.AreEqual(1, mini.Dialoge.FreigabeVorlagen.Count, "der Dialog muss gezeigt werden")
+        Assert.IsFalse(LaeufeViewModel.IstFreigabe(m.Projekt.Staende.Last()))
+
+        mini.Dialoge.FreigabeAntwort = New Freigabebestaetigung With {
+            .Person = "Frau Meier", .Bestaetigt = True, .Notiz = "Geprüft."}
+        m.VerarbeiteBrueckenNachricht("{""v"":1,""typ"":""freigabe"",""nutzlast"":{}}")
+
+        Dim stand = m.Projekt.Staende.Last()
+        Assert.IsTrue(LaeufeViewModel.IstFreigabe(stand))
+        Assert.IsTrue(stand.Geschuetzt)
+        StringAssert.Contains(m.Meldung, "Freigegeben")
+    End Function
+
+    ''' <summary>Ohne angezeigten Stand gibt es nichts freizugeben - und
+    ''' der Nutzer erfaehrt warum, statt dass nichts passiert.</summary>
+    <TestMethod>
+    Public Sub FreigabeOhneAngezeigtenStandMeldetDenGrund()
+        Dim mini = MiniProjekt()
+        mini.Modell.VerarbeiteBrueckenNachricht("{""v"":1,""typ"":""freigabe"",""nutzlast"":{}}")
+
+        Assert.AreEqual(1, mini.Dialoge.Hinweise.Count)
+        StringAssert.Contains(mini.Dialoge.Hinweise(0), "keinem gespeicherten Stand")
+    End Sub
+
+    ''' <summary>Das Startskript traegt den Freigabestand in die Seite -
+    ''' sonst boete das Dashboard eine Freigabe an, die laengst erfolgt
+    ''' ist, und der Nutzer erfuehre es erst durch den Hinweis danach.</summary>
+    <TestMethod>
+    Public Async Function DasStartskriptTraegtDenFreigabestandInDieSeite() As Task
+        Dim mini = MiniProjekt()
+        Dim m = mini.Modell
+        Await m.StundenplanRechnenAsync()
+
+        StringAssert.Contains(m.BrueckenStartSkript(), "window.__freigabe = null")
+
+        mini.Dialoge.FreigabeAntwort = New Freigabebestaetigung With {
+            .Person = "Frau Meier", .Bestaetigt = True}
+        m.VerarbeiteBrueckenNachricht("{""v"":1,""typ"":""freigabe"",""nutzlast"":{}}")
+
+        StringAssert.Contains(m.BrueckenStartSkript(), "Frau Meier")
+    End Function
+
 End Class
+

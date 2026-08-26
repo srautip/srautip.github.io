@@ -53,6 +53,10 @@ Public Interface IDialoge
     ''' Fenster und gehoert deshalb zu den uebrigen Dialogen - das
     ''' HauptViewModel soll auch weiterhin ohne WPF laufen.</summary>
     Function ProjektAssistent() As ProjektEntwurf
+    ''' <summary>Der Freigabe-Dialog (klassenbildung-konzept 10.1): er
+    ''' ZEIGT die verbleibenden Abweichungen und verlangt Name plus
+    ''' aktive Bestaetigung. Nothing bei Abbruch.</summary>
+    Function FreigabeBestaetigen(vorlage As Freigabevorlage) As Freigabebestaetigung
     Sub Hinweis(titel As String, text As String)
     Function Frage(titel As String, text As String) As Boolean
 End Interface
@@ -156,16 +160,39 @@ Public NotInheritable Class HauptViewModel
         Auslieferung.Setze(html)
     End Sub
 
-    ''' <summary>Hinterlegt die Seite eines Bereichs und liefert sie
-    ''' aus, falls dieser Bereich gerade sichtbar ist.</summary>
-    Private Sub SeiteHinterlegen(zielbereich As Bereich, html As String)
+    ''' <summary>Welcher Stand in welchem Dashboard steht. Ohne das
+    ''' waere die Freigabe AUS DER SICHT heraus nicht moeglich: die Seite
+    ''' kennt ihre Herkunft nicht, und der letzte Lauf waere die falsche
+    ''' Antwort, sobald jemand einen aelteren Stand angesehen hat.</summary>
+    Private ReadOnly _standIds As New Dictionary(Of Bereich, String)
+
+    ''' <summary>Hinterlegt die Seite eines Bereichs samt zugehoerigem
+    ''' Stand und liefert sie aus, falls dieser Bereich sichtbar ist.</summary>
+    Private Sub SeiteHinterlegen(zielbereich As Bereich, html As String,
+                                 Optional standId As String = Nothing)
         If html Is Nothing Then
             _seiten.Remove(zielbereich)
+            _standIds.Remove(zielbereich)
         Else
             _seiten(zielbereich) = html
+            If standId Is Nothing Then
+                _standIds.Remove(zielbereich)
+            Else
+                _standIds(zielbereich) = standId
+            End If
         End If
         If _bereich = zielbereich Then Auslieferung.Setze(html)
     End Sub
+
+    ''' <summary>Der Stand, den das aktuelle Dashboard zeigt - Nothing,
+    ''' wenn dort nichts steht oder der Stand inzwischen geloescht
+    ''' wurde.</summary>
+    Public Function AngezeigterStand() As ProjektStand
+        If Not ProjektOffen Then Return Nothing
+        Dim id As String = Nothing
+        If Not _standIds.TryGetValue(_bereich, id) Then Return Nothing
+        Return _projekt.Staende.FirstOrDefault(Function(x) x.Id = id)
+    End Function
 
     ''' <summary>Letzte Rueckmeldung an den Nutzer - was die Statusleiste
     ''' zeigt, solange kein Lauf aktiv ist.</summary>
@@ -467,8 +494,6 @@ Public NotInheritable Class HauptViewModel
             Return
         End If
 
-        SeiteHinterlegen(Bereich.Klassenbildung, ViewerInhalt.KlassenbildungSeite(schule, e))
-
         Dim zeitpunkt = _jetzt()
         Dim stand As New ProjektStand With {
             .Id = zeitpunkt.ToString("yyyy-MM-dd-HHmmss") & "-klassenbildung",
@@ -476,7 +501,11 @@ Public NotInheritable Class HauptViewModel
             .Erstellt = zeitpunkt,
             .Klassenbildung = KlassenbildungLauf.BaueViewerJson(schule, e)
         }
-        _projekt.StandHinzufuegen(stand)
+        MeldeVerdraengte(_projekt.StandHinzufuegen(stand))
+        ' Seite und Stand gehoeren zusammen: erst jetzt gibt es eine
+        ' Id, unter der die Sicht ihren eigenen Stand freigeben kann.
+        SeiteHinterlegen(Bereich.Klassenbildung,
+                         ViewerInhalt.KlassenbildungSeite(schule, e), stand.Id)
         _projekt.Protokolliere(Umgebung.Benutzer, "lauf",
             $"Klassenbildung gerechnet: {e.Geloeste.Count} Variante(n), Konsens-Kern " &
             $"{e.Top.KonsensKern.Count}/{e.Eingabe.Schueler.Count}" &
@@ -566,7 +595,7 @@ Public NotInheritable Class HauptViewModel
             Return
         End If
 
-        SeiteHinterlegen(Bereich.Stundenplan, seite)
+
 
         Dim loesungen = e.Laeufe.Sum(Function(l) l.Result.Solutions.Count)
         Dim zeitpunkt = _jetzt()
@@ -576,7 +605,8 @@ Public NotInheritable Class HauptViewModel
             .Erstellt = zeitpunkt,
             .Stundenplan = StundenplanBericht.BaueStundentafelJson(e)
         }
-        _projekt.StandHinzufuegen(stand)
+        MeldeVerdraengte(_projekt.StandHinzufuegen(stand))
+        SeiteHinterlegen(Bereich.Stundenplan, seite, stand.Id)
 
         Dim verstoesse = e.PlanVerstoesse.Count + e.LehrereinsatzVerstoesse
         _projekt.Protokolliere(Umgebung.Benutzer, "lauf",
@@ -630,7 +660,16 @@ Public NotInheritable Class HauptViewModel
                 {"zeitbudget_s", _projekt.Config.SolveTimeLimitS},
                 {"max_loesungen", _projekt.Config.MaxSolutions}}
         End If
-        Return Bruecke.StartSkript(If(ProjektOffen, _projekt.GuiState, Nothing), namen, planParameter)
+        ''' Der Freigabestand des Standes, den diese Sicht zeigt. Ohne ihn
+        ''' boete das Dashboard eine Freigabe an, die laengst erfolgt ist -
+        ''' und der Nutzer erfuehre es erst durch den Hinweis danach.
+        Dim freigabe As JsonObject = Nothing
+        Dim stand = AngezeigterStand()
+        If stand IsNot Nothing AndAlso LaeufeViewModel.IstFreigabe(stand) Then
+            freigabe = stand.Lauf("freigabe").DeepClone().AsObject()
+        End If
+        Return Bruecke.StartSkript(If(ProjektOffen, _projekt.GuiState, Nothing), namen,
+                                   planParameter, freigabe)
     End Function
 
     ''' <summary>Nimmt eine Nachricht des Boards entgegen. Unbekannte
@@ -658,6 +697,9 @@ Public NotInheritable Class HauptViewModel
 
             Case "plan-neu-rechnen"
                 PlanNeuRechnenAsync(n.Nutzlast)
+
+            Case "freigabe"
+                FreigabeAusSicht()
         End Select
     End Sub
 
@@ -743,6 +785,69 @@ Public NotInheritable Class HauptViewModel
 
         Await StundenplanRechnenAsync()
     End Function
+
+
+    ''' <summary>Einen gesicherten Stand anzeigen, ohne neu zu rechnen
+    ''' (6.13, "ansehen"). Der Bereich richtet sich nach der ART des
+    ''' Standes, nicht danach, wo der Nutzer gerade steht - ein
+    ''' Klassenbildungs-Stand im Stundenplan-Dashboard waere sinnlos.</summary>
+    Public Sub StandAnzeigen(stand As ProjektStand)
+        If stand Is Nothing Then Return
+        Dim istKlassenbildung = stand.Klassenbildung IsNot Nothing
+        Dim json = If(istKlassenbildung, stand.Klassenbildung, stand.Stundenplan)
+        Dim seite = ViewerInhalt.AusGespeichertemJson(json, istKlassenbildung)
+        If seite Is Nothing Then
+            _dialoge.Hinweis("Nichts anzuzeigen", "Dieser Stand enthält kein Ergebnis.")
+            Return
+        End If
+
+        Dim ziel = If(istKlassenbildung, Bereich.Klassenbildung, Bereich.Stundenplan)
+        SeiteHinterlegen(ziel, seite, stand.Id)
+        Bereich = ziel
+        Meldung = $"Stand angezeigt: {stand.Label}"
+    End Sub
+
+
+    ''' <summary>Die Obergrenze verdraengt die aeltesten ungeschuetzten
+    ''' Staende. Das darf nicht still geschehen: wer zehn Laeufe
+    ''' vergleicht, muss erfahren, dass der erste nicht mehr da ist -
+    ''' Projekt.StandHinzufuegen liefert die Ids genau dafuer zurueck,
+    ''' und bis hierher hat sie niemand ausgewertet.</summary>
+    Private Sub MeldeVerdraengte(verdraengt As List(Of String))
+        If verdraengt Is Nothing OrElse verdraengt.Count = 0 Then Return
+        _projekt.Protokolliere(Umgebung.Benutzer, "stand",
+            $"Verdraengt (Obergrenze {_projekt.Manifest.MaxStaende}): " &
+            String.Join(", ", verdraengt), _jetzt())
+        _dialoge.Hinweis("Ältere Stände verdrängt",
+            $"Die Obergrenze von {_projekt.Manifest.MaxStaende} Ständen ist erreicht. " &
+            $"Entfernt wurde(n): {String.Join(", ", verdraengt)}." & vbLf & vbLf &
+            "Freigegebene und geschützte Stände werden nie verdrängt.")
+    End Sub
+
+    ''' <summary>Freigabe direkt aus dem Dashboard (Nutzerwunsch
+    ''' 26.08.2026). Freigegeben wird der Stand, den DIESE Sicht gerade
+    ''' zeigt - nicht der letzte Lauf: wer sich einen aelteren Stand
+    ''' angesehen hat, meint auch diesen.
+    '''
+    ''' Der Weg ist derselbe wie im Bereich Laeufe, samt Dialog mit
+    ''' Abweichungen und Begruendungspflicht. Eine zweite, bequemere
+    ''' Freigabe waere genau die Abkuerzung, die den Nachweis entwertet.</summary>
+    Friend Sub FreigabeAusSicht()
+        Dim stand = AngezeigterStand()
+        If stand Is Nothing Then
+            _dialoge.Hinweis("Kein Stand",
+                "Diese Ansicht gehört zu keinem gespeicherten Stand. " &
+                "Erst rechnen oder im Bereich Läufe einen Stand öffnen.")
+            Return
+        End If
+
+        Dim historie As New LaeufeViewModel(_projekt, _dialoge, _jetzt)
+        If Not historie.Freigeben(stand.Id) Then Return
+
+        Geaendert = True
+        Meldung = $"Freigegeben: {stand.Label}"
+        MeldeSchritte()
+    End Sub
 
 End Class
 

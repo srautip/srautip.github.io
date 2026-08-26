@@ -55,7 +55,8 @@ Public Module Bruecke
     ''' Seite gelangen - sie werden dort ausschliesslich in den DOM
     ''' gerendert (Datenhaltung 6.1/6.2).</summary>
     Public Function StartSkript(zustand As JsonObject, anzeigeNamen As Dictionary(Of String, String),
-                                Optional planParameter As JsonObject = Nothing) As String
+                                Optional planParameter As JsonObject = Nothing,
+                                Optional freigabe As JsonObject = Nothing) As String
         Dim namen As New JsonObject()
         If anzeigeNamen IsNot Nothing Then
             For Each kvp In anzeigeNamen
@@ -67,7 +68,8 @@ Public Module Bruecke
         ' Seite waere eine Fallunterscheidung ohne Gegenwert.
         Return $"window.__gastZustand = {If(zustand Is Nothing, "null", zustand.ToJsonString())};" &
                $"window.__anzeigeNamen = {namen.ToJsonString()};" &
-               $"window.__planParameter = {If(planParameter Is Nothing, "null", planParameter.ToJsonString())};"
+               $"window.__planParameter = {If(planParameter Is Nothing, "null", planParameter.ToJsonString())};" &
+               $"window.__freigabe = {If(freigabe Is Nothing, "null", freigabe.ToJsonString())};"
     End Function
 
     ''' <summary>Uebersetzt die Fixierungsliste der Bruecke in

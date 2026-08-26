@@ -38,6 +38,7 @@ Public Class PlanBrueckeTests
             window.chrome = window.chrome || {};
             window.chrome.webview = { postMessage: function (m) { window.__gesendet.push(m); } };
             window.__planParameter = " & parameterJson & ";
+            window.__freigabe = null;
         "
     End Function
 
@@ -113,4 +114,44 @@ Public Class PlanBrueckeTests
         Assert.AreEqual("30", Await Seite.Locator("#gui-loesungen").InputValueAsync())
     End Function
 
+
+    ' ---------------------------------------------------------------
+    ' Freigabe aus der Sicht (Nutzerwunsch 26.08.2026)
+    ' ---------------------------------------------------------------
+
+    <TestMethod>
+    Public Async Function DerFreigabeKnopfMeldetSichBeimHost() As Task
+        Await SeiteOeffnenAsync(StundentafelSeite("bw-grundschule-beispiel"), HostStub())
+
+        Await Seite.Locator("#gui-freigeben").ClickAsync()
+
+        Dim nachrichten = Await NachrichtenAsync()
+        Assert.AreEqual(1, nachrichten.Count)
+        Assert.AreEqual("freigabe", nachrichten(0)("typ").GetValue(Of String)())
+        ' Die Seite behauptet NICHT, freigegeben zu haben - das entscheidet
+        ' der Dialog im Host, und der kann abgebrochen werden.
+        Dim rueck = Await Seite.Locator("#gui-rueckmeldung").InnerTextAsync()
+        StringAssert.Contains(rueck, "Dialog")
+        Assert.IsFalse(rueck.Contains("Freigegeben!"))
+    End Function
+
+    ''' <summary>Ist der Stand schon freigegeben, sagt die Seite das -
+    ''' sonst boete sie eine Freigabe an, die laengst erfolgt ist.</summary>
+    <TestMethod>
+    Public Async Function EinFreigegebenerStandZeigtSichAlsSolcher() As Task
+        Await SeiteOeffnenAsync(StundentafelSeite("bw-grundschule-beispiel"),
+                                HostStub() & "
+            window.__freigabe = { person: 'Frau Meier', zeitpunkt: '2026-08-26T10:00:00+00:00' };")
+
+        StringAssert.Contains(Await Seite.Locator("#gui-freigeben").InnerTextAsync(), "Erneut")
+        StringAssert.Contains(Await Seite.Locator("#gui-rueckmeldung").InnerTextAsync(), "freigegeben")
+    End Function
+
+    <TestMethod>
+    Public Async Function OhneHostGibtEsKeinenFreigabeKnopf() As Task
+        Await SeiteOeffnenAsync(StundentafelSeite("bw-grundschule-beispiel"))
+        Assert.IsTrue(Await Seite.Locator("#gui-aktionen").IsHiddenAsync())
+    End Function
+
 End Class
+

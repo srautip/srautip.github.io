@@ -47,8 +47,11 @@ Class MainWindow
         End If
 
         Dim zeigtDashboard = _modell.Bereich = Bereich.Klassenbildung OrElse _modell.Bereich = Bereich.Stundenplan
-        Startseite.Visibility = If(zeigtDashboard, Visibility.Collapsed, Visibility.Visible)
+        Dim zeigtLaeufe = _modell.Bereich = Bereich.Laeufe
+        Startseite.Visibility = If(zeigtDashboard OrElse zeigtLaeufe, Visibility.Collapsed, Visibility.Visible)
         Dashboard.Visibility = If(zeigtDashboard, Visibility.Visible, Visibility.Collapsed)
+        Laeufe.Visibility = If(zeigtLaeufe, Visibility.Visible, Visibility.Collapsed)
+        If zeigtLaeufe Then LaeufeAufbauen()
 
         If zeigtDashboard AndAlso _modell.Auslieferung.SeitenGroesse > 0 Then
             Await _host.AnzeigenAsync()
@@ -145,6 +148,88 @@ Class MainWindow
         If antwort <> MessageBoxResult.Yes Then e.Cancel = True
     End Sub
 
+
+    ' ===============================================================
+    ' Bereich "Laeufe" (Stufe G3)
+    ' ===============================================================
+
+    Private _historie As LaeufeViewModel
+
+    ''' <summary>Das Laeufe-ViewModel haengt am PROJEKT, nicht am Fenster -
+    ''' nach "Datei oeffnen" ist es ein anderes. Es deshalb bei jedem
+    ''' Betreten neu zu bauen ist billiger und ehrlicher, als eines ueber
+    ''' Projektwechsel hinweg gueltig zu halten.</summary>
+    Private Sub LaeufeAufbauen()
+        If Not _modell.ProjektOffen Then
+            Standliste.ItemsSource = Nothing
+            StandInfo.Text = "Kein Projekt geöffnet."
+            Return
+        End If
+
+        _historie = New LaeufeViewModel(_modell.Projekt, New WpfDialoge(Me))
+        AddHandler _historie.Geaendert, Sub()
+                                          _modell.Geaendert = True
+                                          LaeufeFuellen()
+                                      End Sub
+        AddHandler _historie.Anzeigen, Sub(s, stand) _modell.StandAnzeigen(stand)
+        LaeufeFuellen()
+    End Sub
+
+    Private Sub LaeufeFuellen()
+        Dim vorher = TryCast(Standliste.SelectedItem, Standzeile)
+        Dim zeilen = _historie.Zeilen()
+        Standliste.ItemsSource = zeilen
+        If vorher IsNot Nothing Then
+            Standliste.SelectedItem = zeilen.FirstOrDefault(Function(z) z.Id = vorher.Id)
+        End If
+        If Standliste.SelectedItem Is Nothing Then Standliste.SelectedIndex = 0
+        StandInfoZeigen()
+    End Sub
+
+    Private Function GewaehlterStand() As Standzeile
+        Return TryCast(Standliste.SelectedItem, Standzeile)
+    End Function
+
+    Private Sub StandInfoZeigen()
+        Dim z = GewaehlterStand()
+        If z Is Nothing Then
+            StandInfo.Text = "Noch kein Lauf gerechnet."
+            StandFreigeben.IsEnabled = False
+            Return
+        End If
+        StandInfo.Text = $"{z.Art} · {z.Kennzahlen}" &
+                         If(z.IstFreigabe, "  ·  freigegeben – geschützt gegen Löschen und Verdrängen", "")
+        StandFreigeben.IsEnabled = Not z.IstFreigabe
+    End Sub
+
+    Private Sub AufStandAuswahl(sender As Object, e As SelectionChangedEventArgs)
+        StandInfoZeigen()
+    End Sub
+
+    Private Sub AufStandAnsehen(sender As Object, e As RoutedEventArgs)
+        Dim z = GewaehlterStand()
+        If z IsNot Nothing Then _historie.Ansehen(z.Id)
+    End Sub
+
+    Private Sub AufStandUmbenennen(sender As Object, e As RoutedEventArgs)
+        Dim z = GewaehlterStand()
+        If z Is Nothing Then Return
+        Dim neu = Microsoft.VisualBasic.Interaction.InputBox(
+            "Neues Label für diesen Stand:", "Umbenennen", z.Label)
+        If neu = "" Then Return
+        _historie.Umbenennen(z.Id, neu)
+    End Sub
+
+    Private Sub AufStandLoeschen(sender As Object, e As RoutedEventArgs)
+        Dim z = GewaehlterStand()
+        If z IsNot Nothing Then _historie.Loeschen(z.Id)
+    End Sub
+
+    Private Sub AufStandFreigeben(sender As Object, e As RoutedEventArgs)
+        Dim z = GewaehlterStand()
+        If z IsNot Nothing Then _historie.Freigeben(z.Id)
+    End Sub
+
 End Class
 
 ''' <summary>Die WPF-Umsetzung der Dialoge. Liegt bewusst im View - das
@@ -191,6 +276,13 @@ Friend NotInheritable Class WpfDialoge
     Public Function ProjektAssistent() As ProjektEntwurf Implements IDialoge.ProjektAssistent
         Dim d As New ProjektAssistent(Me) With {.Owner = _besitzer}
         If d.ShowDialog() = True Then Return d.Entwurf
+        Return Nothing
+    End Function
+
+    Public Function FreigabeBestaetigen(vorlage As Freigabevorlage) As Freigabebestaetigung _
+        Implements IDialoge.FreigabeBestaetigen
+        Dim d As New FreigabeFenster(vorlage) With {.Owner = _besitzer}
+        If d.ShowDialog() = True Then Return d.Bestaetigung
         Return Nothing
     End Function
 

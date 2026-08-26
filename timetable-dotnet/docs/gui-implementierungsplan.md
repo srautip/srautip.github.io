@@ -389,6 +389,63 @@ Klarnamen-Export – G6 Startseite als vollständige Schrittleiste.
   ist ein freies `JsonObject` und wird bereits round-trip-sicher
   gespeichert; die Markierung liegt darin unter `arbeitsstand`.
 
+**Nachtrag zu G3 (Läufe und Freigabe).** Die Freigabe ist die einzige Stelle
+der Anwendung, deren Zweck ein RECHTLICHER Nachweis ist: Art. 22 DSGVO
+verlangt den Beleg, dass eine echte menschliche Prüfung stattgefunden hat.
+Daraus folgen drei Entwurfsentscheidungen, die sonst willkürlich wirken
+würden:
+
+- **Fester Satz UND eigene Begründung** (Nutzerfrage 26.08.2026: wäre eine
+  selbstformulierte Notiz nicht besser?). Beides, nicht eines. Der feste Satz
+  trägt die juristischen Pflichtbestandteile – Bezug auf die geprüften
+  Abweichungen und „in eigener Verantwortung“ –, ein Freitext allein
+  könnte beides weglassen und wäre dann ein SCHWÄCHERER Nachweis. Die Notiz
+  wiederum ist der Beleg der tatsächlichen Befassung: wer die Abweichungen
+  in eigenen Worten abwägt, hat sie gelesen – das lässt sich nicht
+  mechanisch erzeugen, ein Häkchen schon. Pflicht ist sie NUR bei
+  verbleibenden Abweichungen; ohne etwas abzuwägen wäre der Zwang zur Notiz
+  selbst wieder Theater. Die Feldfrage lautet deshalb nicht „Bemerkung“
+  (das erzeugt „ok“), sondern „Warum ist der Stand trotz dieser Abweichungen
+  vertretbar?“ Geprüft wird die Pflicht im ViewModel, nicht nur im Fenster:
+  das Fenster kann man umgehen.
+- **Der Dialog zeigt die Abweichungen im Wortlaut, nicht als Zahl.** Ein
+  bloßer OK-Klick ohne angezeigte Abweichungen wäre als menschliche
+  Beteiligung angreifbar (Klassenbildungs-Konzept 10.1). Der
+  Bestätigungssatz nennt deshalb ihre Anzahl, und der Knopf bleibt aus,
+  solange Haken oder Name fehlen.
+- **Gespeichert wird der Bericht, WIE ER ANGEZEIGT WURDE** – nicht ein
+  Verweis, aus dem man ihn später neu berechnen könnte. Freigegeben wurde,
+  was auf dem Bildschirm stand.
+- **Lücken und Randstunden zählen NICHT als Abweichung.** Sie sind
+  Qualitätsmerkmale, keine Regelverletzungen; sie mitzuzählen blähte den
+  Bestätigungssatz mit Dingen auf, die niemand versprochen hat – und
+  entwertete damit den Nachweis.
+
+Der Schutz gegen Löschen und Verdrängen lag bereits im Kern
+(`Projekt.StandHinzufuegen`/`StandLoeschen`); G3 setzt nur die Marke. Dabei
+fiel eine Lücke auf: `StandHinzufuegen` liefert die verdrängten Ids zurück,
+damit die Oberfläche sie melden kann – ausgewertet hatte sie bis dahin
+niemand. Jetzt erscheinen sie als Hinweis und im Protokoll.
+
+**Freigabe aus der Sicht** (Nutzerwunsch 26.08.2026): die Klassenbildung ist
+aus dem Board freizugeben, der Stundenplan aus der Stundentafel. Beide Wege
+führen durch DENSELBEN Dialog mit Abweichungen und Begründungspflicht – eine
+zweite, bequemere Freigabe wäre genau die Abkürzung, die den Nachweis
+entwertet. Die Seiten entscheiden nichts, sie melden nur.
+
+Damit das geht, musste der Host lernen, WELCHER Stand in welchem Dashboard
+steht (`_standIds`). „Der letzte Lauf“ wäre die falsche Antwort, sobald
+jemand über den Bereich *Läufe* einen älteren Stand geöffnet hat.
+
+**Dabei fiel ein echter Fehler auf.** Der Negativtest zur Standwahl blieb
+grün, obwohl er hätte rot werden müssen. Ursache: die Stand-Id wird
+sekundengenau aus dem Zeitstempel gebildet, zwei Läufe in derselben Sekunde
+erhielten also dieselbe – und beide Codewege trafen denselben Stand. Die Id
+ist aber zugleich der ORDNERNAME im Container (`ergebnisse/<id>/`), zwei
+gleiche Ids überschreiben sich beim Speichern. `Projekt.StandHinzufuegen`
+macht die Id jetzt eindeutig; zwei Tests in `TimetableProjekt.Tests` halten
+das fest, einer davon über Speichern und Laden.
+
 ---
 
 ## Risiken

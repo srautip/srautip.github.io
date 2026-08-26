@@ -42,6 +42,7 @@
     <SolidColorBrush x:Key="farbe-warn-rand" Color="#DDB45F" />
     <SolidColorBrush x:Key="farbe-warn-flaeche" Color="#FDF3E4" />
     <SolidColorBrush x:Key="farbe-krit-text" Color="#B3261E" />
+    <SolidColorBrush x:Key="farbe-krit-rand" Color="#EAA6A1" />
     <SolidColorBrush x:Key="farbe-frei-text" Color="#626B76" />
 
     <!-- ===== Kanon: Akzent ===== -->

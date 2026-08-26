@@ -617,6 +617,8 @@
     <label>Zeitbudget <input type="number" id="gui-budget" min="1" max="3600" step="10"> s</label>
     <label>Lösungen <input type="number" id="gui-loesungen" min="1" max="200" step="1"></label>
     <button type="button" id="gui-rechnen">Neu rechnen</button>
+    <span class="gui-trenner"></span>
+    <button type="button" id="gui-freigeben">Freigeben…</button>
     <span id="gui-rueckmeldung"></span>
   </div>
   <div id="compare-info" hidden></div>
@@ -1702,6 +1704,29 @@
           if (vorgabe.zeitbudget_s) budget.value = vorgabe.zeitbudget_s;
           if (vorgabe.max_loesungen) loesungen.value = vorgabe.max_loesungen;
         }
+
+        // Freigabe aus der Sicht heraus (Nutzerwunsch 26.08.2026). Die
+        // Seite entscheidet NICHTS - sie meldet nur; Abweichungen,
+        // Begruendungspflicht und Nachweis liegen im Host. Eine zweite,
+        // bequemere Freigabe waere genau die Abkuerzung, die den
+        // Nachweis entwertet.
+        var freigabeKnopf = document.getElementById('gui-freigeben');
+        var bereitsFrei = window.__freigabe;
+        if (bereitsFrei) {
+          freigabeKnopf.textContent = 'Erneut freigeben…';
+          freigabeKnopf.title = 'Freigegeben von ' + (bereitsFrei.person || '?') +
+                                ' am ' + (bereitsFrei.zeitpunkt || '').slice(0, 10);
+          rueck.textContent = 'Dieser Stand ist freigegeben.';
+        }
+        freigabeKnopf.addEventListener('click', function () {
+          if (sende('freigabe', {})) {
+            // Bewusst zurueckhaltend: ob wirklich freigegeben wird,
+            // entscheidet der Dialog im Host. Ein "Freigegeben!" hier
+            // waere gelogen, sobald jemand abbricht.
+            rueck.textContent = 'Freigabe-Dialog geöffnet …';
+          }
+        });
+
 
         document.getElementById('gui-rechnen').addEventListener('click', function () {
           var nutzlast = {};
