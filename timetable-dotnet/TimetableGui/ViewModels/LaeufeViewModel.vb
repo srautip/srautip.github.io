@@ -81,9 +81,19 @@ Public NotInheritable Class LaeufeViewModel
         Return _projekt.Staende.FirstOrDefault(Function(s) s.Id = id)
     End Function
 
-    Public Function Freigegebener() As ProjektStand
+    ''' <summary>Der freigegebene Stand einer ART. Die Einschraenkung ist
+    ''' wesentlich: Klassenbildung und Stundenplan sind zwei getrennte
+    ''' Entscheidungen mit je eigenem Nachweis. Ohne den Filter zog die
+    ''' Freigabe eines Stundenplans die Freigabe der Klassenbildung
+    ''' zurueck - ein zerstoerter Nachweis, gemeldet als sinnlose Frage
+    ''' (live gefunden im Test, 26.08.2026).
+    '''
+    ''' Ohne `art` gilt: irgendein freigegebener Stand.</summary>
+    Public Function Freigegebener(Optional art As String = Nothing) As ProjektStand
         If _projekt Is Nothing Then Return Nothing
-        Return _projekt.Staende.FirstOrDefault(AddressOf IstFreigabe)
+        Return _projekt.Staende.FirstOrDefault(
+            Function(s) IstFreigabe(s) AndAlso
+                        (art Is Nothing OrElse Freigabe.ArtVon(s) = art))
     End Function
 
     ' ===============================================================
@@ -163,12 +173,14 @@ Public NotInheritable Class LaeufeViewModel
         ' Eine bestehende Freigabe wird NICHT still ersetzt: sie ist der
         ' Nachweis einer Entscheidung, und zwei davon nebeneinander waeren
         ' genau die Unklarheit, die der Nachweis ausschliessen soll.
-        Dim bisher = Freigegebener()
+        Dim bisher = Freigegebener(vorlage.Art)
         If bisher IsNot Nothing Then
             Dim frage = $"Freigegeben ist derzeit {bisher.Label} vom {bisher.Erstellt:dd.MM.yyyy}." &
                         vbLf & vbLf &
-                        "Die bisherige Freigabe wird zurückgezogen; ihre Protokollzeile bleibt erhalten."
-            If Not _dialoge.Frage("Freigabe ersetzen", frage) Then Return False
+                        $"Die bisherige Freigabe der {vorlage.Art}-Entscheidung wird zurückgezogen; " &
+                        "ihre Protokollzeile bleibt erhalten." & vbLf & vbLf &
+                        "Freigaben anderer Art sind davon nicht betroffen."
+            If Not _dialoge.Frage($"Freigabe ersetzen ({vorlage.Art})", frage) Then Return False
         End If
 
         Dim antwort = _dialoge.FreigabeBestaetigen(vorlage)

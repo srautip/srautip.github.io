@@ -85,25 +85,35 @@ Public Module Freigabe
                $"entscheide {gegenstand} in eigener Verantwortung."
     End Function
 
-    ''' <summary>Baut die Vorlage aus einem Stand. `loesung` ist der
-    ''' 1-basierte Index der markierten Loesung (siehe
-    ''' `lauf.arbeitsstand`); ohne Markierung gilt die erste - dieselbe,
-    ''' die das Dashboard beim Oeffnen zeigt.</summary>
+    ''' <summary>Welche ENTSCHEIDUNG dieser Stand traegt. Klassenbildung
+    ''' und Stundenplan sind zwei verschiedene Entscheidungen mit je
+    ''' eigenem Nachweis - welches Kind in welche Klasse kommt, ist etwas
+    ''' anderes als wann welche Stunde liegt. Sie werden deshalb getrennt
+    ''' freigegeben.</summary>
+    Public Function ArtVon(stand As ProjektStand) As String
+        If stand Is Nothing Then Return "unbekannt"
+        If stand.Stundenplan IsNot Nothing Then Return "Stundenplan"
+        If stand.Klassenbildung IsNot Nothing Then Return "Klassenbildung"
+        Return "unbekannt"
+    End Function
+
+    ''' <summary>Baut die Vorlage aus einem Stand. Massgeblich ist die
+    ''' MARKIERTE Loesung (siehe `lauf.arbeitsstand`); ohne Markierung
+    ''' gilt die erste - dieselbe, die das Dashboard beim Oeffnen
+    ''' zeigt.</summary>
     Public Function Vorlage(stand As ProjektStand) As Freigabevorlage
         If stand Is Nothing Then Return Nothing
         Dim v As New Freigabevorlage With {.StandId = stand.Id, .Label = stand.Label}
 
-        If stand.Stundenplan IsNot Nothing Then
-            v.Art = "Stundenplan"
+        v.Art = ArtVon(stand)
+        If v.Art = "Stundenplan" Then
             FuelleStundenplan(v, stand)
-        ElseIf stand.Klassenbildung IsNot Nothing Then
-            v.Art = "Klassenbildung"
+        ElseIf v.Art = "Klassenbildung" Then
             FuelleKlassenbildung(v, stand)
         Else
             ' Ein Stand ohne Ergebnis ist nichts, was man freigeben
             ' koennte - und das ehrlich zu sagen ist besser, als eine
             ' leere Liste als "keine Abweichungen" auszugeben.
-            v.Art = "unbekannt"
             v.Kennzahlen = "Dieser Stand enthält kein Ergebnis."
         End If
         Return v

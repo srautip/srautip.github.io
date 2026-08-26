@@ -407,4 +407,89 @@ Public Class FreigabeTests
                         erneut.Staende.First().Lauf("freigabe").AsObject()("notiz").GetValue(Of String)())
     End Sub
 
+
+    ' ===============================================================
+    ' Zwei Entscheidungen, zwei Nachweise
+    ' ===============================================================
+
+    ''' <summary>Ein Klassenbildungs-Stand mit erfundenem, aber
+    ''' formgleichem Viewer-JSON.</summary>
+    Private Shared Function Klassen(id As String, minuten As Integer,
+                                    Optional verletzungen As Integer = 0) As ProjektStand
+        Dim liste = String.Join(",", Enumerable.Range(1, verletzungen).Select(
+            Function(i) $"{{""regel_id"": ""G_{i}"", ""regel_typ"": ""buendelung"", ""prio"": 2}}"))
+        Return New ProjektStand With {
+            .Id = id, .Label = "Klassenbildung " & id,
+            .Erstellt = Jetzt.AddMinutes(minuten),
+            .Klassenbildung = JsonNode.Parse($"{{""varianten"": [{{""verletzungen"": [{liste}]}}]}}").AsObject()}
+    End Function
+
+    ''' <summary>Der Fehler, den der manuelle Test gefunden hat: die
+    ''' Freigabe eines Stundenplans meldete, die Klassenbildung sei
+    ''' bereits freigegeben - und haette sie zurueckgezogen. Das sind zwei
+    ''' verschiedene Entscheidungen mit je eigenem Nachweis: welches Kind
+    ''' in welche Klasse kommt, ist etwas anderes als wann welche Stunde
+    ''' liegt.</summary>
+    <TestMethod>
+    Public Sub KlassenbildungUndStundenplanWerdenGetrenntFreigegeben()
+        Dim p = Projekt(Klassen("kb", 0), Plan("sp", 10, muss:=0, kann:=0))
+        Dim d As New TestDialoge With {
+            .FreigabeAntwort = New Freigabebestaetigung With {.Person = "Frau Meier", .Bestaetigt = True}}
+        Dim m = Modell(p, d)
+
+        Assert.IsTrue(m.Freigeben("kb"))
+        Assert.IsTrue(m.Freigeben("sp"))
+
+        Assert.AreEqual(0, d.Fragen.Count,
+                        "es wurde nach dem Ersetzen gefragt, obwohl es zwei verschiedene Entscheidungen sind")
+        Assert.IsTrue(LaeufeViewModel.IstFreigabe(m.Finde("kb")),
+                      "die Klassenbildungs-Freigabe wurde vom Stundenplan zurückgezogen")
+        Assert.IsTrue(LaeufeViewModel.IstFreigabe(m.Finde("sp")))
+        Assert.IsTrue(m.Finde("kb").Geschuetzt)
+        Assert.IsTrue(m.Finde("sp").Geschuetzt)
+    End Sub
+
+    ''' <summary>Innerhalb EINER Art bleibt es beim Ersetzen: zu jedem
+    ''' Zeitpunkt gilt genau ein Stundenplan.</summary>
+    <TestMethod>
+    Public Sub InnerhalbEinerArtErsetztDieNeueFreigabeDieAlte()
+        Dim p = Projekt(Klassen("kb", 0), Plan("sp1", 10, 0, 0), Plan("sp2", 20, 0, 0))
+        Dim d As New TestDialoge With {
+            .FreigabeAntwort = New Freigabebestaetigung With {.Person = "Frau Meier", .Bestaetigt = True}}
+        Dim m = Modell(p, d)
+        m.Freigeben("kb")
+        m.Freigeben("sp1")
+
+        Assert.IsTrue(m.Freigeben("sp2"))
+
+        Assert.AreEqual(1, d.Fragen.Count, "das Ersetzen muss gefragt werden")
+        StringAssert.Contains(d.Fragen(0), "Stundenplan-Entscheidung")
+        Assert.IsFalse(LaeufeViewModel.IstFreigabe(m.Finde("sp1")))
+        Assert.IsTrue(LaeufeViewModel.IstFreigabe(m.Finde("sp2")))
+        Assert.IsTrue(LaeufeViewModel.IstFreigabe(m.Finde("kb")),
+                      "die Klassenbildung darf davon unberührt bleiben")
+    End Sub
+
+    <TestMethod>
+    Public Sub FreigegebenerFiltertNachArt()
+        Dim p = Projekt(Klassen("kb", 0), Plan("sp", 10, 0, 0))
+        Dim d As New TestDialoge With {
+            .FreigabeAntwort = New Freigabebestaetigung With {.Person = "Frau Meier", .Bestaetigt = True}}
+        Dim m = Modell(p, d)
+        m.Freigeben("kb")
+
+        Assert.AreEqual("kb", m.Freigegebener("Klassenbildung").Id)
+        Assert.IsNull(m.Freigegebener("Stundenplan"))
+        Assert.IsNotNull(m.Freigegebener(), "ohne Art zaehlt jede Freigabe")
+    End Sub
+
+    <TestMethod>
+    Public Sub DieArtWirdAmInhaltDesStandesErkannt()
+        Assert.AreEqual("Stundenplan", Freigabe.ArtVon(Plan("a", 0, 0, 0)))
+        Assert.AreEqual("Klassenbildung", Freigabe.ArtVon(Klassen("b", 0)))
+        Assert.AreEqual("unbekannt", Freigabe.ArtVon(New ProjektStand With {.Id = "leer"}))
+        Assert.AreEqual("unbekannt", Freigabe.ArtVon(Nothing))
+    End Sub
+
 End Class
+
