@@ -979,16 +979,116 @@ drin liegt — sonst fehlte genau das Stück, das den Rand kreuzt, und die Spur
 endete sichtbar zu früh. Verlässt eine Spur das Bild und kommt zurück,
 entstehen zwei getrennte Stücke.
 
-**Eine Linie je Typfarbe, nicht je Schiff:** acht Ebenen statt hundert, und
-`setLatLngs()` auf einer bestehenden Ebene statt Abbau und Neuanlage.
-Gemessen bei **98 Schiffen mit je sechs Spurpunkten** — dem teuersten Fall
-knapp unter der Grenze — kostet das Nachzeichnen beim Zoomen **höchstens
-21 ms** (Spitzen 21,1 / 20,5 / 16,7). Die Anhebung von 50 auf 100 kostet
-also nichts Spürbares; die Schranke der Probe bleibt bei 250 ms.
+**Eine Linie je Typfarbe und Altersstufe**, nicht je Schiff: höchstens neun
+Farben mal 25 Stufen statt hundert Ebenen, und `setLatLngs()` auf einer
+bestehenden Ebene statt Abbau und Neuanlage. Gemessen bei **98 Schiffen mit
+je sechs Spurpunkten** — dem teuersten Fall knapp unter der Grenze — kostet
+das Nachzeichnen beim Zoomen **höchstens 21 ms** (Spitzen 21,1 / 20,5 /
+16,7). Die Anhebung von 50 auf 100 kostet also nichts Spürbares; die
+Schranke der Probe bleibt bei 250 ms.
 
 `interactive: false`, wie beim Sichtkreis: Linien dürfen keine Klicks auf
 die Marker abfangen. Das ausgewählte Schiff wird ausgelassen, wenn seine
 eigene, dickere Spur eingeschaltet ist — sonst lägen zwei übereinander.
+
+### Sechs Stunden aus dem Proxy, und je älter desto durchsichtiger
+
+Vorher reichte eine Spur nur so weit zurück, wie das Fenster offen war —
+gemeldet als „es werden nur die Livedaten benutzt". Der Proxy hält sieben
+Tage vor; geholt werden davon die letzten **`TRACK_STUNDEN` = 6**.
+
+**Zwei Endpunkte, weil es zwei Fragen sind:**
+
+| | wofür | gemessen |
+|---|---|---|
+| `GET /v1/replay?bbox=&von=&schritt=60` | alle Schiffe im Bild | 90-km-Ausschnitt, 6 h: **196 Spuren, 13 202 Punkte, 144 KB auf der Leitung** (487 KB entpackt), 200–1300 ms |
+| `GET /v1/track?mmsi=&von=` | das ausgewählte Schiff, volle Auflösung | ein Schiff, beim Öffnen der Detailansicht |
+
+Ein gröberes Raster spart wenig und kostet die Kurven: 180 s statt 60 s
+bringen 77 statt 144 KB. 60 s ist außerdem genau das Raster, in dem der
+Proxy selbst speichert.
+
+**Der Abruf hängt an der bbox, nicht am Schiff** — ausgelöst beim Schwenken
+und nach jedem Delta-Rahmen (die Wache in `verlaufHolen()` macht den Aufruf
+im Sekundentakt kostenlos). Gedeckelt wie beim Snapshot: 25 % Rand um den
+Ausschnitt, fünf Minuten Frist, und nur wenn überhaupt jemand Spuren
+zeichnet.
+
+**Warum das Einfügen nichts doppelt einträgt.** `verlaufEinfuegen()` nimmt
+**nur Punkte, die älter sind als der älteste bekannte**. Damit ist ein
+zweiter Abruf kostenlos, und es braucht kein Buch darüber, was schon geholt
+wurde. Nach dem ersten Einfügen reicht der Bestand ohnehin bis an die
+6-Stunden-Grenze, also fällt beim nächsten Mal alles durch das Raster.
+
+**Nur für Schiffe, die es noch gibt.** Eine Spur ohne Marker wäre ein Strich
+aus dem Nichts, und ein Datensatz ohne aktuelle Position landete als
+Geisterschiff in Tabelle und Zähler.
+
+#### Die Verblassung
+
+| Alter | Transparenz |
+|---|---|
+| 0–1 h | 0 % |
+| 1–2 h | linear bis 10 % |
+| 2–6 h | linear bis 100 % |
+
+**Eine Leaflet-Linie hat genau eine Deckung.** Ein Farbverlauf entsteht also
+nur, indem man die Spur zerlegt. Eine Linie je Punktpaar wäre bei 13 000
+Punkten ein DOM-Grab; gezeichnet wird deshalb in **Viertelstundenstufen**
+(`TRACK_STUFE_MS`) — höchstens 24 Stufen je Farbe. Der Deckungssprung von
+Stufe zu Stufe beträgt im steilsten Stück 0,056, das sieht man auf der Karte
+nicht als Kante.
+
+**Ein Abschnitt zählt mit dem Alter seiner Mitte**, nicht dem eines Endes.
+Bei den üblichen Minutenabständen ist das egal; nach einer Meldelücke von
+zwei Stunden nicht: Mit dem jüngeren Ende gälte die ganze Strecke als
+frisch, mit dem älteren als alt. **Der Punkt an der Stufengrenze gehört
+beiden Läufen** — ohne diese Überlappung klaffte dort eine Lücke von einem
+Abschnitt.
+
+#### Ausdünnen statt abschneiden
+
+`MAX_TRACK_POINTS` steht jetzt bei **900** (6 h im Minutenraster sind allein
+360 Punkte). Läuft es über, dünnt `trackKuerzen()` die **ältere Hälfte** aus,
+statt vorne abzuschneiden. Abschneiden wäre genau falsch: Ein lebhaft
+meldendes Schiff füllte die 300 Punkte der alten Fassung in einer halben
+Stunde, und weggeschnitten würde ausgerechnet das Stück, das die Historie
+gerade beigebracht hat — die Spur wäre wieder eine Livespur.
+
+Gefiltert wird zusätzlich **beim Zeichnen** (`trackImFenster()`), nicht beim
+Speichern: So fällt ein Punkt von selbst heraus, sobald er zu alt ist, ohne
+dass ein Takt daran erinnern muss.
+
+#### Gemessen in `scratchpad/spuren.js`
+
+Zwei Teile, beide gegen echte Gegenstellen:
+
+1. **Verblassen und Fenster** mit gestellter Uhr (`Date.now` ist per
+   Init-Skript versetzbar — anders lässt sich keine stundenalte Spur bauen,
+   weil `setPosition()` den Zeitstempel selbst setzt). Ein Schiff mit 6 h
+   Historie und eines mit 12 h werden **gleich hoch** gezeichnet (140 px) —
+   damit ist das Fenster belegt, ohne einen Maßstab von außen. Die Deckung
+   folgt der Vorgabe auf 0,09 genau, das frische Ende liegt bei 1,000, das
+   alte bei 0,028.
+2. **Historie** gegen einen wirklich gestarteten `aisproxy`, dessen Datenbank
+   vorher mit **seiner eigenen `Speicher`-Klasse** gefüllt wird. Ein
+   selbstgebauter Endpunkt hätte genau die Formatfragen offengelassen, auf
+   die es hier ankommt (Sekunden gegen Millisekunden, Grad mal 1e6, Knoten
+   mal 10). Ergebnis: 73 Trackpunkte über 6,3 km für ein Schiff, das der
+   Client Sekunden kennt.
+
+**Zwei Fallen der Probe, nicht der Anwendung:**
+
+- **Ein Rückwärtssprung der Uhr friert die Tabelle ein.**
+  `refreshVisibleShips()` bremst sich mit `jetzt - zuletzt`. Springt die Uhr
+  um zwölf Stunden zurück, rechnet die Bremse eine Wartezeit von zwölf
+  Stunden aus und stellt einen Wecker; jeder weitere Aufruf steigt an dem
+  Wecker vorn aus. Das zweite Schiff kam deshalb weder in die Tabelle noch
+  auf die Karte. Ein Anstupser mit richtiger Uhr am Ende löst es.
+- **Der Browser kommt hier nur über den Node-Umleiter ins Netz, und Umleiten
+  geht bei WebSockets nicht.** Der echte Proxy in der Cloud ist aus dieser
+  Umgebung also nicht erreichbar — `/v1/replay` käme durch, `/v1/live` nie.
+  Deshalb läuft der Proxy für die Probe lokal.
 
 #### Hysterese, sonst flackert es
 
@@ -2152,7 +2252,7 @@ node lauf.js --live          gegen die ausgelieferte Seite statt localhost
 node lauf.js sortierung ...  nur diese Tests
 ```
 
-29 gepflegte Tests, seriell 687 s. **Parallel ist der große Hebel** — und
+30 gepflegte Tests, seriell 722 s. **Parallel ist der große Hebel** — und
 zwar aus einem messbaren Grund: Ein Seitenaufbau kostet 624 ms (ohne Kacheln
 255 ms), die Laufzeit steckt fast vollständig in festen Wartepausen, und die
 kosten keine CPU.

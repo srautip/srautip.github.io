@@ -1194,6 +1194,14 @@
       Gemessen kostet das Nachzeichnen beim Zoomen bei 98 Schiffen höchstens
       21&nbsp;ms.
     </p>
+    <p class="hint">
+      Über den Proxy reichen die Spuren <b>6&nbsp;Stunden</b> zurück &ndash;
+      auch für die Zeit, in der dieses Fenster gar nicht offen war. Ältere
+      Stücke verblassen: bis zu einer Stunde volle Deckung, bis zwei Stunden
+      auf 10&nbsp;% Transparenz, danach linear bis zum Verschwinden bei sechs
+      Stunden. Ohne Proxy reicht eine Spur nur so weit zurück wie die
+      Sitzung.
+    </p>
 
     <h2 style="margin-top:1.2rem">Eigener Proxy</h2>
     <div class="checkboxes">
@@ -1402,7 +1410,9 @@
   "use strict";
 
   var MAX_TABLE_ROWS = 200;
-  var MAX_TRACK_POINTS = 300;
+  // 6 h Historie im Minutenraster sind schon 360 Punkte, dazu die Livepunkte.
+  // Bei Ueberlauf wird ausgeduennt statt abgeschnitten, siehe trackKuerzen().
+  var MAX_TRACK_POINTS = 900;
   var STALE_AFTER_MS = 10 * 60 * 1000;
 
   // ITU-R M.585 Maritime Identification Digits: "MID:ISO2:Land".
@@ -1615,6 +1625,71 @@
   // staendig ein Schiff den Ausschnitt betritt oder verlaesst.
   var TRACK_HYSTERESE = 5;
 
+  // --- Wie weit Spuren zurueckreichen und wie sie verblassen --------------
+  //
+  // Die Livedaten allein reichen nur so weit zurueck, wie der Browser offen
+  // ist. Der Proxy haelt sieben Tage Historie; gezeigt werden davon die
+  // letzten TRACK_STUNDEN. Aeltere Stuecke werden durchsichtiger, damit man
+  // ohne Legende sieht, was frisch ist und was von vor Stunden.
+  //
+  //   0-1 h   volle Deckung
+  //   1-2 h   linear bis 10 % Transparenz
+  //   2-6 h   linear bis 100 % Transparenz
+  var TRACK_STUNDEN = 6;
+  var TRACK_VOLL_H = 1;
+  var TRACK_KNICK_H = 2;
+  var TRACK_KNICK_TRANSPARENZ = 0.10;
+  // In Stufen zeichnen, nicht je Punkt: Eine Leaflet-Linie hat GENAU EINE
+  // Deckung. Eine Linie je Punktpaar waere bei 13 000 Punkten ein DOM-Grab,
+  // eine Linie je Viertelstunde sind hoechstens 24 Stufen je Farbe. Der
+  // Deckungssprung von einer Stufe zur naechsten betraegt im steilsten Stueck
+  // 0,056 - unterhalb dessen, was man auf der Karte als Kante sieht.
+  var TRACK_STUFE_MS = 15 * 60 * 1000;
+
+  // Deckung (1 = voll) fuer ein Alter in Millisekunden.
+  function trackDeckung(alterMs) {
+    var h = alterMs / 3600000;
+    if (h <= TRACK_VOLL_H) return 1;
+    if (h >= TRACK_STUNDEN) return 0;
+    if (h <= TRACK_KNICK_H) {
+      return 1 - TRACK_KNICK_TRANSPARENZ * (h - TRACK_VOLL_H) / (TRACK_KNICK_H - TRACK_VOLL_H);
+    }
+    return (1 - TRACK_KNICK_TRANSPARENZ) *
+      (1 - (h - TRACK_KNICK_H) / (TRACK_STUNDEN - TRACK_KNICK_H));
+  }
+
+  // Stufennummer und die Deckung, mit der die ganze Stufe gezeichnet wird -
+  // gemessen in der Mitte der Stufe, sonst waere die juengste Stufe schon
+  // blasser als noetig.
+  function trackStufe(alterMs) {
+    var n = Math.floor(Math.max(0, alterMs) / TRACK_STUFE_MS);
+    var max = Math.ceil(TRACK_STUNDEN * 3600000 / TRACK_STUFE_MS);
+    return Math.min(n, max);
+  }
+  function trackStufenDeckung(n) {
+    return trackDeckung((n + 0.5) * TRACK_STUFE_MS);
+  }
+
+  // Alles aelter als TRACK_STUNDEN weg, und wenn danach immer noch zu viele
+  // Punkte drin sind, die AELTERE HAELFTE ausduennen statt vorne
+  // abzuschneiden.
+  //
+  // Abschneiden waere genau falsch: Ein lebhaft meldendes Schiff fuellt die
+  // 300 Punkte der alten Fassung in einer halben Stunde, und weggeschnitten
+  // wuerde ausgerechnet das Stueck, das die Historie gerade beigebracht hat.
+  // Die Spur waere dann wieder eine Livespur - der gemeldete Zustand.
+  function trackKuerzen(track) {
+    var grenze = Date.now() - TRACK_STUNDEN * 3600000;
+    var i = 0;
+    while (i < track.length && track[i].t < grenze) i++;
+    if (i) track = track.slice(i);
+    if (track.length <= MAX_TRACK_POINTS) return track;
+    var haelfte = track.length >> 1;
+    var duenn = [];
+    for (var k = 0; k < haelfte; k += 2) duenn.push(track[k]);
+    return duenn.concat(track.slice(haelfte));
+  }
+
   // Eine Klammer fuer beide Wege in die Einstellung hinein - Eingabefeld und
   // Speicher. Ein leeres Feld ist die Voreinstellung, nicht die Null: "leer"
   // heisst "keine Angabe", und Number("") waere 0 gewesen, also aus.
@@ -1780,6 +1855,9 @@
         // Ohne das bleibt ein neu angefahrenes Gebiet minutenlang leer - und
         // ohne API-Key dauerhaft. Siehe maybeLoadSnapshot().
         maybeLoadSnapshot();
+        // Und die Spuren fuer den neuen Ausschnitt: Der Verlauf haengt an der
+        // bbox, nicht am Schiff.
+        verlaufHolen(false);
         // Wer die Karte zoomt oder schwenkt, arbeitet an der KARTE, nicht an
         // der Tabelle - und deren Inhalt aendert sich dabei zwangslaeufig.
         // Eine Ordnung festzuhalten, die fuer einen anderen Ausschnitt
@@ -3399,7 +3477,7 @@
     var last = entry.track[entry.track.length - 1];
     if (!last || last.lat !== lat || last.lon !== lon) {
       entry.track.push({ lat: lat, lon: lon, t: Date.now(), sog: entry.speed });
-      if (entry.track.length > MAX_TRACK_POINTS) entry.track.shift();
+      if (entry.track.length > MAX_TRACK_POINTS) entry.track = trackKuerzen(entry.track);
     }
 
     if (mapAvailable) {
@@ -5592,13 +5670,62 @@
 
   /* --- Detailansicht je MMSI ---------------------------------------- */
 
+  // Nur das Fenster, das gezeigt werden soll. Gefiltert wird beim ZEICHNEN,
+  // nicht beim Speichern: So faellt ein Punkt von selbst heraus, sobald er zu
+  // alt ist, ohne dass ein Takt daran erinnern muss.
+  function trackImFenster(entry) {
+    if (!entry || !entry.track || !entry.track.length) return [];
+    var grenze = Date.now() - TRACK_STUNDEN * 3600000;
+    var t = entry.track;
+    var i = 0;
+    while (i < t.length && t[i].t < grenze) i++;
+    return i ? t.slice(i) : t;
+  }
+
+  // Eine Punktfolge in Laeufe gleicher Altersstufe zerlegen. Weil die Punkte
+  // chronologisch liegen, sind die Laeufe zusammenhaengend - es entstehen
+  // hoechstens so viele Stuecke wie Stufen, nicht eines je Punktpaar.
+  //
+  // Ein Abschnitt zaehlt mit dem Alter seiner MITTE, nicht dem eines Endes.
+  // Bei den ueblichen Minutenabstaenden macht das keinen Unterschied; nach
+  // einer Meldeluecke von zwei Stunden aber sehr wohl - mit dem juengeren
+  // Ende gaelte die ganze Strecke als frisch, mit dem aelteren als alt.
+  //
+  // Der Punkt an der Stufengrenze gehoert beiden Laeufen. Ohne diese
+  // Ueberlappung klaffte dort eine Luecke von einem Abschnitt.
+  function trackLaeufe(pts, jetzt, nachStufe, dazu) {
+    var lauf = null, aktuell = -1;
+    for (var i = 1; i < pts.length; i++) {
+      var a = pts[i - 1], b = pts[i];
+      if (dazu && !dazu(a, b)) { lauf = null; aktuell = -1; continue; }
+      var n = trackStufe(jetzt - (a.t + b.t) / 2);
+      if (!lauf || n !== aktuell) {
+        aktuell = n;
+        lauf = [[a.lat, a.lon]];
+        (nachStufe[n] || (nachStufe[n] = [])).push(lauf);
+      }
+      lauf.push([b.lat, b.lon]);
+    }
+  }
+
   function drawTrack(entry) {
     if (!mapAvailable) return;
     if (trackLayer) { map.removeLayer(trackLayer); trackLayer = null; }
-    if (!entry || entry.track.length < 2) return;
-    trackLayer = L.polyline(entry.track.map(function (p) { return [p.lat, p.lon]; }), {
-      color: "#3fa9ff", weight: 2, opacity: 0.8
-    }).addTo(map);
+    var pts = trackImFenster(entry);
+    if (pts.length < 2) return;
+    var nachStufe = {};
+    trackLaeufe(pts, Date.now(), nachStufe, null);
+    // Eine Gruppe statt einer Linie: Jede Altersstufe braucht ihre eigene
+    // Deckung, und eine Leaflet-Linie hat genau eine. featureGroup, nicht
+    // layerGroup - nur die erste kann getBounds(), und darauf steht das
+    // Einpassen beim Einschalten der Spur.
+    trackLayer = L.featureGroup();
+    Object.keys(nachStufe).forEach(function (n) {
+      L.polyline(nachStufe[n], {
+        color: "#3fa9ff", weight: 2, opacity: trackStufenDeckung(Number(n))
+      }).addTo(trackLayer);
+    });
+    trackLayer.addTo(map);
   }
 
   /* --- Tracks aller sichtbaren Schiffe, solange es wenige sind ---------- */
@@ -5618,48 +5745,50 @@
     // Rand bekommt etwas Zugabe, damit die Linien nicht sichtbar an der
     // Kante abgeschnitten wirken.
     var box = map.getBounds().pad(0.15);
-    var nachFarbe = {};
+    var jetzt = Date.now();
+    // Eine Ebene je Farbe UND Altersstufe. Das sind hoechstens neun Farben
+    // mal 25 Stufen; angelegt wird nur, was wirklich vorkommt.
+    var nachSchluessel = {};
     sichtbare.forEach(function (entry) {
       // Das ausgewaehlte Schiff hat seine eigene, dickere Spur, wenn der
       // Nutzer sie eingeschaltet hat - keine zweite darunterlegen.
       if (trackLayer && entry.mmsi === selectedMmsi) return;
-      var pts = entry.track;
-      if (!pts || pts.length < 2) return;
+      var pts = trackImFenster(entry);
+      if (pts.length < 2) return;
       var cat = typeCategory(entry);
       var farbe = cat ? TYPE_COLOR_MAP[cat] : NEUTRAL_COLOR;
-      var stuecke = nachFarbe[farbe] || (nachFarbe[farbe] = []);
+      var nachStufe = {};
       // Ein Abschnitt zaehlt, sobald EIN Ende im Bild liegt - sonst fehlte
       // genau das Stueck, das den Rand kreuzt, und die Spur endete zu frueh.
       // Verlaesst sie das Bild und kommt zurueck, entstehen zwei Stuecke.
-      var lauf = null;
-      for (var i = 1; i < pts.length; i++) {
-        var a = pts[i - 1], b = pts[i];
-        if (box.contains([a.lat, a.lon]) || box.contains([b.lat, b.lon])) {
-          if (!lauf) { lauf = [[a.lat, a.lon]]; stuecke.push(lauf); }
-          lauf.push([b.lat, b.lon]);
-        } else {
-          lauf = null;
-        }
-      }
+      trackLaeufe(pts, jetzt, nachStufe, function (a, b) {
+        return box.contains([a.lat, a.lon]) || box.contains([b.lat, b.lon]);
+      });
+      Object.keys(nachStufe).forEach(function (n) {
+        var schluessel = farbe + "|" + n;
+        var stuecke = nachSchluessel[schluessel] || (nachSchluessel[schluessel] = []);
+        for (var i = 0; i < nachStufe[n].length; i++) stuecke.push(nachStufe[n][i]);
+      });
     });
 
-    Object.keys(nachFarbe).forEach(function (farbe) {
-      if (!autoTracks[farbe]) {
-        autoTracks[farbe] = L.polyline([], {
-          color: farbe,
+    Object.keys(nachSchluessel).forEach(function (schluessel) {
+      if (!autoTracks[schluessel]) {
+        var teile = schluessel.split("|");
+        autoTracks[schluessel] = L.polyline([], {
+          color: teile[0],
           weight: 1,
-          opacity: 0.55,
+          opacity: trackStufenDeckung(Number(teile[1])),
           // Wie beim Sichtkreis: Linien duerfen keine Klicks auf die Marker
           // abfangen. Und sie liegen im overlayPane, also unter den Schiffen.
           interactive: false
         }).addTo(map);
       }
-      autoTracks[farbe].setLatLngs(nachFarbe[farbe]);
+      autoTracks[schluessel].setLatLngs(nachSchluessel[schluessel]);
     });
-    // Farben ohne Spuren in dieser Runde leeren, statt die Ebene abzubauen -
+    // Ebenen ohne Spuren in dieser Runde leeren, statt sie abzubauen -
     // ein setLatLngs([]) ist billiger als removeLayer plus Neuanlage.
-    Object.keys(autoTracks).forEach(function (farbe) {
-      if (!nachFarbe[farbe]) autoTracks[farbe].setLatLngs([]);
+    Object.keys(autoTracks).forEach(function (schluessel) {
+      if (!nachSchluessel[schluessel]) autoTracks[schluessel].setLatLngs([]);
     });
   }
 
@@ -6059,6 +6188,9 @@
     kartengroesseNachziehen();
     renderDetail(ships.get(mmsi));
     refreshVisibleShips();
+    // Die volle Spur schon jetzt, nicht erst beim Klick auf "Spur": Sonst
+    // stuende dort "zu wenige Positionen", waehrend die Antwort noch laeuft.
+    proxySpur(mmsi);
     if (autoEnrichInput.checked) enrichShip(mmsi, false);
   }
 
@@ -6361,6 +6493,10 @@
       for (var k = 0; k < rahmen.schiffe.length; k++) proxyUebernimm(rahmen.schiffe[k], jetzt);
       applyMapFilter();
       refreshVisibleShips();
+      // Hier statt in onopen: Beim Verbindungsaufbau ist noch kein Schiff da,
+      // und die Historie wird nur denen zugeordnet, die es gibt. Die Wache in
+      // verlaufHolen() macht den Aufruf im Sekundentakt kostenlos.
+      verlaufHolen(false);
     };
 
     ws.onerror = function () { log("Proxy: Verbindungsfehler."); };
@@ -6418,6 +6554,137 @@
     var box = proxyBox();
     if (!box) return;
     proxySocket.send(JSON.stringify({ bbox: box }));
+  }
+
+  /* --- Historie aus dem Proxy ------------------------------------------
+   *
+   * Ohne sie reicht eine Spur nur so weit zurueck, wie der Browser offen ist.
+   * Der Proxy haelt sieben Tage vor; geholt werden die letzten
+   * TRACK_STUNDEN. Zwei Wege, weil es zwei Fragen sind:
+   *
+   *   /replay?bbox=   alle Schiffe im Bild, im Minutenraster. Gemessen an der
+   *                   echten Schnittstelle fuer einen 90-km-Ausschnitt ueber
+   *                   6 h: 196 Spuren, 13 202 Punkte, 144 KB auf der Leitung
+   *                   (487 KB entpackt). Ein groeberes Raster spart wenig:
+   *                   180 s bringen 77 KB, kosten aber die Kurven.
+   *   /track?mmsi=    ein Schiff in voller Aufloesung, fuer das ausgewaehlte.
+   */
+  var VERLAUF_RASTER_S = 60;
+  var VERLAUF_FRISCH_MS = 5 * 60 * 1000;
+  // Zugabe wie beim Snapshot: Ein kleiner Schwenk soll keinen neuen Abruf
+  // ausloesen.
+  var VERLAUF_RAND = 0.25;
+  var verlaufBox = null;
+  var verlaufAt = 0;
+  var verlaufLaeuft = false;
+  var verlaufFehlerLog = false;
+
+  function verlaufVon() {
+    return Math.floor((Date.now() - TRACK_STUNDEN * 3600000) / 1000);
+  }
+
+  // Historienpunkte VOR die vorhandenen setzen. Aufgenommen wird nur, was
+  // aelter ist als der aelteste bekannte Punkt - damit kann ein zweiter
+  // Abruf nichts doppelt eintragen, und es braucht kein Buch darueber, was
+  // schon geholt wurde.
+  function verlaufEinfuegen(entry, punkte) {
+    if (!entry || !punkte || !punkte.length) return 0;
+    if (!entry.track) entry.track = [];
+    var grenze = entry.track.length ? entry.track[0].t : Infinity;
+    var alt = Date.now() - TRACK_STUNDEN * 3600000;
+    var neu = [];
+    for (var i = 0; i < punkte.length; i++) {
+      var p = punkte[i];
+      var t = p[0] * 1000;
+      if (t >= grenze || t < alt) continue;
+      // Der Proxy speichert ganzzahlig: Grad mal 1e6, Knoten und Grad Kurs
+      // mal 10. Siehe aisproxy/src/speicher.js merke().
+      neu.push({ lat: p[1] / 1e6, lon: p[2] / 1e6, t: t,
+                 sog: p[3] == null ? null : p[3] / 10 });
+    }
+    if (!neu.length) return 0;
+    entry.track = trackKuerzen(neu.concat(entry.track));
+    return neu.length;
+  }
+
+  // Die Spur EINES Schiffes in voller Aufloesung - beim Oeffnen der
+  // Detailansicht, damit sie beim Klick auf "Spur" schon da ist.
+  function proxySpur(mmsi) {
+    if (!proxyLiefert()) return;
+    var entry = ships.get(String(mmsi));
+    if (!entry || entry.spurGeholt) return;
+    // Vor dem Abruf merken, nicht danach: Sonst stellt ein zweites Oeffnen
+    // waehrend der laufenden Anfrage dieselbe gleich noch einmal.
+    entry.spurGeholt = true;
+    fetch(proxyMitToken(proxyBasis() + "/track?mmsi=" + encodeURIComponent(mmsi) +
+        "&von=" + verlaufVon()))
+      .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
+      .then(function (d) {
+        if (!d || !d.punkte) return;
+        var n = verlaufEinfuegen(entry, d.punkte);
+        if (!n) return;
+        if (selectedMmsi === entry.mmsi && trackLayer) drawTrack(entry);
+        refreshVisibleShips();
+      })
+      .catch(function () {
+        // Ein zweiter Versuch darf sein, wenn der erste nicht geklappt hat.
+        entry.spurGeholt = false;
+      });
+  }
+
+  // Die Spuren ALLER Schiffe im Bild. Nur wenn ueberhaupt jemand Spuren
+  // zeichnet - ohne diese Bedingung liefe der Abruf auch bei abgeschalteten
+  // Spuren bei jedem Schwenk mit.
+  function verlaufHolen(erzwingen) {
+    if (!proxyLiefert() || !mapAvailable || verlaufLaeuft) return;
+    if (!trackGrenze && !selectedMmsi) return;
+    var b = map.getBounds();
+    var sicht = { latMin: b.getSouth(), lonMin: b.getWest(),
+                  latMax: b.getNorth(), lonMax: b.getEast() };
+    if (!erzwingen && boxCovers(verlaufBox, sicht) &&
+        Date.now() - verlaufAt < VERLAUF_FRISCH_MS) return;
+
+    var dLat = (sicht.latMax - sicht.latMin) * VERLAUF_RAND;
+    var dLon = (sicht.lonMax - sicht.lonMin) * VERLAUF_RAND;
+    var abruf = { latMin: sicht.latMin - dLat, lonMin: sicht.lonMin - dLon,
+                  latMax: sicht.latMax + dLat, lonMax: sicht.lonMax + dLon };
+    var box = [abruf.latMin, abruf.lonMin, abruf.latMax, abruf.lonMax]
+      .map(function (x) { return x.toFixed(4); }).join(",");
+
+    verlaufLaeuft = true;
+    fetch(proxyMitToken(proxyBasis() + "/replay?bbox=" + encodeURIComponent(box) +
+        "&von=" + verlaufVon() + "&schritt=" + VERLAUF_RASTER_S))
+      .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
+      .then(function (d) {
+        if (!d || !d.spuren) return;
+        var schiffe = 0, punkte = 0;
+        for (var i = 0; i < d.spuren.length; i++) {
+          // Nur Schiffe, die es noch gibt: Eine Spur ohne Marker waere ein
+          // Strich aus dem Nichts, und ein Datensatz ohne Position landete
+          // als Geisterschiff in der Tabelle.
+          var entry = ships.get(String(d.spuren[i].mmsi));
+          if (!entry) continue;
+          var n = verlaufEinfuegen(entry, d.spuren[i].punkte);
+          if (n) { schiffe++; punkte += n; }
+        }
+        verlaufBox = abruf;
+        verlaufAt = Date.now();
+        verlaufFehlerLog = false;
+        if (punkte) {
+          log("Verlauf aus dem Proxy: " + punkte + " Punkte für " + schiffe +
+            " Schiffe (letzte " + TRACK_STUNDEN + " h).");
+          if (selectedMmsi && trackLayer && ships.has(selectedMmsi)) drawTrack(ships.get(selectedMmsi));
+          refreshVisibleShips();
+        }
+      })
+      .catch(function (e) {
+        // Einmal melden, dann bis zum naechsten Erfolg schweigen - ein
+        // dauerhaft gestoerter Abruf darf das Protokoll nicht zumauern.
+        if (verlaufFehlerLog) return;
+        verlaufFehlerLog = true;
+        log("Verlauf konnte nicht geladen werden: " + (e && e.message ? e.message : e));
+      })
+      .finally(function () { verlaufLaeuft = false; });
   }
 
   // Stammdaten und Register in einem Zug: Der Proxy hat den ganzen Bestand
@@ -6728,7 +6995,7 @@
       trackLayer = null;
       return;
     }
-    if (entry.track.length < 2) {
+    if (trackImFenster(entry).length < 2) {
       log("Für MMSI " + entry.mmsi + " liegen noch zu wenige Positionen für einen Track vor.");
       return;
     }
@@ -7043,6 +7310,9 @@
     if (proxyAnInput.checked) {
       rueckfallAktiv = false;
       versorgungBewertet = false;
+      // Der Verlauf kommt nur aus dem Proxy - nach dem Einschalten also neu
+      // fragen, statt auf den naechsten Schwenk zu warten.
+      verlaufBox = null;
       if (socket) { manualDisconnect = true; socket.close(1000, "Wechsel auf Proxy"); }
       log("Proxybetrieb eingeschaltet: " + proxyBasis());
       connect();
