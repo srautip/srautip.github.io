@@ -1035,26 +1035,23 @@ wurde. Nach dem ersten Einfügen reicht der Bestand ohnehin bis an die
 aus dem Nichts, und ein Datensatz ohne aktuelle Position landete als
 Geisterschiff in Tabelle und Zähler.
 
-#### Die Verblassung — anteilig, nicht in festen Stunden
-
-Vorgegeben war sie für ein Sechs-Stunden-Fenster:
+#### Die Verblassung
 
 | Alter | Transparenz |
 |---|---|
-| 0–1 h | 0 % |
-| 1–2 h | linear bis 10 % |
-| 2–6 h | linear bis 100 % |
+| 0–10 min | 0 % |
+| ab 10 min | linear bis 100 % am Rand des Fensters |
 
-Seit das Fenster einstellbar ist, liegen die Knickpunkte **anteilig**:
-`TRACK_VOLL_ANTEIL` = 1/6 und `TRACK_KNICK_ANTEIL` = 2/6. Bei sechs Stunden
-kommt damit **genau die Vorgabe oben** heraus; bei zwei Stunden sind es
-20 min, 40 min und 2 h.
+**Die zehn Minuten sind absolut, nicht anteilig** (`TRACK_VOLL_MS`): Sie
+markieren „eben noch gemeldet" und haben mit der Fensterlänge nichts zu tun.
+Den Verlauf trägt der Rest — bei zwei Stunden Fenster 110 Minuten, bei sechs
+Stunden 350.
 
-**Feste Stunden wären hier falsch gewesen.** Bei einem
-Zwei-Stunden-Fenster hörte die Verblassung dann am ältesten Ende bei
-10 % Transparenz auf — sichtbar kein Verlauf und eine harte Kante am
-Fensterrand. Gemessen: anteilig läuft die Deckung auch bei 2 h von 1,000 bis
-0,084 durch (der Rest ist die Auflösung der Daten, siehe unten).
+*Vorher* lagen die Knickpunkte anteilig (1/6 und 2/6 des Fensters, mit einem
+Knick bei 10 % Transparenz), weil die ursprüngliche Vorgabe für ein
+Sechs-Stunden-Fenster formuliert war. Das verblasste zu langsam: Bei zwei
+Stunden war die halbe Spur noch fast voll gedeckt. Die jetzige Kurve fällt
+von Anfang an gleichmäßig.
 
 ##### „Die Transparenz funktioniert nicht" — sie tat es, nur unsichtbar
 
@@ -1201,6 +1198,38 @@ stehen. `applyMapFilter()` behandelt das wie jeden anderen Ausschluss.
 900 Punkten mal 200 Schiffen je Reglerbewegung wäre ein linearer Lauf 180 000
 Vergleiche.
 
+#### Detailspalte und Kartenfenster zeigen den Stand des Zeitpunkts
+
+`replayAnsicht(entry)` liefert eine **flache Kopie**, in der nur ersetzt ist,
+was die Historie wirklich hergibt: Ort, Geschwindigkeit, Kurs. `renderDetail()`
+und `popupHtml()` überschreiben ihren Parameter gleich in der ersten Zeile
+damit — so ziehen **alle** Ableitungen von selbst mit: Entfernung, Peilung,
+Kursbeschriftung, Positionszeile. Ohne die Kopie müsste jede einzelne Stelle
+den Regler kennen.
+
+Drei bewusste Grenzen:
+
+- **`heading` wird auf `null` gesetzt.** Die Bugrichtung führt die Historie
+  nicht mit; den heutigen Wert stehen zu lassen hieße, eine Angabe von jetzt
+  mit dem Etikett von damals zu versehen. Die Zeile „Steuerkurs" fehlt im
+  Replay deshalb.
+- **Der Abschnitt „Empfang" bleibt live.** „Wann haben wir zuletzt etwas
+  gehört", „wie viele Nachrichten", „Trackpunkte" sind Fragen an die Sitzung,
+  nicht an den eingestellten Zeitpunkt.
+- **Das Abzeichen aktuell/veraltet rechnet gegen die Replayzeit**
+  (`bezugsZeit()`), nicht gegen jetzt — sonst stünde bei jedem Rückblick
+  „veraltet", obwohl das Datum für diesen Moment frisch ist.
+
+**Der Zeitstempel steht hinter dem Schiffsnamen** (`.d-replay`, gelb wie die
+Reglerspalte): Uhrzeit plus derselbe Versatz, den der Regler anzeigt
+(`14:52:36 · −1:12 h`). Er erscheint **nur im Replay** — live bleibt
+`#detailTitle` reiner Text, sonst hätten alle Proben, die den Titel mit dem
+Schiffsnamen vergleichen, plötzlich einen Zeitstempel darin.
+
+**Das Kartenfenster (Popup) zieht nur mit, wenn es offen ist** —
+`marker.isPopupOpen()` in `markerSetzen()`. `bindPopup()` für zweihundert
+Schiffe je Reglerbewegung wäre Arbeit für nichts.
+
 #### Der Richtungspfeil gehört zum Zeitpunkt, nicht zur Gegenwart
 
 Gemeldet: *„Replay funktioniert, allerdings wird die Pfeilrichtung der
@@ -1294,7 +1323,9 @@ angenommen.
 | Klick auf die Anzeige | Regler zurück auf 1000, beide Schiffe auf jetzt |
 | CHARLIE dreht nach einer Stunde von Nord auf Ost | Pfeil live **90°**, ganz unten **0°**, zurück auf live wieder 90° |
 | ALPHA, das nie gedreht hat | bleibt bei 0° |
-| Regler in der Mitte, Verblassung | am Schiff **1,000**, nach hinten bis 0,759 |
+| Regler in der Mitte, Verblassung | am Schiff **1,000**, nach hinten bis 0,614 |
+| Detailspalte, Regler ganz unten | Kurs **0,0° (N)** statt live 90,0° (O), Position 53,72011 statt 53,75000 |
+| Zeitstempel hinter dem Namen | live keiner, unten `14:04:03 · −2:00 h`, Mitte `15:04:03 · −1:00 h` |
 
 Die letzte Zeile ist der Beleg, dass auch die **Verblassung** ab dem
 eingestellten Zeitpunkt rechnet und nicht ab jetzt: Rechnete sie ab jetzt,
