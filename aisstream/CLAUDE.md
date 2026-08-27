@@ -991,11 +991,22 @@ Schranke der Probe bleibt bei 250 ms.
 die Marker abfangen. Das ausgewählte Schiff wird ausgelassen, wenn seine
 eigene, dickere Spur eingeschaltet ist — sonst lägen zwei übereinander.
 
-### Sechs Stunden aus dem Proxy, und je älter desto durchsichtiger
+### Das Spurenfenster aus dem Proxy, und je älter desto durchsichtiger
 
 Vorher reichte eine Spur nur so weit zurück, wie das Fenster offen war —
 gemeldet als „es werden nur die Livedaten benutzt". Der Proxy hält sieben
-Tage vor; geholt werden davon die letzten **`TRACK_STUNDEN` = 6**.
+Tage vor; geholt werden davon die letzten **`trackStunden`** — einstellbar
+auf der Technikseite (`#trackStunden`, `aisstream_track_stunden`),
+**Voreinstellung 2 h**, Obergrenze 24. Derselbe Wert ist der Weg des
+Zeitreglers (siehe unten).
+
+Die Klammer ist dieselbe wie bei der Spurgrenze: `trackStundenAus()` prüft
+Feld **und** Speicher, leer heißt Voreinstellung — **nicht 0**, `Number("")`
+wäre 0 gewesen und damit ein Fenster von null Stunden.
+
+**Ein größeres Fenster braucht ältere Punkte, als bisher geholt wurden.** Der
+Handler setzt deshalb `verlaufBox = null` und fragt sofort neu; ein kleineres
+Fenster schneidet beim Zeichnen von selbst ab und braucht keinen Abruf.
 
 **Zwei Endpunkte, weil es zwei Fragen sind:**
 
@@ -1024,7 +1035,9 @@ wurde. Nach dem ersten Einfügen reicht der Bestand ohnehin bis an die
 aus dem Nichts, und ein Datensatz ohne aktuelle Position landete als
 Geisterschiff in Tabelle und Zähler.
 
-#### Die Verblassung
+#### Die Verblassung — anteilig, nicht in festen Stunden
+
+Vorgegeben war sie für ein Sechs-Stunden-Fenster:
 
 | Alter | Transparenz |
 |---|---|
@@ -1032,12 +1045,25 @@ Geisterschiff in Tabelle und Zähler.
 | 1–2 h | linear bis 10 % |
 | 2–6 h | linear bis 100 % |
 
+Seit das Fenster einstellbar ist, liegen die Knickpunkte **anteilig**:
+`TRACK_VOLL_ANTEIL` = 1/6 und `TRACK_KNICK_ANTEIL` = 2/6. Bei sechs Stunden
+kommt damit **genau die Vorgabe oben** heraus; bei zwei Stunden sind es
+20 min, 40 min und 2 h.
+
+**Feste Stunden wären hier falsch gewesen.** Bei einem
+Zwei-Stunden-Fenster hörte die Verblassung dann am ältesten Ende bei
+10 % Transparenz auf — sichtbar kein Verlauf und eine harte Kante am
+Fensterrand. Gemessen: anteilig läuft die Deckung auch bei 2 h von 1,000 bis
+0,084 durch (der Rest ist die Auflösung der Daten, siehe unten).
+
 **Eine Leaflet-Linie hat genau eine Deckung.** Ein Farbverlauf entsteht also
 nur, indem man die Spur zerlegt. Eine Linie je Punktpaar wäre bei 13 000
-Punkten ein DOM-Grab; gezeichnet wird deshalb in **Viertelstundenstufen**
-(`TRACK_STUFE_MS`) — höchstens 24 Stufen je Farbe. Der Deckungssprung von
-Stufe zu Stufe beträgt im steilsten Stück 0,056, das sieht man auf der Karte
-nicht als Kante.
+Punkten ein DOM-Grab; gezeichnet wird deshalb in **`TRACK_STUFEN` = 24
+Stufen**, deren Breite mit dem Fenster mitwandert (`trackStufeMs()`) — bei
+sechs Stunden die ursprünglichen Viertelstunden, bei zwei Stunden fünf
+Minuten. Feste Viertelstunden hätten ein Zwei-Stunden-Fenster auf acht
+Stufen heruntergebrochen, und dann sieht man die Treppe. Der Deckungssprung
+von Stufe zu Stufe beträgt im steilsten Stück 0,056.
 
 **Ein Abschnitt zählt mit dem Alter seiner Mitte**, nicht dem eines Endes.
 Bei den üblichen Minutenabständen ist das egal; nach einer Meldelücke von
@@ -1099,6 +1125,98 @@ Zwei Teile, beide gegen echte Gegenstellen:
   der Proxy hinter `https`, dort stellt sich die Frage nicht. `spuren.js
   live` überspringt Teil 2 mit einer Meldung, statt still grün zu sein.
 
+### Der Zeitregler: schmale Spalte links neben der Karte
+
+Ein senkrechter Schieber neben der Karte. **Oben ist jetzt, ganz unten jetzt
+minus dem eingestellten Spurenfenster.** Ohne Auswahl bewegen sich **alle**
+Schiffe mit, mit Auswahl **nur das gewählte** — so lässt sich ein einzelnes
+Schiff zurückverfolgen, ohne dass das ganze Bild in die Vergangenheit
+springt.
+
+**Eine Stelle beantwortet die Frage „gilt der Regler für dieses Schiff?"** —
+`replayGilt(entry)`. Marker, Sichtbarkeit, Spurende und Verblassung hängen
+alle daran; drei Stellen mit derselben Bedingung wären auseinandergelaufen.
+Dazu `bezugsZeit(entry)`: Im Replay verblasst die Spur hinter **dem Schiff**,
+nicht hinter der Gegenwart.
+
+| Funktion | Antwort |
+|---|---|
+| `replayLive()` | steht der Regler ganz oben? |
+| `replayZeit()` | welcher Zeitpunkt ist eingestellt |
+| `replayGilt(entry)` | bewegt sich *dieses* Schiff mit |
+| `replayPunkt(entry, t)` | wo es damals war — **`null`, wenn unbekannt** |
+
+**`null` heißt „gehört nicht auf die Karte".** Ein Schiff, dessen Spur erst
+später beginnt, verschwindet im Replay, statt an einer erfundenen Stelle zu
+stehen. `applyMapFilter()` behandelt das wie jeden anderen Ausschluss.
+
+**Zwischen den Stützpunkten wird interpoliert**, per Binärsuche im Track: Bei
+900 Punkten mal 200 Schiffen je Reglerbewegung wäre ein linearer Lauf 180 000
+Vergleiche.
+
+**Der Marker geht nur noch über `markerSetzen()`.** `setPosition()` darf im
+Replay nicht mehr direkt `setLatLng()` rufen — eine hereinkommende
+Livemeldung risse den Marker sonst in die Gegenwart zurück. Der Vergleich mit
+dem zuletzt gesetzten Ort (`entry.ortGesetzt`) spart bei 200 Schiffen je
+Rahmen 200 Leaflet-Aufrufe, die nichts ändern.
+
+**Die Spur endet beim eingestellten Zeitpunkt** (`trackImFenster()`), ihr
+Anfang bleibt aber bei „jetzt minus Fenster": Weiter zurück liegen keine
+Daten, und eine Spur, die mit dem Regler nach hinten mitwanderte, täuschte
+welche vor.
+
+**Ein Auswahlwechsel ändert den Kreis der bewegten Schiffe**, also rufen
+`openDetail()` und `closeDetail()` `replayAnwenden()` — aber nur, wenn der
+Regler überhaupt zurücksteht.
+
+#### Senkrecht, und oben ist oben
+
+```css
+writing-mode: vertical-lr;   /* Chrome 121+, Firefox 120+, Safari 17.4+ */
+direction: rtl;              /* damit das Maximum oben liegt */
+-webkit-appearance: slider-vertical;   /* ältere Safari */
+```
+
+Beide Wege legen das Maximum nach oben, sie widersprechen sich also nicht.
+**Verlassen kann man sich darauf trotzdem nicht** — deshalb zieht die Probe
+den Regler mit der **Maus** an den unteren Rand und prüft, dass der Wert
+danach am Minimum steht. Ein `dispatchEvent` auf `.value` hätte eine
+verdrehte Achse nie bemerkt.
+
+Die Spalte färbt sich im Replay (`#replaySpalte.zurueck`, gelb) — sonst hält
+man eine Karte, die die Vergangenheit zeigt, für kaputt. Die Anzeige darüber
+nennt den Versatz („−1:20 h") und **stellt per Klick auf jetzt zurück**.
+
+Sie steht **oben**, neben dem Regler in seiner Ruhelage: Unten gelesen wirkte
+„live" wie die Beschriftung des unteren Endes — und das ist die
+Vergangenheit.
+
+`#kartenzeile` ist eine Flexbox mit `align-items: stretch`, die Spalte wird
+also genau so hoch wie die Karte. Deren Höhe ist eine Rechnung (`calc(64vh -
+var(--head-h))`) und soll an genau einer Stelle stehen. `min-width: 0` an der
+Karte ist Pflicht — sonst wächst das Flex-Kind auf die Mindestbreite seines
+Inhalts, dieselbe Falle wie bei der Filterleiste. Gemessen: iPhone 15
+Karte 322 px, Spalte 40 px, **Überbreite 0**.
+
+#### Gemessen in `scratchpad/replay.js`
+
+An den Markern auf dem Schirm, nicht an inneren Werten. Die beiden
+Testschiffe fahren nach **Norden**, ihre Bildschirmhöhe fällt also mit der
+Zeit — ein Marker, der beim Ziehen nach unten nach unten wandert, zeigt damit
+Vergangenheit. Die Richtung des Reglers ist dadurch mitgeprüft und nicht
+angenommen.
+
+| | gemessen |
+|---|---|
+| ohne Auswahl, Regler ganz unten | beide Schiffe 148 px nach Süden |
+| mit Auswahl BRAVO | ALPHA **0 px**, BRAVO 148 px |
+| Fenster von 2 h auf 1 h | 148 px → 74 px, also genau halb so weit |
+| Klick auf die Anzeige | Regler zurück auf 1000, beide Schiffe auf jetzt |
+
+Die Auswahl wird **innerhalb** einer Phase gemessen: Das Öffnen der
+Detailspalte verkleinert die Karte und verschiebt damit alle Marker. Wer über
+den Auswahlwechsel hinweg vergleicht, misst die Layoutänderung mit.
+
 #### Hysterese, sonst flackert es
 
 An der Grenze (Voreinstellung **100**) gehen die Spuren an, aus erst wieder
@@ -1158,7 +1276,9 @@ stimmte:
   `.leaflet-overlay-pane path` — dort und nur dort liegen Leaflets Vektoren.
 - **Leaflet setzt bei einer geleerten Linie `d="M0 0"`.** Ein
   `d.split('M')` zählt das als ein Stück. Es zählen nur Stücke mit
-  mindestens zwei Punkten.
+  mindestens zwei Punkten. **Dieselbe Falle noch einmal**, beim kurzen
+  Spurenfenster: Die geleerten Stufenebenen haben einen Bildkasten in der
+  Ecke des SVG und zogen die gemessene Spurhöhe auf 342 statt 45 px.
 - **Der Weg zum Messpunkt zählt mit.** Die Hysterese über den Typfilter
   einzustellen ging schief: Der Filter setzt erst zurück und klickt dann
   Chips einzeln, läuft also zwischendurch über acht sichtbare Schiffe und
@@ -2261,7 +2381,7 @@ node lauf.js --live          gegen die ausgelieferte Seite statt localhost
 node lauf.js sortierung ...  nur diese Tests
 ```
 
-30 gepflegte Tests, seriell 722 s. **Parallel ist der große Hebel** — und
+31 gepflegte Tests, seriell 758 s. **Parallel ist der große Hebel** — und
 zwar aus einem messbaren Grund: Ein Seitenaufbau kostet 624 ms (ohne Kacheln
 255 ms), die Laufzeit steckt fast vollständig in festen Wartepausen, und die
 kosten keine CPU.

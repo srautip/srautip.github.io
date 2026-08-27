@@ -203,6 +203,64 @@
     line-height: 1.4;
   }
   .hint a { color: var(--accent); }
+  /* Karte und Zeitregler nebeneinander. align-items:stretch laesst die
+     Reglerspalte genau so hoch werden wie die Karte - deren Hoehe ist eine
+     Rechnung (siehe unten), und die soll nur an EINER Stelle stehen. */
+  #kartenzeile {
+    display: flex;
+    align-items: stretch;
+    gap: 0.45rem;
+  }
+  #kartenzeile #map {
+    flex: 1 1 auto;
+    /* Ohne min-width:0 waechst ein Flex-Kind auf die Mindestbreite seines
+       Inhalts - dieselbe Falle wie bei der Filterleiste, steht dreimal in
+       CLAUDE.md. */
+    min-width: 0;
+  }
+  #replaySpalte {
+    flex: 0 0 40px;
+    width: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.4rem 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel);
+  }
+  /* Senkrecht, oben der groesste Wert (= jetzt).
+     writing-mode ist der heutige Weg (Chrome 121+, Firefox 120+,
+     Safari 17.4+), -webkit-appearance der fuer aeltere Safari. Beide legen
+     das Maximum nach oben, sie widersprechen sich also nicht. */
+  #replay {
+    writing-mode: vertical-lr;
+    direction: rtl;
+    -webkit-appearance: slider-vertical;
+    appearance: slider-vertical;
+    width: 22px;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0;
+    accent-color: var(--accent);
+  }
+  .replay-wert {
+    all: unset;
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    text-align: center;
+    font-size: 0.58rem;
+    line-height: 1.1;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0.15rem 0;
+  }
+  /* Im Replay faerbt sich die Spalte - sonst uebersieht man, dass die Karte
+     die Vergangenheit zeigt, und haelt sie fuer kaputt. */
+  #replaySpalte.zurueck { border-color: var(--warn); }
+  #replaySpalte.zurueck .replay-wert { color: var(--warn); font-weight: 600; }
   #map {
     /* Kopfzeile plus Karte belegen zusammen 64 % der Fensterhoehe - fuer die
        Liste darunter bleiben damit rund ein Drittel, gefordert waren
@@ -1194,13 +1252,27 @@
       Gemessen kostet das Nachzeichnen beim Zoomen bei 98 Schiffen höchstens
       21&nbsp;ms.
     </p>
+    <label class="zahlzeile" for="trackStunden">
+      Spuren und Replay reichen
+      <input type="number" id="trackStunden" min="1" max="24" step="1" value="2" />
+      Stunden zurück
+    </label>
+    <p class="hint" style="margin-top:0.35rem">
+      Über den Proxy reichen die Spuren so weit zurück &ndash; auch für die
+      Zeit, in der dieses Fenster gar nicht offen war. Derselbe Wert ist der
+      Weg des <b>Zeitreglers</b> links neben der Karte: ganz oben ist jetzt,
+      ganz unten so viele Stunden davor. Ohne Proxy reicht eine Spur nur so
+      weit zurück wie die Sitzung.
+    </p>
     <p class="hint">
-      Über den Proxy reichen die Spuren <b>6&nbsp;Stunden</b> zurück &ndash;
-      auch für die Zeit, in der dieses Fenster gar nicht offen war. Ältere
-      Stücke verblassen: bis zu einer Stunde volle Deckung, bis zwei Stunden
-      auf 10&nbsp;% Transparenz, danach linear bis zum Verschwinden bei sechs
-      Stunden. Ohne Proxy reicht eine Spur nur so weit zurück wie die
-      Sitzung.
+      Ältere Stücke verblassen, und zwar <b>anteilig zum eingestellten
+      Fenster</b>: das erste Sechstel volle Deckung, bis zum Drittel auf
+      10&nbsp;% Transparenz, danach linear bis zum Verschwinden am Rand. Bei
+      6&nbsp;Stunden sind das genau 1&nbsp;h, 2&nbsp;h und 6&nbsp;h; bei
+      2&nbsp;Stunden 20&nbsp;min, 40&nbsp;min und 2&nbsp;h. Feste Stunden
+      hätten bei einem kurzen Fenster gar keine sichtbare Verblassung ergeben.
+      <b>Mehr Stunden kosten Verkehr:</b> gemessen 144&nbsp;KB für einen
+      90-km-Ausschnitt über 6&nbsp;h, also rund 50&nbsp;KB für 2&nbsp;h.
     </p>
 
     <h2 style="margin-top:1.2rem">Eigener Proxy</h2>
@@ -1319,7 +1391,22 @@
   </aside>
 
   <section id="content">
-    <div id="map"></div>
+    <div id="kartenzeile">
+      <!-- Der Zeitregler. Oben ist jetzt, unten das Ende des Spurenfensters.
+           Links von der Karte, damit er die Zoomknoepfe rechts nicht
+           bedraengt. -->
+      <div id="replaySpalte">
+        <!-- Die Anzeige steht OBEN, neben dem Regler in seiner Ruhelage. Unten
+             gelesen wirkte "live" wie die Beschriftung des unteren Endes -
+             und das ist die Vergangenheit. -->
+        <button type="button" id="replayWert" class="replay-wert"
+                title="Zurück auf jetzt">live</button>
+        <input type="range" id="replay" min="0" max="1000" step="1" value="1000"
+               orient="vertical"
+               aria-label="Zeitregler: oben jetzt, unten der Anfang des Spurenfensters" />
+      </div>
+      <div id="map"></div>
+    </div>
     <div class="panel" style="margin-top:1rem">
       <!-- Die Ueberschrift stand frueher in einer eigenen Zeile (15px Text
            plus 12px Rand). Sie ist jetzt Teil der Suchzeile - dieselbe
@@ -1629,48 +1716,146 @@
   //
   // Die Livedaten allein reichen nur so weit zurueck, wie der Browser offen
   // ist. Der Proxy haelt sieben Tage Historie; gezeigt werden davon die
-  // letzten TRACK_STUNDEN. Aeltere Stuecke werden durchsichtiger, damit man
+  // letzten trackStunden. Aeltere Stuecke werden durchsichtiger, damit man
   // ohne Legende sieht, was frisch ist und was von vor Stunden.
   //
   //   0-1 h   volle Deckung
   //   1-2 h   linear bis 10 % Transparenz
   //   2-6 h   linear bis 100 % Transparenz
-  var TRACK_STUNDEN = 6;
-  var TRACK_VOLL_H = 1;
-  var TRACK_KNICK_H = 2;
+  // Wie weit zurueck: einstellbar auf der Technikseite, in Stunden.
+  var TRACK_STUNDEN_VOREINSTELLUNG = 2;
+  var TRACK_STUNDEN_MAX = 24;
+  var trackStunden = TRACK_STUNDEN_VOREINSTELLUNG;
+
+  // Die Knickpunkte liegen ANTEILIG im Fenster, nicht bei festen Stunden.
+  //
+  // Die Vorgabe war fuer ein Sechs-Stunden-Fenster formuliert: 0-1 h voll,
+  // 1-2 h bis 10 %, 2-6 h bis 100 %. Ein Sechstel und ein Drittel geben
+  // genau das wieder, wenn das Fenster sechs Stunden ist - und lassen die
+  // Verblassung heil, wenn es zwei sind. Fest verdrahtete Stunden haetten
+  // bei zwei Stunden am aeltesten Ende bei 10 % Transparenz aufgehoert:
+  // sichtbar keine Verblassung und eine harte Kante am Fensterrand.
+  var TRACK_VOLL_ANTEIL = 1 / 6;
+  var TRACK_KNICK_ANTEIL = 2 / 6;
   var TRACK_KNICK_TRANSPARENZ = 0.10;
   // In Stufen zeichnen, nicht je Punkt: Eine Leaflet-Linie hat GENAU EINE
   // Deckung. Eine Linie je Punktpaar waere bei 13 000 Punkten ein DOM-Grab,
   // eine Linie je Viertelstunde sind hoechstens 24 Stufen je Farbe. Der
   // Deckungssprung von einer Stufe zur naechsten betraegt im steilsten Stueck
   // 0,056 - unterhalb dessen, was man auf der Karte als Kante sieht.
-  var TRACK_STUFE_MS = 15 * 60 * 1000;
+  // 24 Stufen, gleich wie gross das Fenster ist: Bei sechs Stunden sind das
+  // die urspruenglichen Viertelstunden, bei zwei Stunden fuenf Minuten. Feste
+  // Viertelstunden haetten ein Zwei-Stunden-Fenster auf acht Stufen
+  // heruntergebrochen, und dann sieht man die Treppe.
+  var TRACK_STUFEN = 24;
+  function trackStufeMs() { return trackStunden * 3600000 / TRACK_STUFEN; }
 
   // Deckung (1 = voll) fuer ein Alter in Millisekunden.
   function trackDeckung(alterMs) {
-    var h = alterMs / 3600000;
-    if (h <= TRACK_VOLL_H) return 1;
-    if (h >= TRACK_STUNDEN) return 0;
-    if (h <= TRACK_KNICK_H) {
-      return 1 - TRACK_KNICK_TRANSPARENZ * (h - TRACK_VOLL_H) / (TRACK_KNICK_H - TRACK_VOLL_H);
+    // Anteil am Fenster statt absoluter Stunden - siehe TRACK_VOLL_ANTEIL.
+    var a = alterMs / (trackStunden * 3600000);
+    if (a <= TRACK_VOLL_ANTEIL) return 1;
+    if (a >= 1) return 0;
+    if (a <= TRACK_KNICK_ANTEIL) {
+      return 1 - TRACK_KNICK_TRANSPARENZ *
+        (a - TRACK_VOLL_ANTEIL) / (TRACK_KNICK_ANTEIL - TRACK_VOLL_ANTEIL);
     }
     return (1 - TRACK_KNICK_TRANSPARENZ) *
-      (1 - (h - TRACK_KNICK_H) / (TRACK_STUNDEN - TRACK_KNICK_H));
+      (1 - (a - TRACK_KNICK_ANTEIL) / (1 - TRACK_KNICK_ANTEIL));
   }
 
   // Stufennummer und die Deckung, mit der die ganze Stufe gezeichnet wird -
   // gemessen in der Mitte der Stufe, sonst waere die juengste Stufe schon
   // blasser als noetig.
   function trackStufe(alterMs) {
-    var n = Math.floor(Math.max(0, alterMs) / TRACK_STUFE_MS);
-    var max = Math.ceil(TRACK_STUNDEN * 3600000 / TRACK_STUFE_MS);
-    return Math.min(n, max);
+    return Math.min(Math.floor(Math.max(0, alterMs) / trackStufeMs()), TRACK_STUFEN);
   }
   function trackStufenDeckung(n) {
-    return trackDeckung((n + 0.5) * TRACK_STUFE_MS);
+    return trackDeckung((n + 0.5) * trackStufeMs());
   }
 
-  // Alles aelter als TRACK_STUNDEN weg, und wenn danach immer noch zu viele
+  // Dieselbe Klammer wie bei der Spurgrenze: Feld und Speicher laufen durch
+  // eine Funktion, leer heisst Voreinstellung (nicht 0 - Number("") waere 0
+  // gewesen, also ein Fenster von null Stunden).
+  function trackStundenAus(roh) {
+    if (roh === null || String(roh).trim() === "") return TRACK_STUNDEN_VOREINSTELLUNG;
+    var n = Number(roh);
+    if (!isFinite(n)) return TRACK_STUNDEN_VOREINSTELLUNG;
+    return Math.max(1, Math.min(TRACK_STUNDEN_MAX, Math.round(n)));
+  }
+
+  // --- Der Zeitregler (Replay) -------------------------------------------
+  //
+  // Oben ist jetzt, ganz unten jetzt minus dem eingestellten Spurenfenster.
+  // Ohne Auswahl bewegen sich ALLE Schiffe mit, mit Auswahl nur das gewaehlte -
+  // so laesst sich ein einzelnes Schiff zurueckverfolgen, ohne dass das ganze
+  // Bild in die Vergangenheit springt.
+  var REPLAY_STUFEN = 1000;
+  var replayAnteil = 1;                       // 1 = live, 0 = ganz zurueck
+  function replayLive() { return replayAnteil >= 1; }
+  function replayZeit() {
+    return Date.now() - (1 - replayAnteil) * trackStunden * 3600000;
+  }
+  // Gilt der Regler fuer DIESES Schiff? Die Frage muss an einer Stelle
+  // beantwortet werden - Marker, Sichtbarkeit, Spur und Verblassung haengen
+  // alle daran, und drei Stellen mit derselben Bedingung liefen auseinander.
+  function replayGilt(entry) {
+    if (replayLive() || !entry) return false;
+    return !selectedMmsi || entry.mmsi === selectedMmsi;
+  }
+  // Der Zeitpunkt, aus dessen Sicht ein Schiff gezeichnet wird. Im Replay
+  // verblasst die Spur hinter dem Schiff, nicht hinter der Gegenwart.
+  function bezugsZeit(entry) {
+    return replayGilt(entry) ? replayZeit() : Date.now();
+  }
+
+  // Wo ein Schiff zu einem Zeitpunkt war. null heisst "damals nicht bekannt" -
+  // dann gehoert es nicht auf die Karte, statt an einer erfundenen Stelle zu
+  // stehen.
+  function replayPunkt(entry, zeit) {
+    var t = entry && entry.track;
+    if (!t || !t.length) return null;
+    if (zeit < t[0].t) return null;
+    var letzt = t[t.length - 1];
+    if (zeit >= letzt.t) return { lat: letzt.lat, lon: letzt.lon };
+    // Binaersuche statt Durchlauf: Bei 900 Punkten mal 200 Schiffen je
+    // Reglerbewegung waere ein linearer Lauf 180 000 Vergleiche.
+    var lo = 0, hi = t.length - 1;
+    while (hi - lo > 1) {
+      var m = (lo + hi) >> 1;
+      if (t[m].t <= zeit) lo = m; else hi = m;
+    }
+    var a = t[lo], b = t[hi];
+    var f = b.t === a.t ? 0 : (zeit - a.t) / (b.t - a.t);
+    return { lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + (b.lon - a.lon) * f };
+  }
+
+  function replayBeschriftung() {
+    if (replayLive()) return "live";
+    var min = Math.round((1 - replayAnteil) * trackStunden * 60);
+    var h = Math.floor(min / 60), m = min % 60;
+    return "\u2212" + (h ? h + ":" + (m < 10 ? "0" : "") + m + " h" : m + " min");
+  }
+
+  function replayAnzeigen() {
+    if (!replayWertEl) return;
+    replayWertEl.textContent = replayBeschriftung();
+    replayWertEl.title = replayLive()
+      ? "Die Karte zeigt den aktuellen Stand"
+      : "Zeigt den Stand vor " + replayBeschriftung().slice(1) + " \u2013 klicken f\u00fcr jetzt";
+    if (replaySpalteEl) replaySpalteEl.classList.toggle("zurueck", !replayLive());
+  }
+
+  // Karte neu stellen. applyMapFilter() setzt Orte, Sichtbarkeit UND die
+  // Auto-Spuren in einem Durchgang - die eigene Spur des gewaehlten Schiffs
+  // haengt daneben.
+  function replayAnwenden() {
+    if (!mapAvailable) return;
+    applyMapFilter();
+    if (trackLayer && selectedMmsi && ships.has(selectedMmsi)) drawTrack(ships.get(selectedMmsi));
+  }
+
+  // Alles aelter als das Fenster weg, und wenn danach immer noch zu viele
   // Punkte drin sind, die AELTERE HAELFTE ausduennen statt vorne
   // abzuschneiden.
   //
@@ -1679,7 +1864,7 @@
   // wuerde ausgerechnet das Stueck, das die Historie gerade beigebracht hat.
   // Die Spur waere dann wieder eine Livespur - der gemeldete Zustand.
   function trackKuerzen(track) {
-    var grenze = Date.now() - TRACK_STUNDEN * 3600000;
+    var grenze = Date.now() - trackStunden * 3600000;
     var i = 0;
     while (i < track.length && track[i].t < grenze) i++;
     if (i) track = track.slice(i);
@@ -1731,6 +1916,10 @@
   var filterResetEl = document.getElementById("filterReset");
   var showLabelsInput = document.getElementById("showLabels");
   var trackLimitInput = document.getElementById("trackLimit");
+  var trackStundenInput = document.getElementById("trackStunden");
+  var replayInput = document.getElementById("replay");
+  var replayWertEl = document.getElementById("replayWert");
+  var replaySpalteEl = document.getElementById("replaySpalte");
   var proxyAnInput = document.getElementById("proxyAn");
   var proxyUrlInput = document.getElementById("proxyUrl");
   var proxyTokenInput = document.getElementById("proxyToken");
@@ -1779,6 +1968,9 @@
   // Karte nicht lahmlegen - dieselbe Klammer wie bei der Eingabe.
   trackGrenze = trackGrenzeAus(localStorage.getItem("aisstream_track_limit"));
   trackLimitInput.value = String(trackGrenze);
+  trackStunden = trackStundenAus(localStorage.getItem("aisstream_track_stunden"));
+  trackStundenInput.value = String(trackStunden);
+  replayAnzeigen();
 
   // Der Proxy ist die Vorgabe. Faellt er aus, uebernimmt der direkte Weg von
   // selbst - deshalb kostet das nichts, auch wenn der Server gerade steht.
@@ -3482,7 +3674,10 @@
 
     if (mapAvailable) {
       if (entry.marker) {
-        entry.marker.setLatLng([lat, lon]);
+        // Nicht direkt setLatLng: Im Replay steht der Marker woanders, und
+        // eine hereinkommende Livemeldung darf ihn nicht in die Gegenwart
+        // zurueckreissen.
+        markerSetzen(entry);
       } else {
         entry.marker = L.marker([lat, lon], { icon: shipIcon(entry) });
         entry.iconKey = iconKey(entry);
@@ -3597,9 +3792,32 @@
   // anyway, and keeping hundreds of unseen nodes around costs on a phone.
   // A small pad keeps the ones just past the edge in place so nothing pops in
   // while panning; the table uses the exact bounds.
-  function markerInView(entry) {
+  // Wo der Marker gerade STEHEN soll - im Replay nicht die letzte gemeldete
+  // Position, sondern die zum eingestellten Zeitpunkt.
+  function markerOrt(entry) {
+    if (replayGilt(entry)) return replayPunkt(entry, replayZeit());
+    return entry.lat == null ? null : { lat: entry.lat, lon: entry.lon };
+  }
+
+  // Setzt den Marker an seinen Ort und meldet ihn zurueck; null heisst
+  // "gehoert gerade nicht auf die Karte". Der Vergleich mit dem zuletzt
+  // gesetzten Ort spart bei 200 Schiffen je Rahmen 200 Leaflet-Aufrufe, die
+  // nichts aendern.
+  function markerSetzen(entry) {
+    if (!entry.marker) return null;
+    var ort = markerOrt(entry);
+    if (!ort) return null;
+    var alt = entry.ortGesetzt;
+    if (!alt || alt.lat !== ort.lat || alt.lon !== ort.lon) {
+      entry.marker.setLatLng([ort.lat, ort.lon]);
+      entry.ortGesetzt = ort;
+    }
+    return ort;
+  }
+
+  function markerInView(ort) {
     if (!mapAvailable) return true;
-    return map.getBounds().pad(0.25).contains([entry.lat, entry.lon]);
+    return map.getBounds().pad(0.25).contains([ort.lat, ort.lon]);
   }
 
   // The map is the other half of the same slice: a filtered-out ship must
@@ -3609,7 +3827,11 @@
     var gezeigt = [];
     ships.forEach(function (entry) {
       if (!entry.marker) return;
-      var show = passesFilters(entry) && markerInView(entry);
+      var ort = markerSetzen(entry);
+      // Ohne Ort ist das Schiff zum eingestellten Zeitpunkt noch nicht
+      // bekannt gewesen - es verschwindet, statt an einer erfundenen Stelle
+      // zu stehen.
+      var show = !!ort && passesFilters(entry) && markerInView(ort);
       if (show) gezeigt.push(entry);
       if (show === entry.markerShown) return;
       entry.markerShown = show;
@@ -5675,11 +5897,20 @@
   // alt ist, ohne dass ein Takt daran erinnern muss.
   function trackImFenster(entry) {
     if (!entry || !entry.track || !entry.track.length) return [];
-    var grenze = Date.now() - TRACK_STUNDEN * 3600000;
+    var grenze = Date.now() - trackStunden * 3600000;
     var t = entry.track;
     var i = 0;
     while (i < t.length && t[i].t < grenze) i++;
-    return i ? t.slice(i) : t;
+    var aus = i ? t.slice(i) : t;
+    // Im Replay endet die Spur beim eingestellten Zeitpunkt: Was danach kam,
+    // ist aus dieser Sicht Zukunft. Der Anfang bleibt bei "jetzt minus
+    // Fenster" - weiter zurueck liegen keine Daten, und eine Spur, die mit
+    // dem Regler nach hinten mitwandert, taeuschte welche vor.
+    if (!replayGilt(entry)) return aus;
+    var bis = replayZeit();
+    var j = aus.length;
+    while (j > 0 && aus[j - 1].t > bis) j--;
+    return j === aus.length ? aus : aus.slice(0, j);
   }
 
   // Eine Punktfolge in Laeufe gleicher Altersstufe zerlegen. Weil die Punkte
@@ -5714,7 +5945,7 @@
     var pts = trackImFenster(entry);
     if (pts.length < 2) return;
     var nachStufe = {};
-    trackLaeufe(pts, Date.now(), nachStufe, null);
+    trackLaeufe(pts, bezugsZeit(entry), nachStufe, null);
     // Eine Gruppe statt einer Linie: Jede Altersstufe braucht ihre eigene
     // Deckung, und eine Leaflet-Linie hat genau eine. featureGroup, nicht
     // layerGroup - nur die erste kann getBounds(), und darauf steht das
@@ -5745,7 +5976,6 @@
     // Rand bekommt etwas Zugabe, damit die Linien nicht sichtbar an der
     // Kante abgeschnitten wirken.
     var box = map.getBounds().pad(0.15);
-    var jetzt = Date.now();
     // Eine Ebene je Farbe UND Altersstufe. Das sind hoechstens neun Farben
     // mal 25 Stufen; angelegt wird nur, was wirklich vorkommt.
     var nachSchluessel = {};
@@ -5761,7 +5991,7 @@
       // Ein Abschnitt zaehlt, sobald EIN Ende im Bild liegt - sonst fehlte
       // genau das Stueck, das den Rand kreuzt, und die Spur endete zu frueh.
       // Verlaesst sie das Bild und kommt zurueck, entstehen zwei Stuecke.
-      trackLaeufe(pts, jetzt, nachStufe, function (a, b) {
+      trackLaeufe(pts, bezugsZeit(entry), nachStufe, function (a, b) {
         return box.contains([a.lat, a.lon]) || box.contains([b.lat, b.lon]);
       });
       Object.keys(nachStufe).forEach(function (n) {
@@ -6191,6 +6421,9 @@
     // Die volle Spur schon jetzt, nicht erst beim Klick auf "Spur": Sonst
     // stuende dort "zu wenige Positionen", waehrend die Antwort noch laeuft.
     proxySpur(mmsi);
+    // Mit Auswahl bewegt sich nur noch das gewaehlte Schiff - die anderen
+    // muessen also zurueck in die Gegenwart, und zwar sofort.
+    if (!replayLive()) replayAnwenden();
     if (autoEnrichInput.checked) enrichShip(mmsi, false);
   }
 
@@ -6205,6 +6438,8 @@
     kartengroesseNachziehen();
     if (trackLayer) { map.removeLayer(trackLayer); trackLayer = null; }
     refreshVisibleShips();
+    // Ohne Auswahl gilt der Zeitregler wieder fuer alle Schiffe.
+    if (!replayLive()) replayAnwenden();
   }
 
   function scheduleReconnect() {
@@ -6560,7 +6795,7 @@
    *
    * Ohne sie reicht eine Spur nur so weit zurueck, wie der Browser offen ist.
    * Der Proxy haelt sieben Tage vor; geholt werden die letzten
-   * TRACK_STUNDEN. Zwei Wege, weil es zwei Fragen sind:
+   * trackStunden. Zwei Wege, weil es zwei Fragen sind:
    *
    *   /replay?bbox=   alle Schiffe im Bild, im Minutenraster. Gemessen an der
    *                   echten Schnittstelle fuer einen 90-km-Ausschnitt ueber
@@ -6580,7 +6815,7 @@
   var verlaufFehlerLog = false;
 
   function verlaufVon() {
-    return Math.floor((Date.now() - TRACK_STUNDEN * 3600000) / 1000);
+    return Math.floor((Date.now() - trackStunden * 3600000) / 1000);
   }
 
   // Historienpunkte VOR die vorhandenen setzen. Aufgenommen wird nur, was
@@ -6591,7 +6826,7 @@
     if (!entry || !punkte || !punkte.length) return 0;
     if (!entry.track) entry.track = [];
     var grenze = entry.track.length ? entry.track[0].t : Infinity;
-    var alt = Date.now() - TRACK_STUNDEN * 3600000;
+    var alt = Date.now() - trackStunden * 3600000;
     var neu = [];
     for (var i = 0; i < punkte.length; i++) {
       var p = punkte[i];
@@ -6672,7 +6907,7 @@
         verlaufFehlerLog = false;
         if (punkte) {
           log("Verlauf aus dem Proxy: " + punkte + " Punkte für " + schiffe +
-            " Schiffe (letzte " + TRACK_STUNDEN + " h).");
+            " Schiffe (letzte " + trackStunden + " h).");
           if (selectedMmsi && trackLayer && ships.has(selectedMmsi)) drawTrack(ships.get(selectedMmsi));
           refreshVisibleShips();
         }
@@ -7364,6 +7599,36 @@
       ? "Spuren werden bis " + trackGrenze + " sichtbaren Schiffen gezeichnet."
       : "Spuren abgeschaltet.");
   });
+  trackStundenInput.addEventListener("change", function () {
+    var vorher = trackStunden;
+    trackStunden = trackStundenAus(trackStundenInput.value);
+    trackStundenInput.value = String(trackStunden);
+    localStorage.setItem("aisstream_track_stunden", String(trackStunden));
+    if (trackStunden === vorher) return;
+    // Ein groesseres Fenster braucht aeltere Punkte, als bisher geholt wurden -
+    // also den Deckungsvermerk vergessen und neu fragen. Ein kleineres
+    // schneidet beim Zeichnen von selbst ab.
+    verlaufBox = null;
+    verlaufHolen(true);
+    replayAnzeigen();
+    replayAnwenden();
+    log("Spuren und Replay reichen jetzt " + trackStunden + " Stunden zurück.");
+  });
+
+  // Der Zeitregler. "input" statt "change": Es soll sich beim Ziehen bewegen,
+  // nicht erst beim Loslassen.
+  replayInput.addEventListener("input", function () {
+    replayAnteil = Number(replayInput.value) / REPLAY_STUFEN;
+    replayAnzeigen();
+    replayAnwenden();
+  });
+  replayWertEl.addEventListener("click", function () {
+    replayInput.value = String(REPLAY_STUFEN);
+    replayAnteil = 1;
+    replayAnzeigen();
+    replayAnwenden();
+  });
+
   if (mapAvailable) map.on("zoomend", refreshAllLabels);
 
   [["aisstream_auto_snapshot", autoSnapshotInput], ["aisstream_auto_connect", autoConnectInput],
