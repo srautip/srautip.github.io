@@ -14,15 +14,41 @@ Gemessen im Betrieb, nicht geschätzt — die kleinste Ausstattung reicht:
 | Platte | ~500 MB Historie + ~400 MB Images | 10 GB sind bequem |
 | **Verkehr** | **~0,8 GB/Tag ≈ 25 GB/Monat** eingehend | Das ist der einzige Wert, der bei manchen Tarifen eng wird — vorher im Tarif nachsehen |
 
-## Vorher: ein DNS-Eintrag
+## Vorher: der DNS-Eintrag
 
-Für automatisches TLS braucht Caddy einen Namen, der auf den Server zeigt:
+**Das Skript legt ihn nicht an und kann es auch nicht** — der Eintrag liegt
+beim DNS-Anbieter der Domain, nicht auf dem Server. Er ist die einzige
+Handarbeit vorweg.
 
-```
-ais.deinedomain.de.   A   <IP des VPS>
-```
+1. Öffentliche IP des VPS notieren (im Panel oder auf dem Server mit
+   `hostname -I`).
+2. Beim DNS-Anbieter der Domain einen **A-Record** anlegen:
 
-Ohne Domain geht es auch — siehe *Ohne eigene Domain* weiter unten.
+   | Typ | Name | Wert | TTL |
+   |---|---|---|---|
+   | `A` | `ais` | `<IP des VPS>` | 300 |
+
+   Der Name ist meist nur die Subdomain (`ais`), nicht der volle
+   `ais.deinedomain.de` — das hängt vom Anbieter ab.
+3. Warten, bis er greift, und nachsehen:
+
+   ```bash
+   getent ahostsv4 ais.deinedomain.de
+   ```
+
+   `getent` statt `dig`: **`dig` ist auf einem frischen Ubuntu nicht
+   installiert** (steckt in `dnsutils`), `getent` gehört zur glibc.
+
+Das Skript prüft das beim Start und **bricht mit einer erklärenden Meldung
+ab**, wenn der Name nicht auflöst — sonst liefe die ganze Einrichtung durch
+und erst Caddy scheiterte danach still am Zertifikat. Überspringen mit
+`AIS_DNS_EGAL=1` davor.
+
+**Kein A-Record nötig,** wenn der Anbieter schon einen Namen mitliefert (bei
+clouding.io etwa `<uuid>.clouding.host`) — den einfach benutzen. Und ganz
+ohne Domain: `<ip-mit-bindestrichen>.sslip.io` löst bauartbedingt auf die IP
+im Namen auf, ohne jede DNS-Arbeit, und Caddy bekommt dafür ein echtes
+Zertifikat.
 
 Bei clouding.io kommt der Server ohne Firewall-Regeln hoch; die Absicherung
 macht `ufw` auf dem Server selbst, das erledigt das Skript. Falls im Panel
@@ -161,7 +187,7 @@ sichern lohnt nicht.
 
 | Symptom | Ursache in aller Regel |
 |---|---|
-| Caddy bekommt kein Zertifikat | DNS zeigt noch nicht auf den Server, oder Port 80 ist zu. `dig +short ais.deinedomain.de` prüfen |
+| Caddy bekommt kein Zertifikat | DNS zeigt noch nicht auf den Server, oder Port 80 ist zu. Mit `getent ahostsv4 <domain>` prüfen (`dig` ist auf einem frischen Ubuntu nicht installiert) |
 | `Stream verbunden`, aber `schiffe: 0` | Region größer als 400 sq° — der Upstream verwirft die Subscription dann **ohne Fehlermeldung**. Der Proxy warnt beim Start, wenn er es bemerkt |
 | `Cannot find module 'node:sqlite'` | Node älter als 22.5. Im Image kann das nicht passieren; bei einer Installation ohne Docker Node auf 22.22+ heben |
 | Basic-Auth wird abgewiesen, auch mit richtigem Passwort | Der bcrypt-Hash steckt voller `$`, und Docker Compose deutet `$` in der `.env` als Variable — der Hash kommt zerstückelt am Container an. Prüfen mit `docker compose config \| grep PASSWORT`; im `.env` jedes `$` verdoppeln (`$$`) |

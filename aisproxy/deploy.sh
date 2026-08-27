@@ -21,6 +21,57 @@ if [[ -z "$DOMAIN" ]]; then
 fi
 if [[ $EUID -ne 0 ]]; then echo "Bitte als root ausfuehren (sudo)."; exit 1; fi
 
+# --- Vorabpruefung: zeigt der Name ueberhaupt hierher? -----------------
+#
+# Das nicht gesetzte DNS ist die haeufigste Stolperfalle. Ohne diese Pruefung
+# laeuft die Einrichtung komplett durch, und erst Caddy scheitert danach
+# still am Zertifikat - man sucht dann im Proxy statt beim Registrar.
+#
+# getent statt dig: dig steckt in dnsutils und ist auf einem frischen Ubuntu
+# NICHT installiert (nachgesehen). getent gehoert zur glibc und ist immer da.
+dns_pruefen() {
+  local name="$1"
+  [[ "$name" == "localhost" ]] && return 0
+  # sslip.io und nip.io loesen bauartbedingt auf die IP im Namen auf.
+  [[ "$name" == *.sslip.io || "$name" == *.nip.io ]] && return 0
+  [[ "${AIS_DNS_EGAL:-}" == "1" ]] && return 0
+
+  local ziel eigene
+  ziel="$(getent ahostsv4 "$name" 2>/dev/null | awk '{print $1}' | sort -u | tr '\n' ' ')"
+  if [[ -z "$ziel" ]]; then
+    cat <<HINWEIS
+
+Der Name "$name" loest nicht auf.
+
+Fuer automatisches TLS braucht Caddy einen A-Record, der auf diesen Server
+zeigt. Beim DNS-Anbieter der Domain anlegen:
+
+    $name.    A    <oeffentliche IP dieses Servers>
+
+Bis zu einer Stunde Wartezeit einplanen, dann diesen Befehl erneut starten.
+Ohne eigene Domain geht es auch: <ip-mit-bindestrichen>.sslip.io eintragen,
+das loest ohne jede DNS-Arbeit auf die IP im Namen auf.
+
+Pruefung ueberspringen (auf eigene Gefahr): AIS_DNS_EGAL=1 davorsetzen.
+HINWEIS
+    exit 1
+  fi
+
+  eigene="$(hostname -I 2>/dev/null || true)"
+  for ip in $ziel; do
+    if [[ " $eigene " == *" $ip "* ]]; then
+      echo "==> DNS: $name zeigt auf $ip - das ist dieser Server."
+      return 0
+    fi
+  done
+  # Kein Treffer heisst nicht zwingend falsch: Hinter NAT ist die oeffentliche
+  # IP hier nicht gebunden. Also warnen statt abbrechen.
+  echo "==> DNS: $name zeigt auf ${ziel% } - diese Maschine kennt sich unter"
+  echo "         ${eigene% }. Falls das derselbe Server hinter NAT ist, ist"
+  echo "         alles gut; sonst bekommt Caddy kein Zertifikat."
+}
+dns_pruefen "$DOMAIN"
+
 echo "==> 1/6 Paketquellen und Grundwerkzeug"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
