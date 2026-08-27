@@ -2,8 +2,25 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { DatabaseSync } = require("node:sqlite");
 const ais = require("./ais");
+
+// node:sqlite kam in Node 22.5 hinzu und war eine Weile hinter
+// --experimental-sqlite versteckt. Welche 22er-Minorversion auf einem
+// fremden Server liegt, weiss man vorher nicht - und ein blankes
+// "Cannot find module 'node:sqlite'" beim ersten Start waere eine
+// unnoetig lange Fehlersuche.
+let DatabaseSync;
+try {
+  ({ DatabaseSync } = require("node:sqlite"));
+} catch (e) {
+  console.error(
+    "\naisproxy braucht node:sqlite (in Node ab 22.5 enthalten).\n" +
+    "Gefunden: Node " + process.versions.node + "\n" +
+    "Abhilfe: Node auf 22.22 oder neuer heben - oder ersatzweise mit\n" +
+    "  node --experimental-sqlite src/index.js\n" +
+    "starten, falls diese Version das Flag noch verlangt.\n");
+  throw e;
+}
 
 // Die kalte Ablage.
 //

@@ -33,21 +33,17 @@ curl localhost:8080/v1/status
 Ohne `AIS_TOKEN` holt sich der Proxy beim Start selbst einen kostenlosen
 openwaters-Token — genau wie der „Token holen"-Knopf im Client.
 
-### Mit Docker
+### Auf einem Server
+
+Ein Befehl auf einem frischen Ubuntu-VPS:
 
 ```bash
-cp .env.beispiel .env     # AIS_DOMAIN, AIS_BENUTZER, AIS_PASSWORT_HASH
-docker compose up -d
+curl -fsSL https://raw.githubusercontent.com/srautip/srautip.github.io/main/aisproxy/deploy.sh \
+  | bash -s -- ais.deinedomain.de
 ```
 
-Das Passwort für Caddy erzeugt man mit
-`docker run --rm caddy:2-alpine caddy hash-password`.
-
-> **Ungeprüft:** Image und Compose-Datei konnten in der Entwicklungsumgebung
-> nicht gebaut werden — dort lief kein Docker-Daemon. Geprüft sind die
-> Produktionsinstallation (`npm install --omit=dev` zieht nur `ws`) und der
-> Healthcheck-Befehl (meldet Exitcode 0 bei 3 074 Schiffen). Der erste
-> `docker compose up` gehört trotzdem beobachtet.
+Ausführlich, samt Bedarf, Sicherung und dem, was nicht getestet ist:
+**[DEPLOY.md](DEPLOY.md)**.
 
 ## Schnittstelle
 
