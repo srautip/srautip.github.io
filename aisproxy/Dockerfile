@@ -22,7 +22,13 @@ EXPOSE 8080
 
 # Ein Zustand ohne Schiffe ist kaputt, auch wenn der Prozess laeuft - genau
 # der Fall, den eine blosse Portpruefung durchgehen liesse.
+#
+# Das Token muss mit: /v1/status liegt hinter derselben Pruefung wie jeder
+# andere Pfad (server.js, erlaubt()). Ohne Token kam 401 zurueck, der
+# Healthcheck war also seit dem Setzen von AIS_ZUGANG dauerhaft rot, ohne dass
+# irgendetwas fehlte. Die Variable stammt aus derselben Umgebung, aus der der
+# Server sein konfig.ZUGANG bildet - die beiden koennen nicht auseinanderlaufen.
 HEALTHCHECK --interval=60s --timeout=10s --start-period=90s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:8080/v1/status').then(r=>r.json()).then(s=>process.exit(s.schiffe>0?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "const t=process.env.AIS_ZUGANG||'';fetch('http://127.0.0.1:8080/v1/status'+(t?'?token='+encodeURIComponent(t):'')).then(r=>r.json()).then(s=>process.exit(s.schiffe>0?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "src/index.js"]

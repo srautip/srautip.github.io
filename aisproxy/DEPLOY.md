@@ -285,6 +285,7 @@ Die Fotos darunter sind Wikimedia- und Flickr-Bilder und jederzeit neu holbar
 | Der Client verbindet sich nicht, obwohl das Token stimmt | Alte `Caddyfile` mit Basic-Auth über allen Pfaden. Ein Browser kann bei einem WebSocket keine Header setzen, also kommt er nie durch. `git pull && docker compose up -d --build` |
 | Alles läuft, aber der Browser bekommt nichts | Ohne `Access-Control-Allow-Origin` kommt keine Antwort an — der Proxy setzt ihn selbst, aber ein vorgeschalteter Reverse-Proxy darf ihn nicht abschneiden |
 | `update.sh` bricht mit „das sieht nach Verlust aus" ab | Der Bestand ist kleiner als vor dem Update, ohne dass eine Tagestabelle ausgelaufen wäre. Das Skript hat den Weg zurück ausgegeben; die Sicherung von wenigen Minuten vorher liegt unter `/opt/aisproxy-sicherungen` |
+| `update.sh` meldet „Nach 180 s meldet der Dienst noch keine Schiffe", der Client läuft aber | Fassung vom ersten Tag: `/v1/status` liegt hinter der Tokenprüfung, die Statusabfrage schickte keins und bekam 401. Behoben — `cd /opt/aisproxy && git pull && ./update.sh`. Dieselbe Ursache hatte der dauerhaft rote Healthcheck (`docker compose ps` zeigte `unhealthy`) |
 | `update.sh` sagt „In /opt/aisproxy fehlt die .env" | Die Zugangsdaten fehlen schon vor dem Update — es wird bewusst nichts angefasst. Aus `/opt/aisproxy-sicherungen/env-*` zurückkopieren; gibt es keine, legt ein erneuter Lauf von `deploy.sh` neue an, und der Client braucht dann das neue Token |
 
 ## Was hier nicht getestet ist
@@ -320,3 +321,4 @@ der nie feuert, beweist nichts:
 | `.env` verschwindet oder ändert sich beim Pull | aus der Sicherung wiederhergestellt (gleiche Prüfsumme, Modus 600), die vorgefundene Fassung bleibt als `*.abweichend` liegen |
 | Dienst steht still | Kopie aus dem Volume samt `-wal`/`-shm`; zurückgespielt liest sie 5 000 Positionen |
 | Aufräumen | alte Stände weg, Datenbank und Zugangsdaten desselben Standes zusammen |
+| Status hinter der Tokenprüfung | mit Token aus der Containerumgebung: Zahlen und Code 0; ohne: Code 2, eigene Meldung statt „keine Schiffe", Abbruch nach 7 s statt 180 s — gemessen gegen den echten `Server` aus `src/server.js`, nicht gegen eine Attrappe |

@@ -72,9 +72,22 @@ fi
 
 # Die Kennzahlen holt der Container selbst: Auf dem Server steht kein Node,
 # und der Proxy haengt bewusst an keinem Host-Port.
+#
+# Das Token MUSS mit: /v1/status liegt hinter derselben Pruefung wie alle
+# anderen Pfade (server.js, erlaubt()). Ohne Token kommt 401 zurueck, und die
+# Statusabfrage sah dann 180 s lang aus wie "der Dienst meldet keine Schiffe"
+# - genau das ist beim ersten echten Lauf passiert, waehrend der Proxy tadellos
+# lief. Gelesen wird es aus der Umgebung DES CONTAINERS: Dort steht dieselbe
+# Variable, aus der der Server sein konfig.ZUGANG bildet, es kann also gar
+# nicht auseinanderlaufen. Und es steht nirgends auf einer Befehlszeile.
 kennzahlen() {
   docker compose exec -T proxy node -e '
-    fetch("http://127.0.0.1:8080/v1/status").then(r => r.json()).then(s => {
+    const t = process.env.AIS_ZUGANG || "";
+    fetch("http://127.0.0.1:8080/v1/status" +
+          (t ? "?token=" + encodeURIComponent(t) : "")).then(r => {
+      if (r.status === 401) process.exit(2);
+      return r.json();
+    }).then(s => {
       if (!s.speicher) process.exit(1);
       console.log([s.speicher.punkte, s.speicher.tage, s.speicher.stammEintraege,
                    s.schiffe].join(" "));
@@ -105,10 +118,16 @@ fi
 
 VOR_PUNKTE=""; VOR_TAGE=""; VOR_STAMM=""; VOR_SCHIFFE=""
 if docker compose ps --status running proxy 2>/dev/null | grep -q proxy; then
-  if werte="$(kennzahlen)"; then
+  rc=0; werte="$(kennzahlen)" || rc=$?
+  if [[ $rc -eq 0 ]]; then
     read -r VOR_PUNKTE VOR_TAGE VOR_STAMM VOR_SCHIFFE <<< "$werte"
     echo "    Dienst: $VOR_SCHIFFE Schiffe, $VOR_PUNKTE Positionen in $VOR_TAGE Tagestabellen,"
     echo "            $VOR_STAMM Stammdatensaetze"
+  elif [[ $rc -eq 2 ]]; then
+    echo "    Dienst laeuft, weist die Statusabfrage aber mit 401 ab. Der Container"
+    echo "    kennt AIS_ZUGANG offenbar nicht, der Server verlangt es aber."
+    echo "    Nachsehen mit: docker compose config | grep AIS_ZUGANG"
+    echo "    Es wird trotzdem gesichert, nur der Gegenvergleich entfaellt."
   else
     echo "    Dienst laeuft, antwortet aber nicht auf /v1/status - es wird trotzdem"
     echo "    gesichert, nur der Gegenvergleich hinterher entfaellt."
@@ -271,18 +290,36 @@ if ! docker compose up -d --build; then
 fi
 
 echo "==> 5/6 Warten, bis der Dienst wieder Schiffe meldet"
-NACH=""
+NACH=""; ABGEWIESEN=0
 for i in $(seq 1 "$WARTE_RUNDEN"); do
   sleep 5
-  if NACH="$(kennzahlen)"; then
+  rc=0; NACH="$(kennzahlen)" || rc=$?
+  if [[ $rc -eq 0 ]]; then
     read -r N_PUNKTE N_TAGE N_STAMM N_SCHIFFE <<< "$NACH"
     if [[ "$N_SCHIFFE" -gt 0 ]]; then
       echo "    nach $((i * 5)) s: $N_SCHIFFE Schiffe"
       break
     fi
+  elif [[ $rc -eq 2 ]]; then
+    # 401 heisst: Der HTTP-Server antwortet schon, er laesst nur diese Abfrage
+    # nicht zu. Daran aendern weitere 175 Sekunden Warten nichts.
+    ABGEWIESEN=1; NACH=""; break
   fi
   NACH=""
 done
+# 401 heisst: Der Dienst antwortet, er laesst nur diese Abfrage nicht zu. Das
+# ist ein Fehler der Pruefung und kein Grund, einen Rueckbau nahezulegen -
+# sonst baut jemand eine laufende Anlage zurueck, weil das Skript nicht
+# hineinsehen konnte.
+if [[ -z "$NACH" && $ABGEWIESEN -eq 1 ]]; then
+  echo "    Der Dienst antwortet, weist die Statusabfrage aber mit 401 ab."
+  echo "    Der Container kennt AIS_ZUGANG nicht, der Server verlangt es."
+  echo "    Ob er laeuft, zeigen:  docker compose logs --tail=20 proxy"
+  echo "                           curl -u <benutzer>:<passwort> https://<domain>/v1/status?token=<token>"
+  echo "    Nachsehen:             docker compose config | grep AIS_ZUGANG"
+  echo "    Der Umbau selbst ist durch; nur nachgerechnet wurde nichts."
+  exit 1
+fi
 if [[ -z "$NACH" ]]; then
   echo "    Nach $((WARTE_RUNDEN * 5)) s meldet der Dienst noch keine Schiffe."
   echo "    Protokoll:  cd $ZIEL && docker compose logs --tail=50 proxy"
@@ -317,7 +354,9 @@ fi
 # viele Fotos noch offen sind. Der erste Lauf startet 90 s nach dem Start,
 # direkt nach dem Update steht hier also meist noch nichts.
 docker compose exec -T proxy node -e '
-  fetch("http://127.0.0.1:8080/v1/status").then(r => r.json()).then(s => {
+  const t = process.env.AIS_ZUGANG || "";
+  fetch("http://127.0.0.1:8080/v1/status" +
+        (t ? "?token=" + encodeURIComponent(t) : "")).then(r => r.json()).then(s => {
     const r2 = s.register || {};
     console.log("    Register: " + (r2.laeufe || 0) + " Laeufe, " +
       (r2.fotos || 0) + " Fotos, " + (r2.fotoOffen || 0) + " offen" +
