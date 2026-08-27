@@ -1,0 +1,121 @@
+"use strict";
+
+// Alle Stellschrauben an einem Ort. Jede Zahl, die aus einer Messung stammt,
+// traegt sie im Kommentar - sonst weiss beim naechsten Anfassen niemand mehr,
+// ob sie begruendet oder geraten war.
+
+function zahl(name, vorgabe) {
+  const roh = process.env[name];
+  if (roh === undefined || roh === "") return vorgabe;
+  const n = Number(roh);
+  return Number.isFinite(n) ? n : vorgabe;
+}
+
+function text(name, vorgabe) {
+  const roh = process.env[name];
+  return roh === undefined || roh === "" ? vorgabe : roh;
+}
+
+// Die Region: Deutsche Bucht + westliche Ostsee. 21 Quadratgrad, am
+// 27. Aug. 2026 gemessene 2915 Schiffe.
+//
+// Warum nicht groesser: Nordsee + Ostsee waeren 412 sq und 19511 Schiffe -
+// 890 KB je Abruf statt 109 KB. Und warum nicht schlauer geschnitten: Ein
+// 100-km-Kuestenband spart nur 4,4 %, weil 95,8 % der Schiffe ohnehin darin
+// liegen; die Rechteck-Naeherung braeuchte 215 Anfragen je Zyklus fuer 3 %.
+const REGION = {
+  latMin: zahl("AIS_LAT_MIN", 53.0),
+  lonMin: zahl("AIS_LON_MIN", 6.0),
+  latMax: zahl("AIS_LAT_MAX", 56.0),
+  lonMax: zahl("AIS_LON_MAX", 13.0)
+};
+
+const konfig = {
+  REGION,
+
+  // --- Upstream ---
+  STROM_URL: text("AIS_STROM_URL", "wss://ais.openwaters.io/v0/stream"),
+  REST_URL: text("AIS_REST_URL", "https://ais.openwaters.io/v1/vessels"),
+  SCHLUESSEL_URL: text("AIS_SCHLUESSEL_URL", "https://ais.openwaters.io/v1/keys"),
+  // Leer lassen: Dann holt sich der Proxy beim Start selbst einen Token,
+  // genau wie der "Token holen"-Knopf im Client.
+  TOKEN: text("AIS_TOKEN", ""),
+
+  // Nachrichtentypen. Die beiden binaeren fehlen bewusst: Gemessen fuehrt der
+  // Feed sie nicht (5 Minuten ueber der Rhein-/Maasdelta: 4783 Nachrichten,
+  // davon 0 binaere).
+  NACHRICHTENTYPEN: [
+    "PositionReport",
+    "ShipStaticData",
+    "StandardClassBPositionReport",
+    "StaticDataReport",
+    "ExtendedClassBPositionReport"
+  ],
+
+  // Das Sicherheitsnetz. 109 KB gzip je Abruf, bei 60 s also 0,16 GB/Tag.
+  NETZ_MS: zahl("AIS_NETZ_MS", 60000),
+
+  // Der Ratenwaechter. Gemessen laeuft die Region mit 37,6 msg/s gegen ein
+  // Limit von 50 - nur 25 % Luft, und der Server drosselt kommentarlos.
+  // Ueber dieser Marke wird gewarnt, damit man es merkt, bevor Daten fehlen.
+  RATE_LIMIT: zahl("AIS_RATE_LIMIT", 50),
+  RATE_WARNUNG: zahl("AIS_RATE_WARNUNG", 42),
+
+  // --- Zustand ---
+  // Ohne Meldung faellt ein Schiff nach dieser Zeit aus dem heissen Zustand.
+  // 30 Minuten wie im Client, damit beide dasselbe "veraltet" meinen.
+  TTL_MS: zahl("AIS_TTL_MS", 30 * 60 * 1000),
+
+  // --- Historie ---
+  DB_DATEI: text("AIS_DB", "./daten/ais.db"),
+  // Roh vorhalten, danach verdichten.
+  ROH_STUNDEN: zahl("AIS_ROH_STUNDEN", 24),
+  // Insgesamt vorhalten. Aeltere Tagestabellen werden verworfen.
+  HISTORIE_TAGE: zahl("AIS_HISTORIE_TAGE", 7),
+  // Verdichtungsraster fuer alles aelter als ROH_STUNDEN.
+  VERDICHTUNG_S: zahl("AIS_VERDICHTUNG_S", 60),
+  // Ab dieser Fahrt gilt ein Schiff als fahrend. Gemessen sind nur 27 % der
+  // Schiffe in Fahrt - die Verdichtung wirft die Liegenden ganz weg.
+  FAHRT_KN: zahl("AIS_FAHRT_KN", 0.5),
+  // Wie oft Aufraeumen laeuft.
+  PFLEGE_MS: zahl("AIS_PFLEGE_MS", 15 * 60 * 1000),
+  // Sammelschreiben: Einzelne Inserts waeren Verschwendung, ein zu grosser
+  // Puffer verliert bei einem Absturz zu viel.
+  SCHREIB_MS: zahl("AIS_SCHREIB_MS", 2000),
+
+  // --- Register ---
+  WIKIDATA_URL: text("AIS_WIKIDATA_URL", "https://query.wikidata.org/sparql"),
+  DIGITRAFFIC_URL: text("AIS_DIGITRAFFIC_URL", "https://meri.digitraffic.fi/api/ais/v1/vessels"),
+  COMMONS_URL: text("AIS_COMMONS_URL", "https://commons.wikimedia.org/w/api.php"),
+  // Gemessen: 200 MMSIs in einer VALUES-Abfrage, 0,5 s, 12 % Treffer.
+  WIKIDATA_BUENDEL: zahl("AIS_WIKIDATA_BUENDEL", 200),
+  // Abstand zwischen Abfragen an die freien Dienste. Sie kosten nichts, also
+  // ist Zurueckhaltung das Mindeste.
+  REGISTER_PAUSE_MS: zahl("AIS_REGISTER_PAUSE_MS", 1000),
+  // Fristen wie im Client: ein Treffer haelt lange, ein Fehltreffer kurz -
+  // die IMO kann jede Minute per ShipStaticData eintreffen und die Lage aendern.
+  REGISTER_TREFFER_MS: zahl("AIS_REGISTER_TREFFER_MS", 30 * 24 * 3600 * 1000),
+  REGISTER_FEHL_MS: zahl("AIS_REGISTER_FEHL_MS", 3 * 24 * 3600 * 1000),
+  FOTO_BREITE: zahl("AIS_FOTO_BREITE", 480),
+  FOTO_VERZEICHNIS: text("AIS_FOTO_VERZEICHNIS", "./daten/fotos"),
+  REGISTER_AN: text("AIS_REGISTER", "1") !== "0",
+
+  // --- Server ---
+  PORT: zahl("PORT", 8080),
+  // Leer = offen. Hinter Caddy mit Basic-Auth ist das in Ordnung; steht der
+  // Proxy blank im Netz, gehoert hier ein Wert hinein.
+  ZUGANG: text("AIS_ZUGANG", ""),
+  // Standardtakt der Delta-Auslieferung. Der Client darf ihn beim Abonnieren
+  // ueberschreiben.
+  TAKT_MS: zahl("AIS_TAKT_MS", 2000),
+  TAKT_MIN_MS: zahl("AIS_TAKT_MIN_MS", 500),
+  TAKT_MAX_MS: zahl("AIS_TAKT_MAX_MS", 60000)
+};
+
+// Flaeche in Quadratgrad - der Wert, an dem das area-Limit des Tokens haengt.
+konfig.flaeche = function (box) {
+  const b = box || REGION;
+  return Math.abs(b.latMax - b.latMin) * Math.abs(b.lonMax - b.lonMin);
+};
+
+module.exports = konfig;
