@@ -1221,8 +1221,9 @@ Drei bewusste Grenzen:
   „veraltet", obwohl das Datum für diesen Moment frisch ist.
 
 **Der Zeitstempel steht hinter dem Schiffsnamen** (`.d-replay`, gelb wie die
-Reglerspalte): Uhrzeit plus derselbe Versatz, den der Regler anzeigt
-(`14:52:36 · −1:12 h`). Er erscheint **nur im Replay** — live bleibt
+Reglerspalte): **nur der Versatz** (`−1:12 h`), dieselbe Angabe wie am
+Regler. Die absolute Uhrzeit stand zuerst davor und machte die Zeile neben
+einem Schiffsnamen zu lang. Er erscheint **nur im Replay** — live bleibt
 `#detailTitle` reiner Text, sonst hätten alle Proben, die den Titel mit dem
 Schiffsnamen vergleichen, plötzlich einen Zeitstempel darin.
 
@@ -1325,7 +1326,7 @@ angenommen.
 | ALPHA, das nie gedreht hat | bleibt bei 0° |
 | Regler in der Mitte, Verblassung | am Schiff **1,000**, nach hinten bis 0,614 |
 | Detailspalte, Regler ganz unten | Kurs **0,0° (N)** statt live 90,0° (O), Position 53,72011 statt 53,75000 |
-| Zeitstempel hinter dem Namen | live keiner, unten `14:04:03 · −2:00 h`, Mitte `15:04:03 · −1:00 h` |
+| Zeitstempel hinter dem Namen | live keiner, unten `−2:00 h`, Mitte `−1:00 h` |
 
 Die letzte Zeile ist der Beleg, dass auch die **Verblassung** ab dem
 eingestellten Zeitpunkt rechnet und nicht ab jetzt: Rechnete sie ab jetzt,

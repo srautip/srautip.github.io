@@ -1859,14 +1859,6 @@
     return "\u2212" + (h ? h + ":" + (m < 10 ? "0" : "") + m + " h" : m + " min");
   }
 
-  // Der Zeitpunkt als Uhrzeit, dahinter derselbe Versatz wie am Regler.
-  function replayStempel() {
-    var d = new Date(replayZeit());
-    var zz = function (n) { return (n < 10 ? "0" : "") + n; };
-    return zz(d.getHours()) + ":" + zz(d.getMinutes()) + ":" + zz(d.getSeconds()) +
-      " \u00b7 " + replayBeschriftung();
-  }
-
   // Der Datensatz aus der Sicht des Reglers. Flache Kopie, in der NUR ersetzt
   // ist, was die Historie wirklich hergibt: Ort, Geschwindigkeit, Kurs. Alles
   // andere bleibt stehen, und der Empfangsteil der Detailansicht bleibt
@@ -3783,7 +3775,7 @@
       ["ENI", entry.inland && entry.inland.eni]
     ];
     var html = "<b>" + esc(displayName(entry)) + "</b>" +
-      (entry !== echt ? ' <span class="d-replay">' + esc(replayStempel()) + "</span>" : "") +
+      (entry !== echt ? ' <span class="d-replay">' + esc(replayBeschriftung()) + "</span>" : "") +
       "<br/>MMSI: " + esc(entry.mmsi) + "<br/>";
     rows.forEach(function (row) {
       if (row[1] != null && row[1] !== "") html += esc(row[0]) + ": " + esc(row[1]) + "<br/>";
@@ -6223,9 +6215,11 @@
     var info = entry.mmsiInfo || {};
     var stale = stand && (jetzt - stand) > STALE_AFTER_MS;
 
+    // Nur der Versatz, keine Uhrzeit: Neben einem Schiffsnamen ist die Zeile
+    // sonst zu lang, und dieselbe Angabe steht am Regler.
     detailTitle.innerHTML = esc(displayName(entry)) +
       (imReplay ? ' <span class="d-replay" title="Stand zum eingestellten Zeitpunkt des Zeitreglers">' +
-        esc(replayStempel()) + "</span>" : "");
+        esc(replayBeschriftung()) + "</span>" : "");
     // Hinweis, wenn das Schiff schon im Tagebuch steht: Ohne den erzeugt ein
     // zweiter Klick unbemerkt einen zweiten Eintrag.
     var imTagebuch = diaryCountFor(entry.mmsi);
