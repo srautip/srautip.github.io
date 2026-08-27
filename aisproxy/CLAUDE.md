@@ -263,6 +263,25 @@ Gemessen kostet ein Schiff im Schnitt 2,8 s, eines aus dem Abzug knapp eine.
 Mit dieser Reihenfolge und einer Obergrenze von 30 kamen **30 von 30
 Versuchen zu einem Bild — in 50 Sekunden, mit null Suchabrufen.**
 
+### Der Bericht muss "uebersprungen" von "nie passiert" trennen
+
+Gemeldet am 27. Aug. 2026: Auf dem Server stand bei `abzug` null - der Abzug
+schien nicht zu laufen. Er lief. **Die Zaehler leben im Prozess, der Index
+lebt in der Datenbank.** Nach einem Neustart ist der Abzug keine 24 Stunden
+alt, wird also uebersprungen - und die fruehere Fassung liess `abzug` dann auf
+null stehen. Aus dem Status war "frisch und deshalb nicht geholt" nicht von
+"nie geholt" zu unterscheiden.
+
+Dasselbe Muster an zwei weiteren Stellen: `wege` und die Fotozahlen wurden
+erst **am Ende** eines Laufs uebernommen. Der erste Lauf auf einem gefuellten
+Server dauert Minuten, und solange stand dort ueberall null oder 0. Jetzt
+kommt `wege` direkt aus den Zaehlern, `fotoVersucht`/`fotoOffen` wachsen
+waehrend des Laufs, und `laeuftSeit` sagt, seit wann.
+
+Die Regel dahinter ist dieselbe wie bei der stillen Kappung: **Ein Bericht,
+der Untaetigkeit und laufende Arbeit gleich aussehen laesst, ist schlimmer als
+gar keiner** - er laedt dazu ein, an einer funktionierenden Anlage zu suchen.
+
 ### Eine Obergrenze je Lauf, und sie wird gemeldet
 
 `FOTO_MAX_PRO_LAUF` = 300. Ohne sie liefe der erste Lauf über 2 900 Schiffe

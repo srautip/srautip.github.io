@@ -35,7 +35,7 @@ class Register {
                       fotos: 0, fotoFehler: 0, fehler: 0,
                       faellig: 0, fotoFaellig: 0, fotoVersucht: 0, fotoOffen: 0,
                       abzug: null, wege: null,
-                      letzterLauf: null, dauerMs: 0 };
+                      letzterLauf: null, laeuftSeit: null, dauerMs: 0 };
     this.bilder = opt.bilder || new Bilder({ konfig: this.konfig, log: this.log });
     fs.mkdirSync(this.konfig.FOTO_VERZEICHNIS, { recursive: true });
   }
@@ -205,7 +205,20 @@ class Register {
   async bildAbzug() {
     const stand = this.speicher.bildIndexStand();
     const juengste = Math.max(0, ...Object.keys(stand).map(a => stand[a].geholt || 0));
-    if (juengste && Date.now() - juengste < this.konfig.BILD_ABZUG_MS) return null;
+    if (juengste && Date.now() - juengste < this.konfig.BILD_ABZUG_MS) {
+      // Uebersprungen, weil der Abzug frisch ist - und genau das muss im
+      // Bericht stehen. Vorher blieb `abzug` in diesem Fall null, und ein
+      // frisch neu gestarteter Proxy sah aus, als haette er den Abzug nie
+      // geholt: Die Zaehler leben im Prozess, der Index in der Datenbank.
+      this.bericht_.abzug = {
+        zeit: new Date(juengste).toISOString(),
+        uebersprungen: true,
+        alterStunden: Number(((Date.now() - juengste) / 3600000).toFixed(1)),
+        naechster: new Date(juengste + this.konfig.BILD_ABZUG_MS).toISOString()
+      };
+      for (const art of Object.keys(stand)) this.bericht_.abzug[art] = stand[art].eintraege;
+      return null;
+    }
 
     const abfragen = [
       ["imo", "SELECT ?k ?bild WHERE { ?s wdt:P458 ?k ; wdt:P18 ?bild }"],
@@ -277,9 +290,16 @@ class Register {
     const reihe = ausAbzug.concat(mitImo, ohneImo);
     const grenze = Math.min(reihe.length, this.konfig.FOTO_MAX_PRO_LAUF);
     let neu = 0, versucht = 0;
+    // Die Zahlen wandern SOFORT in den Bericht, nicht erst am Ende: Der erste
+    // Lauf auf einem gefuellten Server dauert Minuten, und bis dahin stand im
+    // Status ueberall 0 - ununterscheidbar von "tut nichts".
+    this.bericht_.fotoFaellig = faellig.length;
+    this.bericht_.fotoOffen = reihe.length;
     for (let i = 0; i < grenze; i++) {
       const mmsi = reihe[i];
       versucht++;
+      this.bericht_.fotoVersucht = versucht;
+      this.bericht_.fotoOffen = reihe.length - versucht;
       try {
         if (await this.einFoto(mmsi)) neu++;
       } catch (e) {
@@ -368,6 +388,7 @@ class Register {
     if (this.laeuft) return null;
     this.laeuft = true;
     const t0 = Date.now();
+    this.bericht_.laeuftSeit = new Date(t0).toISOString();
     try {
       const alle = [...this.zustand.schiffe.keys()];
 
@@ -383,7 +404,6 @@ class Register {
         const nur = await this.fotoLauf(alle);
         this.bericht_.laeufe++;
         this.bericht_.letzterLauf = new Date().toISOString();
-        this.bericht_.wege = this.bilder.zaehler;
         return { faellig: 0, fotos: nur };
       }
 
@@ -445,7 +465,6 @@ class Register {
       this.bericht_.faellig = faellig.length;
       this.bericht_.letzterLauf = new Date().toISOString();
       this.bericht_.dauerMs = Date.now() - t0;
-      this.bericht_.wege = this.bilder.zaehler;
       this.log("Register: " + faellig.length + " faellig, " + gefunden.size +
         " gefunden, " + fotos.neu + " Fotos (" + fotos.versucht + " von " +
         fotos.faellig + " Schiffen versucht, " + fotos.offen + " offen), " +
@@ -475,7 +494,15 @@ class Register {
     });
   }
 
-  bericht() { return Object.assign({}, this.bericht_, { laeuft: this.laeuft }); }
+  // wege kommt direkt aus den Zaehlern: Sie erst am Ende des Laufs zu
+  // uebernehmen hiess, waehrend des ersten - minutenlangen - Laufs steht dort
+  // null, obwohl gerade Bilder gesucht werden.
+  bericht() {
+    return Object.assign({}, this.bericht_, {
+      laeuft: this.laeuft,
+      wege: this.bilder.zaehler
+    });
+  }
 }
 
 module.exports = { Register };
