@@ -127,6 +127,14 @@ ssh -L 8080:127.0.0.1:8080 root@<ip>
 # -> http://localhost:8080/v1/status
 ```
 
+**Für den Browser-Client reicht das aber nicht.** Gemessen in Chromium: Ein
+`fetch` von der ausgelieferten Seite (`https://srautip.github.io`) nach
+`http://127.0.0.1:<port>` **hängt** — keine Antwort, kein Fehler; mit
+`http://localhost` genauso. Der WebSocket dorthin kommt zustande, der Abruf
+nicht. Der Tunnel taugt also zum Nachsehen von Hand, nicht als Datenweg für
+den Client. Dafür braucht es `https`, und das ist mit `sslip.io` in einer
+Minute erledigt.
+
 **b) Selbst signiert**: `AIS_DOMAIN` auf die IP setzen und in der `Caddyfile`
 `tls internal` ergänzen. Der Browser warnt dann bei jedem Aufruf — für einen
 Dienst, den der AIS-Client per `fetch` anspricht, ist das unpraktisch.

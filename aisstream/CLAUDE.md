@@ -1089,6 +1089,15 @@ Zwei Teile, beide gegen echte Gegenstellen:
   geht bei WebSockets nicht.** Der echte Proxy in der Cloud ist aus dieser
   Umgebung also nicht erreichbar — `/v1/replay` käme durch, `/v1/live` nie.
   Deshalb läuft der Proxy für die Probe lokal.
+- **Und deshalb läuft Teil 2 nicht gegen die ausgelieferte Seite.** Ein
+  `fetch` von `https://srautip.github.io` nach `http://127.0.0.1` **hängt** —
+  keine Antwort, kein Fehler, auch nach zehn Sekunden nicht; mit
+  `http://localhost` genauso. Der WebSocket dorthin kommt zustande, der
+  Abruf nicht. Gemessen, nicht vermutet, und ein nützliches Gegenbeispiel zu
+  der verbreiteten Annahme, `http://127.0.0.1` sei als „potentially
+  trustworthy" von jeder Mixed-Content-Sperre ausgenommen. Im Betrieb liegt
+  der Proxy hinter `https`, dort stellt sich die Frage nicht. `spuren.js
+  live` überspringt Teil 2 mit einer Meldung, statt still grün zu sein.
 
 #### Hysterese, sonst flackert es
 
