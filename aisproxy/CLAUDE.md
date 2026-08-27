@@ -104,6 +104,36 @@ zweite Lauf im Test stellt deshalb keine einzige Abfrage mehr.
 Wikimedia (`?width=`) liefern die gewünschte Breite serverseitig — also
 braucht der Proxy keine Bildbibliothek.
 
+## Der Typ kommt aus drei Quellen - und keine ist sicher
+
+Gemeldet: „Warum fehlt bei MMSI 309436000 der Typ?" (Liberty of the Seas,
+Kreuzfahrtschiff, 339 m). Nachgemessen am 27. Aug. 2026:
+
+| Quelle | Befund |
+|---|---|
+| AIS-Strom | Gefiltertes Abo auf genau diese MMSI, sechs Minuten: **9 PositionReports, keine einzige Statiknachricht** |
+| Snapshot von openwaters | Der Datensatz hat weder `type` noch `name` - nur Position, Kurs, Fahrt |
+| Wikidata | kennt das Schiff und sagt **„Kreuzfahrtschiff"** (P31) |
+
+Der Typ steht in AIS **nur in Msg 5 bzw. Msg 24**, nicht in einer
+Positionsmeldung. Msg 5 wiederholt sich je Schiff etwa alle sechs Minuten,
+und der Feed reicht unter Last nur eine Stichprobe durch - gemessen kannten
+nach vier Minuten 455 von 2 775 Schiffen ihre AIS-Klasse, nach 13 Minuten
+668 ihre Abmessungen. Ein Schiff ohne Typ ist also der Normalfall, kein
+Fehler.
+
+**Die dritte Quelle wurde weggeworfen:** Die SPARQL-Abfrage in `register.js`
+holt `?typeLabel` (P31) seit jeher mit, die Zuordnung darunter las das Feld
+nur nie. Jetzt landet es als `wd_typ` in der Stammtabelle und geht an den
+Client, der daraus die Zeile „Typ laut Register" fuellt - und in
+`typeCategory()` Farbe und Kategorie bestimmt, wenn der AIS-Code fehlt.
+
+Beim Anlegen der Spalte setzt `speicher.js` **einmalig** `geprueft = 0` fuer
+alle Saetze mit `wd_entity`: Wer schon als „gefunden" vermerkt ist, wuerde
+sonst 30 Tage lang nicht mehr gefragt und bliebe so lange ohne Typ. Nur
+diese Saetze - ein Fehltreffer ohne Wikidata-Eintrag bleibt in Ruhe, sonst
+liefe die Abfrage wieder gegen aussichtslose Schiffe.
+
 ## Bilder: der Abzug ist der Hebel, nicht die nächste Quelle
 
 Gemeldeter Ausgangspunkt: „Welche Möglichkeit gibt es, an mehr Bilder zu

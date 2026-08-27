@@ -125,6 +125,14 @@ class Register {
           schluessel: wert("schluessel"),
           felder: {
             name, wd_entity: wert("ship"),
+            // Der Typ stand schon in der Abfrage (P31) und wurde bis zum
+            // 27. Aug. 2026 weggeworfen. Er ist die einzige Typangabe fuer
+            // Schiffe, von denen nie eine Msg 5 hereinkommt - gemessen an der
+            // "Liberty of the Seas" (MMSI 309436000): in sechs Minuten neun
+            // Positionsmeldungen und keine einzige Statiknachricht, im
+            // Snapshot von openwaters kein Typ - Wikidata dagegen sagt
+            // "Kreuzfahrtschiff".
+            wd_typ: /^Q\d+$/.test(wert("typeLabel") || "") ? null : wert("typeLabel"),
             imo: wert("imo") ? Number(wert("imo")) : null,
             rufzeichen: wert("callsign"),
             brz: zahl("gt"), laenge: zahl("loa"), breite: zahl("beam"),
@@ -455,7 +463,7 @@ class Register {
   // Die Fotos holt jetzt fotoLauf(), getaktet und mit eigenem Fristenwerk.
   uebernimm(mmsi, felder) {
     const daten = { gefunden: 1, quelle: "wikidata", geprueft: Date.now() };
-    for (const k of ["name", "wd_entity", "imo", "rufzeichen", "brz", "laenge",
+    for (const k of ["name", "wd_entity", "wd_typ", "imo", "rufzeichen", "brz", "laenge",
                      "breite", "tiefgang", "baujahr", "eigner", "betreiber",
                      "werft", "flagge", "heimathafen"]) {
       if (felder[k] != null) daten[k] = felder[k];
