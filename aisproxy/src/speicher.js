@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const ais = require("./ais");
+const draht = require("./draht");
 
 // node:sqlite kam in Node 22.5 hinzu und war eine Weile hinter
 // --experimental-sqlite versteckt. Welche 22er-Minorversion auf einem
@@ -42,7 +43,8 @@ const TAG_MS = 24 * 3600 * 1000;
 const STAMM_SPALTEN = ["name", "rufzeichen", "imo", "typ", "laenge", "breite",
   "dimA", "dimB", "dimC", "dimD", "tiefgang", "ziel", "eta",
   "klasse", "geraet", "aisVersion", "dte",
-  "hersteller", "modell", "seriennr"];
+  "hersteller", "modell", "seriennr",
+  "atonTyp", "atonVirtuell", "atonAusserPosition"];
 
 function tagName(ms) {
   const d = new Date(ms);
@@ -106,7 +108,8 @@ class Speicher {
     for (const [k, t] of [["klasse", "TEXT"], ["geraet", "INTEGER"],
                           ["aisVersion", "INTEGER"], ["dte", "INTEGER"],
                           ["hersteller", "TEXT"], ["modell", "TEXT"],
-                          ["seriennr", "TEXT"]]) {
+                          ["seriennr", "TEXT"], ["atonTyp", "INTEGER"],
+                          ["atonVirtuell", "INTEGER"], ["atonAusserPosition", "INTEGER"]]) {
       this.spalteErgaenzen("schiff", k, t);
     }
     // Der Registertyp kommt spaeter als die Registersaetze selbst. Wer schon
@@ -168,6 +171,12 @@ class Speicher {
   // waeren bei 37 Meldungen je Sekunde reine Verschwendung.
   merke(s) {
     if (s.lat == null || s.lon == null) return;
+    // Seezeichen bewegen sich nicht. Sie melden trotzdem alle paar Minuten -
+    // und weil ihre Geschwindigkeit unbekannt ist, wuerde die Verdichtung sie
+    // ausdruecklich BEHALTEN ("ein Schiff ohne Fahrtangabe, das seine Position
+    // aendert, faehrt sehr wohl"). Das ergaebe eine Spur aus lauter identischen
+    // Punkten. Ihr Stammsatz wird geschrieben, ihre Historie nicht.
+    if (s.flags & draht.FLAG_SEEZEICHEN) return;
     this.puffer.push({
       t: Math.floor((s.seen || Date.now()) / 1000),
       mmsi: s.mmsi,
@@ -414,6 +423,7 @@ class Speicher {
       "dimA", "dimB", "dimC", "dimD", "gesehen",
       "klasse", "geraet", "aisVersion", "dte",
       "hersteller", "modell", "seriennr",
+      "atonTyp", "atonVirtuell", "atonAusserPosition",
       "ziel", "eta", "wd_entity", "wd_typ", "brz", "baujahr", "eigner", "betreiber", "werft",
       "flagge", "heimathafen", "foto_datei", "foto_credit", "foto_seite",
       "foto_quelle", "foto_geprueft", "quelle", "gefunden", "geprueft"];

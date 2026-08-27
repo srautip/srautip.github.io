@@ -48,6 +48,7 @@ class Zustand {
             dimA: null, dimB: null, dimC: null, dimD: null,
             klasse: null, geraet: null, aisVersion: null, dte: null,
             hersteller: null, modell: null, seriennr: null,
+            atonTyp: null, atonVirtuell: null, atonAusserPosition: null,
             stammRev: 0 };
       this.schiffe.set(mmsi, s);
     }
@@ -67,7 +68,8 @@ class Zustand {
     const STAMM = ["name", "rufzeichen", "imo", "typ", "laenge", "breite",
                    "tiefgang", "ziel", "eta", "dimA", "dimB", "dimC", "dimD",
                    "klasse", "geraet", "aisVersion", "dte",
-                   "hersteller", "modell", "seriennr"];
+                   "hersteller", "modell", "seriennr",
+                   "atonTyp", "atonVirtuell", "atonAusserPosition"];
 
     for (const k of POSITION) {
       if (felder[k] === undefined) continue;
@@ -171,6 +173,12 @@ class Zustand {
              klasse: s.klasse, geraet: s.geraet, aisVersion: s.aisVersion,
              dte: s.dte, hersteller: s.hersteller, modell: s.modell,
              seriennr: s.seriennr,
+             // Seezeichen. Die Art selbst traegt schon die Flagge im
+             // Binaerrahmen; hier kommt dazu, was nur als Stammdatum Sinn
+             // ergibt: die Art der Tonne, ob sie virtuell ist und ob sie
+             // ihre Position verlassen hat.
+             atonTyp: s.atonTyp, atonVirtuell: s.atonVirtuell,
+             atonAusserPosition: s.atonAusserPosition,
              seen: s.seen, quelle: s.quelle };
   }
 
