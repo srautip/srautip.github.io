@@ -260,37 +260,20 @@ Public NotInheritable Class KlassenbildungEingabeViewModel
         Return v
     End Function
 
-    ''' <summary>Uebernimmt die Vorschau. `zuordnung` sagt, welche Spalte
-    ''' welche Bedeutung hat: -1 heisst "nicht verwenden".
+    ''' <summary>Uebernimmt die Vorschau mit der Zuordnung aus 9.1.
     '''
-    ''' Alles, was nicht Nachname oder Vorname ist, wird ATTRIBUT mit dem
-    ''' Spaltennamen als Schluessel. Damit erzeugt eine Einschulungsliste
-    ''' mit den Spalten "Nachname;Vorname;Betreuung;Wohngebiet" genau die
-    ''' beiden Attribute, auf die Balance und Gruppen dann zugreifen -
-    ''' ohne dass jemand sie vorher anlegen muss.</summary>
+    ''' Die Zuordnung selbst liegt in Spaltenzuordnung.vb - hier steht
+    ''' nur, wie ein Kind entsteht: die Id vergibt die GUI, der Klarname
+    ''' geht nach mapping.json und nirgendwo sonst hin.</summary>
     Public Function ImportUebernehmen(v As ImportVorschau,
-                                      nachnameSpalte As Integer,
-                                      vornameSpalte As Integer) As Integer
-        If v Is Nothing OrElse v.Zeilen.Count = 0 Then Return 0
-        Dim erzeugt = 0
-
-        For Each zeile In v.Zeilen.Skip(If(v.Kopfzeile, 1, 0))
-            Dim attribute As New Dictionary(Of String, String)(StringComparer.Ordinal)
-            For i = 0 To zeile.Length - 1
-                If i = nachnameSpalte OrElse i = vornameSpalte Then Continue For
-                Dim name = If(i < v.Spalten.Count, v.Spalten(i), $"Spalte {i + 1}")
-                If zeile(i) <> "" Then attribute(name) = zeile(i)
-            Next
-
-            Dim nach = If(nachnameSpalte >= 0 AndAlso nachnameSpalte < zeile.Length, zeile(nachnameSpalte), "")
-            Dim vor = If(vornameSpalte >= 0 AndAlso vornameSpalte < zeile.Length, zeile(vornameSpalte), "")
-            ' Eine vollstaendig leere Zeile ist kein Kind.
-            If nach = "" AndAlso vor = "" AndAlso attribute.Count = 0 Then Continue For
-
-            Hinzufuegen(nach, vor, attribute)
-            erzeugt += 1
-        Next
-        Return erzeugt
+                                      wahlen As List(Of Spaltenwahl)) As Importbericht
+        If v Is Nothing OrElse v.Zeilen.Count = 0 Then Return New Importbericht
+        Dim zeilen = v.Zeilen.Skip(If(v.Kopfzeile, 1, 0)).ToList()
+        Dim bericht = Spaltenzuordnung.Uebernehmen(
+            _projekt, zeilen, wahlen,
+            Function(nach, vor, attribute) Hinzufuegen(nach, vor, attribute))
+        MeldeAenderung()
+        Return bericht
     End Function
 
     ' ===============================================================

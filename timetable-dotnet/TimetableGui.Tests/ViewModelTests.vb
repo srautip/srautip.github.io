@@ -71,6 +71,21 @@ Friend NotInheritable Class TestDialoge
         Return FreigabeAntwort
     End Function
 
+    ''' <summary>Pfade fuer die Datei-Dialoge des Imports und der
+    ''' Exporte (9.1). Nothing heisst Abbruch.</summary>
+    Public Property DateiOeffnenPfad As String
+    Public Property DateiSpeichernPfad As String
+
+    Public Function DateiOeffnen(titel As String, filter As String) As String _
+        Implements IDialoge.DateiOeffnen
+        Return DateiOeffnenPfad
+    End Function
+
+    Public Function DateiSpeichernUnter(titel As String, filter As String, vorschlag As String) As String _
+        Implements IDialoge.DateiSpeichernUnter
+        Return DateiSpeichernPfad
+    End Function
+
     Public Sub Hinweis(titel As String, text As String) Implements IDialoge.Hinweis
         Hinweise.Add($"{titel}: {text}")
     End Sub

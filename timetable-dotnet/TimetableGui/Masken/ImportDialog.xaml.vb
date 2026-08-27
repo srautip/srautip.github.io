@@ -1,24 +1,61 @@
-' Vorschau und Spaltenzuordnung des Zwischenablage-Imports.
+' Vorschau und freie Spalten-Zuordnung des Imports (9.1) - Stufe G5.
+'
+' Der Dialog entscheidet nichts: was eine Zuordnung bedeutet und was
+' ihr fehlt, steht in Spaltenzuordnung.vb und ist dort ohne Fenster
+' geprueft.
 Imports System.Windows.Media
+Imports TimetableCore
 
 Partial Class ImportDialog
 
-    Private ReadOnly _vorschau As KlassenbildungEingabeViewModel.ImportVorschau
+    Private ReadOnly _dialoge As IDialoge
+    Private _vorschau As KlassenbildungEingabeViewModel.ImportVorschau
+    Private ReadOnly _neuLesen As Func(Of String, KlassenbildungEingabeViewModel.ImportVorschau)
+    Private _wahlen As New List(Of Spaltenwahl)
     Private _fuellt As Boolean
 
-    Public Sub New(vorschau As KlassenbildungEingabeViewModel.ImportVorschau)
+    ''' <summary>Die getroffene Zuordnung - das Ergebnis des Dialogs.</summary>
+    Public ReadOnly Property Wahlen As List(Of Spaltenwahl)
+        Get
+            Return _wahlen
+        End Get
+    End Property
+
+    Public ReadOnly Property Vorschau As KlassenbildungEingabeViewModel.ImportVorschau
+        Get
+            Return _vorschau
+        End Get
+    End Property
+
+    ''' <summary>`neuLesen` zerlegt einen Text zu einer Vorschau - noetig
+    ''' fuer den CSV-Weg, der eine zweite Quelle desselben Formats ist.
+    ''' Der Dialog haelt dafuer keine eigene Zerlegung vor; zwei
+    ''' Zerleger waeren zwei Meinungen ueber dasselbe Format.</summary>
+    Public Sub New(vorschau As KlassenbildungEingabeViewModel.ImportVorschau,
+                   Optional dialoge As IDialoge = Nothing,
+                   Optional neuLesen As Func(Of String, KlassenbildungEingabeViewModel.ImportVorschau) = Nothing)
         InitializeComponent()
+        _dialoge = dialoge
+        _neuLesen = neuLesen
+        DateiKnopf.Visibility = If(dialoge IsNot Nothing AndAlso neuLesen IsNot Nothing,
+                                   Visibility.Visible, Visibility.Collapsed)
+        Uebernehmen(vorschau)
+    End Sub
+
+    Private Sub Uebernehmen(vorschau As KlassenbildungEingabeViewModel.ImportVorschau)
         _vorschau = vorschau
         _fuellt = True
         Try
             HatKopfzeile.IsChecked = vorschau.Kopfzeile
             Kopfzeile.Text = $"{vorschau.Zeilen.Count} Zeile(n), {vorschau.Spalten.Count} Spalte(n)" &
                              $", getrennt durch {TrennerName(vorschau.Trenner)}."
-            SpaltenwahlFuellen()
+            _wahlen = Spaltenzuordnung.Vorschlag(vorschau.Spalten)
+            ZuordnungBauen()
         Finally
             _fuellt = False
         End Try
         Zeichnen()
+        Pruefen()
     End Sub
 
     Private Shared Function TrennerName(t As Char?) As String
@@ -27,131 +64,210 @@ Partial Class ImportDialog
             Case vbTab(0) : Return "Tabulator"
             Case ";"c : Return "Semikolon"
             Case ","c : Return "Komma"
-            Case Else : Return "„" & t.Value & """"
+            Case Else : Return "'" & t.Value & "'"
         End Select
     End Function
 
-    Public ReadOnly Property NachnameSpalte As Integer
-        Get
-            Return CInt(NachnameWahl.SelectedIndex) - 1
-        End Get
-    End Property
+    ' ===============================================================
+    ' Zuordnung
+    ' ===============================================================
 
-    Public ReadOnly Property VornameSpalte As Integer
-        Get
-            Return CInt(VornameWahl.SelectedIndex) - 1
-        End Get
-    End Property
+    Private Shared ReadOnly Rollen As (Rolle As Spaltenrolle, Text As String)() = {
+        (Spaltenrolle.Verwerfen, "verwerfen"),
+        (Spaltenrolle.Nachname, "Nachname"),
+        (Spaltenrolle.Vorname, "Vorname"),
+        (Spaltenrolle.Attribut, "Attribut"),
+        (Spaltenrolle.Gruppe, "Gruppe"),
+        (Spaltenrolle.Klasse, "Klasse (als Fixierung)")
+    }
 
-    Private Sub SpaltenwahlFuellen()
-        For Each wahl In {NachnameWahl, VornameWahl}
-            wahl.Items.Clear()
-            wahl.Items.Add("(keine)")
-            For Each s In _vorschau.Spalten
-                wahl.Items.Add(s)
+    Private Sub ZuordnungBauen()
+        Zuordnung.Children.Clear()
+        For i = 0 To _wahlen.Count - 1
+            Dim wahl = _wahlen(i)
+            Dim zeile As New StackPanel With {
+                .Orientation = Orientation.Horizontal, .Margin = New Thickness(0, 2, 0, 2)}
+            zeile.Children.Add(New TextBlock With {
+                .Text = wahl.Name, .Width = 220, .VerticalAlignment = VerticalAlignment.Center,
+                .TextTrimming = TextTrimming.CharacterEllipsis})
+
+            Dim rollenwahl As New ComboBox With {.Width = 200}
+            For Each r In Rollen
+                rollenwahl.Items.Add(r.Text)
             Next
-            wahl.SelectedIndex = 0
+            rollenwahl.SelectedIndex = Array.FindIndex(Rollen, Function(r) r.Rolle = wahl.Rolle)
+
+            ' Der Gruppentyp erscheint nur, wenn er gebraucht wird - ein
+            ' dauerhaft sichtbares, meist wirkungsloses Feld erzieht dazu,
+            ' es zu uebersehen.
+            Dim typwahl As New ComboBox With {
+                .Width = 150, .Margin = New Thickness(8, 0, 0, 0),
+                .Visibility = If(wahl.Rolle = Spaltenrolle.Gruppe, Visibility.Visible, Visibility.Hidden)}
+            typwahl.Items.Add("verteilung")
+            typwahl.Items.Add("buendelung")
+            typwahl.SelectedItem = wahl.Gruppentyp
+
+            AddHandler rollenwahl.SelectionChanged,
+                Sub()
+                    If _fuellt Then Return
+                    wahl.Rolle = Rollen(Math.Max(0, rollenwahl.SelectedIndex)).Rolle
+                    typwahl.Visibility = If(wahl.Rolle = Spaltenrolle.Gruppe,
+                                            Visibility.Visible, Visibility.Hidden)
+                    Zeichnen()
+                    Pruefen()
+                End Sub
+            AddHandler typwahl.SelectionChanged,
+                Sub()
+                    If _fuellt Then Return
+                    wahl.Gruppentyp = CStr(If(typwahl.SelectedItem, "verteilung"))
+                End Sub
+
+            zeile.Children.Add(rollenwahl)
+            zeile.Children.Add(typwahl)
+            Zuordnung.Children.Add(zeile)
         Next
-        ' Ein VORSCHLAG, kein Automatismus: erkennt der Text eine
-        ' Kopfzeile mit passenden Namen, werden sie vorbelegt - der
-        ' Nutzer sieht es und kann es aendern.
-        VorschlagenAus("nachname", "name", NachnameWahl)
-        VorschlagenAus("vorname", "rufname", VornameWahl)
     End Sub
 
-    Private Sub VorschlagenAus(ParamArray teile As Object())
-        Dim ziel = CType(teile(teile.Length - 1), ComboBox)
-        For i = 0 To _vorschau.Spalten.Count - 1
-            Dim s = _vorschau.Spalten(i).ToLowerInvariant()
-            For j = 0 To teile.Length - 2
-                If s = CStr(teile(j)) Then
-                    ziel.SelectedIndex = i + 1
-                    Return
-                End If
-            Next
-        Next
+    Private Sub Pruefen()
+        Dim einwaende = Spaltenzuordnung.Einwaende(_wahlen)
+        Dim verworfen = _wahlen.Where(Function(w) w.Rolle = Spaltenrolle.Verwerfen).
+            Select(Function(w) w.Name).ToList()
+
+        If einwaende.Count > 0 Then
+            Befund.Text = String.Join("  ·  ", einwaende)
+            Befund.Foreground = CType(FindResource("farbe-warn-text"), Brush)
+        ElseIf verworfen.Count > 0 Then
+            ' Das Verwerfen ist gewollt, muss aber SICHTBAR sein - sonst
+            ' merkt niemand, dass die halbe Datei nicht ankommt.
+            Befund.Text = $"{_vorschau.Datensaetze} Datensatz/Datensaetze. " &
+                          $"Nicht uebernommen: {String.Join(", ", verworfen)}."
+            Befund.Foreground = CType(FindResource("farbe-text-2"), Brush)
+        Else
+            Befund.Text = $"{_vorschau.Datensaetze} Datensatz/Datensaetze, alle Spalten zugeordnet."
+            Befund.Foreground = CType(FindResource("farbe-text-2"), Brush)
+        End If
+        UebernehmenKnopf.IsEnabled = einwaende.Count = 0
     End Sub
+
+    ' ===============================================================
+    ' Quellen
+    ' ===============================================================
+
+    ''' <summary>Zweite Quelle desselben Formats (9.1). Bewusst KEIN
+    ''' xlsx-Parser - der braeuchte eine neue Abhaengigkeit gegen den
+    ''' BCL-only-Grundsatz; CSV und Einfuegen aus Excel decken die
+    ''' Faelle ab.</summary>
+    Private Sub AufDatei(sender As Object, e As RoutedEventArgs)
+        If _dialoge Is Nothing OrElse _neuLesen Is Nothing Then Return
+        Dim pfad = _dialoge.DateiOeffnen("CSV-Datei wählen",
+                                         "CSV-Datei (*.csv;*.txt)|*.csv;*.txt|Alle Dateien (*.*)|*.*")
+        If pfad Is Nothing Then Return
+        Try
+            ' Encoding.Default ist auf .NET Core UTF-8; eine als ANSI
+            ' gespeicherte Datei aus Excel kaeme mit kaputten Umlauten
+            ' herein. Deshalb ausdruecklich mit BOM-Erkennung lesen und
+            ' bei fehlendem BOM auf die Windows-Codepage zurueckfallen.
+            Dim text = DateiLesen(pfad)
+            Uebernehmen(_neuLesen(text))
+        Catch ex As IO.IOException
+            _dialoge.Hinweis("Datei nicht lesbar", ex.Message)
+        Catch ex As UnauthorizedAccessException
+            _dialoge.Hinweis("Datei nicht lesbar", ex.Message)
+        End Try
+    End Sub
+
+    ''' <summary>Liest die Datei so, wie Excel sie ueblicherweise
+    ''' hinterlaesst: mit BOM als UTF-8, ohne BOM als Windows-1252. Eine
+    ''' Liste mit "Mueller" statt "Müller" ist kein Schoenheitsfehler -
+    ''' der Name landet so in mapping.json.</summary>
+    Friend Shared Function DateiLesen(pfad As String) As String
+        Dim roh = IO.File.ReadAllBytes(pfad)
+        If roh.Length >= 3 AndAlso roh(0) = &HEF AndAlso roh(1) = &HBB AndAlso roh(2) = &HBF Then
+            Return Text.Encoding.UTF8.GetString(roh, 3, roh.Length - 3)
+        End If
+        ' Gueltiges UTF-8 ohne BOM erkennen: der strenge Decoder wirft,
+        ' wenn die Bytefolge keine ist.
+        Try
+            Return New Text.UTF8Encoding(False, True).GetString(roh)
+        Catch ex As Text.DecoderFallbackException
+            Return Text.Encoding.Latin1.GetString(roh)
+        End Try
+    End Function
 
     Private Sub AufKopfzeile(sender As Object, e As RoutedEventArgs)
         If _fuellt Then Return
         _vorschau.Kopfzeile = HatKopfzeile.IsChecked = True
-        ' Ohne Kopfzeile gibt es keine Spaltennamen mehr - dann heissen
-        ' die Attribute "Spalte 1", "Spalte 2", ...
-        _vorschau.Spalten = If(_vorschau.Kopfzeile AndAlso _vorschau.Zeilen.Count > 0,
-                               _vorschau.Zeilen(0).ToList(),
-                               Enumerable.Range(1, If(_vorschau.Zeilen.Count > 0, _vorschau.Zeilen(0).Length, 0)).
-                                   Select(Function(i) $"Spalte {i}").ToList())
         _fuellt = True
         Try
-            SpaltenwahlFuellen()
+            _vorschau.Spalten = If(_vorschau.Kopfzeile AndAlso _vorschau.Zeilen.Count > 0,
+                                   _vorschau.Zeilen(0).ToList(),
+                                   Enumerable.Range(1, If(_vorschau.Zeilen.Count = 0, 0, _vorschau.Zeilen(0).Length)).
+                                       Select(Function(i) $"Spalte {i}").ToList())
+            _wahlen = Spaltenzuordnung.Vorschlag(_vorschau.Spalten)
+            ZuordnungBauen()
         Finally
             _fuellt = False
         End Try
         Zeichnen()
+        Pruefen()
     End Sub
 
-    Private Sub AufSpaltenwahl(sender As Object, e As SelectionChangedEventArgs)
-        If _fuellt Then Return
-        Zeichnen()
-    End Sub
+    ' ===============================================================
+    ' Vorschautabelle
+    ' ===============================================================
+
+    ''' <summary>Hoechstens zehn Zeilen. Eine Vorschau, die 300 Kinder
+    ''' zeigt, ist keine Vorschau mehr - man prueft die ersten paar und
+    ''' scrollt sonst nur.</summary>
+    Private Const Vorschauzeilen As Integer = 10
 
     Private Sub Zeichnen()
-        Kopfzeile.Text = $"{_vorschau.Datensaetze} Kind(er) aus {_vorschau.Zeilen.Count} Zeile(n)" &
-                         $", getrennt durch {TrennerName(_vorschau.Trenner)}."
-
-        Dim attribute = _vorschau.Spalten.
-            Where(Function(s, i) i <> NachnameSpalte AndAlso i <> VornameSpalte).ToList()
-        Attributzeile.Text = If(attribute.Count = 0,
-            "Alle Spalten sind als Name zugeordnet - es entstehen keine Attribute.",
-            "Wird zu Attributen: " & String.Join(", ", attribute) &
-            "   (Namen wandern in die Klarnamen-Tabelle, nicht in die Rechendaten.)")
-
         Tabelle.Children.Clear()
         Tabelle.ColumnDefinitions.Clear()
         Tabelle.RowDefinitions.Clear()
         If _vorschau.Zeilen.Count = 0 Then Return
 
-        Dim breite = _vorschau.Zeilen(0).Length
-        For i = 1 To breite
+        Dim spalten = _wahlen.Count
+        For i = 1 To spalten
             Tabelle.ColumnDefinitions.Add(New ColumnDefinition With {.Width = GridLength.Auto})
         Next
 
-        ' Hoechstens zwoelf Zeilen: die Vorschau soll zeigen, ob die
-        ' Zuordnung stimmt, nicht die ganze Liste ersetzen.
-        Dim zeigen = _vorschau.Zeilen.Take(12).ToList()
-        For z = 0 To zeigen.Count - 1
-            Tabelle.RowDefinitions.Add(New RowDefinition With {.Height = GridLength.Auto})
-            Dim istKopf = (z = 0 AndAlso _vorschau.Kopfzeile)
-            For s = 0 To breite - 1
-                Dim rolle = If(s = NachnameSpalte, "Nachname", If(s = VornameSpalte, "Vorname", ""))
-                Dim t As New TextBlock With {
-                    .Text = zeigen(z)(s),
-                    .Margin = New Thickness(6, 2, 12, 2),
-                    .FontSize = 12,
-                    .FontWeight = If(istKopf, FontWeights.SemiBold, FontWeights.Normal),
-                    .Foreground = CType(FindResource(
-                        If(istKopf, "farbe-text-3",
-                           If(rolle <> "", "farbe-akzent", "farbe-text"))), Brush)}
-                If istKopf Then t.Opacity = 0.8
-                Grid.SetRow(t, z)
-                Grid.SetColumn(t, s)
-                Tabelle.Children.Add(t)
-            Next
+        Dim zeilen = _vorschau.Zeilen.Skip(If(_vorschau.Kopfzeile, 1, 0)).Take(Vorschauzeilen).ToList()
+        Tabelle.RowDefinitions.Add(New RowDefinition())
+        For i = 1 To zeilen.Count
+            Tabelle.RowDefinitions.Add(New RowDefinition())
         Next
 
-        If _vorschau.Zeilen.Count > zeigen.Count Then
-            Tabelle.RowDefinitions.Add(New RowDefinition With {.Height = GridLength.Auto})
-            Dim rest As New TextBlock With {
-                .Text = $"… und {_vorschau.Zeilen.Count - zeigen.Count} weitere Zeile(n)",
-                .Margin = New Thickness(6, 6, 6, 2), .FontSize = 11,
-                .Foreground = CType(FindResource("farbe-text-3"), Brush)}
-            Grid.SetRow(rest, zeigen.Count)
-            Grid.SetColumnSpan(rest, breite)
-            Tabelle.Children.Add(rest)
-        End If
+        For s = 0 To spalten - 1
+            Tabelle.Children.Add(Zelle(_wahlen(s).Name, 0, s, kopf:=True,
+                                       verworfen:=_wahlen(s).Rolle = Spaltenrolle.Verwerfen))
+        Next
+        For z = 0 To zeilen.Count - 1
+            For s = 0 To Math.Min(spalten, zeilen(z).Length) - 1
+                Tabelle.Children.Add(Zelle(zeilen(z)(s), z + 1, s, kopf:=False,
+                                           verworfen:=_wahlen(s).Rolle = Spaltenrolle.Verwerfen))
+            Next
+        Next
     End Sub
 
-    Private Sub AufOk(sender As Object, e As RoutedEventArgs)
+    ''' <summary>Verworfene Spalten stehen durchgestrichen da - so sieht
+    ''' man am Inhalt, was fehlen wird, statt es aus der Zuordnungsliste
+    ''' erschliessen zu muessen.</summary>
+    Private Function Zelle(text As String, zeile As Integer, spalte As Integer,
+                           kopf As Boolean, verworfen As Boolean) As UIElement
+        Dim t As New TextBlock With {
+            .Text = text, .Margin = New Thickness(6, 3, 6, 3),
+            .FontWeight = If(kopf, FontWeights.SemiBold, FontWeights.Normal),
+            .FontSize = 12,
+            .MaxWidth = 180, .TextTrimming = TextTrimming.CharacterEllipsis,
+            .Foreground = CType(FindResource(If(verworfen, "farbe-text-3", "farbe-text")), Brush)}
+        If verworfen Then t.TextDecorations = TextDecorations.Strikethrough
+        Grid.SetRow(t, zeile)
+        Grid.SetColumn(t, spalte)
+        Return t
+    End Function
+
+    Private Sub AufUebernehmen(sender As Object, e As RoutedEventArgs)
         DialogResult = True
     End Sub
 

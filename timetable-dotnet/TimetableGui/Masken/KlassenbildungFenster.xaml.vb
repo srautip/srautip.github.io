@@ -148,13 +148,17 @@ Partial Class KlassenbildungFenster
             Return
         End If
 
-        Dim d As New ImportDialog(v) With {.Owner = Me}
+        Dim d As New ImportDialog(v, _dialoge, AddressOf _eingabe.ImportPruefen) With {.Owner = Me}
         If d.ShowDialog() <> True Then Return
 
-        Dim n = _eingabe.ImportUebernehmen(v, d.NachnameSpalte, d.VornameSpalte)
+        Dim bericht = _eingabe.ImportUebernehmen(d.Vorschau, d.Wahlen)
         KinderFuellen()
+        RegelmaskenFuellen()
         Aktualisieren()
-        _dialoge.Hinweis("Einfügen", $"{n} Kind(er) übernommen.")
+        ' Der Bericht im Klartext, nicht nur eine Zahl: ein Import, der
+        ' still Spalten verwirft und Gruppen anlegt, ist sonst nicht
+        ' nachvollziehbar.
+        _dialoge.Hinweis("Import", bericht.Klartext())
     End Sub
 
     Private Sub AufEntfernen(sender As Object, e As RoutedEventArgs)

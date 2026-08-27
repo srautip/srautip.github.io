@@ -31,6 +31,23 @@ Public Class KlassenbildungEingabeTests
     ''' <summary>Tabulator zuerst: wer aus einer Tabellenkalkulation
     ''' kopiert, bekommt Tabulatoren - und "Meier, Anna" wuerde bei
     ''' Komma-Vorrang mitten im Namen zerrissen.</summary>
+    ''' <summary>Bis Stufe G5 galt: alles ausser Nachname und Vorname
+    ''' wird Attribut. Seither entscheidet der Nutzer je Spalte, und die
+    ''' Vorgabe ist VERWERFEN (9.1, Datenminimierung). Diese Tests meinen
+    ''' weiterhin das alte Verhalten - sie sagen es jetzt ausdruecklich,
+    ''' statt sich auf eine Vorgabe zu verlassen, die es nicht mehr gibt.</summary>
+    Private Shared Function AlleAlsAttribut(v As KlassenbildungEingabeViewModel.ImportVorschau,
+                                            nachname As Integer, vorname As Integer) As List(Of Spaltenwahl)
+        Dim wahlen As New List(Of Spaltenwahl)
+        For i = 0 To v.Spalten.Count - 1
+            Dim rolle = Spaltenrolle.Attribut
+            If i = nachname Then rolle = Spaltenrolle.Nachname
+            If i = vorname Then rolle = Spaltenrolle.Vorname
+            wahlen.Add(New Spaltenwahl With {.Name = v.Spalten(i), .Rolle = rolle})
+        Next
+        Return wahlen
+    End Function
+
     <TestMethod>
     Public Sub TabulatorSchlaegtKomma()
         Dim text = "Meier, Anna" & vbTab & "SOZ" & vbLf & "Schulz, Ben" & vbTab & "FOE"
@@ -103,7 +120,7 @@ Public Class KlassenbildungEingabeTests
         Assert.IsTrue(v.Kopfzeile)
         Assert.AreEqual(2, v.Datensaetze)
 
-        Dim n = vm.ImportUebernehmen(v, nachnameSpalte:=0, vornameSpalte:=1)
+        Dim n = vm.ImportUebernehmen(v, AlleAlsAttribut(v, 0, 1)).Kinder
         Assert.AreEqual(2, n)
 
         ' Kein Name in der Einschulungsliste - weder als Id noch als Attribut.
@@ -132,7 +149,8 @@ Public Class KlassenbildungEingabeTests
                    "Meier;Anna;SOZ;Nord" & vbLf &
                    "Schulz;Ben;;Sued"
 
-        vm.ImportUebernehmen(vm.ImportPruefen(text), 0, 1)
+        Dim vAttr = vm.ImportPruefen(text)
+        vm.ImportUebernehmen(vAttr, AlleAlsAttribut(vAttr, 0, 1))
 
         CollectionAssert.AreEquivalent({"Betreuung", "Wohngebiet"}, vm.Attributnamen,
                                        "Erwartet wurden die Spaltennamen als Vokabular.")
@@ -149,7 +167,8 @@ Public Class KlassenbildungEingabeTests
         Dim vm As New KlassenbildungEingabeViewModel(p, New TestDialoge())
         Dim text = "Betreuung;Wohngebiet" & vbLf & "SOZ;Nord" & vbLf & "FOE;Sued"
 
-        vm.ImportUebernehmen(vm.ImportPruefen(text), nachnameSpalte:=-1, vornameSpalte:=-1)
+        Dim vOhne = vm.ImportPruefen(text)
+        vm.ImportUebernehmen(vOhne, AlleAlsAttribut(vOhne, -1, -1))
 
         Assert.AreEqual(2, p.Klassenbildung.Schueler.Count)
         Assert.AreEqual(0, p.Mapping.Count, "Ohne Namen darf kein Personenbezug entstehen.")
@@ -249,7 +268,8 @@ Public Class KlassenbildungEingabeTests
     Public Sub EineBalanceAufUnbekanntesAttributFaelltAuf()
         Dim p = LeeresProjekt()
         Dim vm As New KlassenbildungEingabeViewModel(p, New TestDialoge())
-        vm.ImportUebernehmen(vm.ImportPruefen("Betreuung" & vbLf & "SOZ" & vbLf & "FOE"), -1, -1)
+        Dim vB = vm.ImportPruefen("Betreuung" & vbLf & "SOZ" & vbLf & "FOE")
+        vm.ImportUebernehmen(vB, AlleAlsAttribut(vB, -1, -1))
         p.Klassenbildung.Balance.Add(New KlassenbildungBalance With {.Attribut = "Geschlecht", .Wert = "w"})
 
         Assert.IsTrue(vm.Pruefe().Any(Function(f) f.Contains("Geschlecht")),

@@ -153,6 +153,20 @@ Faelle - und ausgerechnet der gefaehrlichste bleibt still.
 | `x:Name="Matrix"` im XAML, dazu `Private _matrix` im Code-Behind | WPF erzeugt `_Matrix` - fuer VB derselbe Bezeichner | `BC30260: '_matrix' is already declared` |
 | `“` (U+201C) in einem VB-String, z.B. `"“Pruefen"` | VB akzeptiert die typografischen Anfuehrungszeichen ALS STRINGBEGRENZER - der String endet dort | Folgefehler an ganz anderer Stelle |
 
+**Diagnose fuer den letzten Fall** (dreimal an einem Tag passiert): meldet
+der Compiler `'Module' statement must end with a matching 'End Module'`,
+`'For' must end with a matching 'Next'` oder `Character is not valid` an
+einer Stelle, die offensichtlich in Ordnung ist, dann steht weiter OBEN ein
+`“` in einem String. Die Meldung zeigt nie auf die Ursache. Suchen mit:
+
+```bash
+grep -rn $'\u201c' --include='*.vb' TimetableGui
+```
+
+`TimetableGui.Tests/QuelltextWaechterTests` faengt die Faelle, die den Build
+NICHT brechen; die uebrigen findet nur der grep - denn wenn die Uebersetzung
+scheitert, laeuft auch der Test nicht.
+
 Die erste Zeile ist der Punkt: **ein Test hat sie gefunden, nicht der
 Compiler.** Wer eine Eigenschaft im Konstruktor setzt, prueft ihren
 Wert danach - oder benennt den Parameter von vornherein anders.

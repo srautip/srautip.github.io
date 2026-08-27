@@ -83,6 +83,16 @@ Public Class RegelnFensterTests
             Throw New InvalidOperationException("unerwartet")
         End Function
 
+        Public Function DateiOeffnen(titel As String, filter As String) As String _
+            Implements IDialoge.DateiOeffnen
+            Throw New InvalidOperationException("unerwartet")
+        End Function
+
+        Public Function DateiSpeichernUnter(titel As String, filter As String, vorschlag As String) As String _
+            Implements IDialoge.DateiSpeichernUnter
+            Throw New InvalidOperationException("unerwartet")
+        End Function
+
         Public Sub Hinweis(titel As String, text As String) Implements IDialoge.Hinweis
             Throw New InvalidOperationException($"Unerwarteter Hinweis: {titel} - {text}")
         End Sub

@@ -57,6 +57,12 @@ Public Interface IDialoge
     ''' ZEIGT die verbleibenden Abweichungen und verlangt Name plus
     ''' aktive Bestaetigung. Nothing bei Abbruch.</summary>
     Function FreigabeBestaetigen(vorlage As Freigabevorlage) As Freigabebestaetigung
+    ''' <summary>Beliebige Datei zum Lesen (CSV-Import, 9.1). Nothing
+    ''' bei Abbruch.</summary>
+    Function DateiOeffnen(titel As String, filter As String) As String
+    ''' <summary>Beliebige Datei zum Schreiben (Exporte). Nothing bei
+    ''' Abbruch.</summary>
+    Function DateiSpeichernUnter(titel As String, filter As String, vorschlag As String) As String
     Sub Hinweis(titel As String, text As String)
     Function Frage(titel As String, text As String) As Boolean
 End Interface
@@ -849,6 +855,46 @@ Public NotInheritable Class HauptViewModel
         MeldeSchritte()
     End Sub
 
+
+    ''' <summary>Klarnamen-Export - die einzige gekennzeichnete Ausnahme
+    ''' von der Pseudonymitaets-Grenze. Zwei Bedingungen, beide vom Plan
+    ''' gefordert: Warndialog UND Audit-Eintrag. Der Eintrag ist der
+    ''' wichtigere - ein Dialog sorgt nur dafuer, dass die Entscheidung
+    ''' bewusst faellt, nachvollziehbar wird sie erst im Protokoll.</summary>
+    Public Sub KlarnamenExportieren()
+        If Not ProjektOffen Then Return
+        Dim anzahl = _projekt.Mapping.Count
+        If anzahl = 0 Then
+            _dialoge.Hinweis("Nichts zu exportieren",
+                "Das Projekt fuehrt keine Klarnamen - alle Kinder sind Platzhalter.")
+            Return
+        End If
+
+        If Not _dialoge.Frage("Klarnamen exportieren", Klarnamenexport.Warnung(anzahl)) Then Return
+
+        Dim vorschlag = $"{If(_projekt.Manifest.SchulName, "Schule")}-klarnamen.csv"
+        Dim pfad = _dialoge.DateiSpeichernUnter("Klarnamen exportieren",
+                                                "CSV-Datei (*.csv)|*.csv", vorschlag)
+        If pfad Is Nothing Then Return
+
+        Try
+            ' Mit BOM: sonst zeigt Excel im deutschen Gebietsschema
+            ' Mueller statt Mueller mit Umlaut - und jemand bessert die
+            ' Datei von Hand nach, womit sie noch einmal mehr herumliegt.
+            IO.File.WriteAllLines(pfad, Klarnamenexport.Zeilen(_projekt), New Text.UTF8Encoding(True))
+        Catch ex As IO.IOException
+            _dialoge.Hinweis("Export fehlgeschlagen", ex.Message)
+            Return
+        Catch ex As UnauthorizedAccessException
+            _dialoge.Hinweis("Export fehlgeschlagen", ex.Message)
+            Return
+        End Try
+
+        _projekt.Protokolliere(Umgebung.Benutzer, "export",
+                               Klarnamenexport.Protokollzeile(anzahl, pfad), _jetzt())
+        Geaendert = True
+        Meldung = $"{anzahl} Klarname(n) exportiert - der Vorgang steht im Protokoll."
+    End Sub
 End Class
 
 ''' <summary>Umgebungsangaben, die ins Audit-Log gehoeren. "Wer" ist bei

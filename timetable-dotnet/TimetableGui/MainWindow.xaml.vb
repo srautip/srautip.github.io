@@ -109,6 +109,10 @@ Class MainWindow
         f.ShowDialog()
     End Sub
 
+    Private Sub AufKlarnamenExport(sender As Object, e As RoutedEventArgs)
+        _modell.KlarnamenExportieren()
+    End Sub
+
     Private Sub AufRegeln(sender As Object, e As RoutedEventArgs)
         RegelnOeffnen()
     End Sub
@@ -285,6 +289,20 @@ Friend NotInheritable Class WpfDialoge
         Implements IDialoge.FreigabeBestaetigen
         Dim d As New FreigabeFenster(vorlage) With {.Owner = _besitzer}
         If d.ShowDialog() = True Then Return d.Bestaetigung
+        Return Nothing
+    End Function
+
+    Public Function DateiOeffnen(titel As String, filter As String) As String _
+        Implements IDialoge.DateiOeffnen
+        Dim d As New OpenFileDialog With {.Filter = filter, .Title = titel}
+        If d.ShowDialog(_besitzer) = True Then Return d.FileName
+        Return Nothing
+    End Function
+
+    Public Function DateiSpeichernUnter(titel As String, filter As String, vorschlag As String) As String _
+        Implements IDialoge.DateiSpeichernUnter
+        Dim d As New SaveFileDialog With {.Filter = filter, .Title = titel, .FileName = vorschlag}
+        If d.ShowDialog(_besitzer) = True Then Return d.FileName
         Return Nothing
     End Function
 
