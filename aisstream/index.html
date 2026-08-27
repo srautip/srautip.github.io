@@ -7059,7 +7059,11 @@
           // schon auf Anzeigebreite verkleinert. Das Token muss mit: Der
           // Proxy prueft JEDEN Pfad, auch den fuer die Bilder.
           out.image = proxyMitToken(proxyBasis().replace(/\/v1$/, "") + d.foto);
-          out.imageCredit = { artist: d.foto_credit || null, licence: null, page: null };
+          // Der Link auf die Fotoseite gehoert dazu, nicht nur der Name: Bei
+          // einem Commons-Bild steht dort die Lizenz, bei einem Flickr-Bild
+          // ist er der einzige Weg zurueck zur Quelle.
+          out.imageCredit = { artist: d.foto_credit || null, licence: null,
+                              page: d.foto_seite || null };
         }
         return out;
       });

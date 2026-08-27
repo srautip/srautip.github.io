@@ -104,6 +104,130 @@ zweite Lauf im Test stellt deshalb keine einzige Abfrage mehr.
 Wikimedia (`?width=`) liefern die gewünschte Breite serverseitig — also
 braucht der Proxy keine Bildbibliothek.
 
+## Bilder: der Abzug ist der Hebel, nicht die nächste Quelle
+
+Gemeldeter Ausgangspunkt: „Welche Möglichkeit gibt es, an mehr Bilder zu
+kommen?" Die naheliegende Antwort — neue Bilddienste anbinden — wäre die
+falsche gewesen. Gemessen am 27. Aug. 2026 am laufenden Server:
+
+| | |
+|---|---|
+| 120 Schiffe aus einem 90-km-Ausschnitt | **10** hatten ein Foto |
+| dieselben Schiffe gegen Wikidata | **46 von 77** mit IMO haben dort ein Bild, dazu 21 über die MMSI |
+| Stichprobe 31 mit IMO | Wikidata hat für 22 ein Bild, der Proxy führte **19 davon ohne Foto** |
+
+Und an den Fehlstellen nachgesehen — das war die Diagnose:
+
+```
+211209320 HARLINGERLAND  gefunden=1  foto=None  wd_entity=Q1585523
+211217990 Spiekeroog II  gefunden=1  foto=None  wd_entity=Q52324773
+211224140 NORDSEE        gefunden=1  foto=None  wd_entity=Q1998609
+```
+
+`wd_entity` steht drin: **Der Wikidata-Treffer kam samt Bild-URL an, nur der
+Download schlug fehl.** Die Gegenprobe mit derselben Abfrage findet heute für
+5 von 6 dieser MMSIs ein Bild, und der Download liefert HTTP 200 / 42 KB.
+
+### Drei Ursachen, alle behoben
+
+**1. Die Bilddownloads liefen ohne Pause.** `uebernimm()` lud das Foto
+*innerhalb* der Trefferschleife; die 1 s aus `REGISTER_PAUSE_MS` liegt nur
+zwischen den Bündeln. 26 Downloads am Stück. Gemessen: **25 Bilder ohne Pause
+→ 2× HTTP 429.** Jetzt holt `fotoLauf()` die Bilder getrennt, mit
+`FOTO_PAUSE_MS` und einem Wiederholversuch bei 429.
+
+**2. Ein verlorener Download war von „hat kein Bild" nicht zu
+unterscheiden.** `uebernimm()` setzte `gefunden: 1, geprueft: jetzt`
+unabhängig davon — 30 Tage gesperrt. Jetzt hat das Foto **einen eigenen
+Stand**: `foto_geprueft`, `foto_quelle`, `foto_seite` und `fotoFaellig()`.
+`holeFoto()` **wirft** bei einem gescheiterten Abruf, statt `null` zu
+liefern; nur „gibt es nicht" wird vermerkt.
+
+Zwei Fristen, wie im Client: Lief die Suche **ohne IMO**, ist sie
+unvollständig (`foto_quelle = "teil"`, `FOTO_TEIL_MS` = 1 h) — die IMO kann
+jede Minute per `ShipStaticData` eintreffen. Mit IMO war es eine vollständige
+Suche, die hält `FOTO_FEHL_MS` = 7 Tage.
+
+**3. Der Proxy hatte nur den schwächsten Commons-Weg.** Gemessen im Client:
+Kategorie **24 von 25**, Volltext **6 von 25**. Der Proxy kannte nur den
+Volltext. `src/bilder.js` spiegelt jetzt alle Regeln des Clients
+(`aisstream/index.html` ab Z. 5291) — dieselbe Verabredung wie bei
+`src/ais.js`: zweimal vorhanden, mit Verweis aufeinander.
+
+### Der Wikidata-Abzug: alles auf einmal statt je Schiff
+
+Der eigentliche Vorteil des Servers. Gemessen:
+
+| Abzug | Zeilen | Größe | Dauer |
+|---|---|---|---|
+| IMO → Bild (`P458` + `P18`) | **17 144** | 0,89 MB schlank | 9,8 s |
+| MMSI → Bild (`P587` + `P18`) | **8 638** | | 0,9 s |
+| Wikidata gesamt mit IMO / MMSI | 96 120 / 38 167 | | |
+
+Beide liegen in `bild_index` (`art`, `kennung`, `url`). Danach ist „hat
+dieses Schiff ein Bild?" ein Datenbankzugriff **ohne Netzabruf** — und die
+Antwort steht schon bereit, wenn die IMO Stunden später per `ShipStaticData`
+eintrifft. Genau das kann der Client prinzipiell nicht: Er fragt je Schiff
+und trifft dabei den Moment, in dem er fragt.
+
+Nach dem Schreiben stehen 16 880 statt 17 144 Zeilen — derselbe Rumpf kommt
+in Wikidata mehrfach vor, der Primärschlüssel legt sie zusammen. Das ist
+richtig so, nicht ein Verlust.
+
+### Die Reihenfolge der Wege
+
+```
+Abzug (kein Netzabruf) → Commons-Kategorie → Commons-Volltext
+  → Commons MMSI+Name → Flickr imo<nr> → Flickr mmsi<nr>
+```
+
+Kuratiertes zuerst, Geratenes zuletzt. Die **Titelregel gehört nur auf die
+Volltextwege**: Auf dem Kategorieweg würfe sie die Bilder aller umbenannten
+Schiffe weg (IMO 9052692 fährt heute als BON VIVANT, das Foto heißt
+*Vestfjord*). Auf dem MMSI-Weg bestätigt stattdessen der **Name** die
+Kennung — eine neunstellige Zahl kommt auch zufällig in Beschreibungstexten
+vor (Fall HAV MARLIN gegen ein Vietnamkriegsfoto).
+
+**Flickr ohne Schlüssel**, auf Entscheidung des Betreibers auch ohne
+Lizenzfilter: Der öffentliche Feed nennt Titel, Autor und Link, **aber keine
+Lizenz**. Ausgewiesen wird deshalb, was da ist — Urheber und Link auf die
+Fotoseite (`foto_seite`, den der Client als `page` anzeigt). Nur die
+geprägten Tags `imo<nr>` und `mmsi<nr>`; eine nackte Zahl wäre kein
+Schiffsbeleg.
+
+**Korrektur einer zu frühen Aussage:** Nach einer Stichprobe von 60 Schiffen
+stand hier, Flickr trage im Lauf nichts bei — es hatte dort nur 6 Schiffe
+erreicht und keines getroffen. Über **134 Schiffe** gemessen sind es
+**7 von 65 Bildern** (`imo<nr>` 6, `mmsi<nr>` 1), also gut ein Zehntel des
+Ertrags. Eine Stichprobe, in der ein Weg nur sechsmal drankommt, taugt nicht
+für die Aussage „trägt nichts bei".
+
+### Der gemessene Ertrag
+
+Der ganze Lauf gegen **134 echte Schiffe** der Region, echter Speicher auf
+frischer Datenbank (`scratchpad/fotolauf.js`):
+
+| | |
+|---|---|
+| Vorher (laufender Server) | **14** von 134 mit Foto |
+| Nachher | **65** von 134 — Faktor 4,6 |
+| Wikidata-Abzug | 47 |
+| Commons-Kategorie | 10 |
+| Flickr `imo<nr>` | 6 |
+| Commons MMSI+Name / Flickr `mmsi<nr>` | 1 / 1 |
+| Fehlgeschlagene Downloads | **0** (vorher die Hauptverlustquelle) |
+| Dauer / Platz | 373 s für 134 Schiffe, 3,2 MB, im Mittel 49 KB je Bild |
+
+Der **Volltextweg findet nichts mehr**, was die Kategorie nicht schon hat
+(22 Abrufe, 0 Treffer) — er bleibt als Rückfall drin, kostet aber sichtbar.
+
+### Eine Obergrenze je Lauf, und sie wird gemeldet
+
+`FOTO_MAX_PRO_LAUF` = 300. Ohne sie liefe der erste Lauf über 2 900 Schiffe
+mal bis zu fünf Abrufen mal einer Sekunde — Stunden. Was nicht drankam,
+bleibt fällig und steht als `fotoOffen` im Bericht. **Eine stille Kappung
+liest sich wie „alles abgearbeitet".**
+
 ## Der Fehler, der zweimal passiert ist: entpackt statt Leitung messen
 
 Beim Stream und beim Snapshot habe ich zuerst die **entpackte** Größe
