@@ -1817,7 +1817,9 @@
     if (!t || !t.length) return null;
     if (zeit < t[0].t) return null;
     var letzt = t[t.length - 1];
-    if (zeit >= letzt.t) return { lat: letzt.lat, lon: letzt.lon };
+    if (zeit >= letzt.t) {
+      return { lat: letzt.lat, lon: letzt.lon, sog: letzt.sog, cog: letzt.cog };
+    }
     // Binaersuche statt Durchlauf: Bei 900 Punkten mal 200 Schiffen je
     // Reglerbewegung waere ein linearer Lauf 180 000 Vergleiche.
     var lo = 0, hi = t.length - 1;
@@ -1827,7 +1829,28 @@
     }
     var a = t[lo], b = t[hi];
     var f = b.t === a.t ? 0 : (zeit - a.t) / (b.t - a.t);
-    return { lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + (b.lon - a.lon) * f };
+    // Fahrtdaten vom VORDEREN Punkt: Sie galten ab da bis zum naechsten.
+    // Zwischen zwei Punkten zu mitteln waere erfunden.
+    var cog = a.cog;
+    // Alte Punkte (vor dieser Fassung) und Historie ohne Kursangabe: Dann
+    // traegt die Richtung der Strecke selbst. Besser als gar kein Pfeil und
+    // ehrlicher als der aktuelle Kurs, der zu diesem Zeitpunkt nicht galt.
+    if (cog == null && (a.lat !== b.lat || a.lon !== b.lon)) {
+      cog = bearingDeg(a.lat, a.lon, b.lat, b.lon);
+    }
+    return { lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + (b.lon - a.lon) * f,
+             sog: a.sog, cog: cog };
+  }
+
+  // Fahrtdaten aus der Sicht des Reglers - live sind es die aktuellen.
+  // Heading gibt es in der Historie nicht; im Replay traegt der Kurs allein.
+  function fahrtStand(entry) {
+    if (!replayGilt(entry)) {
+      return { sog: entry.speed, cog: entry.course, heading: entry.heading };
+    }
+    var p = replayPunkt(entry, replayZeit());
+    return p ? { sog: p.sog, cog: p.cog, heading: null }
+             : { sog: null, cog: null, heading: null };
   }
 
   function replayBeschriftung() {
@@ -2220,12 +2243,15 @@
   // (normalizeCog verwirft 360, normalizeHeading die 511), hier also nur noch
   // auf null pruefen.
   function travelCourse(entry) {
-    if (entry.speed != null && entry.speed < DIR_MIN_SOG) return null;
+    // Im Replay gilt der Stand von damals - sonst zeigte der Pfeil eines
+    // zurueckgespulten Schiffes weiter in seine heutige Fahrtrichtung.
+    var f = fahrtStand(entry);
+    if (f.sog != null && f.sog < DIR_MIN_SOG) return null;
     // COG zuerst: Das ist die Richtung, in die das Schiff faehrt. Heading ist
     // die Bugrichtung - besser als nichts, aber nachrangig, denn ein quer
     // versetztes Schiff zeigt woanders hin, als es faehrt.
-    if (entry.course != null) return entry.course;
-    if (entry.heading != null) return entry.heading;
+    if (f.cog != null) return f.cog;
+    if (f.heading != null) return f.heading;
     return null;
   }
 
@@ -3668,7 +3694,10 @@
 
     var last = entry.track[entry.track.length - 1];
     if (!last || last.lat !== lat || last.lon !== lon) {
-      entry.track.push({ lat: lat, lon: lon, t: Date.now(), sog: entry.speed });
+      // Der Kurs muss mit: Im Replay soll der Richtungspfeil zeigen, wohin das
+      // Schiff DAMALS fuhr, nicht wohin es jetzt faehrt.
+      entry.track.push({ lat: lat, lon: lon, t: Date.now(),
+                         sog: entry.speed, cog: entry.course });
       if (entry.track.length > MAX_TRACK_POINTS) entry.track = trackKuerzen(entry.track);
     }
 
@@ -3811,6 +3840,19 @@
     if (!alt || alt.lat !== ort.lat || alt.lon !== ort.lon) {
       entry.marker.setLatLng([ort.lat, ort.lon]);
       entry.ortGesetzt = ort;
+    }
+    // Der Pfeil gehoert zum Ort: Beim Stellen des Reglers laeuft weder
+    // syncMarker() noch eine Nachricht, die ihn sonst nachzoege. Gemerkt wird
+    // der zuletzt gesetzte Kurs, sonst waeren das bei 200 Schiffen je Rahmen
+    // 200 Schreibvorgaenge ohne Aenderung - und der Weg zurueck auf "live"
+    // bliebe unbemerkt, weil dort replayGilt() schon false ist.
+    var kurs = travelCourse(entry);
+    if (kurs !== entry.kursGesetzt) {
+      entry.kursGesetzt = kurs;
+      // Erst das Symbol: OB ein Pfeil da ist, steckt im iconKey, und ein
+      // Neubau schreibt den Winkel gleich mit ins HTML.
+      refreshMarkerIcon(entry);
+      refreshMarkerDirection(entry);
     }
     return ort;
   }
@@ -6835,7 +6877,8 @@
       // Der Proxy speichert ganzzahlig: Grad mal 1e6, Knoten und Grad Kurs
       // mal 10. Siehe aisproxy/src/speicher.js merke().
       neu.push({ lat: p[1] / 1e6, lon: p[2] / 1e6, t: t,
-                 sog: p[3] == null ? null : p[3] / 10 });
+                 sog: p[3] == null ? null : p[3] / 10,
+                 cog: p[4] == null ? null : p[4] / 10 });
     }
     if (!neu.length) return 0;
     entry.track = trackKuerzen(neu.concat(entry.track));
