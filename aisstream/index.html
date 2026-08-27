@@ -259,6 +259,15 @@
   }
   /* Im Replay faerbt sich die Spalte - sonst uebersieht man, dass die Karte
      die Vergangenheit zeigt, und haelt sie fuer kaputt. */
+  /* Der Zeitstempel hinter dem Schiffsnamen im Replay - dieselbe Farbe wie
+     die Reglerspalte, damit beides als ein Zustand lesbar ist. */
+  .d-replay {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--warn);
+    white-space: nowrap;
+    margin-left: 0.35rem;
+  }
   #replaySpalte.zurueck { border-color: var(--warn); }
   #replaySpalte.zurueck .replay-wert { color: var(--warn); font-weight: 600; }
   #map {
@@ -1265,12 +1274,10 @@
       weit zurück wie die Sitzung.
     </p>
     <p class="hint">
-      Ältere Stücke verblassen, und zwar <b>anteilig zum eingestellten
-      Fenster</b>: das erste Sechstel volle Deckung, bis zum Drittel auf
-      10&nbsp;% Transparenz, danach linear bis zum Verschwinden am Rand. Bei
-      6&nbsp;Stunden sind das genau 1&nbsp;h, 2&nbsp;h und 6&nbsp;h; bei
-      2&nbsp;Stunden 20&nbsp;min, 40&nbsp;min und 2&nbsp;h. Feste Stunden
-      hätten bei einem kurzen Fenster gar keine sichtbare Verblassung ergeben.
+      Ältere Stücke verblassen: die ersten <b>10&nbsp;Minuten</b> volle
+      Deckung, danach geradlinig bis zum Verschwinden am Rand des Fensters.
+      Bei 2&nbsp;Stunden trägt der Verlauf also 110&nbsp;Minuten, bei
+      6&nbsp;Stunden 350.
       <b>Mehr Stunden kosten Verkehr:</b> gemessen 144&nbsp;KB für einen
       90-km-Ausschnitt über 6&nbsp;h, also rund 50&nbsp;KB für 2&nbsp;h.
     </p>
@@ -1727,17 +1734,14 @@
   var TRACK_STUNDEN_MAX = 24;
   var trackStunden = TRACK_STUNDEN_VOREINSTELLUNG;
 
-  // Die Knickpunkte liegen ANTEILIG im Fenster, nicht bei festen Stunden.
+  // Verblassung: zehn Minuten volle Deckung, danach geradlinig bis zum
+  // Verschwinden am Fensterrand.
   //
-  // Die Vorgabe war fuer ein Sechs-Stunden-Fenster formuliert: 0-1 h voll,
-  // 1-2 h bis 10 %, 2-6 h bis 100 %. Ein Sechstel und ein Drittel geben
-  // genau das wieder, wenn das Fenster sechs Stunden ist - und lassen die
-  // Verblassung heil, wenn es zwei sind. Fest verdrahtete Stunden haetten
-  // bei zwei Stunden am aeltesten Ende bei 10 % Transparenz aufgehoert:
-  // sichtbar keine Verblassung und eine harte Kante am Fensterrand.
-  var TRACK_VOLL_ANTEIL = 1 / 6;
-  var TRACK_KNICK_ANTEIL = 2 / 6;
-  var TRACK_KNICK_TRANSPARENZ = 0.10;
+  // Die zehn Minuten sind ABSOLUT, nicht anteilig: Sie markieren "eben noch
+  // gemeldet" und haben mit der Fensterlaenge nichts zu tun. Der Rest der
+  // Strecke traegt den Verlauf - bei zwei Stunden Fenster sind das 110
+  // Minuten, bei sechs Stunden 350.
+  var TRACK_VOLL_MS = 10 * 60 * 1000;
   // In Stufen zeichnen, nicht je Punkt: Eine Leaflet-Linie hat GENAU EINE
   // Deckung. Eine Linie je Punktpaar waere bei 13 000 Punkten ein DOM-Grab,
   // eine Linie je Viertelstunde sind hoechstens 24 Stufen je Farbe. Der
@@ -1752,16 +1756,11 @@
 
   // Deckung (1 = voll) fuer ein Alter in Millisekunden.
   function trackDeckung(alterMs) {
-    // Anteil am Fenster statt absoluter Stunden - siehe TRACK_VOLL_ANTEIL.
-    var a = alterMs / (trackStunden * 3600000);
-    if (a <= TRACK_VOLL_ANTEIL) return 1;
-    if (a >= 1) return 0;
-    if (a <= TRACK_KNICK_ANTEIL) {
-      return 1 - TRACK_KNICK_TRANSPARENZ *
-        (a - TRACK_VOLL_ANTEIL) / (TRACK_KNICK_ANTEIL - TRACK_VOLL_ANTEIL);
-    }
-    return (1 - TRACK_KNICK_TRANSPARENZ) *
-      (1 - (a - TRACK_KNICK_ANTEIL) / (1 - TRACK_KNICK_ANTEIL));
+    if (alterMs <= TRACK_VOLL_MS) return 1;
+    var fenster = trackStunden * 3600000;
+    if (alterMs >= fenster) return 0;
+    // Das Fenster ist mindestens eine Stunde, der Nenner also immer positiv.
+    return 1 - (alterMs - TRACK_VOLL_MS) / (fenster - TRACK_VOLL_MS);
   }
 
   // Stufennummer und die Deckung, mit der die ganze Stufe gezeichnet wird -
@@ -1818,7 +1817,7 @@
     if (zeit < t[0].t) return null;
     var letzt = t[t.length - 1];
     if (zeit >= letzt.t) {
-      return { lat: letzt.lat, lon: letzt.lon, sog: letzt.sog, cog: letzt.cog };
+      return { lat: letzt.lat, lon: letzt.lon, sog: letzt.sog, cog: letzt.cog, t: letzt.t };
     }
     // Binaersuche statt Durchlauf: Bei 900 Punkten mal 200 Schiffen je
     // Reglerbewegung waere ein linearer Lauf 180 000 Vergleiche.
@@ -1839,7 +1838,7 @@
       cog = bearingDeg(a.lat, a.lon, b.lat, b.lon);
     }
     return { lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + (b.lon - a.lon) * f,
-             sog: a.sog, cog: cog };
+             sog: a.sog, cog: cog, t: a.t };
   }
 
   // Fahrtdaten aus der Sicht des Reglers - live sind es die aktuellen.
@@ -1860,6 +1859,41 @@
     return "\u2212" + (h ? h + ":" + (m < 10 ? "0" : "") + m + " h" : m + " min");
   }
 
+  // Der Zeitpunkt als Uhrzeit, dahinter derselbe Versatz wie am Regler.
+  function replayStempel() {
+    var d = new Date(replayZeit());
+    var zz = function (n) { return (n < 10 ? "0" : "") + n; };
+    return zz(d.getHours()) + ":" + zz(d.getMinutes()) + ":" + zz(d.getSeconds()) +
+      " \u00b7 " + replayBeschriftung();
+  }
+
+  // Der Datensatz aus der Sicht des Reglers. Flache Kopie, in der NUR ersetzt
+  // ist, was die Historie wirklich hergibt: Ort, Geschwindigkeit, Kurs. Alles
+  // andere bleibt stehen, und der Empfangsteil der Detailansicht bleibt
+  // bewusst live - "wann haben wir zuletzt etwas gehoert" ist eine Frage an
+  // die Sitzung, nicht an den eingestellten Zeitpunkt.
+  //
+  // Damit ziehen alle Ableitungen von selbst mit: Entfernung, Peilung,
+  // Kursbeschriftung, Popup. Ohne die Kopie muesste jede einzelne Stelle den
+  // Regler kennen.
+  function replayAnsicht(entry) {
+    if (!replayGilt(entry)) return entry;
+    var p = replayPunkt(entry, replayZeit());
+    if (!p) return entry;
+    var k = {};
+    for (var f in entry) k[f] = entry[f];
+    k.lat = p.lat;
+    k.lon = p.lon;
+    k.speed = p.sog;
+    k.course = p.cog;
+    // Die Bugrichtung fuehrt die Historie nicht mit. Den heutigen Wert stehen
+    // zu lassen hiesse, eine Angabe von jetzt mit dem Etikett von damals zu
+    // versehen.
+    k.heading = null;
+    k.replayAt = p.t;
+    return k;
+  }
+
   function replayAnzeigen() {
     if (!replayWertEl) return;
     replayWertEl.textContent = replayBeschriftung();
@@ -1875,7 +1909,13 @@
   function replayAnwenden() {
     if (!mapAvailable) return;
     applyMapFilter();
-    if (trackLayer && selectedMmsi && ships.has(selectedMmsi)) drawTrack(ships.get(selectedMmsi));
+    if (selectedMmsi && ships.has(selectedMmsi)) {
+      var e = ships.get(selectedMmsi);
+      if (trackLayer) drawTrack(e);
+      // Die Detailspalte zeigt sonst weiter den Livestand, waehrend der
+      // Marker daneben in der Vergangenheit steht.
+      renderDetail(e);
+    }
   }
 
   // Alles aelter als das Fenster weg, und wenn danach immer noch zu viele
@@ -3724,6 +3764,10 @@
   }
 
   function popupHtml(entry) {
+    // Dasselbe wie in der Detailspalte: Im Replay zeigt auch das Kartenfenster
+    // den Stand von damals.
+    var echt = entry;
+    entry = replayAnsicht(entry);
     var info = entry.mmsiInfo || {};
     var rows = [
       ["Typ", entry.typeDetail || entry.typeLabel],
@@ -3738,7 +3782,9 @@
       ["Passagiere", entry.persons && entry.persons.passengers],
       ["ENI", entry.inland && entry.inland.eni]
     ];
-    var html = "<b>" + esc(displayName(entry)) + "</b><br/>MMSI: " + esc(entry.mmsi) + "<br/>";
+    var html = "<b>" + esc(displayName(entry)) + "</b>" +
+      (entry !== echt ? ' <span class="d-replay">' + esc(replayStempel()) + "</span>" : "") +
+      "<br/>MMSI: " + esc(entry.mmsi) + "<br/>";
     rows.forEach(function (row) {
       if (row[1] != null && row[1] !== "") html += esc(row[0]) + ": " + esc(row[1]) + "<br/>";
     });
@@ -3846,6 +3892,10 @@
     // der zuletzt gesetzte Kurs, sonst waeren das bei 200 Schiffen je Rahmen
     // 200 Schreibvorgaenge ohne Aenderung - und der Weg zurueck auf "live"
     // bliebe unbemerkt, weil dort replayGilt() schon false ist.
+    // Ein offenes Kartenfenster zeigt sonst weiter den Livestand. Nur das
+    // offene: bindPopup fuer zweihundert Schiffe je Reglerbewegung waere
+    // Arbeit fuer nichts.
+    if (entry.marker.isPopupOpen && entry.marker.isPopupOpen()) syncMarker(entry);
     var kurs = travelCourse(entry);
     if (kurs !== entry.kursGesetzt) {
       entry.kursGesetzt = kurs;
@@ -6161,10 +6211,21 @@
   }
 
   function renderDetail(entry) {
+    // Im Replay zeigt die Spalte den Stand des eingestellten Zeitpunkts. Der
+    // Datensatz wird gleich hier ersetzt, damit alles darunter - Entfernung,
+    // Peilung, Kurs, Geschwindigkeit - von selbst mitzieht.
+    var echt = entry;
+    entry = replayAnsicht(entry);
+    var imReplay = entry !== echt;
+    // "Frisch" heisst im Replay: frisch fuer den eingestellten Zeitpunkt.
+    var jetzt = bezugsZeit(echt);
+    var stand = imReplay ? entry.replayAt : entry.updatedAt;
     var info = entry.mmsiInfo || {};
-    var stale = entry.updatedAt && (Date.now() - entry.updatedAt) > STALE_AFTER_MS;
+    var stale = stand && (jetzt - stand) > STALE_AFTER_MS;
 
-    detailTitle.textContent = displayName(entry);
+    detailTitle.innerHTML = esc(displayName(entry)) +
+      (imReplay ? ' <span class="d-replay" title="Stand zum eingestellten Zeitpunkt des Zeitreglers">' +
+        esc(replayStempel()) + "</span>" : "");
     // Hinweis, wenn das Schiff schon im Tagebuch steht: Ohne den erzeugt ein
     // zweiter Klick unbemerkt einen zweiten Eintrag.
     var imTagebuch = diaryCountFor(entry.mmsi);
