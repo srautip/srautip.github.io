@@ -5995,7 +5995,9 @@
     trackLayer = L.featureGroup();
     Object.keys(nachStufe).forEach(function (n) {
       L.polyline(nachStufe[n], {
-        color: "#3fa9ff", weight: 2, opacity: trackStufenDeckung(Number(n))
+        // Eine Stufe dicker als die Auto-Spuren, damit die eigene Spur des
+        // gewaehlten Schiffs weiterhin heraussticht.
+        color: "#3fa9ff", weight: 3, opacity: trackStufenDeckung(Number(n))
       }).addTo(trackLayer);
     });
     trackLayer.addTo(map);
@@ -6048,7 +6050,13 @@
         var teile = schluessel.split("|");
         autoTracks[schluessel] = L.polyline([], {
           color: teile[0],
-          weight: 1,
+          // 2 statt 1: Gemessen legt eine 1 px breite Linie durch die
+          // Kantenglaettung selbst bei voller Deckung nur rund die HALBE
+          // Farbe auf den staerksten Bildpunkt - die ganze Verblassung spielte
+          // sich dadurch in einem ohnehin blassen Bereich ab und war auf
+          // echten Kacheln nicht zu sehen. Bei 2 px sind es 80 %, und das
+          // gemessene Verhaeltnis Deckung/Wirkung liegt bei 1.
+          weight: 2,
           opacity: trackStufenDeckung(Number(teile[1])),
           // Wie beim Sichtkreis: Linien duerfen keine Klicks auf die Marker
           // abfangen. Und sie liegen im overlayPane, also unter den Schiffen.
