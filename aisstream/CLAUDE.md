@@ -318,6 +318,26 @@ Kette wäre also gut die Hälfte der Treffer verloren gegangen.
 Quellen praktisch nicht erfasst. Das ist kein Fehler, das ist die Realität
 offener Schiffsdaten — im UI steht die Zahl deshalb direkt dran.
 
+**In der Deutschen Bucht auch: null.** Nachgemessen am 27. Aug. 2026 mit 20
+Schiffen aus 53–56 N / 6–13 E: **0 von 20** bei Digitraffic. Gegenprobe mit
+MMSIs aus deren eigener Liste: HTTP 200, die Abfrage stimmt also. Die
+Flaggenverteilung im Digitraffic-Bestand erklärt es — Schweden 106, Finnland
+67, Russland 40, Estland 26 von 400: Es ist finnisches AIS und deckt die
+**nördliche und östliche** Ostsee ab. Die 21 % oben stammen aus einer
+Stichprobe, die diese Gewässer einschloss.
+
+Praktische Folge für den Client: Wer im heimischen Revier zwischen Ems und
+Elbe unterwegs ist, bekommt die IMO **nicht** von Digitraffic, sondern nur
+aus `ShipStaticData` (AIS-Typ 5, alle 6 Minuten). Der Digitraffic-Aufruf
+kostet dort eine Anfrage und liefert nichts — abschalten wäre falsch (in der
+Ostsee trägt er), aber die Erwartung gehört korrigiert.
+
+**Sammelabruf statt Einzelabfrage:** `GET /api/ais/v1/vessels` ohne MMSI im
+Pfad liefert den kompletten Bestand — am 27. Aug. 2026 gemessen **1 165
+Schiffe in 58 KB in 0,8 s**. Für einen Server, der viele MMSIs braucht, ist
+das ein Abruf statt tausender. Im Browser lohnt es nicht, weil dort immer nur
+ein Schiff zur Zeit interessiert.
+
 ### `GET https://meri.digitraffic.fi/api/ais/v1/vessels/{mmsi}`
 
 Liefert die AIS-Statik: `imo`, `callSign`, `destination`, `eta`, `draught`,
