@@ -33,14 +33,27 @@ test("null bleibt null - Sentinels ueberleben die Leitung", () => {
   assert.strictEqual(schiffe[0].status, null);
 });
 
-test("20 Byte je Schiff, 7 Byte Kopf - die Rechnung im Entwurf haengt daran", () => {
+test("22 Byte je Schiff, 7 Byte Kopf - die Rechnung im Entwurf haengt daran", () => {
   assert.strictEqual(draht.packe(0, []).length, 7);
-  assert.strictEqual(draht.packe(0, [{ mmsi: 1, lat: 0, lon: 0 }]).length, 27);
+  assert.strictEqual(draht.packe(0, [{ mmsi: 1, lat: 0, lon: 0 }]).length, 29);
   const sechshundert = [];
   for (let i = 0; i < 600; i++) sechshundert.push({ mmsi: i, lat: 53, lon: 8 });
-  // Der Entwurf verspricht ~12 KB fuer ein Erstbild von 600 Schiffen.
-  assert.strictEqual(draht.packe(0, sechshundert).length, 7 + 600 * 20);
-  assert.ok(draht.packe(0, sechshundert).length < 12.5 * 1024);
+  assert.strictEqual(draht.packe(0, sechshundert).length, 7 + 600 * draht.SATZ);
+  // Der Entwurf rechnete mit 20 Byte und rund 12 KB. Das Altersfeld kostet
+  // zwei Byte mehr je Schiff - 13,2 statt 12 KB fuer 600 Schiffe. Dafuer
+  // stimmt die Altersanzeige im Client, und die war sonst gelogen.
+  assert.ok(draht.packe(0, sechshundert).length < 14 * 1024);
+});
+
+test("das Alter reist mit und ueberlebt die Leitung", () => {
+  const { schiffe } = draht.entpacke(draht.packe(1, [
+    { mmsi: 1, lat: 54, lon: 8, alter: 31 },
+    { mmsi: 2, lat: 54, lon: 8, alter: null },
+    { mmsi: 3, lat: 54, lon: 8, alter: 999999 }
+  ]));
+  assert.strictEqual(schiffe[0].alter, 31, "Sekunden seit der Meldung");
+  assert.strictEqual(schiffe[1].alter, null, "unbekannt bleibt unbekannt");
+  assert.strictEqual(schiffe[2].alter, 65534, "und laeuft nicht ueber");
 });
 
 test("ein abgeschnittener Rahmen wird erkannt, nicht stillschweigend halb gelesen", () => {

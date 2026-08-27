@@ -288,6 +288,59 @@ Digitraffic gewonnene IMO verdoppelt näherungsweise die Wikidata-Trefferquote
 gegenüber der Suche allein über die MMSI. Details, Feldlisten und Zahlen zur
 Trefferquote: nächster Abschnitt.
 
+## Betrieb über den eigenen Proxy (abschaltbar, Vorgabe: aus)
+
+Auf der Technikseite lässt sich der Client von openwaters weg auf einen
+eigenen Proxy umstellen (`../aisproxy`). **Der bisherige Weg bleibt die
+Vorgabe** — der Schalter steht auf aus, bis sich der Server im Betrieb
+bewährt hat. Gespeichert in `aisstream_proxy_an` und `aisstream_proxy_url`.
+
+Im Proxybetrieb ändert sich der Datenweg vollständig:
+
+| | direkt | über den Proxy |
+|---|---|---|
+| Live-Daten | WebSocket zu openwaters + Snapshot alle 60 s | ein WebSocket zum Proxy, nur Änderungen |
+| API-Key | nötig | **keiner** — den hält der Proxy |
+| Register | Digitraffic → Wikidata → Commons je Schiff | `GET /v1/ship/{mmsi}`, vorgewärmt |
+| Verkehr | ein Vollbild je Abruf | gemessen **6,4 KB/min** |
+
+**Umgeschaltet wird zur Laufzeit**, ohne Neuladen: `proxyUmschalten()` räumt
+den einen Weg ab und baut den anderen auf. `sendSubscription()`,
+`snapshotTick()` und `maybeLoadSnapshot()` steigen im Proxybetrieb vorn aus,
+statt dass der Aufrufer das wissen müsste.
+
+**Das Register fällt zurück.** Der Proxy deckt nur seine Region ab, die Karte
+darf aber überallhin. Antwortet er mit `register: "offen"` oder gar nicht,
+läuft `enrichDirekt()` — die unveränderte alte Kette.
+
+### Das Drahtformat muss auf beiden Seiten dasselbe sein
+
+22 Byte je Schiff, gespiegelt in `proxyEntpacke()` hier und
+`aisproxy/src/draht.js` dort. Ändert sich das eine, muss das andere mit —
+sonst liest der Client Unsinn, ohne es zu merken. Die Längenprüfung im
+Entpacker ist genau dafür da.
+
+**Das Altersfeld war zuerst nicht drin** und musste nachgerüstet werden. Ohne
+es müsste der Client „jetzt" annehmen und zeigte Daten als taufrisch, die
+gemessen im Median 31 s alt sind — genau die Vortäuschung, die der Entwurf
+vermeiden wollte. Übertragen werden **Sekunden seit der Meldung**, nicht ein
+Zeitstempel: Ein relativer Wert ist gegen eine abweichende Browseruhr immun.
+
+### Und noch einmal die Hoisting-Falle
+
+`PROXY_URL_VORGABE` stand zunächst per `var` unten beim Proxy-Block, wurde
+aber oben beim Wiederherstellen aus dem Speicher schon gebraucht. Ergebnis:
+Im Adressfeld stand wörtlich **„undefined"**. Funktionsdeklarationen werden
+hochgezogen, `var`-**Werte** nicht. Die Konstante steht deshalb jetzt oben
+bei den Elementen, mit Vermerk. Das ist das fünfte Mal, dass dieselbe Falle
+in diesem Projekt zugeschlagen hat — der Test hat sie gefunden, nicht das
+Lesen.
+
+Geprüft in `scratchpad/proxyclient.js`: der Client gegen einen **echten**
+aisproxy, nicht gegen einen Nachbau — Einschalten, Daten, Ausschnittwechsel,
+Ausschalten, Neustart. Ein Nachbau hätte genau die Formatabweichung
+durchgehen lassen, auf die es hier ankommt.
+
 ## Anreicherung per IMO/MMSI: Digitraffic + Wikidata
 
 Zwei Quellen, beide **frei, ohne Schlüssel und mit `access-control-allow-origin: *`**

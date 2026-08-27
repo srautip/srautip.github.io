@@ -137,10 +137,14 @@ class Zustand {
     return out;
   }
 
-  // Fuer das Drahtformat aufbereiten.
-  static alsDraht(s) {
+  // Fuer das Drahtformat aufbereiten. `jetzt` wird durchgereicht, damit alle
+  // Saetze eines Rahmens dieselbe Bezugszeit haben - sonst schwankte das
+  // Alter innerhalb eines Rahmens um die Rechendauer.
+  static alsDraht(s, jetzt) {
+    jetzt = jetzt || Date.now();
     return { mmsi: s.mmsi, lat: s.lat, lon: s.lon, sog: s.sog, cog: s.cog,
-             hdg: s.hdg, status: s.status, flags: s.flags };
+             hdg: s.hdg, status: s.status, flags: s.flags,
+             alter: s.seen ? Math.round((jetzt - s.seen) / 1000) : null };
   }
 
   // Stammdaten als JSON - gehen nur einmal je MMSI hinueber.
