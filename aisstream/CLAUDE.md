@@ -265,9 +265,18 @@ Sechs externe Quellen, keine davon braucht mehr als einen Schlüssel-losen
 Aufruf. Details und Trefferquoten je Quelle stehen in den Abschnitten
 darunter — hier nur die Zusammenfassung, damit nichts doppelt gepflegt wird.
 
+**Beide Live-Quellen laufen aktuell über denselben Anbieter, openwaters.io.**
+`aisstream.io` selbst ist derzeit **nicht im Einsatz** — der Default-Server
+ist der `/v0/stream`-Kompatibilitätsendpunkt von openwaters.io, ein
+inoffizieller Drittanbieter, der das aisstream.io-Protokoll 1:1 spiegelt
+(Ausweichlösung während der AISstream.io-Störung, siehe „Server-Endpoint —
+aktueller Stand" oben). Wer einen offiziellen aisstream.io-Key hat, kann die
+Server-URL im UI manuell umstellen — das ist keine Quelle, die der Client
+von sich aus anspricht.
+
 | Quelle | Endpunkt | Liefert | Ausgelöst |
 |---|---|---|---|
-| AIS-Livestream | `wss://stream.aisstream.io/v0/stream` (oder openwaters-Ausweich) | Position, SOG, COG, Heading, Navstatus (`PositionReport` u. Class-B-Varianten); Typ, Maße, IMO, Ziel (`ShipStaticData`); Name/Rufzeichen (`StaticDataReport`); ENI, Personen an Bord (Binär, **standardmäßig aus**) | laufend, solange verbunden |
+| openwaters-Livestream | `wss://ais.openwaters.io/v0/stream` (Default; `stream.aisstream.io` nur bei manueller Umstellung) | Position, SOG, COG, Heading, Navstatus (`PositionReport` u. Class-B-Varianten); Typ, Maße, IMO, Ziel (`ShipStaticData`); Name/Rufzeichen (`StaticDataReport`); ENI, Personen an Bord (Binär, **standardmäßig aus**) | laufend, solange verbunden |
 | openwaters-Snapshot | `GET ais.openwaters.io/v1/vessels?bbox=…` | Position, SOG, COG, Heading, Navstatus, Name, Typcode, Kind (Seezeichen/Landstation) — **keine** Maße, IMO oder Rufzeichen | beim Laden, alle 60 s, nach Kartenschwenk |
 | Digitraffic | `GET meri.digitraffic.fi/api/ais/v1/vessels/{mmsi}` | IMO, Name, Rufzeichen, Ziel, ETA, Tiefgang, Typcode, Länge/Breite | beim Öffnen eines Schiffs (Register-Kette) |
 | Wikidata | SPARQL, `query.wikidata.org` | Name, Typ, IMO, MMSI, Rufzeichen, BRZ/NRZ, Länge, Breite, Tiefgang, Geschwindigkeit, Baujahr, Klasse, Eigner, Betreiber, Werft, Flagge, Heimathafen, Foto-URL | beim Öffnen eines Schiffs (Register-Kette) |
