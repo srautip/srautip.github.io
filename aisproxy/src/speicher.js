@@ -109,6 +109,16 @@ class Speicher {
                           ["seriennr", "TEXT"]]) {
       this.spalteErgaenzen("schiff", k, t);
     }
+    // Der Registertyp kommt spaeter als die Registersaetze selbst. Wer schon
+    // als "gefunden" vermerkt ist, wuerde sonst 30 Tage lang nicht mehr
+    // gefragt und bliebe so lange ohne Typ. Deshalb GENAU EINMAL - beim
+    // Anlegen der Spalte - die Frist dieser Saetze zuruecksetzen. Der
+    // naechste Registerlauf holt sie in wenigen Buendelabfragen nach.
+    if (this.spalteErgaenzen("schiff", "wd_typ", "TEXT")) {
+      const n = this.db.prepare(
+        "UPDATE schiff SET geprueft = 0 WHERE wd_entity IS NOT NULL").run().changes;
+      if (n) this.log(n + " Registersatz/-saetze zum Nachfragen vorgemerkt (neuer Typ)");
+    }
     this.spalteErgaenzen("schiff", "gesehen", "INTEGER");
     this.spalteErgaenzen("schiff", "foto_geprueft", "INTEGER DEFAULT 0");
     this.spalteErgaenzen("schiff", "foto_quelle", "TEXT");
@@ -404,7 +414,7 @@ class Speicher {
       "dimA", "dimB", "dimC", "dimD", "gesehen",
       "klasse", "geraet", "aisVersion", "dte",
       "hersteller", "modell", "seriennr",
-      "ziel", "eta", "wd_entity", "brz", "baujahr", "eigner", "betreiber", "werft",
+      "ziel", "eta", "wd_entity", "wd_typ", "brz", "baujahr", "eigner", "betreiber", "werft",
       "flagge", "heimathafen", "foto_datei", "foto_credit", "foto_seite",
       "foto_quelle", "foto_geprueft", "quelle", "gefunden", "geprueft"];
     const daten = {};

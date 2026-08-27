@@ -257,3 +257,36 @@ test("Stammdaten aus dem Strom loeschen keine Registerangabe", () => {
   assert.strictEqual(b.gesehen, 1);
   speicher.stopp();
 });
+
+test("neue Spalte wd_typ merkt vorhandene Registersaetze zum Nachfragen vor", () => {
+  // Der Registertyp kam spaeter als die Registersaetze. Ohne diesen einmaligen
+  // Nachzug bliebe ein als "gefunden" vermerktes Schiff 30 Tage ohne Typ -
+  // genau der Fall der "Liberty of the Seas": Wikidata weiss
+  // "Kreuzfahrtschiff", der Proxy fragte nur nicht mehr nach.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aisproxy-mig-"));
+  const konfig = {
+    DB_DATEI: path.join(dir, "m.db"), ROH_STUNDEN: 24, HISTORIE_TAGE: 7,
+    VERDICHTUNG_S: 60, FAHRT_KN: 0.5, SCHREIB_MS: 100000,
+    REGISTER_TREFFER_MS: 30 * 24 * 3600 * 1000, REGISTER_FEHL_MS: 3 * 24 * 3600 * 1000,
+    FOTO_TEIL_MS: 3600 * 1000, FOTO_FEHL_MS: 7 * 24 * 3600 * 1000
+  };
+  let sp = new Speicher({ konfig, log: () => {} });
+  sp.db.exec("ALTER TABLE schiff DROP COLUMN wd_typ");   // Stand vor der Aenderung
+  sp.stammSetze(211000001, { name: "MIT REGISTER", wd_entity: "Q1", gefunden: 1, geprueft: Date.now() });
+  sp.stammSetze(211000002, { name: "OHNE REGISTER", gefunden: 0, geprueft: Date.now() });
+  sp.stopp();
+
+  sp = new Speicher({ konfig, log: () => {} });
+  assert.strictEqual(sp.stammFaellig([211000001]).length, 1, "der Registersatz wird neu gefragt");
+  assert.strictEqual(sp.stammFaellig([211000002]).length, 0,
+    "ein Fehltreffer ohne Wikidata-Eintrag wird NICHT angefasst - sonst laeuft " +
+    "die Abfrage wieder gegen aussichtslose Schiffe");
+  sp.stammSetze(211000001, { geprueft: Date.now() });
+  sp.stopp();
+
+  // Und beim naechsten Start passiert nichts mehr: Der Nachzug haengt am
+  // Anlegen der Spalte, nicht an ihrem Inhalt.
+  sp = new Speicher({ konfig, log: () => {} });
+  assert.strictEqual(sp.stammFaellig([211000001]).length, 0);
+  sp.stopp();
+});

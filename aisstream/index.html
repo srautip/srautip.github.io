@@ -7082,6 +7082,11 @@
         if (d.name) out.name = d.name;
         if (d.imo) out.imo = String(d.imo);
         if (d.rufzeichen) out.callSign = d.rufzeichen;
+        // Der Registertyp aus Wikidata. Er zaehlt doppelt: Er füllt die Zeile
+        // „Typ laut Register" und entscheidet in typeCategory() über Farbe und
+        // Kategorie — für Schiffe, von denen nie eine AIS-Statiknachricht
+        // hereinkommt, ist er die einzige Typangabe überhaupt.
+        if (d.wd_typ) out.typeLabel = d.wd_typ;
         if (d.laenge) out.loa = d.laenge;
         if (d.breite) out.beam = d.breite;
         if (d.tiefgang) out.draft = d.tiefgang;
