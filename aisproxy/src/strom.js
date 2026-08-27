@@ -216,8 +216,8 @@ function uebersetze(o) {
       // minutenlang wartet.
       const n = ais.textSauber(msg.Name); if (n) felder.name = n;
       if (msg.ShipType != null) felder.typ = Number(msg.ShipType);
-      const m = ais.masse(msg.Dimension);
-      if (m) { felder.laenge = m.laenge; felder.breite = m.breite; }
+      const m = ais.masseFelder(msg.Dimension);
+      if (m) Object.assign(felder, m);
     }
   } else if (typ === "ShipStaticData" && msg) {
     const n = ais.textSauber(msg.Name); if (n) felder.name = n;
@@ -227,8 +227,8 @@ function uebersetze(o) {
     const eta = etaZahl(msg.Eta); if (eta != null) felder.eta = eta;
     if (msg.MaximumStaticDraught) felder.tiefgang = Number(msg.MaximumStaticDraught);
     if (msg.Type != null) felder.typ = Number(msg.Type);
-    const m = ais.masse(msg.Dimension);
-    if (m) { felder.laenge = m.laenge; felder.breite = m.breite; }
+    const m = ais.masseFelder(msg.Dimension);
+    if (m) Object.assign(felder, m);
   } else if (typ === "StaticDataReport" && msg) {
     // Class B verteilt seine Statik auf Teil A (Name) und Teil B (Rufzeichen,
     // Typ, Masse).
@@ -236,8 +236,8 @@ function uebersetze(o) {
     const n = ais.textSauber(a.Name); if (n) felder.name = n;
     const c = ais.textSauber(b.CallSign); if (c) felder.rufzeichen = c;
     if (b.ShipType != null) felder.typ = Number(b.ShipType);
-    const m = ais.masse(b.Dimension);
-    if (m) { felder.laenge = m.laenge; felder.breite = m.breite; }
+    const m = ais.masseFelder(b.Dimension);
+    if (m) Object.assign(felder, m);
   } else {
     return Object.keys(felder).length ? { mmsi, felder, stand, hatPosition } : null;
   }

@@ -256,6 +256,33 @@ Bestand gegen den vorherigen. Mitgesichert werden `.env` und
 und ohne sie käme niemand mehr an den Dienst — ein neues Token müsste in
 jeden Client nachgetragen werden.
 
+## Stammdaten: die vier Bezugspunkte gehoeren mit auf die Leitung
+
+`ais.masse()` rechnet aus `Dimension` die Laenge (A+B) und die Breite (C+D).
+Lange hat der Zustand **nur diese Summen** behalten. Der Client braucht aber
+A/B/C/D einzeln: Daraus zeichnet er den Rumpf und rechnet Groessenklasse und
+Verdraengung (`capacityEstimate`, `shipLengthMeters` in
+`aisstream/index.html`).
+
+Gemessen am 27. Aug. 2026 gegen einen echten Proxy, Client mit **leerem**
+localStorage: **80 von 80 Markern ohne Rumpf**, obwohl der Proxy die Masse von
+10 der sichtbaren Schiffe kannte und die Tabelle daneben „400×61" anzeigte.
+Aufgefallen ist es erst beim Leeren des Clientspeichers - vorher kamen die
+Bezugspunkte aus dem direkten AIS-Empfang und ueberlebten dort jeden Neuladen.
+
+Deshalb gibt `ais.masseFelder()` jetzt `dimA..dimD` mit, der Zustand fuehrt sie
+als Stammdaten, und `alsStamm()` schickt sie als `dim: {A,B,C,D}` - `null`,
+wenn nichts bekannt ist, denn `{A:0,B:0,C:0,D:0}` ist truthy und genau daran
+ist der Client schon einmal haengengeblieben.
+
+**Der Strom ist die einzige Quelle dafuer**, und `ShipStaticData` kommt je
+Schiff nur etwa alle sechs Minuten. Gemessen an einem frisch gestarteten
+Proxy: nach 3 min 155 von 2 791 Schiffen mit Masse, nach 13 min 668, danach
+nur noch rund 10 je Minute - der Rest sind Fahrzeuge, die selten oder gar
+keine Abmessungen senden. Persistiert wird davon **nichts**: Die Tabelle
+`schiff` fuellt nur das Register (Wikidata/Digitraffic). Nach einem Neustart
+faengt diese Kurve also wieder bei null an.
+
 ## `/v1/status` liegt hinter der Tokenpruefung — auch fuer eigene Abfragen
 
 `erlaubt()` in `src/server.js` steht **vor** dem Pfadverteiler; `/v1/status`

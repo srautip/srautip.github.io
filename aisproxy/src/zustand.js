@@ -45,6 +45,7 @@ class Zustand {
             status: null, flags: 0, seen: 0, quelle: quelle || "?", rev: 0,
             name: null, rufzeichen: null, imo: null, typ: null,
             laenge: null, breite: null, tiefgang: null, ziel: null, eta: null,
+            dimA: null, dimB: null, dimC: null, dimD: null,
             stammRev: 0 };
       this.schiffe.set(mmsi, s);
     }
@@ -62,7 +63,7 @@ class Zustand {
     let stammGeaendert = false;
     const POSITION = ["lat", "lon", "sog", "cog", "hdg", "status", "flags"];
     const STAMM = ["name", "rufzeichen", "imo", "typ", "laenge", "breite",
-                   "tiefgang", "ziel", "eta"];
+                   "tiefgang", "ziel", "eta", "dimA", "dimB", "dimC", "dimD"];
 
     for (const k of POSITION) {
       if (felder[k] === undefined) continue;
@@ -148,9 +149,17 @@ class Zustand {
   }
 
   // Stammdaten als JSON - gehen nur einmal je MMSI hinueber.
+  //
+  // `dim` traegt die vier Bezugspunkte der Antenne mit. Die Summen allein
+  // reichen dem Client nicht: Er zeichnet daraus die Rumpfform und rechnet
+  // Groessenklasse und Verdraengung aus - ohne sie stand jedes Schiff, das er
+  // nur ueber den Proxy kennt, als "ohne bekannte Masse" auf der Karte,
+  // waehrend die Tabelle daneben die Groesse anzeigte.
   static alsStamm(s) {
     return { mmsi: s.mmsi, name: s.name, rufzeichen: s.rufzeichen, imo: s.imo,
              typ: s.typ, laenge: s.laenge, breite: s.breite,
+             dim: s.dimA == null && s.dimB == null ? null
+                : { A: s.dimA || 0, B: s.dimB || 0, C: s.dimC || 0, D: s.dimD || 0 },
              tiefgang: s.tiefgang, ziel: s.ziel, eta: s.eta,
              seen: s.seen, quelle: s.quelle };
   }
