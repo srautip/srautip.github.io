@@ -1056,6 +1056,53 @@ Zwei-Stunden-Fenster hörte die Verblassung dann am ältesten Ende bei
 Fensterrand. Gemessen: anteilig läuft die Deckung auch bei 2 h von 1,000 bis
 0,084 durch (der Rest ist die Auflösung der Daten, siehe unten).
 
+##### „Die Transparenz funktioniert nicht" — sie tat es, nur unsichtbar
+
+Gemeldet, und die Frage war richtig gestellt: *„Prüfe nochmal, ob bei den
+Map-Linien Transparenz überhaupt unterstützt wird."* Nachgemessen an den
+**Pixeln** eines Schirmfotos (`scratchpad/deckungpixel.js`, Kacheln
+abgeklemmt, damit der Untergrund einfarbig ist, Spur als senkrechte Linie
+über zwei Stunden):
+
+| | |
+|---|---|
+| Verhältnis gemessene zu vorgegebener Deckung | **konstant 0,50–0,62** |
+| Spitzenpixel bei voller Deckung, `weight: 1` | nur **0,5** der Farbe |
+| dasselbe bei `weight: 2` | **0,8**, Verhältnis 0,80–1,05 |
+| `weight: 3` | unverändert 0,8 — mehr bringt nichts |
+
+**`stroke-opacity` wird also sauber gezeichnet**, der Verlauf ist linear und
+trifft die Vorgabe. Der Fehler saß in der **Linienbreite**: Eine 1 px breite
+Linie liegt fast nie auf einer Pixelspalte, die Kantenglättung verteilt sie
+auf zwei — der stärkste Bildpunkt bekommt schon bei voller Deckung nur die
+halbe Farbe. Die ganze Verblassung spielte sich damit in einem ohnehin
+blassen Bereich ab, und auf echten OSM-Kacheln war davon nichts zu sehen.
+
+**Deshalb `weight: 2` für die Auto-Spuren** (vorher 1) und **3 für die eigene
+Spur des gewählten Schiffs** (vorher 2). Auf dem Schirmfoto über echten
+Kacheln ist der Verlauf danach deutlich: kräftig am Schiff, aufgelöst am
+alten Ende.
+
+**Der Vorschlag, statt der Deckung die Farbe Richtung Meeresblau zu ziehen,
+hilft hier nicht** — die Kantenglättung halbiert auch eine angeglichene
+Farbe, das Problem läge unverändert bei der Breite. Und über Land wäre eine
+meerfarbene Linie falsch, während Transparenz auf jedem Untergrund stimmt.
+
+**Zwei Fallen bei der Messung selbst:**
+
+- **Nicht die hellste Stelle der Bildzeile nehmen.** Der erste Anlauf suchte
+  den stärksten Ausreißer jeder Zeile und fand mal den schwarzen
+  Schiffsmarker, mal die weiße Legende, mal die Zoomknöpfe — gemessen wurde
+  die Bedienoberfläche, nicht die Spur. Gesucht wird jetzt nur im
+  ±3-px-Fenster um die Linie, deren Lage der Pfad selbst verrät.
+- **Bezug ist die gerechnete Farbe, nicht der größte Messwert.** Sonst
+  normiert man auf einen Ausreißer.
+
+Zwei Proben mussten mitziehen: `autotracks.js` filtert Leaflets Vektoren nach
+Linienbreite (um Richtungspfeile und gestrichelte Sichtkreise auszulassen)
+und zählte mit der alten Schranke `≤ 1,2` plötzlich **null** Spuren. Wer die
+Breite im Client ändert, muss die Zahl dort mitziehen.
+
 **Eine Leaflet-Linie hat genau eine Deckung.** Ein Farbverlauf entsteht also
 nur, indem man die Spur zerlegt. Eine Linie je Punktpaar wäre bei 13 000
 Punkten ein DOM-Grab; gezeichnet wird deshalb in **`TRACK_STUFEN` = 24
@@ -1247,6 +1294,11 @@ angenommen.
 | Klick auf die Anzeige | Regler zurück auf 1000, beide Schiffe auf jetzt |
 | CHARLIE dreht nach einer Stunde von Nord auf Ost | Pfeil live **90°**, ganz unten **0°**, zurück auf live wieder 90° |
 | ALPHA, das nie gedreht hat | bleibt bei 0° |
+| Regler in der Mitte, Verblassung | am Schiff **1,000**, nach hinten bis 0,759 |
+
+Die letzte Zeile ist der Beleg, dass auch die **Verblassung** ab dem
+eingestellten Zeitpunkt rechnet und nicht ab jetzt: Rechnete sie ab jetzt,
+wäre das Stück am Schiff eine Stunde alt und läge bei 0,68 statt 1,000.
 
 Das dritte Schiff CHARLIE fährt die erste Hälfte nach Norden mit Kurs 0 und
 die zweite nach Osten mit Kurs 90 — **Position und gemeldeter Kurs passen
