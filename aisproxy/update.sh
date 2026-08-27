@@ -155,7 +155,11 @@ if docker compose ps --status running proxy 2>/dev/null | grep -q proxy; then
     exit 1
   fi
   read -r S_PUNKTE S_TAGE S_STAMM S_GROESSE <<< "$ergebnis"
-  docker compose cp proxy:/daten/sicherung.db "$SICHERUNG" >/dev/null
+  if ! docker compose cp proxy:/daten/sicherung.db "$SICHERUNG" >/dev/null; then
+    echo "    Die Sicherung liess sich nicht aus dem Container holen."
+    echo "    Es wird NICHTS aktualisiert."
+    exit 1
+  fi
   docker compose exec -T proxy node -e \
     'require("node:fs").unlinkSync("/daten/sicherung.db")' < /dev/null || true
   echo "    $SICHERUNG"
