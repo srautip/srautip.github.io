@@ -279,9 +279,37 @@ ist der Client schon einmal haengengeblieben.
 Schiff nur etwa alle sechs Minuten. Gemessen an einem frisch gestarteten
 Proxy: nach 3 min 155 von 2 791 Schiffen mit Masse, nach 13 min 668, danach
 nur noch rund 10 je Minute - der Rest sind Fahrzeuge, die selten oder gar
-keine Abmessungen senden. Persistiert wird davon **nichts**: Die Tabelle
-`schiff` fuellt nur das Register (Wikidata/Digitraffic). Nach einem Neustart
-faengt diese Kurve also wieder bei null an.
+keine Abmessungen senden.
+
+### Deshalb werden sie mitgeschrieben
+
+Bis zum 27. Aug. 2026 standen diese Stammdaten **nur im Arbeitsspeicher** -
+die Tabelle `schiff` fuellte allein das Register. Nach jedem Neustart begann
+die Lernkurve oben wieder bei null, und ein Client mit leerem
+Zwischenspeicher sah in der Zeit lauter Schiffe ohne Masse.
+
+Jetzt haelt `speicher.merkeStamm()` sie fest, gebuendelt im selben Takt wie
+die Positionen (`SCHREIB_MS`, gemessen rund 10 Saetze je Sekunde). Drei
+Regeln, die dabei zaehlen:
+
+- **Nur was bekannt ist.** `stammSetze()` schreibt jedes uebergebene Feld,
+  also wuerde ein `null` aus dem Strom eine Registerangabe *loeschen*. Die
+  Probe dazu steht in `test/speicher.test.js`: Wikidata-Laenge 95, danach eine
+  AIS-Meldung ohne Masse - die 95 bleibt stehen.
+- **Register- und Fotospalten fasst dieser Weg nicht an** (`STAMM_SPALTEN`).
+  Ein Schreiber, der beide Seiten bedient, ueberschreibt frueher oder spaeter
+  die eine mit dem Nichtwissen der anderen.
+- **Beim ersten Sehen wird nachgeschlagen**, nicht nur beim Kaltstart: Der
+  Kaltstart erwischt die Schiffe mit frischer Position in der Historie, wer
+  danach auftaucht, bekaeme sonst wieder minutenlang nichts. Gefuellt werden
+  dabei nur *fehlende* Felder - die eben eingetroffene Meldung ist juenger als
+  die Datenbank.
+
+Gemessen an einem echten Proxy mit echtem Strom: 250 Schiffe mit Abmessungen
+in drei Minuten gelernt, sauber beendet, mit derselben Datenbank neu
+gestartet - **25 Sekunden spaeter kannte er 286 davon wieder** (die 250 aus
+der Datenbank plus die inzwischen frisch gemeldeten) und 2 475 Namen. Ohne
+Persistenz waeren es die zwei, drei aus 25 Sekunden Strom gewesen.
 
 ## `/v1/status` liegt hinter der Tokenpruefung — auch fuer eigene Abfragen
 
