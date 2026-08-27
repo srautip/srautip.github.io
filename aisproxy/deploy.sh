@@ -12,6 +12,7 @@ set -euo pipefail
 DOMAIN="${1:-}"
 BENUTZER="${AIS_BENUTZER:-skipper}"
 ZIEL="/opt/aisproxy"
+QUELLE="/opt/aisproxy-src"
 REPO="${AIS_REPO:-https://github.com/srautip/srautip.github.io.git}"
 
 if [[ -z "$DOMAIN" ]]; then
@@ -88,16 +89,36 @@ fi
 systemctl enable --now docker >/dev/null
 
 echo "==> 3/6 Quellcode nach $ZIEL"
-if [[ -d "$ZIEL/.git" ]]; then
-  git -C "$ZIEL" pull --ff-only
+# Der Klon BLEIBT stehen, und $ZIEL ist nur ein Verweis darauf.
+#
+# Zuerst wurde das Unterverzeichnis aus dem Klon herausgeschoben und der Klon
+# geloescht - damit war .git weg, "git pull" im Zielverzeichnis scheiterte mit
+# "not a git repository", und ein zweiter Lauf dieses Skripts haette
+# rm -rf "$ZIEL" gemacht und die Zugangsdaten gleich mit geloescht.
+#
+# Der Verweis haelt die Pfade flach (/opt/aisproxy/docker-compose.yml statt
+# /opt/aisproxy-src/aisproxy/...), und "cd /opt/aisproxy && git pull" findet
+# das Repo, weil git dem physischen Pfad folgt.
+if [[ -d "$QUELLE/.git" ]]; then
+  git -C "$QUELLE" pull --ff-only
 else
-  rm -rf "$ZIEL"
+  rm -rf "$QUELLE"
   # Nur das Unterverzeichnis holen - das Repo enthaelt mehrere Projekte.
-  git clone --depth 1 --filter=blob:none --sparse "$REPO" "$ZIEL.repo"
-  git -C "$ZIEL.repo" sparse-checkout set aisproxy
-  mv "$ZIEL.repo/aisproxy" "$ZIEL"
-  rm -rf "$ZIEL.repo"
+  git clone --depth 1 --filter=blob:none --sparse "$REPO" "$QUELLE"
+  git -C "$QUELLE" sparse-checkout set aisproxy
 fi
+
+# Eine aeltere, flache Installation uebernehmen, ohne etwas wegzuwerfen.
+if [[ -e "$ZIEL" && ! -L "$ZIEL" ]]; then
+  echo "    aeltere Installation gefunden - Zugangsdaten werden uebernommen"
+  for datei in .env zugangsdaten.txt; do
+    [[ -f "$ZIEL/$datei" ]] && cp -p "$ZIEL/$datei" "$QUELLE/aisproxy/$datei"
+  done
+  ( cd "$ZIEL" && docker compose down 2>/dev/null || true )
+  mv "$ZIEL" "$ZIEL.alt-$(date +%Y%m%d%H%M%S)"
+  echo "    alte Installation liegt unter $ZIEL.alt-* - loeschbar, wenn alles laeuft"
+fi
+ln -sfn "$QUELLE/aisproxy" "$ZIEL"
 
 echo "==> 4/6 Zugangsdaten"
 if [[ ! -f "$ZIEL/.env" ]]; then

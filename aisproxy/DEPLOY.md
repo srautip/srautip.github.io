@@ -85,10 +85,11 @@ Falls man lieber sieht, was passiert — es sind fünf Schritte:
 apt-get update && apt-get install -y ca-certificates curl git ufw
 curl -fsSL https://get.docker.com | sh
 
-# 2  Nur das Proxy-Verzeichnis holen
-git clone --depth 1 --sparse https://github.com/srautip/srautip.github.io.git /tmp/r
-git -C /tmp/r sparse-checkout set aisproxy
-mv /tmp/r/aisproxy /opt/aisproxy && rm -rf /tmp/r
+# 2  Nur das Proxy-Verzeichnis holen. Der Klon BLEIBT stehen, /opt/aisproxy
+#    ist nur ein Verweis darauf - sonst gäbe es später kein `git pull`.
+git clone --depth 1 --sparse https://github.com/srautip/srautip.github.io.git /opt/aisproxy-src
+git -C /opt/aisproxy-src sparse-checkout set aisproxy
+ln -sfn /opt/aisproxy-src/aisproxy /opt/aisproxy
 
 # 3  Zugangsdaten
 cd /opt/aisproxy
@@ -171,6 +172,26 @@ cd /opt/aisproxy && git pull && docker compose up -d --build
 
 Die Historie liegt im Volume `daten` und übersteht das.
 
+### Wenn dort „not a git repository" steht
+
+Dann stammt die Installation aus einer frühen Fassung des Skripts, die das
+Verzeichnis aus dem Klon herausschob und den Klon samt `.git` löschte.
+Einmalig umstellen — die Zugangsdaten bleiben erhalten:
+
+```bash
+git clone --depth 1 --sparse https://github.com/srautip/srautip.github.io.git /opt/aisproxy-src
+git -C /opt/aisproxy-src sparse-checkout set aisproxy
+cp /opt/aisproxy/.env /opt/aisproxy/zugangsdaten.txt /opt/aisproxy-src/aisproxy/
+cd /opt/aisproxy && docker compose down
+cd /opt && mv aisproxy aisproxy.alt && ln -sfn /opt/aisproxy-src/aisproxy /opt/aisproxy
+cd /opt/aisproxy && docker compose up -d --build
+```
+
+Dasselbe macht ein erneuter Lauf von `deploy.sh` inzwischen von selbst. Die
+Volumes überleben, weil der Projektname in der `docker-compose.yml` fest
+steht (`name: aisproxy`) und nicht aus dem Verzeichnisnamen abgeleitet wird.
+Läuft alles, kann `/opt/aisproxy.alt*` weg.
+
 ## Sichern
 
 Es gibt genau eine Datei, die zählt:
@@ -191,6 +212,7 @@ sichern lohnt nicht.
 | `Stream verbunden`, aber `schiffe: 0` | Region größer als 400 sq° — der Upstream verwirft die Subscription dann **ohne Fehlermeldung**. Der Proxy warnt beim Start, wenn er es bemerkt |
 | `Cannot find module 'node:sqlite'` | Node älter als 22.5. Im Image kann das nicht passieren; bei einer Installation ohne Docker Node auf 22.22+ heben |
 | Basic-Auth wird abgewiesen, auch mit richtigem Passwort | Der bcrypt-Hash steckt voller `$`, und Docker Compose deutet `$` in der `.env` als Variable — der Hash kommt zerstückelt am Container an. Prüfen mit `docker compose config \| grep PASSWORT`; im `.env` jedes `$` verdoppeln (`$$`) |
+| `git pull` sagt „not a git repository" | Installation aus einer frühen Skriptfassung ohne `.git`. Siehe *Aktualisieren* — einmalig umstellen, Zugangsdaten bleiben |
 | Der Client verbindet sich nicht, obwohl das Token stimmt | Alte `Caddyfile` mit Basic-Auth über allen Pfaden. Ein Browser kann bei einem WebSocket keine Header setzen, also kommt er nie durch. `git pull && docker compose up -d --build` |
 | Alles läuft, aber der Browser bekommt nichts | Ohne `Access-Control-Allow-Origin` kommt keine Antwort an — der Proxy setzt ihn selbst, aber ein vorgeschalteter Reverse-Proxy darf ihn nicht abschneiden |
 

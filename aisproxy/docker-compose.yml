@@ -4,6 +4,11 @@
 # Historie und einer Handvoll Nutzern waere ein zweiter Dienst zum Betreiben,
 # Sichern und Aktualisieren kein guter Tausch.
 
+# Der Projektname FEST, nicht aus dem Verzeichnisnamen abgeleitet. Sonst
+# heissen die Volumes nach einem Umzug anders - und die Historie waere weg,
+# ohne dass jemand eine Fehlermeldung sieht.
+name: aisproxy
+
 services:
   proxy:
     build: .
