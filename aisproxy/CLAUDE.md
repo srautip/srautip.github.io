@@ -240,6 +240,22 @@ mal bis zu fünf Abrufen mal einer Sekunde — Stunden. Was nicht drankam,
 bleibt fällig und steht als `fotoOffen` im Bericht. **Eine stille Kappung
 liest sich wie „alles abgearbeitet".**
 
+## Sichern heißt `VACUUM INTO`, nicht `cp`
+
+Die Datenbank läuft im WAL-Modus. Ein `cp ais.db` nimmt genau das nicht mit,
+was seit dem letzten Checkpoint geschrieben wurde — und das kann alles sein.
+Gemessen an 5 000 frisch geschriebenen Zeilen mit offenem Schreiber: `cp`
+liefert **0** Positionen (Hauptdatei 4 KB, WAL 190 KB), `VACUUM INTO` liefert
+**5 000**. Die `cp`-Sicherung sieht dabei aus wie eine Sicherung. Genau so
+stand es bis zum 27. Aug. 2026 in `DEPLOY.md`.
+
+Deshalb macht `update.sh` vor jedem Update ein `VACUUM INTO`, **öffnet die
+Sicherung sofort wieder und zählt sie**, und liest nach dem Neustart den
+Bestand gegen den vorherigen. Mitgesichert werden `.env` und
+`zugangsdaten.txt`: Beide sind ungetrackt, kein git-Befehl holt sie zurück,
+und ohne sie käme niemand mehr an den Dienst — ein neues Token müsste in
+jeden Client nachgetragen werden.
+
 ## Der Fehler, der zweimal passiert ist: entpackt statt Leitung messen
 
 Beim Stream und beim Snapshot habe ich zuerst die **entpackte** Größe
