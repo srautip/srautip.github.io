@@ -1,0 +1,26 @@
+# TLS besorgt sich Caddy selbst, sobald AIS_DOMAIN ein echter Name ist.
+{$AIS_DOMAIN} {
+	encode gzip
+
+	# Fotos brauchen keine Anmeldung - sie sind ohnehin Wikimedia-Bilder,
+	# und der Client laedt viele davon.
+	handle /v1/foto/* {
+		reverse_proxy proxy:8080
+	}
+
+	handle {
+		basic_auth {
+			{$AIS_BENUTZER} {$AIS_PASSWORT_HASH}
+		}
+		# Der WebSocket laeuft ueber dieselbe Regel - Caddy reicht den
+		# Upgrade von sich aus durch, dafuer ist keine Sonderbehandlung noetig.
+		reverse_proxy proxy:8080
+	}
+
+	log {
+		output file /data/zugriff.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

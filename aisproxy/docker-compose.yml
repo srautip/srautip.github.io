@@ -1,0 +1,54 @@
+# Zwei Dienste, kein Datenbankcontainer: SQLite liegt als Datei im Volume.
+# Umschlagpunkt zu Postgres/TimescaleDB waeren mehrere schreibende Prozesse,
+# mehr als rund 50 GB oder Auswertungen parallel zum Betrieb. Bei 200 MB
+# Historie und einer Handvoll Nutzern waere ein zweiter Dienst zum Betreiben,
+# Sichern und Aktualisieren kein guter Tausch.
+
+services:
+  proxy:
+    build: .
+    restart: unless-stopped
+    environment:
+      # Region: Deutsche Bucht + westliche Ostsee, 21 sq, gemessen 2915-3100
+      # Schiffe. Groesser waere teurer, ein Kuestenband-Zuschnitt brachte
+      # gemessen nur 4,4 % - siehe README.
+      AIS_LAT_MIN: "53.0"
+      AIS_LON_MIN: "6.0"
+      AIS_LAT_MAX: "56.0"
+      AIS_LON_MAX: "13.0"
+      # Leer lassen: Der Proxy holt sich beim Start selbst einen Token.
+      AIS_TOKEN: "${AIS_TOKEN:-}"
+      # Zugang fuer den kleinen Kreis. Caddy davor macht TLS und Basic-Auth,
+      # das hier schuetzt zusaetzlich den direkten Port.
+      AIS_ZUGANG: "${AIS_ZUGANG:-}"
+      AIS_HISTORIE_TAGE: "7"
+      TZ: "Europe/Berlin"
+    volumes:
+      - daten:/daten
+    # Nach aussen nur ueber Caddy. Zum Messen von der Maschine selbst:
+    # ports: ["127.0.0.1:8080:8080"]
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      AIS_DOMAIN: "${AIS_DOMAIN:-localhost}"
+      # Erzeugen mit: docker run --rm caddy:2-alpine caddy hash-password
+      AIS_BENUTZER: "${AIS_BENUTZER:-skipper}"
+      AIS_PASSWORT_HASH: "${AIS_PASSWORT_HASH:-}"
+    depends_on:
+      - proxy
+
+volumes:
+  daten:
+  caddy_data:
+  caddy_config:

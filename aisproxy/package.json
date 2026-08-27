@@ -1,0 +1,16 @@
+{
+  "name": "aisproxy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Caching-Proxy fuer AIS-Daten: Livestream buendeln, Historie vorhalten, Clients sparsam beliefern",
+  "type": "commonjs",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/",
+    "test:live": "node test/live.test.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
