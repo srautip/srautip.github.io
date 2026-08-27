@@ -288,12 +288,17 @@ Digitraffic gewonnene IMO verdoppelt näherungsweise die Wikidata-Trefferquote
 gegenüber der Suche allein über die MMSI. Details, Feldlisten und Zahlen zur
 Trefferquote: nächster Abschnitt.
 
-## Betrieb über den eigenen Proxy (abschaltbar, Vorgabe: aus)
+## Betrieb über den eigenen Proxy (Vorgabe: an, abschaltbar)
 
-Auf der Technikseite lässt sich der Client von openwaters weg auf einen
-eigenen Proxy umstellen (`../aisproxy`). **Der bisherige Weg bleibt die
-Vorgabe** — der Schalter steht auf aus, bis sich der Server im Betrieb
-bewährt hat. Gespeichert in `aisstream_proxy_an` und `aisstream_proxy_url`.
+Der Client bezieht seine Daten aus dem eigenen Proxy (`../aisproxy`); auf der
+Technikseite lässt sich das abschalten. **Die Vorgabe ist der Proxy** — er
+braucht keinen API-Key, liefert nur Änderungen und hat das Register schon
+vorgewärmt. Gespeichert in `aisstream_proxy_an` und `aisstream_proxy_url`.
+
+Der Umstieg war nur vertretbar, weil der **Rückfall** dazugehört: Fällt der
+Proxy aus, übernimmt der direkte Weg von selbst (siehe unten). Ein Schalter,
+der ab Werk auf einen einzelnen Server zeigt, wäre sonst ein Ausfallpunkt,
+den der Nutzer erst auf der Technikseite wieder wegklicken müsste.
 
 Im Proxybetrieb ändert sich der Datenweg vollständig:
 
@@ -312,6 +317,61 @@ statt dass der Aufrufer das wissen müsste.
 **Das Register fällt zurück.** Der Proxy deckt nur seine Region ab, die Karte
 darf aber überallhin. Antwortet er mit `register: "offen"` oder gar nicht,
 läuft `enrichDirekt()` — die unveränderte alte Kette.
+
+### Die Ampel: welcher Weg trägt gerade?
+
+Der Punkt neben dem Zahnrad zeigt nicht mehr nur „verbunden", sondern
+**woher die Daten kommen**:
+
+| Farbe | Text | Lage |
+|---|---|---|
+| grün | `Proxy` | der Proxy liefert |
+| gelb | `Proxy nicht erreichbar - direkt bei openwaters` | Rückfall trägt |
+| rot | `weder Proxy noch openwaters erreichbar` | beide Wege tot |
+
+Zwei Funktionen, die man nicht verwechseln darf:
+
+- **`proxyAktiv()`** — der *Schalter* steht auf an.
+- **`proxyLiefert()`** — der Proxy *versorgt uns gerade wirklich*
+  (`proxyAktiv() && !rueckfallAktiv`).
+
+An `proxyLiefert()` hängen die Weichen in `sendSubscription()`,
+`snapshotTick()` und `maybeLoadSnapshot()`. Stünde dort weiter
+`proxyAktiv()`, blieben im Rückfall genau die Wege zu, die ihn tragen
+sollen — der Schalter steht ja noch auf an.
+
+`connect()` ist dafür geteilt: die Proxyweiche vorn, der alte Rumpf als
+**`direktVerbinden()`**. Zwei Aufrufer brauchen ihn — der Knopf bei
+abgeschaltetem Proxy und `rueckfallStarten()`.
+
+**Der Rückfall wartet nicht.** `ws.onclose` des Proxys ruft
+`rueckfallStarten()` sofort, nicht erst nach ein paar vergeblichen
+Versuchen: Der Proxy wird im Hintergrund weiter angeklopft, und sobald er
+antwortet, räumt `rueckfallBeenden()` die Direktverbindung wieder ab.
+
+**Zuerst der Snapshot, dann der Stream.** `rueckfallStarten()` ruft
+`maybeLoadSnapshot()` vor `direktVerbinden()`, weil der Snapshot **ohne
+API-Key** auskommt. Bei einem Nutzer ohne eigenen Schlüssel — dem
+Normalfall, seit der Proxy die Vorgabe ist — ist er der einzige Beleg, dass
+openwaters überhaupt erreichbar ist. Ohne ihn wäre Gelb nie erreichbar und
+die Ampel spränge von Grün direkt auf Rot.
+
+**Rot braucht einen echten Fehlschlag, kein ablaufendes Zeitfenster.**
+Zuerst hing „openwaters ist auch weg" allein daran, dass der letzte
+erfolgreiche Snapshot älter als drei Takte war — die Probe blieb damit
+drei Minuten auf Gelb stehen, obwohl der Abruf längst scheiterte. Deshalb
+merkt sich `snapshotFehlerAt` den letzten *gescheiterten* Versuch;
+`versorgung()` verlangt `snapshotAt > snapshotFehlerAt`. Das Zeitfenster
+bleibt zusätzlich drin, damit ein längst veralteter Erfolg nicht ewig als
+Beleg durchgeht.
+
+**Ein 5-s-Takt urteilt nach.** Ohne ihn bliebe die Anzeige auf Gelb stehen,
+wenn *später* auch openwaters wegbricht: Diesen Übergang meldet kein
+Ereignis, er hängt am Ablaufen des Fensters.
+
+Gemessen in `scratchpad/ampel.js` — gegen einen echten aisproxy, der
+mittendrin gestoppt und wieder gestartet wird, und mit einem echten
+Abbruch der openwaters-Aufrufe: grün → gelb → rot → grün.
 
 ### Nur das Token, nicht Benutzer und Passwort
 
@@ -2064,6 +2124,26 @@ Breitengrenzen selbst** gilt `--voll`: Erst das iPad Mini quer mit genau
 Die fünf längsten: `zeilentreffer` 66 s, `groessecache` 64 s,
 `typkategorie` 47 s, `snapshotpan` 46 s, `mvtest` 38 s. Wer weiter drücken
 will, holt dort die festen Wartepausen heraus, nicht anderswo.
+
+**Jede Probe muss den Proxy abschalten — als letztes Init-Skript vor dem
+`goto`.** Seit der Proxy die Vorgabe ist, landen sonst die eingespeisten
+`FakeWS`-Meldungen (aisstream-JSON) im Proxyzweig, der Binärrahmen erwartet,
+und die Seite bleibt leer. Beim Umstellen fielen dadurch **22 von 28 Tests**
+auf einen Schlag durch. Deshalb steht in jeder Probe:
+
+```js
+await page.addInitScript(() => { try { localStorage.setItem('aisstream_proxy_an', '0'); } catch (e) {} });
+```
+
+Die **Reihenfolge** ist kein Schönheitsfehler: Init-Skripte laufen in der
+Reihenfolge ihrer Registrierung, und mehrere Proben rufen selbst
+`localStorage.clear()` als Init-Skript. Stand die Zeile davor, war sie
+wieder weg — nach dem ersten Anlauf blieben genau deshalb noch 11 Tests rot.
+Zuletzt registrieren, direkt vor jedem `goto`.
+
+Die Vorgabe selbst prüfen `scratchpad/proxyclient.js` und
+`scratchpad/ampel.js` — die beiden Proben, die den Proxy **nicht**
+abschalten dürfen.
 
 **Der eine zeitempfindliche Test: `snapshotpan`.** Er ist unter vier
 parallelen Browsern einmal durchgefallen und lief allein wie im nächsten

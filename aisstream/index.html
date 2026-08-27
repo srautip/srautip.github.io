@@ -20,6 +20,7 @@
     --muted: #93a0bd;
     --accent: #3fa9ff;
     --ok: #35c37c;
+    --warn: #f2b134;
     --err: #ff5d6c;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
@@ -89,6 +90,7 @@
     display: inline-block;
   }
   .dot.connected { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  .dot.warn { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
   .dot.error { background: var(--err); box-shadow: 0 0 6px var(--err); }
   main {
     display: grid;
@@ -1195,7 +1197,7 @@
 
     <h2 style="margin-top:1.2rem">Eigener Proxy</h2>
     <div class="checkboxes">
-      <label><input type="checkbox" id="proxyAn" /> Daten über den eigenen Proxy beziehen</label>
+      <label><input type="checkbox" id="proxyAn" checked /> Daten über den eigenen Proxy beziehen</label>
     </div>
     <label for="proxyUrl">Adresse</label>
     <input type="text" id="proxyUrl" placeholder="https://…/v1" autocomplete="off" />
@@ -1214,6 +1216,11 @@
       sieben Tage Historie und schickt nur noch <b>Änderungen</b> statt
       Vollbildern &ndash; gemessen <b>6,4&nbsp;KB/min</b> im laufenden Betrieb.
       Ein API-Key wird dafür nicht gebraucht, den hält der Proxy.
+      <b>Fällt er aus, übernimmt der direkte Weg von selbst</b> &ndash; der
+      Punkt neben dem Zahnrad zeigt, woher die Daten gerade kommen:
+      <b style="color:var(--ok)">grün</b> Proxy,
+      <b style="color:var(--warn)">gelb</b> direkt bei openwaters,
+      <b style="color:var(--err)">rot</b> beides nicht erreichbar.
       <b>Achtung:</b> Das Alter der Daten ändert sich dadurch nicht &ndash; sie
       sind auch über den Proxy im Median rund 31&nbsp;s alt, das ist eine
       Eigenschaft der Quelle. Umschalten wirkt sofort, ein Neuladen ist nicht
@@ -1698,12 +1705,12 @@
   trackGrenze = trackGrenzeAus(localStorage.getItem("aisstream_track_limit"));
   trackLimitInput.value = String(trackGrenze);
 
-  // Der Proxy ist bewusst AUS in der Vorgabe: Der bisherige Weg bleibt der
-  // Normalfall, bis sich der eigene Server im Betrieb bewaehrt hat.
+  // Der Proxy ist die Vorgabe. Faellt er aus, uebernimmt der direkte Weg von
+  // selbst - deshalb kostet das nichts, auch wenn der Server gerade steht.
   proxyUrlInput.value = localStorage.getItem("aisstream_proxy_url") || PROXY_URL_VORGABE;
   var gespeichertesToken = localStorage.getItem("aisstream_proxy_token");
   proxyTokenInput.value = gespeichertesToken === null ? PROXY_TOKEN_VORGABE : gespeichertesToken;
-  if (localStorage.getItem("aisstream_proxy_an") === "1") proxyAnInput.checked = true;
+  proxyAnInput.checked = localStorage.getItem("aisstream_proxy_an") !== "0";
 
   if (localStorage.getItem("aisstream_auto_enrich") === "0") autoEnrichInput.checked = false;
   if (localStorage.getItem("aisstream_show_labels") === "0") showLabelsInput.checked = false;
@@ -5224,6 +5231,11 @@
   // keine Anfrage - genau dafuer ist der Rand da.
   var snapshotBox = null;
   var snapshotAt = 0;
+  // Wann ein Abruf zuletzt FEHLGESCHLAGEN ist. Ohne diesen Wert liesse sich
+  // "openwaters ist weg" nur am Ablaufen eines Zeitfensters ablesen - die
+  // Ampel zeigte dann drei Minuten lang Gelb, obwohl der Fehlschlag laengst
+  // vorlag. Gemessen: Probe 3 blieb genau deshalb auf Gelb stehen.
+  var snapshotFehlerAt = 0;
   // Auch innerhalb der abgedeckten Box irgendwann neu holen: Wer nach einer
   // Viertelstunde zurueckschwenkt, soll keine Karteileichen sehen. Nur beim
   // Schwenken, kein Hintergrundtakt.
@@ -5382,6 +5394,10 @@
         // Ein Abbruch ist die Regel, nicht der Fehlerfall: Er bedeutet, dass
         // der Nutzer weitergeschwenkt hat.
         if (e && e.name === "AbortError") return;
+        // Ein echter Fehlschlag ist der Beleg, dass openwaters gerade NICHT
+        // erreichbar ist - er faerbt die Ampel, ohne dass man ein Zeitfenster
+        // ablaufen lassen muesste.
+        snapshotFehlerAt = Date.now();
         // Ein dauerhaft gestoerter Takt darf den Log nicht minutenweise
         // zumauern - einmal melden, dann bis zum naechsten Erfolg schweigen.
         if (stumm) {
@@ -5397,15 +5413,19 @@
         if (frist) clearTimeout(frist);
         if (snapshotCtrl === ctrl) snapshotCtrl = null;
         snapshotBtn.disabled = false;
+        // Der Snapshot ist der Beleg, ob openwaters ueberhaupt erreichbar ist -
+        // er braucht keinen Schluessel. Nach jedem Versuch neu urteilen.
+        versorgungAnzeigen();
       });
   }
 
   // Nach jedem Kartenschwenk (400 ms entprellt). Vier Ausstiege, jeder mit
   // eigenem Grund - siehe die Konstanten oben.
   function maybeLoadSnapshot() {
-    // Im Proxybetrieb ueberfluessig: Der Proxy schickt das Vollbild fuer den
-    // neuen Ausschnitt von selbst, sobald er die neue bbox bekommt.
-    if (proxyAktiv()) return;
+    // Solange der Proxy liefert, ueberfluessig: Er schickt das Vollbild fuer
+    // den neuen Ausschnitt von selbst. Im Rueckfall muss der Weg aber wieder
+    // offen sein - deshalb proxyLiefert() und nicht proxyAktiv().
+    if (proxyLiefert()) return;
     if (!autoSnapshotInput.checked) return;
     if (!vesselsApiBase()) return;
     if (!mapAvailable) return;
@@ -5446,7 +5466,7 @@
   }
 
   function snapshotTick() {
-    if (proxyAktiv()) return;
+    if (proxyLiefert()) return;
     if (!autoRefreshInput.checked) return;
     // Ein Tab im Hintergrund schaut niemand an. Ohne diese Zeile fragt ein
     // vergessenes Fenster tagelang jede Minute weiter.
@@ -6021,7 +6041,67 @@
   var proxyGewollt = false;
   var proxyZaehler = { saetze: 0, bytes: 0, stamm: 0 };
 
+  // Laeuft der Proxy nicht, uebernimmt der direkte Weg - und der Punkt neben
+  // dem Zahnrad sagt, welcher gerade traegt.
+  var rueckfallAktiv = false;
+  var versorgungBewertet = false;   // erst nach dem ersten Ergebnis urteilen
+  var versorgungTakt = null;
+
   function proxyAktiv() { return !!(proxyAnInput && proxyAnInput.checked); }
+
+  // "Der Proxy versorgt uns gerade wirklich" - nicht bloss "er ist
+  // eingeschaltet". Daran haengen die Weichen im Snapshot- und Streamweg:
+  // Im Rueckfall muessen die wieder laufen duerfen.
+  function proxyLiefert() { return proxyAktiv() && !rueckfallAktiv; }
+
+  // Gruen: der Proxy liefert. Gelb: er ist weg, openwaters traegt. Rot:
+  // beides nicht erreichbar.
+  function versorgung() {
+    if (!proxyAktiv()) return null;         // ohne Proxy gilt die alte Anzeige
+    if (proxySocket && proxySocket.readyState === 1) {
+      return { farbe: "connected", text: "Proxy" };
+    }
+    if (!versorgungBewertet) return null;   // erster Versuch laeuft noch
+    // Der Snapshot kommt ohne Schluessel aus - er allein genuegt als Beleg,
+    // dass openwaters erreichbar ist. Drei Takte Nachsicht, damit ein
+    // einzelner verpasster Abruf nicht sofort auf Rot springt.
+    // Der letzte Versuch zaehlt, nicht nur sein Alter: Ist er fehlgeschlagen,
+    // hilft kein Zeitfenster mehr. Das Fenster bleibt trotzdem drin, damit ein
+    // laengst veralteter Erfolg nicht ewig als Beleg durchgeht.
+    var direktOk = (socket && socket.readyState === 1) ||
+      (snapshotAt > snapshotFehlerAt && Date.now() - snapshotAt < 3 * SNAPSHOT_REFRESH_MS);
+    if (direktOk) return { farbe: "warn", text: "Proxy nicht erreichbar - direkt bei openwaters" };
+    return { farbe: "error", text: "weder Proxy noch openwaters erreichbar" };
+  }
+
+  function versorgungAnzeigen() {
+    var v = versorgung();
+    if (v) setStatus(v.farbe, v.text);
+  }
+
+  // Der Rueckfall. Der Proxy wird im Hintergrund weiter versucht - kommt er
+  // zurueck, wird der direkte Weg wieder abgeraeumt.
+  function rueckfallStarten() {
+    if (rueckfallAktiv || !proxyAktiv()) return;
+    rueckfallAktiv = true;
+    versorgungBewertet = true;
+    log("Proxy nicht erreichbar - Rückfall auf die Direktverbindung.");
+    // Der Snapshot laeuft OHNE Schluessel. Deshalb zuerst er: Er belegt, ob
+    // openwaters ueberhaupt erreichbar ist, auch wenn kein Key gespeichert ist.
+    maybeLoadSnapshot();
+    if (apiKeyInput.value.trim() && !socket) {
+      manualDisconnect = false;
+      direktVerbinden();
+    }
+    versorgungAnzeigen();
+  }
+
+  function rueckfallBeenden() {
+    if (!rueckfallAktiv) return;
+    rueckfallAktiv = false;
+    log("Proxy wieder erreichbar - die Direktverbindung wird beendet.");
+    if (socket) { manualDisconnect = true; socket.close(1000, "Proxy wieder da"); }
+  }
 
   function proxyBasis() {
     var u = ((proxyUrlInput && proxyUrlInput.value) || "").trim().replace(/\/+$/, "");
@@ -6173,9 +6253,11 @@
 
     ws.onopen = function () {
       proxyVersuch = 0;
-      setStatus("connected", "verbunden (Proxy)");
+      versorgungBewertet = true;
+      rueckfallBeenden();
       disconnectBtn.disabled = false;
       log("Proxy verbunden: " + basis);
+      versorgungAnzeigen();
     };
 
     ws.onmessage = function (evt) {
@@ -6223,8 +6305,12 @@
       }
       var warte = PROXY_RUECKZUG_MS[Math.min(proxyVersuch, PROXY_RUECKZUG_MS.length - 1)];
       proxyVersuch++;
-      setStatus("", "warte auf Wiederverbindung…");
+      versorgungBewertet = true;
       log("Proxy getrennt (Code " + evt.code + "), neuer Versuch in " + (warte / 1000) + " s.");
+      // Nicht warten, bis der Proxy vielleicht zurueckkommt: sofort den
+      // direkten Weg anwerfen. Er wird wieder abgeraeumt, sobald der Proxy da ist.
+      rueckfallStarten();
+      versorgungAnzeigen();
       proxyWecker = setTimeout(proxyVerbinde, warte);
     };
   }
@@ -6246,6 +6332,8 @@
 
   function proxyTrennen() {
     proxyGewollt = false;
+    rueckfallAktiv = false;
+    versorgungBewertet = false;
     clearTimeout(proxyWecker);
     proxyWecker = null;
     if (proxySocket) { try { proxySocket.close(1000, "Client"); } catch (e) {} }
@@ -6300,7 +6388,7 @@
   }
 
   function sendSubscription() {
-    if (proxyAktiv()) return;
+    if (proxyLiefert()) return;
     if (!socket || socket.readyState !== 1 /* OPEN */) return;
 
     var apiKey = apiKeyInput.value.trim();
@@ -6361,7 +6449,13 @@
     // Im Proxybetrieb gibt es weder Server-URL noch API-Key - beides haelt
     // der Proxy. Deshalb die Weiche ganz vorn, vor jeder Pruefung.
     if (proxyAktiv()) { proxyVerbinde(); return; }
+    direktVerbinden();
+  }
 
+  // Der direkte Weg zu openwaters. Als eigene Funktion, weil ihn zwei
+  // Aufrufer brauchen: der Knopf bei abgeschaltetem Proxy - und der
+  // Rueckfall, wenn der Proxy ausfaellt.
+  function direktVerbinden() {
     var serverUrl = serverUrlInput.value.trim();
     if (!serverUrl) {
       alert("Bitte eine Server-URL eingeben.");
@@ -6389,7 +6483,9 @@
 
     socket.onopen = function () {
       reconnectAttempt = 0;
-      setStatus("connected", "verbunden");
+      // Im Rueckfall ist "verbunden" die halbe Wahrheit - dort entscheidet
+      // versorgungAnzeigen(), ob gruen oder gelb.
+      if (proxyAktiv()) versorgungAnzeigen(); else setStatus("connected", "verbunden");
       disconnectBtn.disabled = false;
       log("WebSocket verbunden, sende Subscription…");
       sendSubscription();
@@ -6875,6 +6971,8 @@
   function proxyUmschalten() {
     localStorage.setItem("aisstream_proxy_an", proxyAnInput.checked ? "1" : "0");
     if (proxyAnInput.checked) {
+      rueckfallAktiv = false;
+      versorgungBewertet = false;
       if (socket) { manualDisconnect = true; socket.close(1000, "Wechsel auf Proxy"); }
       log("Proxybetrieb eingeschaltet: " + proxyBasis());
       connect();
@@ -6935,6 +7033,11 @@
         localStorage.setItem(pair[0], pair[1].checked ? "1" : "0");
       });
     });
+
+  // Alle fuenf Sekunden neu urteilen. Ohne diesen Takt bliebe die Anzeige auf
+  // Gelb stehen, wenn spaeter auch openwaters wegbricht - der Wechsel auf Rot
+  // haengt an einem ABLAUFENDEN Zeitfenster, nicht an einem Ereignis.
+  versorgungTakt = setInterval(versorgungAnzeigen, 5000);
 
   // Der Takt laeuft immer; ob er etwas tut, entscheidet snapshotTick(). Ein
   // Intervall, das je nach Schalter an- und abgemeldet wird, geht schneller

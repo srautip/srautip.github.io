@@ -144,11 +144,12 @@ weit, als es im Entwurf klang.
   Donnerstagvormittag: 37,5 msg/s, Spitze 38,4. Ob Verkehrsspitzen an die 50
   stoßen, zeigt erst ein Tageslauf mit `strom.rateSpitze`. Das ist die
   einzige Zahl, die den Entwurf noch kippen könnte.
-- **Docker ist ungeprüft.** In der Entwicklungsumgebung lief kein Daemon.
-  Geprüft sind Produktionsinstallation und Healthcheck-Befehl.
-- **Der Client kennt den Proxy noch nicht.** Er läuft weiter direkt gegen
-  openwaters. Die Anbindung ist der nächste Schritt: eine zweite wählbare
-  Quelle an derselben Stelle, an der heute die Server-URL steht.
+- ~~**Docker ist ungeprüft.**~~ Erledigt: läuft seit dem 27. Aug. 2026 auf
+  einem Ubuntu-VPS bei clouding.io, `/v1/status` antwortet mit 200. Die
+  beiden Fehler, die dabei auftraten, stecken in `deploy.sh` und `DEPLOY.md`
+  (bcrypt-`$` in der `.env`, `curl | bash` verschluckt den Skriptrest).
+- **Die Zeitreihen liegen brach.** `/v1/replay` liefert Spuren, aber der
+  Client hat noch keine Animation dafür. Der Speicher füllt sich derweil.
 - **Kein Löschen von Fotos.** Fällt ein Schiff dauerhaft aus der Region,
   bleibt sein Bild liegen. Bei ein paar tausend verkleinerten Bildern ist das
   vertretbar, aber irgendwann will es eine Pflege.
