@@ -15,7 +15,9 @@ function neu(ueber) {
     ROH_STUNDEN: 24, HISTORIE_TAGE: 7, VERDICHTUNG_S: 60, FAHRT_KN: 0.5,
     SCHREIB_MS: 100000,
     REGISTER_TREFFER_MS: 30 * 24 * 3600 * 1000,
-    REGISTER_FEHL_MS: 3 * 24 * 3600 * 1000
+    REGISTER_FEHL_MS: 3 * 24 * 3600 * 1000,
+    FOTO_TEIL_MS: 60 * 60 * 1000,
+    FOTO_FEHL_MS: 7 * 24 * 3600 * 1000
   }, ueber || {});
   const s = new Speicher({ konfig, log: () => {} });
   s.__dir = dir;
@@ -174,4 +176,60 @@ test("Stammdaten: anlegen, ergaenzen, Faelligkeit", () => {
   assert.strictEqual(s.name, "EINS", "das Ergaenzen loescht nichts");
   assert.strictEqual(s.imo, 9876543);
   sp.stopp();
+});
+
+test("der Fotostand haengt NICHT am Registerstand", () => {
+  const s = neu();
+  // Genau der gemeldete Zustand: Wikidata-Treffer sitzt, Bild fehlt, weil der
+  // Download an einem HTTP 429 gescheitert ist. Frueher war das Schiff damit
+  // 30 Tage gesperrt.
+  s.stammSetze(211209320, { wd_entity: "Q1585523", gefunden: 1, geprueft: Date.now() });
+  assert.deepStrictEqual(s.stammFaellig([211209320]), [],
+    "fuer die Stammdaten ist es erledigt");
+  assert.deepStrictEqual(s.fotoFaellig([211209320]), [211209320],
+    "fuer das Foto nicht");
+});
+
+test("zwei Fristen: ohne IMO kurz, mit IMO lang", () => {
+  const s = neu();
+  const jetzt = Date.now();
+  // "teil" heisst: gesucht wurde ohne IMO. Die kann jede Minute per
+  // ShipStaticData kommen, also bald wieder fragen.
+  s.stammSetze(1, { foto_geprueft: jetzt - 2 * 3600 * 1000, foto_quelle: "teil" });
+  s.stammSetze(2, { foto_geprueft: jetzt - 2 * 3600 * 1000, foto_quelle: "nichts" });
+  assert.deepStrictEqual(s.fotoFaellig([1, 2], jetzt), [1]);
+  // Nach einer Woche ist auch die vollstaendige Suche wieder dran.
+  assert.deepStrictEqual(s.fotoFaellig([1, 2], jetzt + 8 * TAG), [1, 2]);
+});
+
+test("wer ein Bild hat, wird nicht mehr gefragt", () => {
+  const s = neu();
+  s.stammSetze(7, { foto_datei: "7.jpg", foto_geprueft: 1 });
+  assert.deepStrictEqual(s.fotoFaellig([7], Date.now() + 99 * TAG), []);
+});
+
+test("der Bildabzug haelt Zuordnungen und laesst sich auffrischen", () => {
+  const s = neu();
+  assert.strictEqual(s.bildIndexSchreibe("imo", [["9321483", "https://a.jpg"],
+                                                 ["7904592", "https://b.jpg"]]), 2);
+  s.bildIndexSchreibe("mmsi", [["211209320", "https://c.jpg"]]);
+  assert.strictEqual(s.bildIndexHole("imo", "9321483"), "https://a.jpg");
+  assert.strictEqual(s.bildIndexHole("imo", 9321483), "https://a.jpg", "Zahl wie Text");
+  assert.strictEqual(s.bildIndexHole("mmsi", "211209320"), "https://c.jpg");
+  assert.strictEqual(s.bildIndexHole("imo", "211209320"), null, "die Arten sind getrennt");
+  assert.strictEqual(s.bildIndexHole("imo", null), null);
+  // Ein zweiter Abzug ueberschreibt, statt zu verdoppeln.
+  s.bildIndexSchreibe("imo", [["9321483", "https://neu.jpg"]]);
+  assert.strictEqual(s.bildIndexHole("imo", "9321483"), "https://neu.jpg");
+  assert.strictEqual(s.bildIndexStand().imo.eintraege, 2);
+});
+
+test("neue Spalten kommen auch in eine bestehende Datenbank", () => {
+  const s = neu();
+  // spalteErgaenzen ist das Mittel gegen die Handwanderung auf dem Server:
+  // CREATE TABLE IF NOT EXISTS aendert an einer vorhandenen Tabelle nichts.
+  assert.strictEqual(s.spalteErgaenzen("schiff", "foto_quelle", "TEXT"), false,
+    "schon da");
+  assert.strictEqual(s.spalteErgaenzen("schiff", "probe_spalte", "TEXT"), true);
+  assert.strictEqual(s.spalteErgaenzen("schiff", "probe_spalte", "TEXT"), false);
 });

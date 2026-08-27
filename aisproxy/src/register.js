@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const ais = require("./ais");
+const { Bilder } = require("./bilder");
 
 // Das Schiffsregister - der Teil, an dem ein Proxy etwas kann, das ein
 // Browser prinzipiell nicht kann.
@@ -30,9 +31,12 @@ class Register {
     this.zustand = opt.zustand;
     this.log = opt.log || console.log;
     this.laeuft = false;
-    this.bericht_ = { laeufe: 0, wikidata: 0, wdTreffer: 0, commons: 0,
-                      commonsTreffer: 0, digitraffic: 0, fotos: 0, fehler: 0,
+    this.bericht_ = { laeufe: 0, wikidata: 0, wdTreffer: 0, digitraffic: 0,
+                      fotos: 0, fotoFehler: 0, fehler: 0,
+                      faellig: 0, fotoFaellig: 0, fotoVersucht: 0, fotoOffen: 0,
+                      abzug: null, wege: null,
                       letzterLauf: null, dauerMs: 0 };
+    this.bilder = opt.bilder || new Bilder({ konfig: this.konfig, log: this.log });
     fs.mkdirSync(this.konfig.FOTO_VERZEICHNIS, { recursive: true });
   }
 
@@ -145,61 +149,26 @@ class Register {
     }
   }
 
-  // --- Commons: Foto ueber die IMO ---------------------------------------
-  // Die IMO MUSS im Dateinamen stehen. Die Volltextsuche ist unscharf: Bei
-  // IMO 9892896 ("Bore Wave") lieferte sie "Aftermath of Severn Bore wave" -
-  // einen Fluss. Lieber kein Bild als das falsche Schiff.
-  async commons(imo) {
-    try {
-      this.bericht_.commons++;
-      const url = this.konfig.COMMONS_URL + "?action=query&generator=search" +
-        "&gsrsearch=" + encodeURIComponent("IMO " + imo) +
-        "&gsrnamespace=6&gsrlimit=20&prop=imageinfo&iiprop=url|extmetadata" +
-        "&iiurlwidth=" + this.konfig.FOTO_BREITE + "&format=json&origin=*";
-      const res = await fetch(url, { headers: { "User-Agent": AGENT },
-        signal: AbortSignal.timeout(30000) });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const json = await res.json();
-      const seiten = (json.query && json.query.pages) || {};
-      const treffer = [];
-      for (const k of Object.keys(seiten)) {
-        const p = seiten[k];
-        if (!p || p.ns !== 6 || !p.imageinfo || !/\.(jpe?g|png)$/i.test(p.title)) continue;
-        // Die harte Regel: IMO im Dateinamen.
-        if (p.title.indexOf(String(imo)) === -1) continue;
-        treffer.push(p);
-      }
-      if (!treffer.length) return null;
-      treffer.sort((a, b) => a.title.localeCompare(b.title));
-      const p = treffer[0];
-      const info = p.imageinfo[0];
-      const meta = info.extmetadata || {};
-      const entfernen = s => s ? String(s).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() : null;
-      this.bericht_.commonsTreffer++;
-      return {
-        url: info.thumburl || info.url,
-        credit: [entfernen(meta.Artist && meta.Artist.value),
-                 entfernen(meta.LicenseShortName && meta.LicenseShortName.value)]
-          .filter(Boolean).join(" · ") || "Wikimedia Commons",
-        seite: "https://commons.wikimedia.org/wiki/" + encodeURIComponent(p.title)
-      };
-    } catch (e) {
-      this.bericht_.fehler++;
-      return null;
-    }
-  }
-
   // Bild holen und lokal ablegen. Verkleinert wird NICHT hier - Commons und
   // Wikimedia liefern die gewuenschte Breite selbst (iiurlwidth bzw.
   // ?width=), also braucht der Proxy keine Bildbibliothek.
+  // Liefert den Dateinamen, null bei "gibt es nicht" - und wirft bei einem
+  // FEHLGESCHLAGENEN Abruf. Der Unterschied ist der Kern: Ein verlorener
+  // Download darf nicht als "hat kein Bild" festgeschrieben werden.
   async holeFoto(mmsi, url) {
-    try {
-      const mitBreite = /Special:FilePath/i.test(url) && !/[?&]width=/.test(url)
-        ? url + (url.indexOf("?") === -1 ? "?" : "&") + "width=" + this.konfig.FOTO_BREITE
-        : url;
+    const mitBreite = /Special:FilePath/i.test(url) && !/[?&]width=/.test(url)
+      ? url + (url.indexOf("?") === -1 ? "?" : "&") + "width=" + this.konfig.FOTO_BREITE
+      : url;
+    for (let versuch = 0; versuch < 2; versuch++) {
       const res = await fetch(mitBreite, { headers: { "User-Agent": AGENT },
         signal: AbortSignal.timeout(30000) });
-      if (!res.ok) return null;
+      if (res.status === 429) {
+        // Gemessen: 25 Bilder ohne Pause hintereinander ergeben 2x HTTP 429.
+        // Einmal laenger warten und noch einmal versuchen.
+        if (versuch === 0) { await schlaf(this.konfig.FOTO_PAUSE_MS * 5); continue; }
+        throw new Error("HTTP 429");
+      }
+      if (!res.ok) throw new Error("HTTP " + res.status);
       const typ = res.headers.get("content-type") || "";
       if (!/^image\//.test(typ)) return null;
       const buf = Buffer.from(await res.arrayBuffer());
@@ -209,7 +178,165 @@ class Register {
       fs.writeFileSync(path.join(this.konfig.FOTO_VERZEICHNIS, datei), buf);
       this.bericht_.fotos++;
       return datei;
-    } catch (e) { return null; }
+    }
+    return null;
+  }
+
+  // --- Der Bildabzug: alles auf einmal statt je Schiff --------------------
+  //
+  // Gemessen am 27. Aug. 2026: Wikidata fuehrt 96 120 Objekte mit IMO, davon
+  // 17 127 mit Bild, und 38 167 mit MMSI, davon 8 638 mit Bild. Der KOMPLETTE
+  // Abzug IMO->Bild kommt in EINER Abfrage: 17 144 Zeilen, 0,89 MB schlank,
+  // 9,8 s. Ueber die MMSI 8 638 Zeilen in 0,9 s.
+  //
+  // Das ist der eigentliche Vorteil des Servers. Der Client kann nur je Schiff
+  // fragen und trifft dabei den Moment, in dem er fragt: Ist die IMO noch
+  // nicht per ShipStaticData eingetroffen, geht die Frage ins Leere - und war
+  // danach beantwortet. Mit dem Abzug ist die Antwort schon da, wenn die IMO
+  // Stunden spaeter kommt.
+  async bildAbzug() {
+    const stand = this.speicher.bildIndexStand();
+    const juengste = Math.max(0, ...Object.keys(stand).map(a => stand[a].geholt || 0));
+    if (juengste && Date.now() - juengste < this.konfig.BILD_ABZUG_MS) return null;
+
+    const abfragen = [
+      ["imo", "SELECT ?k ?bild WHERE { ?s wdt:P458 ?k ; wdt:P18 ?bild }"],
+      ["mmsi", "SELECT ?k ?bild WHERE { ?s wdt:P587 ?k ; wdt:P18 ?bild }"]
+    ];
+    const bericht = {};
+    for (const [art, q] of abfragen) {
+      try {
+        this.bericht_.wikidata++;
+        const res = await fetch(this.konfig.WIKIDATA_URL + "?format=json&query=" +
+          encodeURIComponent(q), {
+          headers: { "User-Agent": AGENT, "Accept-Encoding": "gzip" },
+          signal: AbortSignal.timeout(120000)
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const json = await res.json();
+        const zeilen = (json.results && json.results.bindings) || [];
+        const paare = [];
+        for (const z of zeilen) {
+          if (!z.k || !z.bild) continue;
+          // Wikidata gibt http:// aus - auf einer https-Seite waere das
+          // Mischinhalt, und der Proxy laedt es ohnehin selbst.
+          paare.push([z.k.value, z.bild.value.replace(/^http:\/\//i, "https://")]);
+        }
+        bericht[art] = this.speicher.bildIndexSchreibe(art, paare);
+        this.log("Bildabzug " + art + ": " + paare.length + " Zuordnungen");
+      } catch (e) {
+        this.bericht_.fehler++;
+        this.log("Bildabzug " + art + " fehlgeschlagen: " + e.message);
+      }
+      await schlaf(this.konfig.REGISTER_PAUSE_MS);
+    }
+    this.bericht_.abzug = Object.assign({ zeit: new Date().toISOString() }, bericht);
+    return bericht;
+  }
+
+  // --- Der Fotolauf ------------------------------------------------------
+  //
+  // Getrennt vom Registerlauf, weil "hat Stammdaten" und "hat ein Bild" zwei
+  // Fragen sind. Vorher gab es nur ein gefunden-Flag: Ein Schiff mit
+  // Wikidata-Stammdaten ohne Bild war 30 Tage gesperrt, auch wenn nur der
+  // Download an einem 429 gescheitert war.
+  //
+  // Reihenfolge der Wege, jeder Schritt gemessen (siehe bilder.js):
+  //   Abzug (kein Netzabruf) -> Commons-Kategorie -> Commons-Volltext
+  //   -> Commons MMSI+Name -> Flickr imo -> Flickr mmsi
+  async fotoLauf(alle) {
+    const faellig = this.speicher.fotoFaellig(alle);
+    // Schiffe MIT IMO zuerst: dort ist die Trefferquote um ein Vielfaches
+    // hoeher, und die Obergrenze je Lauf soll nicht bei den aussichtslosen
+    // verbraucht werden.
+    const mitImo = [], ohneImo = [];
+    for (const mmsi of faellig) {
+      (this.imoVon(mmsi) ? mitImo : ohneImo).push(mmsi);
+    }
+    const reihe = mitImo.concat(ohneImo);
+    const grenze = Math.min(reihe.length, this.konfig.FOTO_MAX_PRO_LAUF);
+    let neu = 0, versucht = 0;
+    for (let i = 0; i < grenze; i++) {
+      const mmsi = reihe[i];
+      versucht++;
+      try {
+        if (await this.einFoto(mmsi)) neu++;
+      } catch (e) {
+        // Ein gescheiterter Abruf wird NICHT vermerkt - das Schiff bleibt
+        // faellig. Genau daran hing der gemeldete Zustand.
+        this.bericht_.fotoFehler++;
+      }
+      await schlaf(this.konfig.FOTO_PAUSE_MS);
+    }
+    const offen = reihe.length - versucht;
+    this.bericht_.fotoFaellig = faellig.length;
+    this.bericht_.fotoVersucht = versucht;
+    this.bericht_.fotoOffen = offen;
+    if (offen) this.log("Fotolauf: " + offen + " Schiffe bleiben fuer den naechsten Lauf");
+    return { faellig: faellig.length, versucht, neu, offen };
+  }
+
+  imoVon(mmsi) {
+    const s = this.zustand.hole(mmsi);
+    if (s && s.imo) return String(s.imo);
+    const stamm = this.speicher.stammHole(mmsi);
+    return stamm && stamm.imo ? String(stamm.imo) : null;
+  }
+
+  // Ein Schiff, alle Wege der Reihe nach. Wirft, wenn ein Abruf scheitert -
+  // dann bleibt das Schiff faellig, statt als "kein Bild" zu gelten.
+  async einFoto(mmsi) {
+    const imo = this.imoVon(mmsi);
+    const stamm = this.speicher.stammHole(mmsi) || {};
+    const s = this.zustand.hole(mmsi);
+    const name = (s && s.name) || stamm.name || null;
+
+    let treffer = null, quelle = null;
+    // 1) Der Abzug - ohne Netzabruf, deshalb zuerst.
+    const ausAbzug = (imo && this.speicher.bildIndexHole("imo", imo)) ||
+      this.speicher.bildIndexHole("mmsi", String(mmsi));
+    if (ausAbzug) {
+      treffer = { url: ausAbzug, credit: "Wikidata / Wikimedia Commons", seite: null };
+      quelle = "wikidata";
+    }
+    const wege = [];
+    if (imo) {
+      wege.push(["commonsKategorie", () => this.bilder.commonsKategorie(imo)]);
+      wege.push(["commonsVolltext", () => this.bilder.commonsVolltext(imo)]);
+    }
+    wege.push(["commonsMmsi", () => this.bilder.commonsMmsi(String(mmsi), name)]);
+    if (this.konfig.FLICKR_AN) {
+      if (imo) wege.push(["flickrImo", () => this.bilder.flickr("imo", imo)]);
+      wege.push(["flickrMmsi", () => this.bilder.flickr("mmsi", String(mmsi))]);
+    }
+    for (const [weg, fn] of wege) {
+      if (treffer) break;
+      const t = await fn();
+      await schlaf(this.konfig.FOTO_PAUSE_MS);
+      if (t) { treffer = t; quelle = weg; }
+    }
+
+    if (!treffer) {
+      // "Nichts gefunden" ist ein Ergebnis - aber ein unvollstaendiges, wenn
+      // die IMO fehlte. Dann haelt der Vermerk nur kurz, damit das Schiff
+      // wiederkommt, sobald ShipStaticData die IMO nachreicht.
+      this.speicher.stammSetze(mmsi, {
+        foto_geprueft: Date.now(), foto_quelle: imo ? "nichts" : "teil"
+      });
+      return false;
+    }
+    const datei = await this.holeFoto(mmsi, treffer.url);
+    if (!datei) {
+      this.speicher.stammSetze(mmsi, {
+        foto_geprueft: Date.now(), foto_quelle: imo ? "nichts" : "teil"
+      });
+      return false;
+    }
+    this.speicher.stammSetze(mmsi, {
+      foto_datei: datei, foto_credit: treffer.credit, foto_seite: treffer.seite,
+      foto_quelle: quelle, foto_geprueft: Date.now()
+    });
+    return true;
   }
 
   // --- Der Lauf ----------------------------------------------------------
@@ -222,8 +349,22 @@ class Register {
     const t0 = Date.now();
     try {
       const alle = [...this.zustand.schiffe.keys()];
+
+      // 0) Der Bildabzug. Muss VOR allem anderen laufen: Er beantwortet die
+      //    Fotofrage fuer den halben Bestand ohne eine einzige Abfrage je
+      //    Schiff.
+      await this.bildAbzug();
+
       const faellig = this.speicher.stammFaellig(alle);
-      if (!faellig.length) return { faellig: 0 };
+      if (!faellig.length) {
+        // Auch ohne faellige Stammdaten kann ein Foto fehlen - der Fotolauf
+        // hat sein eigenes Fristenwerk und darf hier nicht mit aussteigen.
+        const nur = await this.fotoLauf(alle);
+        this.bericht_.laeufe++;
+        this.bericht_.letzterLauf = new Date().toISOString();
+        this.bericht_.wege = this.bilder.zaehler;
+        return { faellig: 0, fotos: nur };
+      }
 
       // 1) Digitraffic: ein Abruf, nimmt die Ostseeraender mit.
       await this.digitraffic();
@@ -239,7 +380,7 @@ class Register {
           const mmsi = Number(t.schluessel);
           if (!Number.isFinite(mmsi)) continue;
           gefunden.add(mmsi);
-          await this.uebernimm(mmsi, t.felder);
+          this.uebernimm(mmsi, t.felder);
         }
         await schlaf(this.konfig.REGISTER_PAUSE_MS);
       }
@@ -262,29 +403,12 @@ class Register {
           const mmsi = perImo.get(String(t.schluessel));
           if (!mmsi) continue;
           gefunden.add(mmsi);
-          await this.uebernimm(mmsi, t.felder);
+          this.uebernimm(mmsi, t.felder);
         }
         await schlaf(this.konfig.REGISTER_PAUSE_MS);
       }
 
-      // 4) Commons nur fuer Schiffe mit IMO und ohne Wikidata-Foto.
-      for (const [imo, mmsi] of perImo) {
-        const stamm = this.speicher.stammHole(mmsi);
-        if (stamm && stamm.foto_datei) continue;
-        const foto = await this.commons(imo);
-        await schlaf(this.konfig.REGISTER_PAUSE_MS);
-        if (!foto) continue;
-        const datei = await this.holeFoto(mmsi, foto.url);
-        if (datei) {
-          this.speicher.stammSetze(mmsi, {
-            foto_datei: datei, foto_credit: foto.credit, gefunden: 1,
-            quelle: "commons", geprueft: Date.now()
-          });
-          gefunden.add(mmsi);
-        }
-      }
-
-      // 5) Was nichts ergeben hat, wird als Fehltreffer vermerkt. "Nichts
+      // 4) Was nichts ergeben hat, wird als Fehltreffer vermerkt. "Nichts
       //    gefunden" IST ein Ergebnis - ohne diesen Vermerk fragt der Proxy
       //    dieselben aussichtslosen Schiffe endlos nach.
       const jetzt = Date.now();
@@ -293,27 +417,35 @@ class Register {
         this.speicher.stammSetze(mmsi, { gefunden: 0, geprueft: jetzt });
       }
 
+      // 5) Die Fotos, getrennt vom Registerstand und mit eigenem Takt.
+      const fotos = await this.fotoLauf(alle);
+
       this.bericht_.laeufe++;
+      this.bericht_.faellig = faellig.length;
       this.bericht_.letzterLauf = new Date().toISOString();
       this.bericht_.dauerMs = Date.now() - t0;
+      this.bericht_.wege = this.bilder.zaehler;
       this.log("Register: " + faellig.length + " faellig, " + gefunden.size +
-        " gefunden, " + ((Date.now() - t0) / 1000).toFixed(1) + " s");
-      return { faellig: faellig.length, gefunden: gefunden.size, dauerMs: Date.now() - t0 };
+        " gefunden, " + fotos.neu + " Fotos (" + fotos.versucht + " von " +
+        fotos.faellig + " Schiffen versucht, " + fotos.offen + " offen), " +
+        ((Date.now() - t0) / 1000).toFixed(1) + " s");
+      return { faellig: faellig.length, gefunden: gefunden.size,
+               fotos, dauerMs: Date.now() - t0 };
     } finally {
       this.laeuft = false;
     }
   }
 
-  async uebernimm(mmsi, felder) {
+  // Kein Fotodownload mehr hier drin. Vorher hing er in dieser Schleife und
+  // lief damit ohne jede Pause 26-mal hintereinander - gemessen 2 von 25 mit
+  // HTTP 429, und jedes verlorene Bild galt danach 30 Tage als "hat keins".
+  // Die Fotos holt jetzt fotoLauf(), getaktet und mit eigenem Fristenwerk.
+  uebernimm(mmsi, felder) {
     const daten = { gefunden: 1, quelle: "wikidata", geprueft: Date.now() };
     for (const k of ["name", "wd_entity", "imo", "rufzeichen", "brz", "laenge",
                      "breite", "tiefgang", "baujahr", "eigner", "betreiber",
                      "werft", "flagge", "heimathafen"]) {
       if (felder[k] != null) daten[k] = felder[k];
-    }
-    if (felder.bild) {
-      const datei = await this.holeFoto(mmsi, felder.bild);
-      if (datei) { daten.foto_datei = datei; daten.foto_credit = "Wikidata / Wikimedia Commons"; }
     }
     this.speicher.stammSetze(mmsi, daten);
     this.zustand.ergaenze(mmsi, {

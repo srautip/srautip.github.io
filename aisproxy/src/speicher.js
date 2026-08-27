@@ -78,6 +78,42 @@ class Speicher {
       )`);
     this.db.exec("CREATE INDEX IF NOT EXISTS schiff_geprueft ON schiff (geprueft)");
     this.db.exec("CREATE INDEX IF NOT EXISTS schiff_imo ON schiff (imo)");
+
+    // Der Fotostand steht GETRENNT vom Registerstand.
+    //
+    // Vorher gab es nur "gefunden": Ein Schiff mit Wikidata-Stammdaten galt
+    // damit als erledigt und war 30 Tage gesperrt - auch wenn der Bilddownload
+    // in derselben Sekunde an einem HTTP 429 gescheitert war. Gemessen an drei
+    // echten Schiffen (HARLINGERLAND, Spiekeroog II, NORDSEE): wd_entity
+    // gesetzt, foto_datei leer, und bei einer Wiederholung heute liefert
+    // dieselbe Abfrage sehr wohl ein Bild. Ein verlorener Download darf nicht
+    // wie "hat kein Bild" aussehen.
+    this.spalteErgaenzen("schiff", "foto_geprueft", "INTEGER DEFAULT 0");
+    this.spalteErgaenzen("schiff", "foto_quelle", "TEXT");
+    this.spalteErgaenzen("schiff", "foto_seite", "TEXT");
+
+    // Der Bildabzug aus Wikidata. Statt je Schiff zu fragen, wird die
+    // vollstaendige Zuordnung einmal geholt und hier gehalten - gemessen
+    // 17 144 Zeilen IMO->Bild in EINER Abfrage (0,89 MB, 9,8 s) und 8 638
+    // ueber die MMSI. Danach ist "hat dieses Schiff ein Bild?" ein
+    // Datenbankzugriff, auch fuer ein Schiff, das gerade erst auftaucht.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS bild_index (
+        art TEXT, kennung TEXT, url TEXT, geholt INTEGER,
+        PRIMARY KEY (art, kennung)
+      )`);
+  }
+
+  // SQLite kennt kein "ADD COLUMN IF NOT EXISTS". Ein bestehender Server hat
+  // die Tabelle laengst, CREATE TABLE IF NOT EXISTS aendert daran nichts -
+  // ohne diesen Weg braeuchte jede neue Spalte eine Handwanderung auf dem
+  // Server.
+  spalteErgaenzen(tabelle, name, typ) {
+    const da = this.db.prepare(`PRAGMA table_info(${tabelle})`).all()
+      .some(s => s.name === name);
+    if (da) return false;
+    this.db.exec(`ALTER TABLE ${tabelle} ADD COLUMN ${name} ${typ}`);
+    return true;
   }
 
   tabelleFuer(ms) {
@@ -306,7 +342,8 @@ class Speicher {
     const vorhanden = this.stammHole(mmsi);
     const erlaubt = ["name", "rufzeichen", "imo", "typ", "laenge", "breite", "tiefgang",
       "ziel", "eta", "wd_entity", "brz", "baujahr", "eigner", "betreiber", "werft",
-      "flagge", "heimathafen", "foto_datei", "foto_credit", "quelle", "gefunden", "geprueft"];
+      "flagge", "heimathafen", "foto_datei", "foto_credit", "foto_seite",
+      "foto_quelle", "foto_geprueft", "quelle", "gefunden", "geprueft"];
     const daten = {};
     for (const k of erlaubt) if (felder[k] !== undefined) daten[k] = felder[k];
     if (!vorhanden) {
@@ -320,6 +357,60 @@ class Speicher {
       this.db.prepare(`UPDATE schiff SET ${keys.map(k => k + " = ?").join(", ")} WHERE mmsi = ?`)
         .run(...keys.map(k => daten[k]), Number(mmsi));
     }
+  }
+
+  bildIndexSchreibe(art, paare) {
+    const stmt = this.db.prepare(
+      "INSERT INTO bild_index (art, kennung, url, geholt) VALUES (?, ?, ?, ?) " +
+      "ON CONFLICT(art, kennung) DO UPDATE SET url = excluded.url, geholt = excluded.geholt");
+    const jetzt = Date.now();
+    this.db.exec("BEGIN");
+    try {
+      for (const [kennung, url] of paare) stmt.run(art, String(kennung), url, jetzt);
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      this.log("Bildindex schreiben fehlgeschlagen: " + e.message);
+      return 0;
+    }
+    return paare.length;
+  }
+
+  bildIndexHole(art, kennung) {
+    if (kennung == null) return null;
+    const r = this.db.prepare("SELECT url FROM bild_index WHERE art = ? AND kennung = ?")
+      .get(art, String(kennung));
+    return r ? r.url : null;
+  }
+
+  bildIndexStand() {
+    const r = this.db.prepare(
+      "SELECT art, COUNT(*) AS n, MAX(geholt) AS geholt FROM bild_index GROUP BY art").all();
+    const out = {};
+    for (const z of r) out[z.art] = { eintraege: z.n, geholt: z.geholt };
+    return out;
+  }
+
+  // Wer braucht einen FOTO-Versuch? Getrennt vom Registerstand: Ein Schiff mit
+  // Stammdaten, aber ohne Bild, gehoert weiter gefragt - nur eben seltener als
+  // eines, das noch nie dran war.
+  fotoFaellig(mmsis, jetzt) {
+    jetzt = jetzt || Date.now();
+    const out = [];
+    for (const mmsi of mmsis) {
+      const s = this.stammHole(mmsi);
+      if (s && s.foto_datei) continue;              // hat eins, fertig
+      if (!s || !s.foto_geprueft) { out.push(mmsi); continue; }
+      // "teil" heisst: gesucht wurde ohne IMO, der Versuch war unvollstaendig.
+      // Der haelt nur kurz - die IMO kann jede Minute per ShipStaticData
+      // eintreffen und aus einem aussichtslosen Fall einen aussichtsreichen
+      // machen. Genau dieses Muster hat im Client den Fall MAERSK VIRGINIA
+      // geloest.
+      const frist = s.foto_quelle === "teil"
+        ? this.konfig.FOTO_TEIL_MS : this.konfig.FOTO_FEHL_MS;
+      if (jetzt - s.foto_geprueft > frist) out.push(mmsi);
+    }
+    return out;
   }
 
   // Wer ist faellig? Ein Treffer haelt lange, ein Fehltreffer kurz - die IMO

@@ -18,7 +18,12 @@ const konfig = Object.assign({}, require("../src/konfig"), {
   DB_DATEI: path.join(dir, "r.db"),
   FOTO_VERZEICHNIS: path.join(dir, "fotos"),
   WIKIDATA_BUENDEL: 200,
-  REGISTER_PAUSE_MS: 1200
+  REGISTER_PAUSE_MS: 1200,
+  // Klein halten: Der Fotolauf fasst je Schiff bis zu fuenf fremde Dienste
+  // an. Fuer die Probe zaehlt, DASS die Kette traegt, nicht wie viele Bilder
+  // zusammenkommen - die Zahl misst scratchpad/fotolauf.js am ganzen Bestand.
+  FOTO_MAX_PRO_LAUF: 25,
+  FOTO_PAUSE_MS: 700
 });
 
 let fehler = 0;
@@ -75,12 +80,32 @@ const ok = (b, t) => { if (!b) fehler++; console.log((b ? "  OK   " : "  FEHL ")
   const lauf = await register.lauf();
   console.log("  " + JSON.stringify(lauf));
   const b = register.bericht();
-  console.log("  Abfragen: Wikidata " + b.wikidata + ", Commons " + b.commons +
-    ", Fotos " + b.fotos + ", Fehler " + b.fehler);
+  console.log("  Abfragen: Wikidata " + b.wikidata + ", Fotos " + b.fotos +
+    ", Fotofehler " + b.fotoFehler + ", Fehler " + b.fehler);
+  console.log("  Bildwege: " + JSON.stringify(b.wege));
   ok(lauf && lauf.faellig > 0, "6) es gab etwas zu tun");
-  ok(b.wikidata <= 4, "7) und es kostete nur " + b.wikidata +
+  // Zwei Abfragen fuer den Abzug, dazu je ein Buendel MMSI und IMO.
+  ok(b.wikidata <= 6, "7) und es kostete nur " + b.wikidata +
     " Wikidata-Abfragen fuer " + lauf.faellig + " Schiffe (einzeln waeren es " +
     lauf.faellig + ")");
+
+  const abzug = speicher.bildIndexStand();
+  console.log("  Bildabzug: " + JSON.stringify(abzug));
+  ok(abzug.imo && abzug.imo.eintraege > 10000,
+    "7a) der Bildabzug haelt die ganze IMO-Zuordnung (" +
+    (abzug.imo ? abzug.imo.eintraege : 0) + " Zeilen) - danach kostet die " +
+    "Fotofrage je Schiff keinen Abruf mehr");
+  ok(abzug.mmsi && abzug.mmsi.eintraege > 5000,
+    "7b) und die ueber die MMSI (" + (abzug.mmsi ? abzug.mmsi.eintraege : 0) + ")");
+  ok(lauf.fotos && lauf.fotos.neu > 0,
+    "7c) der Fotolauf bringt Bilder (" + (lauf.fotos ? lauf.fotos.neu : 0) +
+    " von " + (lauf.fotos ? lauf.fotos.versucht : 0) + " versuchten)");
+  ok(lauf.fotos && lauf.fotos.versucht <= konfig.FOTO_MAX_PRO_LAUF,
+    "7d) die Obergrenze je Lauf greift");
+  ok(lauf.fotos && lauf.fotos.offen === lauf.fotos.faellig - lauf.fotos.versucht,
+    "7e) und was nicht drankam, steht als offen im Bericht (" +
+    (lauf.fotos ? lauf.fotos.offen : "?") + ") - eine stille Kappung " +
+    "liest sich wie \"alles abgearbeitet\"");
 
   const stand = speicher.bericht();
   console.log("  Stammdaten: " + stand.stammEintraege + " Eintraege, " +
@@ -93,7 +118,20 @@ const ok = (b, t) => { if (!b) fehler++; console.log((b ? "  OK   " : "  FEHL ")
   const zweiter = await register.lauf();
   ok(zweiter.faellig === 0, "9) der zweite Lauf findet nichts Faelliges mehr - " +
     "ohne den Fehltreffer-Vermerk liefe er endlos gegen dieselben Schiffe");
-  ok(register.bericht().wikidata === vorher, "10) und stellt keine einzige Abfrage");
+  // Der Fotolauf arbeitet weiter an seinem Rueckstand - das ist gewollt und
+  // hat mit dem Registerstand nichts zu tun. Geprueft wird hier NUR, dass
+  // keine Wikidata-Abfrage mehr faellt.
+  ok(register.bericht().wikidata === vorher, "10) und stellt keine " +
+    "Wikidata-Abfrage mehr - auch der Bildabzug wird nicht erneut geholt");
+
+  // Und die Gegenprobe zum eigentlichen Befund: Ein Schiff, dessen Foto nicht
+  // geklappt hat, darf nicht wie "hat keins" behandelt werden.
+  console.log("\n=== Fotostand haengt nicht am Registerstand ===");
+  speicher.stammSetze(999999999, { wd_entity: "Q1", gefunden: 1, geprueft: Date.now() });
+  ok(speicher.stammFaellig([999999999]).length === 0 &&
+     speicher.fotoFaellig([999999999]).length === 1,
+    "11) Stammdaten erledigt, Foto weiter faellig - genau das war der Fehler, " +
+    "der 19 von 22 Schiffen mit vorhandenem Wikidata-Bild ohne Foto liess");
 
   speicher.stopp();
   console.log("\n" + (fehler ? fehler + " Pruefung(en) fehlgeschlagen" : "alle Pruefungen bestanden"));

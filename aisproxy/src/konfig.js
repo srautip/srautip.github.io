@@ -100,6 +100,34 @@ const konfig = {
   FOTO_VERZEICHNIS: text("AIS_FOTO_VERZEICHNIS", "./daten/fotos"),
   REGISTER_AN: text("AIS_REGISTER", "1") !== "0",
 
+  // --- Bilder ---
+  // Der vollstaendige Abzug aus Wikidata. Gemessen: 17 144 Zeilen IMO->Bild in
+  // einer Abfrage (0,89 MB, 9,8 s) und 8 638 ueber die MMSI. Einmal am Tag
+  // reicht - die Zuordnung Kennung->Bild aendert sich in Wochen, nicht in
+  // Stunden.
+  BILD_ABZUG_MS: zahl("AIS_BILD_ABZUG_MS", 24 * 3600 * 1000),
+  // Pause zwischen zwei BILDDOWNLOADS. Vorher gab es keine: Die Fotos liefen
+  // innerhalb der Trefferschleife hintereinander weg, und gemessen antwortet
+  // Commons dann auf 2 von 25 mit HTTP 429. Jedes verlorene Bild galt danach
+  // 30 Tage als "hat kein Bild".
+  FOTO_PAUSE_MS: zahl("AIS_FOTO_PAUSE_MS", 1000),
+  // Wie lange ein erfolgloser Fotoversuch haelt. Zwei Fristen, wie im Client:
+  // Lief der Versuch OHNE IMO, ist er unvollstaendig und wird bald wiederholt -
+  // die IMO kann jede Minute per ShipStaticData eintreffen. Mit IMO war es
+  // eine vollstaendige Suche, die haelt lange.
+  FOTO_TEIL_MS: zahl("AIS_FOTO_TEIL_MS", 60 * 60 * 1000),
+  FOTO_FEHL_MS: zahl("AIS_FOTO_FEHL_MS", 7 * 24 * 3600 * 1000),
+  // Obergrenze je Lauf. Ohne sie liefe der erste Lauf ueber 2900 Schiffe mal
+  // bis zu fuenf Abrufen mal einer Sekunde Pause - Stunden. Was nicht drankam,
+  // bleibt faellig und kommt im naechsten Lauf, und der Bericht sagt, wie viel
+  // offen blieb.
+  FOTO_MAX_PRO_LAUF: zahl("AIS_FOTO_MAX_PRO_LAUF", 300),
+  // Flickr ohne Schluessel: der oeffentliche Feed nimmt Tags entgegen.
+  // Gemessen an echten Schiffen der Region: "imo<nr>" 9 von 17, "mmsi<nr>"
+  // 3 von 25. Der Feed nennt Titel, Autor und Link, aber keine Lizenz.
+  FLICKR_URL: text("AIS_FLICKR_URL", "https://api.flickr.com/services/feeds/photos_public.gne"),
+  FLICKR_AN: text("AIS_FLICKR", "1") !== "0",
+
   // --- Server ---
   PORT: zahl("PORT", 8080),
   // Leer = offen. Hinter Caddy mit Basic-Auth ist das in Ordnung; steht der
