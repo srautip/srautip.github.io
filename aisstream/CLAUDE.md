@@ -1154,6 +1154,39 @@ stehen. `applyMapFilter()` behandelt das wie jeden anderen Ausschluss.
 900 Punkten mal 200 Schiffen je Reglerbewegung wäre ein linearer Lauf 180 000
 Vergleiche.
 
+#### Der Richtungspfeil gehört zum Zeitpunkt, nicht zur Gegenwart
+
+Gemeldet: *„Replay funktioniert, allerdings wird die Pfeilrichtung der
+Schiffe nicht an die eingestellte Zeitspanne angepasst."* Richtig — der Pfeil
+las `entry.course`, und das ist der **aktuelle** Kurs. Ein zwei Stunden
+zurückgespultes Schiff stand damit an der richtigen Stelle und zeigte in die
+Richtung, in die es heute fährt.
+
+**Der Kurs reist jetzt im Spurpunkt mit.** `setPosition()` legt `cog` neben
+`sog` ab, und `verlaufEinfuegen()` nimmt das fünfte Feld der Historie
+(`cog_01`) mit — der Proxy liefert es längst, es wurde nur weggeworfen.
+
+`fahrtStand(entry)` ist die eine Stelle, die „welcher Fahrtstand gilt
+gerade?" beantwortet; `travelCourse()` fragt nur noch dort. Zwei Feinheiten:
+
+- **Die Fahrtdaten kommen vom vorderen Stützpunkt**, nicht interpoliert.
+  Zwischen zwei gemeldeten Kursen zu mitteln wäre erfunden — die Position
+  dazwischen ist eine Schätzung, der Kurs war ein Messwert.
+- **Ohne `cog` trägt die Streckenrichtung.** Punkte aus einer Sitzung vor
+  dieser Änderung und Historie ohne Kursangabe fallen auf `bearingDeg()`
+  zwischen den beiden Stützpunkten zurück. Besser als kein Pfeil und
+  ehrlicher als der heutige Kurs, der damals nicht galt.
+- **Heading gibt es in der Historie nicht.** Im Replay trägt der Kurs allein;
+  der Rückfall auf die Bugrichtung entfällt dort.
+
+**Nachgezogen wird in `markerSetzen()`**, gemerkt über `entry.kursGesetzt`.
+Beim Stellen des Reglers läuft weder `syncMarker()` noch eine Nachricht, die
+den Pfeil sonst nachzöge — und der Weg **zurück** auf live bliebe unbemerkt,
+wenn die Auffrischung an `replayGilt()` hinge: Dort ist die Bedingung schon
+wieder falsch. Erst `refreshMarkerIcon()` (ob überhaupt ein Pfeil da ist,
+steckt im `iconKey`, und ein Neubau schreibt den Winkel gleich mit ins HTML),
+dann `refreshMarkerDirection()` für den Winkel ohne Neubau.
+
 **Der Marker geht nur noch über `markerSetzen()`.** `setPosition()` darf im
 Replay nicht mehr direkt `setLatLng()` rufen — eine hereinkommende
 Livemeldung risse den Marker sonst in die Gegenwart zurück. Der Vergleich mit
@@ -1212,6 +1245,15 @@ angenommen.
 | mit Auswahl BRAVO | ALPHA **0 px**, BRAVO 148 px |
 | Fenster von 2 h auf 1 h | 148 px → 74 px, also genau halb so weit |
 | Klick auf die Anzeige | Regler zurück auf 1000, beide Schiffe auf jetzt |
+| CHARLIE dreht nach einer Stunde von Nord auf Ost | Pfeil live **90°**, ganz unten **0°**, zurück auf live wieder 90° |
+| ALPHA, das nie gedreht hat | bleibt bei 0° |
+
+Das dritte Schiff CHARLIE fährt die erste Hälfte nach Norden mit Kurs 0 und
+die zweite nach Osten mit Kurs 90 — **Position und gemeldeter Kurs passen
+zusammen**. Eine Probe mit widersprüchlichen Daten hätte den Rückfall auf die
+Streckenrichtung verdeckt. Vor der Pfeilmessung wird das Fenster wieder auf
+2 h gestellt: Bei 1 h läge das untere Ende genau auf dem Kurswechsel, und
+eine Messung auf der Kante prüft nichts Verlässliches.
 
 Die Auswahl wird **innerhalb** einer Phase gemessen: Das Öffnen der
 Detailspalte verkleinert die Karte und verschiebt damit alle Marker. Wer über
