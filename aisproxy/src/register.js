@@ -246,14 +246,27 @@ class Register {
   //   -> Commons MMSI+Name -> Flickr imo -> Flickr mmsi
   async fotoLauf(alle) {
     const faellig = this.speicher.fotoFaellig(alle);
-    // Schiffe MIT IMO zuerst: dort ist die Trefferquote um ein Vielfaches
-    // hoeher, und die Obergrenze je Lauf soll nicht bei den aussichtslosen
-    // verbraucht werden.
-    const mitImo = [], ohneImo = [];
+    // Reihenfolge nach Aussicht und Preis, in drei Stufen:
+    //
+    //   1. im Abzug              ein Download, KEIN Suchabruf
+    //   2. mit IMO, nicht im Abzug   bis zu vier Suchabrufe, gute Aussicht
+    //   3. ohne IMO                  zwei Abrufe, magere Aussicht
+    //
+    // Der Grund ist der Rueckstand: Beim ersten Lauf auf einem gefuellten
+    // Server sind alle 2900 Schiffe faellig, die Obergrenze laesst aber nur
+    // einen Teil zu. Gemessen kostet ein Schiff im Schnitt 2,8 s, eines aus
+    // dem Abzug knapp eine - die billigen Treffer zuerst zu nehmen bringt in
+    // denselben Minuten ein Vielfaches an Bildern.
+    const ausAbzug = [], mitImo = [], ohneImo = [];
     for (const mmsi of faellig) {
-      (this.imoVon(mmsi) ? mitImo : ohneImo).push(mmsi);
+      const imo = this.imoVon(mmsi);
+      const imAbzug = (imo && this.speicher.bildIndexHole("imo", imo)) ||
+        this.speicher.bildIndexHole("mmsi", String(mmsi));
+      if (imAbzug) ausAbzug.push(mmsi);
+      else if (imo) mitImo.push(mmsi);
+      else ohneImo.push(mmsi);
     }
-    const reihe = mitImo.concat(ohneImo);
+    const reihe = ausAbzug.concat(mitImo, ohneImo);
     const grenze = Math.min(reihe.length, this.konfig.FOTO_MAX_PRO_LAUF);
     let neu = 0, versucht = 0;
     for (let i = 0; i < grenze; i++) {
