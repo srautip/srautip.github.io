@@ -239,6 +239,32 @@ function uebersetze(o) {
     if (msg.Dte != null) felder.dte = msg.Dte ? 1 : 0;
     const m = ais.masseFelder(msg.Dimension);
     if (m) Object.assign(felder, m);
+  } else if (typ === "AidsToNavigationReport" && msg) {
+    // Seezeichen: Tonnen, Baken, Leuchtfeuer - und "virtuelle", die es
+    // physisch gar nicht gibt und die eine Landstation nur aussendet.
+    //
+    // Der Typcode kommt in ein EIGENES Feld: Msg 21 zaehlt eine ganz andere
+    // Liste als der Schiffstyp aus Msg 5 (dort ist 30 "Fischerei", hier
+    // "Leuchtturm"). In `typ` gelegt, haette der Client jede Tonne als
+    // irgendein Schiff beschriftet.
+    const lat = msg.Latitude != null ? msg.Latitude : meta.latitude;
+    const lon = msg.Longitude != null ? msg.Longitude : meta.longitude;
+    if (ais.positionGueltig(lat, lon)) {
+      felder.lat = lat; felder.lon = lon; hatPosition = true;
+    }
+    // Der Name kann laenger als 20 Zeichen sein - der Rest steht in der
+    // Erweiterung und gehoert direkt angehaengt.
+    const n = ais.textSauber(String(msg.Name || "") + String(msg.NameExtension || ""));
+    if (n) felder.name = n;
+    if (msg.Type != null) felder.atonTyp = Number(msg.Type);
+    if (msg.VirtualAtoN != null) felder.atonVirtuell = msg.VirtualAtoN ? 1 : 0;
+    if (msg.OffPosition != null) felder.atonAusserPosition = msg.OffPosition ? 1 : 0;
+    const g = geraeteTyp(msg); if (g) felder.geraet = g;
+    const m = ais.masseFelder(msg.Dimension);
+    if (m) Object.assign(felder, m);
+    // Die Flagge traegt die Art schon im Binaerrahmen - der Client macht
+    // daraus "Seezeichen", ohne auf die Stammdaten zu warten.
+    felder.flags = flaggen("aton", false);
   } else if (typ === "StaticDataReport" && msg) {
     // Class B verteilt seine Statik auf Teil A (Name) und Teil B (Rufzeichen,
     // Typ, Masse, Transponder). Teil B traegt statt der Masse ein

@@ -229,3 +229,32 @@ test("Msg 24: Teil A darf den Schiffstyp aus Teil B nicht auf 0 setzen", () => {
   assert.strictEqual(fb.geraet, 1);
   assert.strictEqual(fb.laenge, 10);
 });
+
+test("Msg 21: Seezeichen kommen als Seezeichen an, nicht als Schiffe", () => {
+  // Der Typcode zaehlt hier eine ANDERE Liste als bei Schiffen: 20 heisst
+  // "Leuchttonne", waehrend derselbe Code in Msg 5 ein Segelboot waere. Ihn
+  // in `typ` zu legen liesse jede Tonne als Fahrzeug erscheinen.
+  const r = uebersetze({
+    MessageType: "AidsToNavigationReport",
+    Message: { AidsToNavigationReport: {
+      Latitude: 54.0, Longitude: 8.0, Name: "ELBE APPROACH LIGHT",
+      NameExtension: "BUOY", Type: 20, VirtualAtoN: false, OffPosition: true,
+      Fixtype: 1, Dimension: { A: 4, B: 4, C: 3, D: 3 },
+      UserID: 992111840, Valid: true } },
+    MetaData: { MMSI: 992111840, time_utc: "2026-08-27 21:00:00.0 +0000 UTC" }
+  });
+  assert.ok(r.hatPosition);
+  assert.strictEqual(r.felder.lat, 54.0);
+  assert.strictEqual(r.felder.atonTyp, 20);
+  assert.strictEqual(r.felder.typ, undefined, "kein Schiffstyp aus einer Tonne");
+  // Der Name kann laenger als 20 Zeichen sein - der Rest steht in der
+  // Erweiterung und gehoert direkt angehaengt, ohne Leerzeichen.
+  assert.strictEqual(r.felder.name, "ELBE APPROACH LIGHTBUOY");
+  assert.strictEqual(r.felder.atonVirtuell, 0);
+  assert.strictEqual(r.felder.atonAusserPosition, 1);
+  assert.strictEqual(r.felder.geraet, 1);
+  assert.strictEqual(r.felder.laenge, 8);
+  // Die Flagge traegt die Art schon im Binaerrahmen - daraus macht der Client
+  // "Seezeichen", ohne auf die Stammdaten zu warten.
+  assert.strictEqual(r.felder.flags & 1, 1);
+});

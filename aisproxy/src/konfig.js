@@ -49,7 +49,14 @@ const konfig = {
     "ShipStaticData",
     "StandardClassBPositionReport",
     "StaticDataReport",
-    "ExtendedClassBPositionReport"
+    "ExtendedClassBPositionReport",
+    // Seezeichen. Gemessen am 27. Aug. 2026: Der Upstream openwaters liefert
+    // davon KEINE - weder im Strom (75 s ohne Filter: nur die vier obigen
+    // Typen) noch im REST-Abzug (2 762 Datensaetze, alle kind=vessel). Der
+    // Typ im Abo schadet trotzdem nicht (gemessen: die Schiffe laufen
+    // unveraendert weiter), und wer den Strom auf aisstream.io umstellt
+    // (AIS_STROM_URL + AIS_TOKEN), bekommt die Tonnen damit sofort mit.
+    "AidsToNavigationReport"
   ],
 
   // Das Sicherheitsnetz. 109 KB gzip je Abruf, bei 60 s also 0,16 GB/Tag.

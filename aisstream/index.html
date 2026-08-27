@@ -6783,6 +6783,17 @@
       if (d.hersteller && !entry.vendor) entry.vendor = cleanText(d.hersteller);
       if (d.seriennr && !entry.serial) entry.serial = String(d.seriennr);
       if (d.modell && !entry.vendorModel) entry.vendorModel = String(d.modell);
+      // Seezeichen. Die Art steht schon in den Flaggen des Binärrahmens; hier
+      // kommt dazu, was nur als Stammdatum Sinn ergibt. Der Typcode zählt eine
+      // andere Liste als der Schiffstyp — deshalb atonTypeLabel und nicht
+      // shipTypeLabel.
+      if (d.atonTyp != null) {
+        entry.station = entry.station || "Seezeichen";
+        entry.typeLabel = atonTypeLabel(d.atonTyp) || entry.typeLabel;
+        entry.typeDetail = entry.typeDetail || entry.typeLabel;
+      }
+      if (d.atonVirtuell != null) entry.atonVirtual = !!d.atonVirtuell;
+      if (d.atonAusserPosition != null) entry.atonOffPosition = !!d.atonAusserPosition;
       // Die Masse gehoert nach entry.dim - daraus baut die Karte den Marker
       // und capacityEstimate die Groessenklasse. Hier stand frueher NUR
       // entry.size: Die Tabellenspalte war gefuellt, und dieselben Schiffe

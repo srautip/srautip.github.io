@@ -104,6 +104,53 @@ zweite Lauf im Test stellt deshalb keine einzige Abfrage mehr.
 Wikimedia (`?width=`) liefern die gewünschte Breite serverseitig — also
 braucht der Proxy keine Bildbibliothek.
 
+## Seezeichen: eingebaut, aber der Upstream liefert keine
+
+Msg 21 (`AidsToNavigationReport`) wird jetzt uebersetzt, gespeichert und an
+den Client gegeben. **Gemessen am 27. Aug. 2026 kommt davon trotzdem nichts
+an, und zwar nicht wegen des Proxys:**
+
+| Probe | Ergebnis |
+|---|---|
+| Abo nur auf `AidsToNavigationReport`, 3 min ueber der ganzen Region | **0 Nachrichten** |
+| Abo ganz OHNE Typfilter, 75 s | 2 261 PositionReport, 104 ShipStaticData, 63 StandardClassB, 33 StaticDataReport - **kein einziges Seezeichen** |
+| REST-Abzug von openwaters | 2 762 Datensaetze, **alle** `kind=vessel` |
+
+Der Upstream `ais.openwaters.io` fuehrt schlicht keine Seezeichen. Wer sie
+sehen will, stellt den Strom auf aisstream.io um - der Proxy kann das ohne
+Codeaenderung:
+
+```
+AIS_STROM_URL=wss://stream.aisstream.io/v0/stream
+AIS_TOKEN=<eigener aisstream-Schluessel>
+```
+
+Den zusaetzlichen Typ im Abo vertraegt der jetzige Upstream: gemessen laufen
+die Schiffe unveraendert weiter (2 261 Positionsmeldungen in 75 s).
+
+**Drei Dinge, die beim Bauen zaehlten:**
+
+- **Der Typcode gehoert NICHT in `typ`.** Msg 21 zaehlt eine eigene Liste:
+  20 ist dort "Leuchttonne", in Msg 5 waere es ein Segelboot. Er steht als
+  `atonTyp` daneben, und der Client beschriftet ihn mit `atonTypeLabel()`.
+- **Der Name kann laenger als 20 Zeichen sein.** Der Rest kommt in
+  `NameExtension` und gehoert ohne Trennzeichen angehaengt
+  ("ELBE APPROACH LIGHT" + "BUOY").
+- **Keine Positionshistorie fuer Tonnen.** Sie bewegen sich nicht, melden
+  aber alle paar Minuten - und weil ihre Geschwindigkeit unbekannt ist, wuerde
+  die Verdichtung sie ausdruecklich behalten (siehe `sog IS NULL` oben). Das
+  ergaebe eine Spur aus lauter identischen Punkten. `merke()` steigt fuer sie
+  aus, der Stammsatz wird trotzdem geschrieben.
+
+Die Flagge `FLAG_SEEZEICHEN` gab es im Drahtformat schon, der Client wertet
+sie seit jeher aus - es kam nur nie eine an.
+
+Geprueft ist die ganze Kette gegen einen **eigenen AIS-Strom**
+(`scratchpad/seezeichen.js`): Msg 21 hinein, und am anderen Ende steht im
+Client "ELBE APPROACH LIGHTBUOY / Leuchttonne / 8x6", im Detailfenster als
+Seezeichen gefuehrt - 16 Pruefungen, dazu die Gegenprobe, dass die Tonne
+keine Positionspunkte bekommt und das Schiff daneben schon.
+
 ## Der Typ kommt aus drei Quellen - und keine ist sicher
 
 Gemeldet: „Warum fehlt bei MMSI 309436000 der Typ?" (Liberty of the Seas,
