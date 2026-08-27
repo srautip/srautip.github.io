@@ -174,10 +174,10 @@ Public Module Spaltenzuordnung
             Next
 
             If klasseSpalte >= 0 Then
-                Dim n As Integer
-                If Integer.TryParse(Feld(zeile, klasseSpalte).Trim(), n) AndAlso n >= 1 Then
+                Dim nummer = Klassennummer(projekt, Feld(zeile, klasseSpalte))
+                If nummer.HasValue Then
                     projekt.Klassenbildung.Fixierungen.Add(
-                        New KlassenbildungFixierung With {.Kind = id, .Klasse = n})
+                        New KlassenbildungFixierung With {.Kind = id, .Klasse = nummer.Value})
                     bericht.Fixierungen += 1
                 ElseIf Feld(zeile, klasseSpalte).Trim() <> "" Then
                     ohneKlassenzahl += 1
@@ -194,13 +194,35 @@ Public Module Spaltenzuordnung
         Next
 
         If ohneKlassenzahl > 0 Then
-            ' Nicht still schlucken: "1a" statt "1" ist der haeufigste
-            ' Fall, und wer es nicht erfaehrt, sucht spaeter nach
-            ' fehlenden Fixierungen.
-            bericht.Hinweise.Add($"{ohneKlassenzahl} Zeile(n) mit einer Klassenangabe, die keine Zahl ist – " &
-                                 "dort entstand keine Fixierung.")
+            ' Nicht still schlucken: eine Klasse, die weder Zahl noch
+            ' Label ist, kommt vor - und wer es nicht erfaehrt, sucht
+            ' spaeter nach fehlenden Fixierungen.
+            bericht.Hinweise.Add($"{ohneKlassenzahl} Zeile(n) mit einer Klassenangabe, die weder eine " &
+                                 "Zahl noch eines der Klassen-Labels ist – dort entstand keine Fixierung.")
         End If
         Return bericht
+    End Function
+
+    ''' <summary>Die Klassennummer aus einer Zellenangabe. Echte Listen
+    ''' schreiben nicht 1, sondern 5a - deshalb wird auch gegen die
+    ''' LABELS der Klassen geprueft. Ohne das verlangte die Oberflaeche
+    ''' vom Nutzer, seine Datei vorher umzuschreiben, und genau das soll
+    ''' sie ihm ersparen.
+    '''
+    ''' Nothing heisst: nicht zuzuordnen - der Aufrufer meldet es.</summary>
+    Private Function Klassennummer(projekt As Projekt, wert As String) As Integer?
+        Dim w = If(wert, "").Trim()
+        If w = "" Then Return Nothing
+
+        Dim n As Integer
+        If Integer.TryParse(w, n) AndAlso n >= 1 Then Return n
+
+        Dim labels = projekt.Klassenbildung.Klassen.Labels
+        If labels IsNot Nothing Then
+            Dim i = labels.FindIndex(Function(l) String.Equals(l, w, StringComparison.CurrentCultureIgnoreCase))
+            If i >= 0 Then Return i + 1
+        End If
+        Return Nothing
     End Function
 
     Private Function Index(wahlen As List(Of Spaltenwahl), rolle As Spaltenrolle) As Integer

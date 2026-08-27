@@ -189,7 +189,7 @@ Public Class ImportZuordnungTests
 
         Assert.AreEqual(2, bericht.Kinder)
         Assert.AreEqual(1, bericht.Fixierungen)
-        Assert.IsTrue(bericht.Hinweise.Any(Function(h) h.Contains("keine Zahl")))
+        Assert.IsTrue(bericht.Hinweise.Any(Function(h) h.Contains("weder eine Zahl")))
     End Sub
 
     ' ===============================================================
@@ -304,4 +304,119 @@ Public Class ImportZuordnungTests
         Assert.IsTrue(d.Hinweise.Any(Function(h) h.Contains("Platzhalter")))
     End Sub
 
+
+    ''' <summary>Echte Klassenlisten schreiben nicht "1", sondern "5a".
+    ''' Ohne den Abgleich gegen die Labels haette die Oberflaeche vom
+    ''' Nutzer verlangt, seine Datei vorher umzuschreiben - genau das
+    ''' soll sie ihm ersparen.</summary>
+    <TestMethod>
+    Public Sub EineKlassenspalteErkenntAuchDieLabels()
+        Dim p As New Projekt()
+        p.Klassenbildung.Klassen.Labels = New List(Of String) From {"5a", "5b", "5c", "5d"}
+        Dim m = Modell(p)
+        Dim v = m.ImportPruefen("Nachname;Klasse" & vbLf & "Meier;5a" & vbLf & "Schulz;5C" & vbLf & "Braun;2")
+        Dim bericht = m.ImportUebernehmen(v, Spaltenzuordnung.Vorschlag(v.Spalten))
+
+        Assert.AreEqual(3, bericht.Fixierungen)
+        Dim fix = p.Klassenbildung.Fixierungen
+        Assert.AreEqual(1, fix(0).Klasse.Value, "5a ist die erste Klasse")
+        Assert.AreEqual(3, fix(1).Klasse.Value, "die Schreibweise darf nicht zaehlen")
+        Assert.AreEqual(2, fix(2).Klasse.Value, "eine Zahl gilt weiterhin unmittelbar")
+    End Sub
+
+    <TestMethod>
+    Public Sub EineUnbekannteKlassenangabeBleibtEinHinweis()
+        Dim p As New Projekt()
+        p.Klassenbildung.Klassen.Labels = New List(Of String) From {"5a", "5b"}
+        Dim m = Modell(p)
+        Dim v = m.ImportPruefen("Nachname;Klasse" & vbLf & "Meier;9z")
+        Dim bericht = m.ImportUebernehmen(v, Spaltenzuordnung.Vorschlag(v.Spalten))
+
+        Assert.AreEqual(0, bericht.Fixierungen)
+        Assert.IsTrue(bericht.Hinweise.Any(Function(h) h.Contains("Klassen-Labels")))
+    End Sub
+
+
+    ' ===============================================================
+    ' Die mitgelieferten Beispieldateien
+    ' ===============================================================
+
+    Private Shared Function Beispieldatei(schule As String, name As String) As String
+        Return IO.Path.Combine(TestsWurzel(), schule, "import-beispiel", name)
+    End Function
+
+    ''' <summary>Eine Beispieldatei, die nie durch den Importer laeuft,
+    ''' ist eine Behauptung. Diese beiden Tests fahren sie wirklich
+    ''' hinein - inklusive BOM-Erkennung und Trennzeichen.</summary>
+    <TestMethod>
+    Public Sub DieEinschulungslisteDerGrundschuleLaeuftDurch()
+        Dim p As New Projekt()
+        Dim m = Modell(p)
+        Dim text = ImportDialog.DateiLesen(
+            Beispieldatei("bw-grundschule-beispiel", "einschulungsliste.csv"))
+        Dim v = m.ImportPruefen(text)
+
+        Assert.IsTrue(v.Kopfzeile, "die Kopfzeile muss erkannt werden")
+        Assert.AreEqual(100, v.Datensaetze)
+        CollectionAssert.Contains(v.Spalten, "Sprachfoerderung")
+
+        ' So, wie die Anleitung es beschreibt: Attribute setzen, Kita als
+        ' Gruppe, Telefon und Geburtsdatum verwerfen.
+        Dim w = Spaltenzuordnung.Vorschlag(v.Spalten)
+        For Each name In {"Geschlecht", "Sprachfoerderung", "Kann-Kind", "Wohngebiet"}
+            w.Single(Function(x) x.Name = name).Rolle = Spaltenrolle.Attribut
+        Next
+        w.Single(Function(x) x.Name = "Kita").Rolle = Spaltenrolle.Gruppe
+        Assert.AreEqual(0, Spaltenzuordnung.Einwaende(w).Count)
+
+        Dim bericht = m.ImportUebernehmen(v, w)
+
+        Assert.AreEqual(100, bericht.Kinder)
+        Assert.AreEqual(100, p.Mapping.Count)
+        Assert.AreEqual(6, bericht.Gruppen.Count, "sechs Kitas")
+        CollectionAssert.AreEquivalent(New List(Of String) From {"Telefon", "Geburtsdatum"},
+                                       bericht.Verworfen)
+        ' Die Telefonnummern sind wirklich nirgends gelandet.
+        Assert.IsFalse(p.Klassenbildung.Schueler.Any(
+            Function(s) s.Attribute.Keys.Any(Function(k) k.Contains("Telefon"))))
+        CollectionAssert.AreEquivalent(
+            New List(Of String) From {"Geschlecht", "Sprachfoerderung", "Kann-Kind", "Wohngebiet"},
+            m.Attributnamen)
+    End Sub
+
+    ''' <summary>Die GMS-Datei fuehrt den Fall aus 9.3 vor: eine
+    ''' bestehende Einteilung mit den echten Klassennamen 5a..5d.</summary>
+    <TestMethod>
+    Public Sub DieBestehendeEinteilungDerGmsWirdZuFixierungen()
+        Dim p As New Projekt()
+        p.Klassenbildung.Klassen.Labels = New List(Of String) From {"5a", "5b", "5c", "5d"}
+        Dim m = Modell(p)
+        Dim text = ImportDialog.DateiLesen(
+            Beispieldatei("bw-gms-beispiel", "bestehende-einteilung.csv"))
+        Dim v = m.ImportPruefen(text)
+
+        Assert.AreEqual(116, v.Datensaetze)
+
+        Dim w = Spaltenzuordnung.Vorschlag(v.Spalten)
+        Assert.AreEqual(Spaltenrolle.Klasse, w.Single(Function(x) x.Name = "Klasse").Rolle,
+                        "eine Spalte namens Klasse soll vorgeschlagen werden")
+        w.Single(Function(x) x.Name = "Religion").Rolle = Spaltenrolle.Gruppe
+        w.Single(Function(x) x.Name = "Niveau").Rolle = Spaltenrolle.Attribut
+
+        Dim bericht = m.ImportUebernehmen(v, w)
+
+        Assert.AreEqual(116, bericht.Kinder)
+        Assert.AreEqual(116, bericht.Fixierungen, "5a..5d muessen ueber die Labels aufgeloest werden")
+        Assert.AreEqual(0, bericht.Hinweise.Count, String.Join(" | ", bericht.Hinweise))
+        Assert.AreEqual(3, bericht.Gruppen.Count, "ev, kath, ethik")
+        CollectionAssert.AreEquivalent(New List(Of String) From {"Mailadresse"}, bericht.Verworfen)
+        ' 116 Kinder auf vier Klassen, gleichmaessig verteilt.
+        For k = 1 To 4
+            Dim n = k
+            Assert.AreEqual(29, p.Klassenbildung.Fixierungen.Where(Function(f) f.Klasse = n).Count)
+        Next
+    End Sub
+
 End Class
+
+
