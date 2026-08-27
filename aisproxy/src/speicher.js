@@ -35,6 +35,13 @@ try {
 
 const TAG_MS = 24 * 3600 * 1000;
 
+// Was aus dem AIS-Strom in die Stammtabelle wandert. Register- und
+// Fotospalten stehen bewusst NICHT hier: Die fuellt register.js, und ein
+// Schreiber, der beide Seiten anfasst, ueberschreibt frueher oder spaeter die
+// eine mit dem Nichtwissen der anderen.
+const STAMM_SPALTEN = ["name", "rufzeichen", "imo", "typ", "laenge", "breite",
+  "dimA", "dimB", "dimC", "dimD", "tiefgang", "ziel", "eta"];
+
 function tagName(ms) {
   const d = new Date(ms);
   return "pos_" + d.getUTCFullYear() +
@@ -59,6 +66,8 @@ class Speicher {
     this.geschrieben = 0;
     this.stammTabelle();
     this.taktSchreiben = null;
+    this.stammPuffer = new Map();
+    this.stammGeschrieben = 0;
   }
 
   stammTabelle() {
@@ -88,6 +97,10 @@ class Speicher {
     // gesetzt, foto_datei leer, und bei einer Wiederholung heute liefert
     // dieselbe Abfrage sehr wohl ein Bild. Ein verlorener Download darf nicht
     // wie "hat kein Bild" aussehen.
+    // Die Bezugspunkte der Antenne. SQLite kennt kein "ADD COLUMN IF NOT
+    // EXISTS", deshalb der Umweg ueber spalteErgaenzen.
+    for (const k of ["dimA", "dimB", "dimC", "dimD"]) this.spalteErgaenzen("schiff", k, "REAL");
+    this.spalteErgaenzen("schiff", "gesehen", "INTEGER");
     this.spalteErgaenzen("schiff", "foto_geprueft", "INTEGER DEFAULT 0");
     this.spalteErgaenzen("schiff", "foto_quelle", "TEXT");
     this.spalteErgaenzen("schiff", "foto_seite", "TEXT");
@@ -147,7 +160,45 @@ class Speicher {
     });
   }
 
+  // Stammdaten aus dem Strom vormerken. Frueher standen sie NUR im
+  // Arbeitsspeicher: Nach jedem Neustart musste der Proxy die Abmessungen neu
+  // lernen, und weil ShipStaticData je Schiff nur etwa alle sechs Minuten
+  // kommt, dauerte das gemessen 13 Minuten fuer 668 von 2 800 Schiffen. Ein
+  // Client mit leerem Zwischenspeicher sah in der Zeit lauter Schiffe "ohne
+  // bekannte Masse".
+  //
+  // Geschrieben wird nur, was auch bekannt ist: Ein null wuerde in
+  // stammSetze() eine vorhandene Registerangabe ueberschreiben.
+  merkeStamm(s) {
+    const felder = {};
+    for (const k of STAMM_SPALTEN) if (s[k] != null) felder[k] = s[k];
+    if (!Object.keys(felder).length) return;
+    felder.gesehen = Math.floor((s.seen || Date.now()) / 1000);
+    this.stammPuffer.set(Number(s.mmsi), felder);
+  }
+
+  schreibeStamm() {
+    if (!this.stammPuffer.size) return 0;
+    const stapel = this.stammPuffer;
+    this.stammPuffer = new Map();
+    let n = 0;
+    this.db.exec("BEGIN");
+    try {
+      for (const [mmsi, felder] of stapel) { this.stammSetze(mmsi, felder); n++; }
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      this.log("Stammdaten schreiben fehlgeschlagen: " + e.message);
+      return 0;
+    }
+    this.stammGeschrieben += n;
+    return n;
+  }
+
   schreibe() {
+    // Vor der Abkuerzung unten: Stammdaten fallen auch dann an, wenn gerade
+    // keine Position im Puffer liegt.
+    this.schreibeStamm();
     if (!this.puffer.length) return 0;
     const stapel = this.puffer;
     this.puffer = [];
@@ -341,6 +392,7 @@ class Speicher {
   stammSetze(mmsi, felder) {
     const vorhanden = this.stammHole(mmsi);
     const erlaubt = ["name", "rufzeichen", "imo", "typ", "laenge", "breite", "tiefgang",
+      "dimA", "dimB", "dimC", "dimD", "gesehen",
       "ziel", "eta", "wd_entity", "brz", "baujahr", "eigner", "betreiber", "werft",
       "flagge", "heimathafen", "foto_datei", "foto_credit", "foto_seite",
       "foto_quelle", "foto_geprueft", "quelle", "gefunden", "geprueft"];
@@ -438,6 +490,7 @@ class Speicher {
     return {
       tage: tage.length, tabellen: tage, punkte: zeilen,
       geschrieben: this.geschrieben, puffer: this.puffer.length,
+      stammGeschrieben: this.stammGeschrieben, stammPuffer: this.stammPuffer.size,
       stammEintraege: stamm.n, stammTreffer: stamm.treffer || 0
     };
   }

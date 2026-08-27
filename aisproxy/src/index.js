@@ -34,13 +34,18 @@ async function start() {
     }, r.t * 1000, "kalt");
     wieder++;
   }
-  // Stammdaten dazu, sonst stehen die wiederhergestellten Schiffe namenlos da.
+  // Stammdaten dazu, sonst stehen die wiederhergestellten Schiffe namenlos da
+  // - und ohne Abmessungen, was sie im Client als "ohne bekannte Masse" auf
+  // die Karte bringt.
+  const ausStamm = (r) => ({
+    name: r.name, rufzeichen: r.rufzeichen, imo: r.imo, typ: r.typ,
+    laenge: r.laenge, breite: r.breite, tiefgang: r.tiefgang,
+    dimA: r.dimA, dimB: r.dimB, dimC: r.dimC, dimD: r.dimD,
+    ziel: r.ziel, eta: r.eta
+  });
   for (const mmsi of zustand.schiffe.keys()) {
     const s = speicher.stammHole(mmsi);
-    if (s) zustand.ergaenze(mmsi, {
-      name: s.name, rufzeichen: s.rufzeichen, imo: s.imo, typ: s.typ,
-      laenge: s.laenge, breite: s.breite, tiefgang: s.tiefgang
-    });
+    if (s) zustand.ergaenze(mmsi, ausStamm(s));
   }
   if (wieder) log(wieder + " Schiff(e) aus der Historie wiederhergestellt");
 
@@ -69,6 +74,38 @@ async function start() {
   // 37 Meldungen je Sekunde reine Verschwendung.
   const beiMeldung = (s, hatPosition) => {
     if (hatPosition !== false) speicher.merke(s);
+
+    // Beim ersten Sehen nachschlagen, was ueber dieses Schiff schon
+    // gespeichert ist. Der Kaltstart oben erwischt nur die Schiffe mit
+    // frischer Position in der Historie; wer erst danach auftaucht, waere
+    // sonst wieder minutenlang namen- und masselos, obwohl alles in der
+    // Datenbank steht.
+    //
+    // Nur fehlende Felder: Die Meldung, die gerade hereinkam, ist juenger als
+    // die Datenbank - sie darf nicht ueberschrieben werden.
+    if (!s.stammGeholt) {
+      s.stammGeholt = true;
+      const alt = speicher.stammHole(s.mmsi);
+      if (alt) {
+        const fehlend = {};
+        for (const [k, v] of Object.entries(ausStamm(alt))) if (v != null && s[k] == null) fehlend[k] = v;
+        if (Object.keys(fehlend).length) zustand.ergaenze(s.mmsi, fehlend);
+      }
+      // Absichtlich KEIN "das kam ja von dort, muss nicht zurueck": Die
+      // Meldung, die dieses Schiff gerade erst bekannt gemacht hat, kann
+      // selbst neue Statik tragen. Wer hier abkuerzt, schreibt sie erst beim
+      // naechsten Wechsel weg - und wenn keiner kommt, nie. Der Preis ist ein
+      // idempotentes UPDATE je Schiff beim ersten Sehen.
+    }
+
+    // Stammdaten aus dem Strom festhalten. Ohne das lernt der Proxy die
+    // Abmessungen nach jedem Neustart neu - gemessen 13 Minuten fuer 668 von
+    // 2 800 Schiffen, denn ShipStaticData kommt je Schiff nur etwa alle sechs
+    // Minuten.
+    if (s.stammRev && s.stammRev !== s.gesichertRev) {
+      s.gesichertRev = s.stammRev;
+      speicher.merkeStamm(s);
+    }
   };
 
   const strom = new Strom({ konfig, zustand, log, beiMeldung });

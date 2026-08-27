@@ -233,3 +233,27 @@ test("neue Spalten kommen auch in eine bestehende Datenbank", () => {
   assert.strictEqual(s.spalteErgaenzen("schiff", "probe_spalte", "TEXT"), true);
   assert.strictEqual(s.spalteErgaenzen("schiff", "probe_spalte", "TEXT"), false);
 });
+
+test("Stammdaten aus dem Strom loeschen keine Registerangabe", () => {
+  // stammSetze() schreibt jedes uebergebene Feld. Kaeme aus dem Strom ein
+  // null fuer die Laenge, waere die Angabe aus Wikidata weg - und niemand
+  // wuerde es merken, weil die Spalte ja "schon einmal gefuellt war".
+  const speicher = neu();
+  speicher.stammSetze(211000009, { name: "AUS WIKIDATA", laenge: 95, gefunden: 1 });
+  speicher.merkeStamm({ mmsi: 211000009, name: "AUS AIS", laenge: null, breite: null,
+                        dimA: null, seen: Date.now() });
+  assert.strictEqual(speicher.schreibeStamm(), 1);
+  const a = speicher.stammHole(211000009);
+  assert.strictEqual(a.laenge, 95, "die Registerlaenge muss stehen bleiben");
+  assert.strictEqual(a.name, "AUS AIS", "der frische AIS-Name darf durch");
+  assert.strictEqual(a.gefunden, 1, "und der Registerstand bleibt unberuehrt");
+
+  // Und der vollstaendige Satz kommt samt Bezugspunkten an.
+  speicher.merkeStamm({ mmsi: 211000010, name: "MS PROBE", laenge: 400, breite: 61,
+                        dimA: 350, dimB: 50, dimC: 30, dimD: 31, typ: 70, seen: 1000 });
+  speicher.schreibeStamm();
+  const b = speicher.stammHole(211000010);
+  assert.deepStrictEqual([b.dimA, b.dimB, b.dimC, b.dimD], [350, 50, 30, 31]);
+  assert.strictEqual(b.gesehen, 1);
+  speicher.stopp();
+});
