@@ -221,6 +221,18 @@ frischer Datenbank (`scratchpad/fotolauf.js`):
 Der **Volltextweg findet nichts mehr**, was die Kategorie nicht schon hat
 (22 Abrufe, 0 Treffer) — er bleibt als Rückfall drin, kostet aber sichtbar.
 
+### Die Reihenfolge im Fotolauf ist nach Preis sortiert
+
+Drei Stufen: **im Abzug** (ein Download, kein Suchabruf) → **mit IMO, nicht im
+Abzug** (bis zu vier Suchabrufe, gute Aussicht) → **ohne IMO** (zwei Abrufe,
+magere Aussicht).
+
+Der Grund ist der Rückstand: Beim ersten Lauf auf einem gefüllten Server sind
+alle 2 900 Schiffe fällig, die Obergrenze lässt aber nur einen Teil zu.
+Gemessen kostet ein Schiff im Schnitt 2,8 s, eines aus dem Abzug knapp eine.
+Mit dieser Reihenfolge und einer Obergrenze von 30 kamen **30 von 30
+Versuchen zu einem Bild — in 50 Sekunden, mit null Suchabrufen.**
+
 ### Eine Obergrenze je Lauf, und sie wird gemeldet
 
 `FOTO_MAX_PRO_LAUF` = 300. Ohne sie liefe der erste Lauf über 2 900 Schiffe
