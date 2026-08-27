@@ -164,6 +164,8 @@ sichern lohnt nicht.
 | Caddy bekommt kein Zertifikat | DNS zeigt noch nicht auf den Server, oder Port 80 ist zu. `dig +short ais.deinedomain.de` prüfen |
 | `Stream verbunden`, aber `schiffe: 0` | Region größer als 400 sq° — der Upstream verwirft die Subscription dann **ohne Fehlermeldung**. Der Proxy warnt beim Start, wenn er es bemerkt |
 | `Cannot find module 'node:sqlite'` | Node älter als 22.5. Im Image kann das nicht passieren; bei einer Installation ohne Docker Node auf 22.22+ heben |
+| Basic-Auth wird abgewiesen, auch mit richtigem Passwort | Der bcrypt-Hash steckt voller `$`, und Docker Compose deutet `$` in der `.env` als Variable — der Hash kommt zerstückelt am Container an. Prüfen mit `docker compose config \| grep PASSWORT`; im `.env` jedes `$` verdoppeln (`$$`) |
+| Der Client verbindet sich nicht, obwohl das Token stimmt | Alte `Caddyfile` mit Basic-Auth über allen Pfaden. Ein Browser kann bei einem WebSocket keine Header setzen, also kommt er nie durch. `git pull && docker compose up -d --build` |
 | Alles läuft, aber der Browser bekommt nichts | Ohne `Access-Control-Allow-Origin` kommt keine Antwort an — der Proxy setzt ihn selbst, aber ein vorgeschalteter Reverse-Proxy darf ihn nicht abschneiden |
 
 ## Was hier nicht getestet ist
