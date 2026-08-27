@@ -259,6 +259,26 @@ Die Schiffe ohne Typ hatten ausnahmslos nur `PositionReport` empfangen.
 3. **Registeranreicherung** — Digitraffic/Wikidata je MMSI, allerdings mit
    niedriger Trefferquote (siehe unten).
 
+## Datenquellen im Überblick
+
+Sechs externe Quellen, keine davon braucht mehr als einen Schlüssel-losen
+Aufruf. Details und Trefferquoten je Quelle stehen in den Abschnitten
+darunter — hier nur die Zusammenfassung, damit nichts doppelt gepflegt wird.
+
+| Quelle | Endpunkt | Liefert | Ausgelöst |
+|---|---|---|---|
+| AIS-Livestream | `wss://stream.aisstream.io/v0/stream` (oder openwaters-Ausweich) | Position, SOG, COG, Heading, Navstatus (`PositionReport` u. Class-B-Varianten); Typ, Maße, IMO, Ziel (`ShipStaticData`); Name/Rufzeichen (`StaticDataReport`); ENI, Personen an Bord (Binär, **standardmäßig aus**) | laufend, solange verbunden |
+| openwaters-Snapshot | `GET ais.openwaters.io/v1/vessels?bbox=…` | Position, SOG, COG, Heading, Navstatus, Name, Typcode, Kind (Seezeichen/Landstation) — **keine** Maße, IMO oder Rufzeichen | beim Laden, alle 60 s, nach Kartenschwenk |
+| Digitraffic | `GET meri.digitraffic.fi/api/ais/v1/vessels/{mmsi}` | IMO, Name, Rufzeichen, Ziel, ETA, Tiefgang, Typcode, Länge/Breite | beim Öffnen eines Schiffs (Register-Kette) |
+| Wikidata | SPARQL, `query.wikidata.org` | Name, Typ, IMO, MMSI, Rufzeichen, BRZ/NRZ, Länge, Breite, Tiefgang, Geschwindigkeit, Baujahr, Klasse, Eigner, Betreiber, Werft, Flagge, Heimathafen, Foto-URL | beim Öffnen eines Schiffs (Register-Kette) |
+| Wikimedia Commons | `commons.wikimedia.org/w/api.php` | Foto samt Urheber/Lizenz, gefunden über die IMO im Dateinamen | Fallback, wenn Wikidata kein Foto hat |
+| Browser-Geolocation | `navigator.geolocation.watchPosition` | eigener Standort (✕-Symbol, Entfernungsspalte, Sichtlinien) | nach Erlaubnis, laufend |
+
+Digitraffic und Wikidata laufen **hintereinander**, nicht parallel — die aus
+Digitraffic gewonnene IMO verdoppelt näherungsweise die Wikidata-Trefferquote
+gegenüber der Suche allein über die MMSI. Details, Feldlisten und Zahlen zur
+Trefferquote: nächster Abschnitt.
+
 ## Anreicherung per IMO/MMSI: Digitraffic + Wikidata
 
 Zwei Quellen, beide **frei, ohne Schlüssel und mit `access-control-allow-origin: *`**
