@@ -1199,6 +1199,15 @@
     </div>
     <label for="proxyUrl">Adresse</label>
     <input type="text" id="proxyUrl" placeholder="https://…/v1" autocomplete="off" />
+    <label for="proxyToken">Zugangstoken</label>
+    <input type="text" id="proxyToken" placeholder="leer lassen, wenn der Proxy offen ist" autocomplete="off" />
+    <p class="hint" style="margin-top:0.35rem">
+      <b>Nur das Token, nicht Benutzer und Passwort.</b> Ein Browser kann bei
+      einem WebSocket keine Header setzen, Basic-Auth ist für den Live-Kanal
+      also gar nicht erfüllbar &ndash; Benutzername und Passwort des Servers
+      sind für den Browseraufruf von <code>/v1/status</code> und für
+      <code>curl</code> da, nicht für diesen Client.
+    </p>
     <p class="hint" style="margin-top:0.35rem">
       Statt direkt bei openwaters zu lesen, holt der Client dann alles von einem
       eigenen Server. Der bündelt <b>eine</b> Verbindung für alle Nutzer, hält
@@ -1642,12 +1651,18 @@
   var trackLimitInput = document.getElementById("trackLimit");
   var proxyAnInput = document.getElementById("proxyAn");
   var proxyUrlInput = document.getElementById("proxyUrl");
+  var proxyTokenInput = document.getElementById("proxyToken");
   // Steht HIER OBEN, obwohl es zum Proxy-Block weiter unten gehoert:
   // Funktionsdeklarationen werden hochgezogen, var-WERTE nicht. Weiter unten
   // deklariert war die Vorgabe beim Wiederherstellen aus dem Speicher noch
   // undefined - und im Adressfeld stand woertlich "undefined". Genau diese
   // Falle hat in diesem Projekt schon mehrfach zugeschlagen.
   var PROXY_URL_VORGABE = "https://8244a7c9-68a8-4828-b121-e974a0dc6f28.clouding.host/v1";
+  // Das Token des eigenen Proxys. Es steht hier im Klartext und damit
+  // oeffentlich - der Client liegt auf GitHub Pages. Bewusste Entscheidung
+  // des Betreibers, damit die Seite ohne Einrichtung funktioniert; wer das
+  // nicht will, laesst das Feld leer und traegt es je Browser einmal ein.
+  var PROXY_TOKEN_VORGABE = "uqpKrAIyhiVmFPkV6md62ocJr7t9Iewp";
   var ownPosInput = document.getElementById("ownPos");
   var autoSnapshotInput = document.getElementById("autoSnapshot");
   var autoRefreshInput = document.getElementById("autoRefresh");
@@ -1686,6 +1701,8 @@
   // Der Proxy ist bewusst AUS in der Vorgabe: Der bisherige Weg bleibt der
   // Normalfall, bis sich der eigene Server im Betrieb bewaehrt hat.
   proxyUrlInput.value = localStorage.getItem("aisstream_proxy_url") || PROXY_URL_VORGABE;
+  var gespeichertesToken = localStorage.getItem("aisstream_proxy_token");
+  proxyTokenInput.value = gespeichertesToken === null ? PROXY_TOKEN_VORGABE : gespeichertesToken;
   if (localStorage.getItem("aisstream_proxy_an") === "1") proxyAnInput.checked = true;
 
   if (localStorage.getItem("aisstream_auto_enrich") === "0") autoEnrichInput.checked = false;
@@ -6011,6 +6028,19 @@
     return u || PROXY_URL_VORGABE;
   }
 
+  function proxyToken() {
+    return ((proxyTokenInput && proxyTokenInput.value) || "").trim();
+  }
+
+  // Das Token geht als Abfrageparameter mit, nicht als Header: Beim
+  // WebSocket gibt es keinen anderen Weg, und fuer die Abrufe dieselbe Form
+  // zu nehmen erspart einen CORS-Vorabflug je Anfrage.
+  function proxyMitToken(url) {
+    var t = proxyToken();
+    if (!t) return url;
+    return url + (url.indexOf("?") === -1 ? "?" : "&") + "token=" + encodeURIComponent(t);
+  }
+
   // Der Ausschnitt, den der Proxy liefern soll. Die bbox-Felder folgen der
   // Karte ohnehin (updateBboxFieldsFromMap) - sie hier zu benutzen hält
   // beide Wege auf demselben Stand.
@@ -6128,7 +6158,8 @@
     }
     proxyGewollt = true;
     clearTimeout(proxyWecker);
-    var url = basis.replace(/^http/i, "ws") + "/live?bbox=" + encodeURIComponent(box) + "&takt=2000";
+    var url = proxyMitToken(basis.replace(/^http/i, "ws") +
+      "/live?bbox=" + encodeURIComponent(box) + "&takt=2000");
     setStatus("", "verbinde mit Proxy…");
     connectBtn.disabled = true;
 
@@ -6198,6 +6229,21 @@
     };
   }
 
+  // Nach einer Aenderung an Adresse oder Token sofort neu aufbauen - und
+  // dabei den Rueckzug zuruecksetzen.
+  //
+  // Die Bedingung war zuerst "nur wenn ein Socket offen ist". Das war falsch:
+  // Nach einem falschen Token ist der Socket zu und der Client wartet in
+  // einem Rueckzug von bis zu 30 s. Genau dann korrigiert der Nutzer das
+  // Token - und es passierte minutenlang nichts, weil kein Socket da war,
+  // auf den die Bedingung haette zutreffen koennen.
+  function proxyNeuVerbinden() {
+    if (!proxyAktiv()) return;
+    proxyTrennen();
+    proxyVersuch = 0;
+    proxyVerbinde();
+  }
+
   function proxyTrennen() {
     proxyGewollt = false;
     clearTimeout(proxyWecker);
@@ -6220,7 +6266,7 @@
   // vorgewärmt, die Antwort kommt also ohne Wartezeit. Findet er nichts,
   // läuft die gewohnte Kette (Digitraffic/Wikidata/Commons) als Rückfall.
   function proxyRegister(mmsi) {
-    return fetch(proxyBasis() + "/ship/" + encodeURIComponent(mmsi))
+    return fetch(proxyMitToken(proxyBasis() + "/ship/" + encodeURIComponent(mmsi)))
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
@@ -6244,8 +6290,9 @@
         if (d.wd_entity) out.entity = d.wd_entity;
         if (d.foto) {
           // Der Proxy liefert einen relativen Pfad - und das Bild liegt dort
-          // schon auf Anzeigebreite verkleinert.
-          out.image = proxyBasis().replace(/\/v1$/, "") + d.foto;
+          // schon auf Anzeigebreite verkleinert. Das Token muss mit: Der
+          // Proxy prueft JEDEN Pfad, auch den fuer die Bilder.
+          out.image = proxyMitToken(proxyBasis().replace(/\/v1$/, "") + d.foto);
           out.imageCredit = { artist: d.foto_credit || null, licence: null, page: null };
         }
         return out;
@@ -6846,14 +6893,17 @@
 
   proxyAnInput.addEventListener("change", proxyUmschalten);
 
+  proxyTokenInput.addEventListener("change", function () {
+    localStorage.setItem("aisstream_proxy_token", proxyTokenInput.value.trim());
+    proxyNeuVerbinden();
+  });
+
   proxyUrlInput.addEventListener("change", function () {
     var wert = proxyUrlInput.value.trim().replace(/\/+$/, "");
     if (!wert) wert = PROXY_URL_VORGABE;
     proxyUrlInput.value = wert;
     localStorage.setItem("aisstream_proxy_url", wert);
-    // Laeuft gerade eine Verbindung zur alten Adresse, gehoert sie erneuert -
-    // sonst wirkt die Aenderung erst beim naechsten Verbindungsabriss.
-    if (proxyAktiv() && proxySocket) { proxyTrennen(); proxyVerbinde(); }
+    proxyNeuVerbinden();
   });
 
   showLabelsInput.addEventListener("change", function () {

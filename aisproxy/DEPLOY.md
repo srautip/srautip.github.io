@@ -121,6 +121,22 @@ Die zwei Zahlen, auf die es ankommt, stehen in `/v1/status`:
 - **`netz.letzteNeu`** — wie viele Schiffe der Snapshot beisteuert, die der
   Stream nicht gezeigt hat.
 
+## Der Browser-Client braucht das Token, nicht das Passwort
+
+Ein Browser kann bei einem WebSocket keine Header setzen — Basic-Auth ist für
+`/v1/live` also gar nicht erfüllbar. Deshalb deckt Basic-Auth in der
+`Caddyfile` **nur** noch ab, was ein Mensch aufruft (`/v1/status`, die
+Startseite). Die Schnittstellenpfade schützt das Token des Proxys selbst
+(`AIS_ZUGANG`), das der Client als `?token=` mitschickt.
+
+Auf der Technikseite des Clients gehört also **nur das Token** aus
+`zugangsdaten.txt` hinein. Benutzername und Passwort sind für den
+Browseraufruf und für `curl` da:
+
+```bash
+curl -u skipper:<passwort> https://<domain>/v1/status
+```
+
 ## Aktualisieren
 
 ```bash

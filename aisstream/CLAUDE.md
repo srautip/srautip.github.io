@@ -313,6 +313,37 @@ statt dass der Aufrufer das wissen müsste.
 darf aber überallhin. Antwortet er mit `register: "offen"` oder gar nicht,
 läuft `enrichDirekt()` — die unveränderte alte Kette.
 
+### Nur das Token, nicht Benutzer und Passwort
+
+**Ein Browser kann bei einem WebSocket keine Header setzen** — die
+`WebSocket`-Schnittstelle nimmt ausschließlich URL und Protokolle entgegen.
+Basic-Auth ist für `/v1/live` damit *grundsätzlich* nicht erfüllbar, und
+eingebettete Zugangsdaten in der URL (`wss://benutzer:pass@host/`) sind
+veraltet und werden verworfen. Deshalb:
+
+- Auf der Einstellungsseite steht **nur ein Tokenfeld**. Benutzername und
+  Passwort wären tote Felder — die gehören zum Browseraufruf von
+  `/v1/status` und zu `curl`.
+- Das Token geht als **Abfrageparameter** mit (`?token=`), nicht als Header.
+  Beim WebSocket gibt es keinen anderen Weg, und dieselbe Form für die
+  Abrufe erspart je Anfrage einen CORS-Vorabflug.
+- **Auch die Fotoadresse trägt es** — der Proxy prüft jeden Pfad.
+- In `aisproxy/Caddyfile` deckt Basic-Auth deshalb **nicht** mehr die
+  Schnittstellenpfade ab. Täte es das, käme der Client nie durch, ganz
+  gleich welche Zugangsdaten eingetragen sind.
+
+**Das Token steht im Klartext im Quelltext** und damit öffentlich, weil die
+Seite auf GitHub Pages liegt. Bewusste Entscheidung des Betreibers, damit
+die Seite ohne Einrichtung funktioniert. Wer das nicht will: Feld leeren, es
+wird je Browser in `aisstream_proxy_token` gehalten.
+
+**Eine Korrektur muss sofort wirken.** Der Handler prüfte zuerst „nur wenn
+ein Socket offen ist" — falsch: Nach einem falschen Token ist der Socket zu
+und der Client wartet in einem Rückzug von bis zu 30 s. Genau dann korrigiert
+der Nutzer das Token, und es passierte minutenlang nichts.
+`proxyNeuVerbinden()` setzt den Rückzug deshalb zurück. Gefunden hat das die
+Gegenprobe im Test, nicht das Lesen.
+
 ### Das Drahtformat muss auf beiden Seiten dasselbe sein
 
 22 Byte je Schiff, gespiegelt in `proxyEntpacke()` hier und
