@@ -1193,6 +1193,24 @@
       21&nbsp;ms.
     </p>
 
+    <h2 style="margin-top:1.2rem">Eigener Proxy</h2>
+    <div class="checkboxes">
+      <label><input type="checkbox" id="proxyAn" /> Daten über den eigenen Proxy beziehen</label>
+    </div>
+    <label for="proxyUrl">Adresse</label>
+    <input type="text" id="proxyUrl" placeholder="https://…/v1" autocomplete="off" />
+    <p class="hint" style="margin-top:0.35rem">
+      Statt direkt bei openwaters zu lesen, holt der Client dann alles von einem
+      eigenen Server. Der bündelt <b>eine</b> Verbindung für alle Nutzer, hält
+      sieben Tage Historie und schickt nur noch <b>Änderungen</b> statt
+      Vollbildern &ndash; gemessen <b>6,4&nbsp;KB/min</b> im laufenden Betrieb.
+      Ein API-Key wird dafür nicht gebraucht, den hält der Proxy.
+      <b>Achtung:</b> Das Alter der Daten ändert sich dadurch nicht &ndash; sie
+      sind auch über den Proxy im Median rund 31&nbsp;s alt, das ist eine
+      Eigenschaft der Quelle. Umschalten wirkt sofort, ein Neuladen ist nicht
+      nötig.
+    </p>
+
     <h2 style="margin-top:1.2rem">Beim Laden der Seite</h2>
     <div class="checkboxes">
       <label><input type="checkbox" id="autoSnapshot" checked /> Snapshot automatisch laden</label>
@@ -1622,6 +1640,14 @@
   var filterResetEl = document.getElementById("filterReset");
   var showLabelsInput = document.getElementById("showLabels");
   var trackLimitInput = document.getElementById("trackLimit");
+  var proxyAnInput = document.getElementById("proxyAn");
+  var proxyUrlInput = document.getElementById("proxyUrl");
+  // Steht HIER OBEN, obwohl es zum Proxy-Block weiter unten gehoert:
+  // Funktionsdeklarationen werden hochgezogen, var-WERTE nicht. Weiter unten
+  // deklariert war die Vorgabe beim Wiederherstellen aus dem Speicher noch
+  // undefined - und im Adressfeld stand woertlich "undefined". Genau diese
+  // Falle hat in diesem Projekt schon mehrfach zugeschlagen.
+  var PROXY_URL_VORGABE = "https://8244a7c9-68a8-4828-b121-e974a0dc6f28.clouding.host/v1";
   var ownPosInput = document.getElementById("ownPos");
   var autoSnapshotInput = document.getElementById("autoSnapshot");
   var autoRefreshInput = document.getElementById("autoRefresh");
@@ -1656,6 +1682,11 @@
   // Karte nicht lahmlegen - dieselbe Klammer wie bei der Eingabe.
   trackGrenze = trackGrenzeAus(localStorage.getItem("aisstream_track_limit"));
   trackLimitInput.value = String(trackGrenze);
+
+  // Der Proxy ist bewusst AUS in der Vorgabe: Der bisherige Weg bleibt der
+  // Normalfall, bis sich der eigene Server im Betrieb bewaehrt hat.
+  proxyUrlInput.value = localStorage.getItem("aisstream_proxy_url") || PROXY_URL_VORGABE;
+  if (localStorage.getItem("aisstream_proxy_an") === "1") proxyAnInput.checked = true;
 
   if (localStorage.getItem("aisstream_auto_enrich") === "0") autoEnrichInput.checked = false;
   if (localStorage.getItem("aisstream_show_labels") === "0") showLabelsInput.checked = false;
@@ -1701,6 +1732,7 @@
       mapMoveTimer = setTimeout(function () {
         updateBboxFieldsFromMap();
         sendSubscription();
+        proxyAusschnitt();
         // Ohne das bleibt ein neu angefahrenes Gebiet minutenlang leer - und
         // ohne API-Key dauerhaft. Siehe maybeLoadSnapshot().
         maybeLoadSnapshot();
@@ -5033,6 +5065,39 @@
     if (selectedMmsi === mmsi) renderDetail(entry);
 
     var generation = cacheGeneration;
+
+    // Im Proxybetrieb zuerst dort fragen: Der Proxy hat den ganzen Bestand
+    // seiner Region vorgewaermt, die Antwort kommt also ohne Wartezeit und
+    // ohne die drei freien Dienste zu belasten. Findet er nichts, laeuft
+    // unten die gewohnte Kette weiter - der Proxy deckt nur seine Region ab,
+    // und der Nutzer darf die Karte ueberallhin schieben.
+    if (proxyAktiv()) {
+      var proxyJob = proxyRegister(mmsi).catch(function () { return null; })
+        .then(function (data) {
+          if (!data) return null;
+          // Wurden die Zwischenspeicher inzwischen geleert, gehoert dieses
+          // Ergebnis zu einer vergangenen Welt - dann nicht mehr eintragen.
+          if (generation !== cacheGeneration) return null;
+          applyEnrichment(entry, data);
+          entry.enrichState = "done";
+          enrichCacheSet(mmsi, data, true, false);
+          delete enrichInFlight[mmsi];
+          if (selectedMmsi === mmsi) renderDetail(entry);
+          refreshVisibleShips();
+          return data;
+        });
+      enrichInFlight[mmsi] = proxyJob.then(function (data) {
+        return data ? data : enrichDirekt(mmsi, entry, force);
+      });
+      return enrichInFlight[mmsi];
+    }
+    return enrichDirekt(mmsi, entry, force);
+  }
+
+  // Der bisherige Weg: Digitraffic, Wikidata, Commons. Unveraendert - er
+  // traegt weiterhin alles ausserhalb der Proxyregion.
+  function enrichDirekt(mmsi, entry, force) {
+    var generation = cacheGeneration;
     // Wird gesetzt, wenn der Durchlauf ohne IMO lief und kein Bild fand.
     var unvollstaendig = false;
     var soft = function (e) {
@@ -5321,6 +5386,9 @@
   // Nach jedem Kartenschwenk (400 ms entprellt). Vier Ausstiege, jeder mit
   // eigenem Grund - siehe die Konstanten oben.
   function maybeLoadSnapshot() {
+    // Im Proxybetrieb ueberfluessig: Der Proxy schickt das Vollbild fuer den
+    // neuen Ausschnitt von selbst, sobald er die neue bbox bekommt.
+    if (proxyAktiv()) return;
     if (!autoSnapshotInput.checked) return;
     if (!vesselsApiBase()) return;
     if (!mapAvailable) return;
@@ -5361,6 +5429,7 @@
   }
 
   function snapshotTick() {
+    if (proxyAktiv()) return;
     if (!autoRefreshInput.checked) return;
     // Ein Tab im Hintergrund schaut niemand an. Ohne diese Zeile fragt ein
     // vergessenes Fenster tagelang jede Minute weiter.
@@ -5915,7 +5984,276 @@
   // Reads the current form values and (re-)sends a subscription on the
   // open socket. Used both for the initial connect and whenever the map
   // view changes, so the live subscription always tracks what's on screen.
+  /* --- Betrieb über den eigenen Proxy ---------------------------------
+
+     Statt direkt bei openwaters zu lesen, kann der Client seine Daten von
+     einem eigenen Proxy beziehen (siehe ../aisproxy). Der hält EINE
+     Upstream-Verbindung für alle Nutzer, führt sieben Tage Historie und
+     schickt nur noch Änderungen: gemessen 6,4 KB/min statt eines Vollbilds
+     je Abruf.
+
+     Der alte Weg bleibt die Vorgabe - umgeschaltet wird auf der
+     Technikseite. Beide Wege füllen denselben Schiffsdatensatz über
+     getShip()/setPosition(), damit alles darüber (Karte, Tabelle, Spuren,
+     Detailansicht) nichts davon merkt.
+  */
+  var PROXY_RUECKZUG_MS = [2000, 5000, 10000, 20000, 30000];
+  var proxySocket = null;
+  var proxyVersuch = 0;
+  var proxyWecker = null;
+  var proxyGewollt = false;
+  var proxyZaehler = { saetze: 0, bytes: 0, stamm: 0 };
+
+  function proxyAktiv() { return !!(proxyAnInput && proxyAnInput.checked); }
+
+  function proxyBasis() {
+    var u = ((proxyUrlInput && proxyUrlInput.value) || "").trim().replace(/\/+$/, "");
+    return u || PROXY_URL_VORGABE;
+  }
+
+  // Der Ausschnitt, den der Proxy liefern soll. Die bbox-Felder folgen der
+  // Karte ohnehin (updateBboxFieldsFromMap) - sie hier zu benutzen hält
+  // beide Wege auf demselben Stand.
+  function proxyBox() {
+    var t = [latMinInput.value, lonMinInput.value, latMaxInput.value, lonMaxInput.value]
+      .map(parseFloat);
+    if (t.some(isNaN)) return null;
+    return t.join(",");
+  }
+
+  // Spiegel von aisproxy/src/draht.js. 22 Byte je Schiff:
+  //   u32 mmsi │ i32 lat │ i32 lon │ u16 sog │ u16 cog │ u16 hdg │ u8 status
+  //   │ u8 flags │ u16 alter
+  // Ändert sich das Format dort, ändert es sich hier mit - sonst liest der
+  // Client Unsinn, ohne es zu merken.
+  var PROXY_SATZ = 22, PROXY_KOPF = 7, PROXY_TYP_DELTA = 0x01;
+  var PROXY_U16_LEER = 0xffff, PROXY_U8_LEER = 0xff;
+  var PROXY_FLAG_SEEZEICHEN = 1, PROXY_FLAG_LANDSTATION = 2, PROXY_FLAG_KLASSE_B = 4;
+
+  function proxyEntpacke(puffer) {
+    var dv = new DataView(puffer);
+    if (dv.byteLength < PROXY_KOPF) return null;
+    if (dv.getUint8(0) !== PROXY_TYP_DELTA) return null;
+    var n = dv.getUint16(5, true);
+    // Länge gegen die Anzahl prüfen: Ein halb gelesener Rahmen wäre sonst
+    // stillschweigend falsche Positionen auf der Karte.
+    if (dv.byteLength !== PROXY_KOPF + n * PROXY_SATZ) {
+      log("Proxy: Rahmenlänge passt nicht (" + dv.byteLength + " Byte für " + n + " Schiffe).");
+      return null;
+    }
+    var out = [];
+    for (var i = 0; i < n; i++) {
+      var o = PROXY_KOPF + i * PROXY_SATZ;
+      var sog = dv.getUint16(o + 12, true);
+      var cog = dv.getUint16(o + 14, true);
+      var hdg = dv.getUint16(o + 16, true);
+      var st = dv.getUint8(o + 18);
+      var alter = dv.getUint16(o + 20, true);
+      out.push({
+        mmsi: String(dv.getUint32(o, true)),
+        lat: dv.getInt32(o + 4, true) / 1e6,
+        lon: dv.getInt32(o + 8, true) / 1e6,
+        sog: sog === PROXY_U16_LEER ? null : sog / 10,
+        cog: cog === PROXY_U16_LEER ? null : cog / 10,
+        hdg: hdg === PROXY_U16_LEER ? null : hdg,
+        status: st === PROXY_U8_LEER ? null : st,
+        flags: dv.getUint8(o + 19),
+        alter: alter === PROXY_U16_LEER ? null : alter
+      });
+    }
+    return { rev: dv.getUint32(1, true), schiffe: out };
+  }
+
+  // Ein Positionssatz in denselben Datensatz, den auch Strom und Snapshot
+  // füllen.
+  function proxyUebernimm(s, jetzt) {
+    var entry = getShip(s.mmsi);
+    entry.total = entry.total || 0;
+    // Das Alter kommt RELATIV mit (Sekunden seit der Meldung). Absolute
+    // Zeitstempel wären an einer abweichenden Browseruhr gescheitert, und
+    // "jetzt" anzunehmen hätte Daten als taufrisch ausgewiesen, die im
+    // Median rund 31 s alt sind.
+    var stand = s.alter == null ? jetzt : jetzt - s.alter * 1000;
+    if (entry.updatedAt && stand < entry.updatedAt) return;
+
+    if (s.sog != null) entry.speed = s.sog;
+    if (s.cog != null) entry.course = s.cog;
+    if (s.hdg != null) entry.heading = s.hdg;
+    if (s.status != null) entry.navStatus = s.status;
+    if (s.flags & PROXY_FLAG_SEEZEICHEN) entry.station = entry.station || "Seezeichen";
+    if (s.flags & PROXY_FLAG_LANDSTATION) entry.station = entry.station || "Landstation";
+    if (s.flags & PROXY_FLAG_KLASSE_B) entry.aisClass = entry.aisClass || "B";
+    entry.snapshotSource = "proxy";
+
+    setPosition(entry, s.lat, s.lon, new Date(stand).toISOString());
+    entry.updatedAt = stand;
+    if (!entry.firstSeen || entry.updatedAt < entry.firstSeen) entry.firstSeen = entry.updatedAt;
+  }
+
+  // Stammdaten kommen als JSON und nur EINMAL je MMSI - deshalb dürfen sie
+  // hier nichts überschreiben, was der Nutzer schon sieht, sondern nur
+  // füllen.
+  function proxyStammdaten(liste) {
+    for (var i = 0; i < liste.length; i++) {
+      var d = liste[i];
+      var entry = getShip(String(d.mmsi));
+      if (d.name) entry.name = cleanText(d.name) || entry.name;
+      if (d.rufzeichen) entry.callSign = entry.callSign || cleanText(d.rufzeichen);
+      if (d.imo) entry.imo = entry.imo || String(d.imo);
+      if (d.ziel) entry.destination = entry.destination || cleanText(d.ziel);
+      if (d.typ != null && entry.typeCode == null) {
+        entry.typeCode = d.typ;
+        entry.typeLabel = shipTypeLabel(d.typ) || entry.typeLabel;
+        entry.typeDetail = shipTypeDetail(d.typ) || entry.typeDetail;
+      }
+      if (d.tiefgang && !entry.draught) entry.draught = d.tiefgang;
+      if (d.laenge && d.breite && !entry.size) {
+        entry.size = Math.round(d.laenge) + "×" + Math.round(d.breite);
+      }
+      rememberStatic(entry);
+      syncMarker(entry);
+      proxyZaehler.stamm++;
+    }
+  }
+
+  function proxyVerbinde() {
+    if (!proxyAktiv()) return;
+    var box = proxyBox();
+    if (!box) { log("Proxy: keine gültige Bounding-Box."); return; }
+    var basis = proxyBasis();
+    if (!/^https?:\/\//i.test(basis)) {
+      log("Proxy: die Adresse muss mit http:// oder https:// beginnen.");
+      setStatus("error", "Proxy-Adresse ungültig");
+      return;
+    }
+    proxyGewollt = true;
+    clearTimeout(proxyWecker);
+    var url = basis.replace(/^http/i, "ws") + "/live?bbox=" + encodeURIComponent(box) + "&takt=2000";
+    setStatus("", "verbinde mit Proxy…");
+    connectBtn.disabled = true;
+
+    var ws;
+    try { ws = new WebSocket(url); }
+    catch (e) { log("Proxy: Verbindung nicht möglich - " + e.message); return; }
+    proxySocket = ws;
+    // Ohne das kommen die Binärrahmen als Blob und müssten erst asynchron
+    // gelesen werden - mitten im Takt genau das, was man nicht will.
+    ws.binaryType = "arraybuffer";
+
+    ws.onopen = function () {
+      proxyVersuch = 0;
+      setStatus("connected", "verbunden (Proxy)");
+      disconnectBtn.disabled = false;
+      log("Proxy verbunden: " + basis);
+    };
+
+    ws.onmessage = function (evt) {
+      if (typeof evt.data === "string") {
+        var o;
+        try { o = JSON.parse(evt.data); } catch (e) { return; }
+        proxyZaehler.bytes += evt.data.length;
+        if (o.typ === "stamm" && o.schiffe) proxyStammdaten(o.schiffe);
+        else if (o.typ === "weg" && o.mmsi) {
+          for (var i = 0; i < o.mmsi.length; i++) {
+            var mmsi = String(o.mmsi[i]);
+            var e = ships.get(mmsi);
+            if (!e) continue;
+            if (e.marker && mapAvailable) map.removeLayer(e.marker);
+            e.marker = null;
+            ships.delete(mmsi);
+            if (selectedMmsi === mmsi) closeDetail();
+            if (markierteMmsi === mmsi) markierteMmsi = null;
+          }
+        }
+        refreshVisibleShips();
+        return;
+      }
+      var rahmen = proxyEntpacke(evt.data);
+      if (!rahmen) return;
+      proxyZaehler.bytes += evt.data.byteLength;
+      proxyZaehler.saetze += rahmen.schiffe.length;
+      msgCount += rahmen.schiffe.length;
+      msgCountEl.textContent = msgCount;
+      var jetzt = Date.now();
+      for (var k = 0; k < rahmen.schiffe.length; k++) proxyUebernimm(rahmen.schiffe[k], jetzt);
+      applyMapFilter();
+      refreshVisibleShips();
+    };
+
+    ws.onerror = function () { log("Proxy: Verbindungsfehler."); };
+
+    ws.onclose = function (evt) {
+      proxySocket = null;
+      if (!proxyGewollt) {
+        setStatus("", "nicht verbunden");
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+        return;
+      }
+      var warte = PROXY_RUECKZUG_MS[Math.min(proxyVersuch, PROXY_RUECKZUG_MS.length - 1)];
+      proxyVersuch++;
+      setStatus("", "warte auf Wiederverbindung…");
+      log("Proxy getrennt (Code " + evt.code + "), neuer Versuch in " + (warte / 1000) + " s.");
+      proxyWecker = setTimeout(proxyVerbinde, warte);
+    };
+  }
+
+  function proxyTrennen() {
+    proxyGewollt = false;
+    clearTimeout(proxyWecker);
+    proxyWecker = null;
+    if (proxySocket) { try { proxySocket.close(1000, "Client"); } catch (e) {} }
+    proxySocket = null;
+  }
+
+  // Beim Schwenken der Karte: neuen Ausschnitt schicken statt neu zu
+  // verbinden. Der Proxy setzt den Client dabei zurück auf rev 0 und
+  // liefert das Vollbild für den neuen Bereich.
+  function proxyAusschnitt() {
+    if (!proxySocket || proxySocket.readyState !== 1) return;
+    var box = proxyBox();
+    if (!box) return;
+    proxySocket.send(JSON.stringify({ bbox: box }));
+  }
+
+  // Stammdaten und Register in einem Zug: Der Proxy hat den ganzen Bestand
+  // vorgewärmt, die Antwort kommt also ohne Wartezeit. Findet er nichts,
+  // läuft die gewohnte Kette (Digitraffic/Wikidata/Commons) als Rückfall.
+  function proxyRegister(mmsi) {
+    return fetch(proxyBasis() + "/ship/" + encodeURIComponent(mmsi))
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (d) {
+        if (!d || d.register !== "gefunden") return null;
+        var out = { sources: ["Proxy"] };
+        if (d.name) out.name = d.name;
+        if (d.imo) out.imo = String(d.imo);
+        if (d.rufzeichen) out.callSign = d.rufzeichen;
+        if (d.laenge) out.loa = d.laenge;
+        if (d.breite) out.beam = d.breite;
+        if (d.tiefgang) out.draft = d.tiefgang;
+        if (d.brz) out.gt = d.brz;
+        if (d.baujahr) out.built = d.baujahr;
+        if (d.eigner) out.owner = d.eigner;
+        if (d.betreiber) out.operator = d.betreiber;
+        if (d.werft) out.builder = d.werft;
+        if (d.flagge) out.flag = d.flagge;
+        if (d.heimathafen) out.homeport = d.heimathafen;
+        if (d.wd_entity) out.entity = d.wd_entity;
+        if (d.foto) {
+          // Der Proxy liefert einen relativen Pfad - und das Bild liegt dort
+          // schon auf Anzeigebreite verkleinert.
+          out.image = proxyBasis().replace(/\/v1$/, "") + d.foto;
+          out.imageCredit = { artist: d.foto_credit || null, licence: null, page: null };
+        }
+        return out;
+      });
+  }
+
   function sendSubscription() {
+    if (proxyAktiv()) return;
     if (!socket || socket.readyState !== 1 /* OPEN */) return;
 
     var apiKey = apiKeyInput.value.trim();
@@ -5973,6 +6311,10 @@
     }
     manualDisconnect = false;
 
+    // Im Proxybetrieb gibt es weder Server-URL noch API-Key - beides haelt
+    // der Proxy. Deshalb die Weiche ganz vorn, vor jeder Pruefung.
+    if (proxyAktiv()) { proxyVerbinde(); return; }
+
     var serverUrl = serverUrlInput.value.trim();
     if (!serverUrl) {
       alert("Bitte eine Server-URL eingeben.");
@@ -6028,6 +6370,14 @@
 
   function disconnect() {
     manualDisconnect = true;
+    if (proxyAktiv() || proxySocket) {
+      proxyTrennen();
+      setStatus("", "nicht verbunden");
+      connectBtn.disabled = false;
+      disconnectBtn.disabled = true;
+      log("Proxy-Verbindung beendet.");
+      if (!socket) return;
+    }
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
@@ -6472,6 +6822,40 @@
     if (ownPosInput.checked) startOwnPos(); else stopOwnPos();
   });
 
+  // Umschalten wirkt sofort: Der eine Weg wird abgeraeumt, der andere
+  // aufgebaut. Ein Neuladen zu verlangen waere unnoetig - und wer es doch
+  // tut, landet dank localStorage im selben Zustand.
+  function proxyUmschalten() {
+    localStorage.setItem("aisstream_proxy_an", proxyAnInput.checked ? "1" : "0");
+    if (proxyAnInput.checked) {
+      if (socket) { manualDisconnect = true; socket.close(1000, "Wechsel auf Proxy"); }
+      log("Proxybetrieb eingeschaltet: " + proxyBasis());
+      connect();
+    } else {
+      proxyTrennen();
+      setStatus("", "nicht verbunden");
+      connectBtn.disabled = false;
+      disconnectBtn.disabled = true;
+      log("Proxybetrieb ausgeschaltet - wieder der direkte Weg.");
+      // Nicht von selbst neu verbinden: Der direkte Weg braucht einen
+      // API-Key, und den kommentarlos einzufordern waere unhoeflich.
+      if (autoConnectInput.checked && apiKeyInput.value.trim()) connect();
+      else maybeLoadSnapshot();
+    }
+  }
+
+  proxyAnInput.addEventListener("change", proxyUmschalten);
+
+  proxyUrlInput.addEventListener("change", function () {
+    var wert = proxyUrlInput.value.trim().replace(/\/+$/, "");
+    if (!wert) wert = PROXY_URL_VORGABE;
+    proxyUrlInput.value = wert;
+    localStorage.setItem("aisstream_proxy_url", wert);
+    // Laeuft gerade eine Verbindung zur alten Adresse, gehoert sie erneuert -
+    // sonst wirkt die Aenderung erst beim naechsten Verbindungsabriss.
+    if (proxyAktiv() && proxySocket) { proxyTrennen(); proxyVerbinde(); }
+  });
+
   showLabelsInput.addEventListener("change", function () {
     localStorage.setItem("aisstream_show_labels", showLabelsInput.checked ? "1" : "0");
     refreshAllLabels();
@@ -6567,7 +6951,12 @@
   if (autoConnectInput.checked) {
     // Never auto-connect without a stored key - connect() would pop an
     // alert on every single page load, which is worse than doing nothing.
-    if (apiKeyInput.value.trim()) {
+    // Im Proxybetrieb faellt die Bedingung weg: Dort haelt der Proxy den
+    // Schluessel, der Client braucht keinen.
+    if (proxyAktiv()) {
+      log("Automatische Verbindung beim Laden (Proxy)…");
+      connect();
+    } else if (apiKeyInput.value.trim()) {
       log("Automatische Verbindung beim Laden…");
       connect();
     } else {

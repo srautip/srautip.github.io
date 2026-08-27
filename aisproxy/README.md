@@ -100,8 +100,8 @@ Alles über Umgebungsvariablen, Vorgaben in `src/konfig.js`.
 ## Tests
 
 ```bash
-npm test                       # 44 Prüfungen, offline, ~1,6 s
-node test/live.test.js 120     # gegen den echten Upstream, ~2,5 min
+npm test                       # 45 Prüfungen, offline, ~1,6 s
+node test/live.js 120     # gegen den echten Upstream, ~2,5 min
 node test/register.live.js     # gegen Wikidata/Digitraffic/Commons
 ```
 

@@ -6,13 +6,20 @@
 // Upstreams rund 310 Byte. 20 Byte sind Faktor 15 - und das entscheidet
 // darueber, ob ein Zwei-Sekunden-Takt auf dem Handy vertretbar ist oder nicht.
 //
-//   u32 mmsi │ i32 lat │ i32 lon │ u16 sog │ u16 cog │ u16 hdg │ u8 status │ u8 flags
+//   u32 mmsi │ i32 lat │ i32 lon │ u16 sog │ u16 cog │ u16 hdg │ u8 status │ u8 flags │ u16 alter
 //
 // lat/lon als Grad x 1e6: 11 cm Aufloesung, und +-180e6 passt bequem in i32.
 // Namen und Stammdaten reisen NICHT hier mit - die aendern sich fast nie und
 // gehen einmal je MMSI als JSON hinueber.
+//
+// `alter` sind SEKUNDEN SEIT DER MELDUNG, nicht ein Zeitstempel. Zwei Gruende:
+// Ein relativer Wert ist gegen abweichende Uhren im Browser immun, und 18
+// Stunden Spanne passen in zwei Byte. Ohne dieses Feld muesste der Client
+// "jetzt" annehmen und zeigte damit Daten als taufrisch an, die gemessen im
+// Median 31 s alt sind - genau die Vortaeuschung, die der Entwurf ausdruecklich
+// vermeiden wollte.
 
-const SATZ = 20;
+const SATZ = 22;
 
 // Sentinels auf der Leitung. null wird zu diesen Werten, und der Client macht
 // daraus wieder null. Ein eigenes Anwesenheitsbit je Feld waere sparsamer,
@@ -33,6 +40,8 @@ function schreibe(buf, off, s) {
   buf.writeUInt16LE(s.hdg == null ? U16_LEER : Math.min(0xfffe, Math.round(s.hdg)), off + 16);
   buf.writeUInt8(s.status == null ? U8_LEER : (s.status & 0xff), off + 18);
   buf.writeUInt8((s.flags || 0) & 0xff, off + 19);
+  buf.writeUInt16LE(s.alter == null ? U16_LEER
+    : Math.max(0, Math.min(0xfffe, Math.round(s.alter))), off + 20);
 }
 
 function lies(buf, off) {
@@ -40,6 +49,7 @@ function lies(buf, off) {
   const cog = buf.readUInt16LE(off + 14);
   const hdg = buf.readUInt16LE(off + 16);
   const st = buf.readUInt8(off + 18);
+  const alter = buf.readUInt16LE(off + 20);
   return {
     mmsi: buf.readUInt32LE(off),
     lat: buf.readInt32LE(off + 4) / 1e6,
@@ -48,7 +58,8 @@ function lies(buf, off) {
     cog: cog === U16_LEER ? null : cog / 10,
     hdg: hdg === U16_LEER ? null : hdg,
     status: st === U8_LEER ? null : st,
-    flags: buf.readUInt8(off + 19)
+    flags: buf.readUInt8(off + 19),
+    alter: alter === U16_LEER ? null : alter
   };
 }
 

@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node src/index.js",
     "test": "node --test test/",
-    "test:live": "node test/live.test.js"
+    "test:live": "node test/live.js"
   },
   "dependencies": {
     "ws": "^8.18.0"

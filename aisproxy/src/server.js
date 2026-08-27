@@ -121,7 +121,7 @@ class Server {
       rev: this.zustand.rev,
       zeit: Date.now(),
       anzahl: schiffe.length,
-      schiffe: schiffe.map(s => Object.assign(Zustand.alsStamm(s), Zustand.alsDraht(s)))
+      schiffe: schiffe.map(s => Object.assign(Zustand.alsStamm(s), Zustand.alsDraht(s, Date.now())))
     });
   }
 
@@ -163,7 +163,7 @@ class Server {
     const stamm = this.speicher.stammHole(mmsi);
     if (!heiss && !stamm) return jsonAus(res, 404, { fehler: "unbekannte MMSI" });
     const antwort = Object.assign({ mmsi }, stamm || {});
-    if (heiss) Object.assign(antwort, Zustand.alsStamm(heiss), Zustand.alsDraht(heiss));
+    if (heiss) Object.assign(antwort, Zustand.alsStamm(heiss), Zustand.alsDraht(heiss, Date.now()));
     if (stamm && stamm.foto_datei) antwort.foto = "/v1/foto/" + stamm.foto_datei;
     // Ehrlichkeit ueber den Registerstand: "noch nicht gefragt" und
     // "gefragt, nichts gefunden" sind zwei verschiedene Dinge.
@@ -258,7 +258,8 @@ class Server {
       for (const m of weg) c.bekannt.delete(m);
     }
     if (geaendert.length) {
-      const rahmen = draht.packe(stand, geaendert.map(Zustand.alsDraht));
+      const jetzt = Date.now();
+      const rahmen = draht.packe(stand, geaendert.map(s => Zustand.alsDraht(s, jetzt)));
       c.ws.send(rahmen);
       c.bytes += rahmen.length;
       c.gesendet += geaendert.length;
