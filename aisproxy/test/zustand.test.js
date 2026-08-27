@@ -116,3 +116,29 @@ test("lineares Durchsehen traegt die Regionsgroesse - deshalb kein zweiter Index
   assert.ok(jeDurchlauf < 5, "unter 5 ms (gemessen " + jeDurchlauf.toFixed(3) + ")");
   assert.ok(n >= 0);
 });
+
+test("die Stammdaten tragen die vier Bezugspunkte, nicht nur die Summen", () => {
+  // Der Client zeichnet den Rumpf aus A/B/C/D und rechnet daraus
+  // Groessenklasse und Verdraengung. Solange der Proxy nur laenge/breite
+  // schickte, stand jedes Schiff, das der Client nur ueber den Proxy kannte,
+  // als "ohne bekannte Masse" auf der Karte - waehrend die Tabelle daneben
+  // "400×61" anzeigte. Gemessen an einem echten Proxy: 80 von 80 Markern
+  // ohne Rumpf, obwohl der Proxy die Masse von 10 dieser Schiffe kannte.
+  const ais = require("../src/ais");
+  const z = neu();
+  z.melde(211000001, Object.assign({ lat: 54, lon: 8 },
+    ais.masseFelder({ A: 350, B: 50, C: 30, D: 31 })), 1000, "strom");
+  const s = Zustand.alsStamm(z.hole(211000001));
+  assert.strictEqual(s.laenge, 400);
+  assert.strictEqual(s.breite, 61);
+  assert.deepStrictEqual(s.dim, { A: 350, B: 50, C: 30, D: 31 });
+
+  // Und ohne Angabe bleibt es leer statt auf einem Nullobjekt zu bestehen:
+  // {A:0,B:0,C:0,D:0} ist truthy, genau daran ist der Client schon einmal
+  // haengengeblieben (usableDim in aisstream/index.html).
+  z.melde(211000002, { lat: 54, lon: 8 }, 1000, "strom");
+  assert.strictEqual(Zustand.alsStamm(z.hole(211000002)).dim, null);
+  z.melde(211000003, Object.assign({ lat: 54, lon: 8 },
+    ais.masseFelder({ A: 0, B: 0, C: 0, D: 0 }) || {}), 1000, "strom");
+  assert.strictEqual(Zustand.alsStamm(z.hole(211000003)).dim, null);
+});

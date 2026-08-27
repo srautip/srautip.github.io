@@ -2258,6 +2258,9 @@
       var l = (Number(entry.dim.A) || 0) + (Number(entry.dim.B) || 0);
       if (l) return l;
     }
+    // Aus dem Proxy, wenn er nur die Summen kennt. Vor dem Register: beides
+    // ist dieselbe AIS-Quelle, nur ohne Antennenabstaende.
+    if (entry.aisLoa) return Number(entry.aisLoa) || null;
     if (entry.enrich) {
       if (entry.enrich.dt && entry.enrich.dt.length) return entry.enrich.dt.length;
       if (entry.enrich.loa) return entry.enrich.loa;
@@ -3351,7 +3354,8 @@
   var STATIC_MAX = 2000;
   var STATIC_SAVE_DEBOUNCE = 3000;
   var STATIC_FIELDS = ["name", "callSign", "imo", "typeCode", "typeLabel",
-    "typeDetail", "size", "aisClass", "vendor", "serial", "station"];
+    "typeDetail", "size", "aisClass", "vendor", "serial", "station",
+    "aisLoa", "aisBeam"];
   var STATIC_INLAND_FIELDS = ["eni", "eriCode", "eriLabel", "eriLength", "eriBeam"];
 
   var staticCache = {};
@@ -6163,9 +6167,9 @@
   function capacityEstimate(entry) {
     var dim = entry.dim;
     var length = entry.inland && entry.inland.eriLength ? entry.inland.eriLength
-      : (dim ? (Number(dim.A) || 0) + (Number(dim.B) || 0) : 0);
+      : (dim ? (Number(dim.A) || 0) + (Number(dim.B) || 0) : Number(entry.aisLoa) || 0);
     var beam = entry.inland && entry.inland.eriBeam ? entry.inland.eriBeam
-      : (dim ? (Number(dim.C) || 0) + (Number(dim.D) || 0) : 0);
+      : (dim ? (Number(dim.C) || 0) + (Number(dim.D) || 0) : Number(entry.aisBeam) || 0);
     if (!length || !beam) return {};
 
     var draught = Number(entry.draught) || 0;
@@ -6759,6 +6763,21 @@
         entry.typeDetail = shipTypeDetail(d.typ) || entry.typeDetail;
       }
       if (d.tiefgang && !entry.draught) entry.draught = d.tiefgang;
+      // Die Masse gehoert nach entry.dim - daraus baut die Karte den Marker
+      // und capacityEstimate die Groessenklasse. Hier stand frueher NUR
+      // entry.size: Die Tabellenspalte war gefuellt, und dieselben Schiffe
+      // standen auf der Karte als "ohne bekannte Masse". Aufgefallen ist es
+      // erst, als jemand den lokalen Zwischenspeicher leerte - vorher kamen
+      // die Bezugspunkte aus dem direkten AIS-Empfang und blieben im Cache.
+      if (!usableDim(entry.dim)) {
+        if (usableDim(d.dim)) entry.dim = d.dim;
+        else if (d.laenge && d.breite) {
+          // Aeltere Proxystaende schicken nur die Summen. Zum Zeichnen reicht
+          // das; die Antennenabstaende fehlen dann - erfunden werden sie nicht.
+          entry.aisLoa = d.laenge;
+          entry.aisBeam = d.breite;
+        }
+      }
       if (d.laenge && d.breite && !entry.size) {
         entry.size = Math.round(d.laenge) + "×" + Math.round(d.breite);
       }

@@ -64,9 +64,9 @@ class Register {
         // draught kommt in Dezimetern (68 = 6,8 m), Masse in Metern.
         if (v.draught) felder.tiefgang = v.draught / 10;
         if (v.shipType != null) felder.typ = Number(v.shipType);
-        const m = ais.masse({ A: v.referencePointA, B: v.referencePointB,
-                              C: v.referencePointC, D: v.referencePointD });
-        if (m) { felder.laenge = m.laenge; felder.breite = m.breite; }
+        const m = ais.masseFelder({ A: v.referencePointA, B: v.referencePointB,
+                                    C: v.referencePointC, D: v.referencePointD });
+        if (m) Object.assign(felder, m);
         // Nur eintragen, was uns betrifft - der Bestand ist ostseeweit.
         if (!this.zustand.hole(v.mmsi)) continue;
         this.speicher.stammSetze(v.mmsi, felder);

@@ -52,6 +52,18 @@ function masse(dim) {
   return { laenge, breite, a, b, c, d };
 }
 
+// Die Felder, wie sie in den Zustand wandern. A/B/C/D sind die Abstaende der
+// Antenne von Bug/Heck/Backbord/Steuerbord - der Client zeichnet daraus die
+// Rumpfform und rechnet Verdraengung und Groessenklasse aus. Frueher hat der
+// Proxy nur die Summen behalten; im Client blieben die Schiffe deshalb "ohne
+// bekannte Masse", sobald sein eigener Zwischenspeicher leer war.
+function masseFelder(dim) {
+  const m = masse(dim);
+  if (!m) return null;
+  return { laenge: m.laenge, breite: m.breite,
+           dimA: m.a, dimB: m.b, dimC: m.c, dimD: m.d };
+}
+
 // AIS packt die ETA in einen Integer: month<<16 | day<<11 | hour<<6 | minute.
 // Der Proxy speichert diesen Rohwert und rechnet ihn nicht um - die
 // Beschriftung ist Sache des Clients. Geprueft wird nur der Sentinel, damit
@@ -105,6 +117,6 @@ function zellen(box) {
 }
 
 module.exports = {
-  sogNormal, cogNormal, headingNormal, masse, etaRoh, textSauber,
+  sogNormal, cogNormal, headingNormal, masse, masseFelder, etaRoh, textSauber,
   positionGueltig, inBox, zelle, zellen, GITTER, ETA_LEER
 };
