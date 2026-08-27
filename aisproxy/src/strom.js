@@ -220,6 +220,11 @@ function uebersetze(o) {
       if (m) Object.assign(felder, m);
     }
   } else if (typ === "ShipStaticData" && msg) {
+    // Alles, was Msg 5 traegt. Frueher standen hier nur die Felder, die die
+    // Tabelle im Client fuellen - Geraetetyp, AIS-Fassung und das
+    // DTE-Bit fielen unter den Tisch, und ueber den Proxy wusste der Client
+    // nicht einmal, ob ein Schiff Klasse A oder B faehrt.
+    felder.klasse = "A";
     const n = ais.textSauber(msg.Name); if (n) felder.name = n;
     const c = ais.textSauber(msg.CallSign); if (c) felder.rufzeichen = c;
     if (msg.ImoNumber) felder.imo = Number(msg.ImoNumber);
@@ -227,22 +232,54 @@ function uebersetze(o) {
     const eta = etaZahl(msg.Eta); if (eta != null) felder.eta = eta;
     if (msg.MaximumStaticDraught) felder.tiefgang = Number(msg.MaximumStaticDraught);
     if (msg.Type != null) felder.typ = Number(msg.Type);
+    // aisstream schreibt FixType, aeltere Faelle Fixtype - beides annehmen,
+    // sonst bleibt die Spalte leer und niemand merkt es.
+    const g = geraeteTyp(msg); if (g != null) felder.geraet = g;
+    if (msg.AisVersion != null) felder.aisVersion = Number(msg.AisVersion);
+    if (msg.Dte != null) felder.dte = msg.Dte ? 1 : 0;
     const m = ais.masseFelder(msg.Dimension);
     if (m) Object.assign(felder, m);
   } else if (typ === "StaticDataReport" && msg) {
     // Class B verteilt seine Statik auf Teil A (Name) und Teil B (Rufzeichen,
-    // Typ, Masse).
+    // Typ, Masse, Transponder). Teil B traegt statt der Masse ein
+    // Mutterschiff, wenn das Geraet an einem Beiboot haengt - dann ist die
+    // Dimension leer, und das ist kein Fehler.
     const a = msg.ReportA || {}, b = msg.ReportB || {};
+    felder.klasse = "B";
     const n = ais.textSauber(a.Name); if (n) felder.name = n;
-    const c = ais.textSauber(b.CallSign); if (c) felder.rufzeichen = c;
-    if (b.ShipType != null) felder.typ = Number(b.ShipType);
-    const m = ais.masseFelder(b.Dimension);
-    if (m) Object.assign(felder, m);
+    // Teil A und Teil B kommen als ZWEI Nachrichten, und die jeweils andere
+    // Haelfte ist dann mit Nullen gefuellt und traegt Valid: false. Ohne
+    // diesen Riegel setzte jede Teil-A-Meldung den Schiffstyp auf 0
+    // ("keine Angabe") - ein bekannter Typ ging dabei verloren. Nachgesehen
+    // an echten Nachrichten: ReportB {CallSign:"", ShipType:0, Valid:false}.
+    if (b.Valid !== false) {
+      const c = ais.textSauber(b.CallSign); if (c) felder.rufzeichen = c;
+      if (b.ShipType) felder.typ = Number(b.ShipType);
+      // Die Schreibweise stammt von aisstream und ist samt Tippfehler echt:
+      // VenderIDModel/VenderIDSerial. Geraten hatte ich UnitModelCode und
+      // SerialNumber - beide Spalten blieben in der Messung leer, 0 von 2775.
+      const h = ais.textSauber(b.VendorIDName); if (h) felder.hersteller = h;
+      const mo = b.VenderIDModel != null ? b.VenderIDModel : b.UnitModelCode;
+      if (mo) felder.modell = String(mo);
+      const sn = b.VenderIDSerial != null ? b.VenderIDSerial : b.SerialNumber;
+      if (sn) felder.seriennr = String(sn);
+      const g = geraeteTyp(b); if (g) felder.geraet = g;
+      const m = ais.masseFelder(b.Dimension);
+      if (m) Object.assign(felder, m);
+    }
   } else {
     return Object.keys(felder).length ? { mmsi, felder, stand, hatPosition } : null;
   }
 
   return { mmsi, felder, stand, hatPosition };
+}
+
+// Der Typ des Positionsgeraets (1 = GPS, 3 = Loran, 15 = intern). aisstream
+// schreibt ihn je nach Nachricht als FixType oder Fixtype - der Client nimmt
+// aus demselben Grund beide Schreibweisen.
+function geraeteTyp(msg) {
+  const v = msg.FixType != null ? msg.FixType : msg.Fixtype;
+  return v == null ? null : Number(v);
 }
 
 // AIS liefert die ETA im Strom als Objekt, Digitraffic als gepackten Integer.

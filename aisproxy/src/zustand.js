@@ -46,6 +46,8 @@ class Zustand {
             name: null, rufzeichen: null, imo: null, typ: null,
             laenge: null, breite: null, tiefgang: null, ziel: null, eta: null,
             dimA: null, dimB: null, dimC: null, dimD: null,
+            klasse: null, geraet: null, aisVersion: null, dte: null,
+            hersteller: null, modell: null, seriennr: null,
             stammRev: 0 };
       this.schiffe.set(mmsi, s);
     }
@@ -63,7 +65,9 @@ class Zustand {
     let stammGeaendert = false;
     const POSITION = ["lat", "lon", "sog", "cog", "hdg", "status", "flags"];
     const STAMM = ["name", "rufzeichen", "imo", "typ", "laenge", "breite",
-                   "tiefgang", "ziel", "eta", "dimA", "dimB", "dimC", "dimD"];
+                   "tiefgang", "ziel", "eta", "dimA", "dimB", "dimC", "dimD",
+                   "klasse", "geraet", "aisVersion", "dte",
+                   "hersteller", "modell", "seriennr"];
 
     for (const k of POSITION) {
       if (felder[k] === undefined) continue;
@@ -161,6 +165,12 @@ class Zustand {
              dim: s.dimA == null && s.dimB == null ? null
                 : { A: s.dimA || 0, B: s.dimB || 0, C: s.dimC || 0, D: s.dimD || 0 },
              tiefgang: s.tiefgang, ziel: s.ziel, eta: s.eta,
+             // Der Rest von Msg 5 und 24. Der Client zeigt Klasse, Geraet,
+             // Hersteller und Seriennummer im Detailfenster; ueber den Proxy
+             // fehlten sie ihm bisher ganz.
+             klasse: s.klasse, geraet: s.geraet, aisVersion: s.aisVersion,
+             dte: s.dte, hersteller: s.hersteller, modell: s.modell,
+             seriennr: s.seriennr,
              seen: s.seen, quelle: s.quelle };
   }
 

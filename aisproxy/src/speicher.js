@@ -40,7 +40,9 @@ const TAG_MS = 24 * 3600 * 1000;
 // Schreiber, der beide Seiten anfasst, ueberschreibt frueher oder spaeter die
 // eine mit dem Nichtwissen der anderen.
 const STAMM_SPALTEN = ["name", "rufzeichen", "imo", "typ", "laenge", "breite",
-  "dimA", "dimB", "dimC", "dimD", "tiefgang", "ziel", "eta"];
+  "dimA", "dimB", "dimC", "dimD", "tiefgang", "ziel", "eta",
+  "klasse", "geraet", "aisVersion", "dte",
+  "hersteller", "modell", "seriennr"];
 
 function tagName(ms) {
   const d = new Date(ms);
@@ -100,6 +102,13 @@ class Speicher {
     // Die Bezugspunkte der Antenne. SQLite kennt kein "ADD COLUMN IF NOT
     // EXISTS", deshalb der Umweg ueber spalteErgaenzen.
     for (const k of ["dimA", "dimB", "dimC", "dimD"]) this.spalteErgaenzen("schiff", k, "REAL");
+    // Der Rest der Statik aus Msg 5 und 24.
+    for (const [k, t] of [["klasse", "TEXT"], ["geraet", "INTEGER"],
+                          ["aisVersion", "INTEGER"], ["dte", "INTEGER"],
+                          ["hersteller", "TEXT"], ["modell", "TEXT"],
+                          ["seriennr", "TEXT"]]) {
+      this.spalteErgaenzen("schiff", k, t);
+    }
     this.spalteErgaenzen("schiff", "gesehen", "INTEGER");
     this.spalteErgaenzen("schiff", "foto_geprueft", "INTEGER DEFAULT 0");
     this.spalteErgaenzen("schiff", "foto_quelle", "TEXT");
@@ -393,6 +402,8 @@ class Speicher {
     const vorhanden = this.stammHole(mmsi);
     const erlaubt = ["name", "rufzeichen", "imo", "typ", "laenge", "breite", "tiefgang",
       "dimA", "dimB", "dimC", "dimD", "gesehen",
+      "klasse", "geraet", "aisVersion", "dte",
+      "hersteller", "modell", "seriennr",
       "ziel", "eta", "wd_entity", "brz", "baujahr", "eigner", "betreiber", "werft",
       "flagge", "heimathafen", "foto_datei", "foto_credit", "foto_seite",
       "foto_quelle", "foto_geprueft", "quelle", "gefunden", "geprueft"];

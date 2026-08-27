@@ -41,7 +41,9 @@ async function start() {
     name: r.name, rufzeichen: r.rufzeichen, imo: r.imo, typ: r.typ,
     laenge: r.laenge, breite: r.breite, tiefgang: r.tiefgang,
     dimA: r.dimA, dimB: r.dimB, dimC: r.dimC, dimD: r.dimD,
-    ziel: r.ziel, eta: r.eta
+    ziel: r.ziel, eta: r.eta,
+    klasse: r.klasse, geraet: r.geraet, aisVersion: r.aisVersion, dte: r.dte,
+    hersteller: r.hersteller, modell: r.modell, seriennr: r.seriennr
   });
   for (const mmsi of zustand.schiffe.keys()) {
     const s = speicher.stammHole(mmsi);
