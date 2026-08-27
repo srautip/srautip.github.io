@@ -54,11 +54,23 @@ if [[ ! -f "$ZIEL/.env" ]]; then
   # fuer den Proxy dahinter.
   PASSWORT="$(head -c 18 /dev/urandom | base64 | tr -d '/+=' | head -c 20)"
   ZUGANG="$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 32)"
-  HASH="$(docker run --rm caddy:2-alpine caddy hash-password --plaintext "$PASSWORT")"
+  HASH="$(docker run --rm caddy:2-alpine caddy hash-password --plaintext "$PASSWORT" < /dev/null)"
+  if [[ -z "$HASH" ]]; then
+    echo "    Passwort-Hash konnte nicht erzeugt werden - Caddy bekommt keine Basic-Auth."
+    echo "    Von Hand nachholen: docker run --rm caddy:2-alpine caddy hash-password"
+  fi
+  # Bcrypt-Hashes stecken voller Dollarzeichen ($2a$14$...), und Docker Compose
+  # deutet ein $ in der .env als Variable - der Hash kaeme zerstueckelt beim
+  # Container an und JEDE Anmeldung schluege fehl, auch die richtige. Genau das
+  # ist beim ersten Deployment passiert. Verdoppeln macht daraus ein Literal.
+  # ACHTUNG bei der Schreibweise: ${HASH//$/$$} sieht richtig aus, ist es aber
+  # nicht - $$ expandiert in bash zur Prozess-ID, und der Hash kaeme als
+  # "102942a10294..." heraus. Die Dollarzeichen muessen maskiert werden.
+  HASH_ESC="${HASH//\$/\$\$}"
   cat > "$ZIEL/.env" <<EOF
 AIS_DOMAIN=$DOMAIN
 AIS_BENUTZER=$BENUTZER
-AIS_PASSWORT_HASH=$HASH
+AIS_PASSWORT_HASH=$HASH_ESC
 AIS_ZUGANG=$ZUGANG
 AIS_TOKEN=
 EOF
@@ -90,7 +102,7 @@ echo "Warte auf den ersten Snapshot (bis zu 60 s) …"
 for i in $(seq 1 30); do
   sleep 5
   if docker compose exec -T proxy node -e \
-      "fetch('http://127.0.0.1:8080/v1/status').then(r=>r.json()).then(s=>{console.log(s.schiffe+' Schiffe, '+(s.strom.verbunden?'Strom steht':'Strom fehlt noch'));process.exit(s.schiffe>0?0:1)}).catch(()=>process.exit(1))" 2>/dev/null; then
+      "fetch('http://127.0.0.1:8080/v1/status').then(r=>r.json()).then(s=>{console.log(s.schiffe+' Schiffe, '+(s.strom.verbunden?'Strom steht':'Strom fehlt noch'));process.exit(s.schiffe>0?0:1)}).catch(()=>process.exit(1))" < /dev/null 2>/dev/null; then
     echo
     echo "Fertig. https://$DOMAIN/v1/status"
     [[ -f "$ZIEL/zugangsdaten.txt" ]] && cat "$ZIEL/zugangsdaten.txt"
