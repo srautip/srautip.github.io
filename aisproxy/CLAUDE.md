@@ -281,6 +281,37 @@ Proxy: nach 3 min 155 von 2 791 Schiffen mit Masse, nach 13 min 668, danach
 nur noch rund 10 je Minute - der Rest sind Fahrzeuge, die selten oder gar
 keine Abmessungen senden.
 
+### Was alles aus Msg 5 und Msg 24 kommt
+
+Seit dem 27. Aug. 2026 uebernimmt der Proxy die **ganze** Statik, nicht mehr
+nur die Felder, die im Client eine Tabellenspalte fuellen:
+
+| aus dem Strom | Spalte | im Snapshot (2 775 Schiffe, 4 min) |
+|---|---|---|
+| Msg 5 / 24 | `klasse` (A/B) | 455 |
+| `FixType` (Msg 5 und ReportB) | `geraet` | 347 |
+| `AisVersion` | `aisVersion` | 337 |
+| `Dte` | `dte` (0/1) | 337 |
+| `VendorIDName` | `hersteller` | 17 |
+| `VenderIDModel` | `modell` | 14 |
+| `VenderIDSerial` | `seriennr` | 16 |
+
+**Die Feldnamen stehen so im Feed, samt Tippfehler:** `VenderIDModel` und
+`VenderIDSerial`. Zuerst hatte ich `UnitModelCode` und `SerialNumber` aus dem
+Schema abgeschrieben - die Spalten blieben leer, 0 von 2 775, ohne dass
+irgendetwas fehlgeschlagen waere. Erst ein Blick auf rohe Nachrichten hat es
+gezeigt. Der Client trug denselben Fehler seit jeher: Seine Zeile
+"Seriennummer" las `partB.SerialNumber` und war deshalb immer leer.
+
+`MothershipMMSI` gibt es im Feed nicht - dafuer wurde die schon gebaute
+Spalte wieder entfernt. Eine Spalte, die nie etwas enthaelt, ist Ballast.
+
+**Der Riegel gegen Teil A:** Msg 24 kommt als zwei Nachrichten, und die
+jeweils andere Haelfte ist mit Nullen gefuellt und traegt `Valid: false`.
+Ohne Pruefung darauf setzte **jede Teil-A-Meldung den Schiffstyp auf 0**
+("keine Angabe") und loeschte damit einen bekannten Typ - im Proxy wie im
+Client. Beide pruefen jetzt `ReportB.Valid !== false`.
+
 ### Deshalb werden sie mitgeschrieben
 
 Bis zum 27. Aug. 2026 standen diese Stammdaten **nur im Arbeitsspeicher** -

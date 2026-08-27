@@ -158,3 +158,74 @@ test("Seezeichen bekommen ihre Flagge", () => {
   });
   assert.ok(s.flags & draht.FLAG_SEEZEICHEN);
 });
+
+// Beide Nachrichten stammen aus einem echten Mitschnitt vom 27. Aug. 2026.
+// Die Feldnamen sind der Grund fuer diese Proben: aisstream schreibt
+// VenderIDModel/VenderIDSerial - samt Tippfehler. Geraten hatte ich
+// UnitModelCode und SerialNumber; beide Spalten blieben in der Messung leer
+// (0 von 2 775 Schiffen), ohne dass irgendetwas fehlgeschlagen waere.
+const STATIK5 = {
+  MessageType: "ShipStaticData",
+  Message: { ShipStaticData: {
+    AisVersion: 0, CallSign: "V2IK2", Destination: "DE EME",
+    Dimension: { A: 116, B: 27, C: 2, D: 20 }, Dte: false,
+    Eta: { Day: 22, Hour: 18, Minute: 0, Month: 8 }, FixType: 1,
+    ImoNumber: 9553646, MaximumStaticDraught: 6.8, MessageID: 5,
+    Name: "GAMMAGAS", RepeatIndicator: 0, Spare: false, Type: 83,
+    UserID: 305491000, Valid: true } },
+  MetaData: { MMSI: 305491000, time_utc: "2026-08-27 20:00:00.0 +0000 UTC" }
+};
+
+test("Msg 5 wird vollstaendig uebernommen, nicht nur die Tabellenfelder", () => {
+  const f = uebersetze(STATIK5).felder;
+  assert.strictEqual(f.klasse, "A");
+  assert.strictEqual(f.name, "GAMMAGAS");
+  assert.strictEqual(f.rufzeichen, "V2IK2");
+  assert.strictEqual(f.imo, 9553646);
+  assert.strictEqual(f.typ, 83);
+  assert.strictEqual(f.ziel, "DE EME");
+  assert.strictEqual(f.tiefgang, 6.8);
+  assert.strictEqual(f.laenge, 143);
+  assert.deepStrictEqual([f.dimA, f.dimB, f.dimC, f.dimD], [116, 27, 2, 20]);
+  assert.strictEqual(f.geraet, 1, "FixType: 1 = GPS");
+  assert.strictEqual(f.aisVersion, 0);
+  assert.strictEqual(f.dte, 0, "aus dem Bool wird 0/1, sonst passt es in keine Spalte");
+});
+
+test("Msg 24: Teil A darf den Schiffstyp aus Teil B nicht auf 0 setzen", () => {
+  // Teil A und Teil B kommen als zwei Nachrichten. Die jeweils andere Haelfte
+  // ist mit Nullen gefuellt und traegt Valid: false - ohne Riegel setzte jede
+  // Teil-A-Meldung typ auf 0 ("keine Angabe") und loeschte damit einen
+  // bekannten Typ.
+  const teilA = {
+    MessageType: "StaticDataReport",
+    Message: { StaticDataReport: {
+      MessageID: 24, PartNumber: false, RepeatIndicator: 0,
+      ReportA: { Name: "BLUEFIN", Valid: true },
+      ReportB: { CallSign: "", Dimension: { A: 0, B: 0, C: 0, D: 0 }, FixType: 0,
+                 ShipType: 0, Spare: 0, Valid: false, VenderIDModel: 0,
+                 VenderIDSerial: 0, VendorIDName: "" },
+      UserID: 211714360, Valid: true } },
+    MetaData: { MMSI: 211714360, time_utc: "2026-08-27 20:00:00.0 +0000 UTC" }
+  };
+  const fa = uebersetze(teilA).felder;
+  assert.strictEqual(fa.name, "BLUEFIN");
+  assert.strictEqual(fa.klasse, "B");
+  assert.strictEqual(fa.typ, undefined, "kein typ 0 aus einer leeren Haelfte");
+  assert.strictEqual(fa.hersteller, undefined);
+
+  const teilB = JSON.parse(JSON.stringify(teilA));
+  teilB.Message.StaticDataReport.ReportA = { Name: "", Valid: false };
+  teilB.Message.StaticDataReport.ReportB = {
+    CallSign: "DK1234", Dimension: { A: 6, B: 4, C: 2, D: 2 }, FixType: 1,
+    ShipType: 37, Spare: 0, Valid: true, VenderIDModel: 1,
+    VenderIDSerial: 499761, VendorIDName: "SMT" };
+  const fb = uebersetze(teilB).felder;
+  assert.strictEqual(fb.typ, 37);
+  assert.strictEqual(fb.rufzeichen, "DK1234");
+  assert.strictEqual(fb.hersteller, "SMT");
+  assert.strictEqual(fb.modell, "1");
+  assert.strictEqual(fb.seriennr, "499761", "VenderIDSerial, nicht SerialNumber");
+  assert.strictEqual(fb.geraet, 1);
+  assert.strictEqual(fb.laenge, 10);
+});

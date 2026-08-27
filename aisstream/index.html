@@ -3355,7 +3355,7 @@
   var STATIC_SAVE_DEBOUNCE = 3000;
   var STATIC_FIELDS = ["name", "callSign", "imo", "typeCode", "typeLabel",
     "typeDetail", "size", "aisClass", "vendor", "serial", "station",
-    "aisLoa", "aisBeam"];
+    "aisLoa", "aisBeam", "fixType"];
   var STATIC_INLAND_FIELDS = ["eni", "eriCode", "eriLabel", "eriLength", "eriBeam"];
 
   var staticCache = {};
@@ -4408,19 +4408,31 @@
       var partA = msg.ReportA || {};
       var partB = msg.ReportB || {};
       entry.name = cleanText(partA.Name) || entry.name;
-      entry.callSign = cleanText(partB.CallSign) || entry.callSign;
-      if (partB.ShipType != null) {
-        entry.typeCode = partB.ShipType;
-        entry.typeLabel = shipTypeLabel(partB.ShipType) || entry.typeLabel;
-        entry.typeDetail = shipTypeDetail(partB.ShipType) || entry.typeDetail;
+      // Teil A und Teil B kommen als ZWEI Nachrichten. In der jeweils anderen
+      // Hälfte stehen Nullen und `Valid: false` — nachgesehen an echten
+      // Nachrichten: ReportB {CallSign:"", ShipType:0, Valid:false}. Ohne
+      // diesen Riegel setzte jede Teil-A-Meldung den Schiffstyp auf 0
+      // („keine Angabe"), und ein bekannter Typ ging dabei verloren.
+      if (partB.Valid !== false) {
+        entry.callSign = cleanText(partB.CallSign) || entry.callSign;
+        if (partB.ShipType) {
+          entry.typeCode = partB.ShipType;
+          entry.typeLabel = shipTypeLabel(partB.ShipType) || entry.typeLabel;
+          entry.typeDetail = shipTypeDetail(partB.ShipType) || entry.typeDetail;
+        }
+        var dim24 = usableDim(partB.Dimension);
+        if (dim24) {
+          entry.dim = dim24;
+          entry.size = shipSize(dim24) || entry.size;
+        }
+        entry.vendor = cleanText(partB.VendorIDName) || entry.vendor;
+        // aisstream schreibt VenderIDSerial — samt Tippfehler. Hier stand
+        // SerialNumber, ein Feld, das es nicht gibt: Die Zeile „Seriennummer"
+        // im Detailfenster blieb deshalb immer leer.
+        var seriennr = partB.VenderIDSerial != null ? partB.VenderIDSerial : partB.SerialNumber;
+        if (seriennr) entry.serial = String(seriennr);
+        if (partB.FixType) entry.fixType = partB.FixType;
       }
-      var dim24 = usableDim(partB.Dimension);
-      if (dim24) {
-        entry.dim = dim24;
-        entry.size = shipSize(dim24) || entry.size;
-      }
-      entry.vendor = cleanText(partB.VendorIDName) || entry.vendor;
-      entry.serial = partB.SerialNumber != null ? String(partB.SerialNumber) : entry.serial;
       entry.staticFromCache = null;
       rememberStatic(entry);
       syncMarker(entry);
@@ -6763,6 +6775,14 @@
         entry.typeDetail = shipTypeDetail(d.typ) || entry.typeDetail;
       }
       if (d.tiefgang && !entry.draught) entry.draught = d.tiefgang;
+      // Der Rest der AIS-Statik. Der Proxy schickt sie seit dem 27. Aug. 2026
+      // vollstaendig mit; vorher kannte der Client ueber den Proxy nicht
+      // einmal die AIS-Klasse eines Schiffs.
+      if (d.klasse && !entry.aisClass) entry.aisClass = d.klasse;
+      if (d.geraet != null && entry.fixType == null) entry.fixType = d.geraet;
+      if (d.hersteller && !entry.vendor) entry.vendor = cleanText(d.hersteller);
+      if (d.seriennr && !entry.serial) entry.serial = String(d.seriennr);
+      if (d.modell && !entry.vendorModel) entry.vendorModel = String(d.modell);
       // Die Masse gehoert nach entry.dim - daraus baut die Karte den Marker
       // und capacityEstimate die Groessenklasse. Hier stand frueher NUR
       // entry.size: Die Tabellenspalte war gefuellt, und dieselben Schiffe
