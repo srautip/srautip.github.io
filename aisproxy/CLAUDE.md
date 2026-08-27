@@ -148,8 +148,11 @@ weit, als es im Entwurf klang.
   einem Ubuntu-VPS bei clouding.io, `/v1/status` antwortet mit 200. Die
   beiden Fehler, die dabei auftraten, stecken in `deploy.sh` und `DEPLOY.md`
   (bcrypt-`$` in der `.env`, `curl | bash` verschluckt den Skriptrest).
-- **Die Zeitreihen liegen brach.** `/v1/replay` liefert Spuren, aber der
-  Client hat noch keine Animation dafür. Der Speicher füllt sich derweil.
+- **Die Animation fehlt noch.** Seit dem 27. Aug. 2026 holt der Client aus
+  `/v1/replay` und `/v1/track` die letzten sechs Stunden und zeichnet sie als
+  verblassende Spur (gemessen 144 KB auf der Leitung für einen 90-km-
+  Ausschnitt, 196 Spuren, 13 202 Punkte). Das *Abspielen* über die Zeit —
+  wofür `von`/`bis`/`schritt` eigentlich gedacht sind — gibt es noch nicht.
 - **Kein Löschen von Fotos.** Fällt ein Schiff dauerhaft aus der Region,
   bleibt sein Bild liegen. Bei ein paar tausend verkleinerten Bildern ist das
   vertretbar, aber irgendwann will es eine Pflege.
