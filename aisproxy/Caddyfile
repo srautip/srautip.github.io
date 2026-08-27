@@ -2,9 +2,21 @@
 {$AIS_DOMAIN} {
 	encode gzip
 
-	# Fotos brauchen keine Anmeldung - sie sind ohnehin Wikimedia-Bilder,
-	# und der Client laedt viele davon.
-	handle /v1/foto/* {
+	# WICHTIG, sonst funktioniert der Browser-Client nicht:
+	#
+	# Ein Browser kann bei einem WebSocket KEINE Header setzen - die
+	# WebSocket-Schnittstelle nimmt nur URL und Protokolle entgegen. Basic-Auth
+	# ist damit fuer /v1/live grundsaetzlich nicht erfuellbar; Caddy antwortete
+	# mit 401, bevor der Upgrade ueberhaupt beim Proxy ankommt. Eingebettete
+	# Zugangsdaten in der URL (wss://benutzer:pass@host/) sind veraltet und
+	# werden von den Browsern verworfen.
+	#
+	# Die Schnittstelle schuetzt deshalb das Token des Proxys selbst
+	# (AIS_ZUGANG, als ?token= oder Bearer-Header) - das kann der Client
+	# mitschicken. Basic-Auth bleibt fuer das, was ein Mensch im Browser
+	# aufruft.
+	@schnittstelle path /v1/live* /v1/snapshot* /v1/replay* /v1/track* /v1/ship/* /v1/foto/*
+	handle @schnittstelle {
 		reverse_proxy proxy:8080
 	}
 
@@ -12,8 +24,6 @@
 		basic_auth {
 			{$AIS_BENUTZER} {$AIS_PASSWORT_HASH}
 		}
-		# Der WebSocket laeuft ueber dieselbe Regel - Caddy reicht den
-		# Upgrade von sich aus durch, dafuer ist keine Sonderbehandlung noetig.
 		reverse_proxy proxy:8080
 	}
 
