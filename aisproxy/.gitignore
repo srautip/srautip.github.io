@@ -1,3 +1,7 @@
 node_modules/
 daten/
 .env
+# Schreibt deploy.sh in den Arbeitsbaum. Ungetrackt UND ignoriert, sonst
+# bricht ein spaeterer "git pull" mit "would be overwritten by merge" ab,
+# falls derselbe Pfad je im Repo angelegt wird.
+zugangsdaten.txt

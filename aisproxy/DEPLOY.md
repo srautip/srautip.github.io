@@ -175,10 +175,50 @@ curl -u skipper:<passwort> https://<domain>/v1/status
 ## Aktualisieren
 
 ```bash
+/opt/aisproxy/update.sh
+```
+
+Das ist alles. Beim allerersten Mal muss das Skript erst ins Verzeichnis
+kommen: `cd /opt/aisproxy && git pull && ./update.sh` — danach holt es sich
+selbst.
+
+Was es tut, und warum es mehr ist als `git pull && docker compose up`:
+
+1. **Stand notieren** — Git-Commit und `/v1/status` (Positionen, Tagestabellen,
+   Stammdaten).
+2. **Sichern und die Sicherung gegenlesen** — `VACUUM INTO`, danach wird die
+   Sicherung sofort wieder geöffnet und gezählt. Dazu `.env` und
+   `zugangsdaten.txt`. Alles nach `/opt/aisproxy-sicherungen` (Modus 700,
+   die Dateien 600). Scheitert hier etwas, wird **nichts** aktualisiert.
+3. `git pull --ff-only`, dann prüfen, ob die Zugangsdaten noch dieselben sind —
+   sonst werden sie aus der Sicherung von eben zurückgeschrieben, **vor** dem
+   Neubau.
+4. `docker compose up -d --build`.
+5. Warten, bis `/v1/status` wieder Schiffe meldet (bis 180 s).
+6. **Gegenlesen:** Sind es mindestens so viele Positionen wie vorher? Sonst
+   Abbruch mit Exitcode 1 und dem Weg zurück. Einzige erlaubte Ausnahme: Die
+   Zahl der Tagestabellen ist gesunken — dann ist eine Tagestabelle nach
+   `AIS_HISTORIE_TAGE` ausgelaufen, das ist Pflege und kein Verlust.
+
+Zum Schluss stehen der Registerstand (Fotos, offene, Bildwege) und die Pfade
+der Sicherungen da. Die letzten sieben Stände bleiben liegen, ältere räumt das
+Skript weg — Datenbank und zugehörige Zugangsdaten zusammen.
+
+Stellschrauben als Umgebungsvariablen: `AIS_ZIEL`, `AIS_SICHERUNGEN`,
+`AIS_BEHALTEN`, `AIS_WARTE_RUNDEN` (× 5 s).
+
+Die Historie liegt im Volume `aisproxy_daten` und übersteht den Neubau ohnehin
+— der Projektname steht in der `docker-compose.yml` fest. Der einzige Befehl,
+der sie wirklich löscht, ist `docker compose down -v`; er kommt in keinem
+Skript dieses Projekts vor.
+
+Von Hand geht es weiterhin:
+
+```bash
 cd /opt/aisproxy && git pull && docker compose up -d --build
 ```
 
-Die Historie liegt im Volume `daten` und übersteht das.
+Dann gibt es nur eben keine Sicherung davor und keine Gegenprobe danach.
 
 ### Wenn dort „not a git repository" steht
 
@@ -202,15 +242,36 @@ Läuft alles, kann `/opt/aisproxy.alt*` weg.
 
 ## Sichern
 
-Es gibt genau eine Datei, die zählt:
+`update.sh` macht das bei jedem Lauf mit. Von Hand:
 
 ```bash
-docker compose exec proxy sh -c 'cp /daten/ais.db /daten/sicherung.db'
+cd /opt/aisproxy
+docker compose exec -T proxy node -e '
+  const { DatabaseSync } = require("node:sqlite");
+  const d = new DatabaseSync("/daten/ais.db");
+  d.exec("VACUUM INTO \x27/daten/sicherung.db\x27");' < /dev/null
 docker compose cp proxy:/daten/sicherung.db ./ais-$(date +%F).db
+docker compose exec -T proxy rm /daten/sicherung.db < /dev/null
+cp .env ./env-$(date +%F)          # ohne die kommt niemand mehr an den Dienst
 ```
 
-Die Fotos darunter sind Wikimedia-Bilder und jederzeit neu holbar — sie zu
-sichern lohnt nicht.
+**Nicht `cp /daten/ais.db`.** Hier stand das vorher, und es ist falsch: Die
+Datenbank läuft im WAL-Modus, alles seit dem letzten Checkpoint steht in
+`ais.db-wal`. Nachgemessen an einer Datenbank mit 5 000 frisch geschriebenen
+Zeilen und offenem Schreiber:
+
+| | Positionen in der Sicherung |
+|---|---|
+| `cp ais.db` | **0** von 5 000 (die Hauptdatei war 4 KB, das WAL 190 KB) |
+| `VACUUM INTO` | **5 000** von 5 000 |
+
+Die `cp`-Sicherung sah dabei wie eine richtige Sicherung aus. Steht der Dienst
+gerade still, geht ein Kopieren doch — dann aber `ais.db` **samt** `-wal` und
+`-shm`, und beim Zurückspielen alle drei zusammen (gegengeprüft: liest 5 000
+Positionen zurück).
+
+Die Fotos darunter sind Wikimedia- und Flickr-Bilder und jederzeit neu holbar
+— sie zu sichern lohnt nicht.
 
 ## Wenn es klemmt
 
@@ -223,6 +284,8 @@ sichern lohnt nicht.
 | `git pull` sagt „not a git repository" | Installation aus einer frühen Skriptfassung ohne `.git`. Siehe *Aktualisieren* — einmalig umstellen, Zugangsdaten bleiben |
 | Der Client verbindet sich nicht, obwohl das Token stimmt | Alte `Caddyfile` mit Basic-Auth über allen Pfaden. Ein Browser kann bei einem WebSocket keine Header setzen, also kommt er nie durch. `git pull && docker compose up -d --build` |
 | Alles läuft, aber der Browser bekommt nichts | Ohne `Access-Control-Allow-Origin` kommt keine Antwort an — der Proxy setzt ihn selbst, aber ein vorgeschalteter Reverse-Proxy darf ihn nicht abschneiden |
+| `update.sh` bricht mit „das sieht nach Verlust aus" ab | Der Bestand ist kleiner als vor dem Update, ohne dass eine Tagestabelle ausgelaufen wäre. Das Skript hat den Weg zurück ausgegeben; die Sicherung von wenigen Minuten vorher liegt unter `/opt/aisproxy-sicherungen` |
+| `update.sh` sagt „In /opt/aisproxy fehlt die .env" | Die Zugangsdaten fehlen schon vor dem Update — es wird bewusst nichts angefasst. Aus `/opt/aisproxy-sicherungen/env-*` zurückkopieren; gibt es keine, legt ein erneuter Lauf von `deploy.sh` neue an, und der Client braucht dann das neue Token |
 
 ## Was hier nicht getestet ist
 
@@ -240,3 +303,20 @@ build` konnte also nie laufen. Geprüft sind:
 
 Damit ist alles außer der Container-Schicht selbst erprobt. Beim ersten
 `docker compose up -d --build` also einmal ins Protokoll sehen.
+
+**`update.sh`** ist aus demselben Grund gegen eine Docker-Attrappe geprüft,
+nicht gegen echtes Docker — dafür aber jeder Zweig einzeln, denn ein Zweig,
+der nie feuert, beweist nichts:
+
+| Zweig | Ergebnis |
+|---|---|
+| guter Lauf | sichert, zieht `git pull`, startet, „die Historie ist vollständig da" |
+| `VACUUM INTO` aus einem offenen WAL | 5 000 von 5 000 Positionen (der Codeschnipsel wurde dafür aus `update.sh` herausgeschnitten, nicht nachgebaut) |
+| Positionen weg, Tage gleich | Exit 1 mit Rückweg |
+| Tagestabelle ausgelaufen | Exit 0, „normale Pflege" |
+| Dienst meldet keine Schiffe / Bau scheitert | Exit 1 mit Rückweg |
+| Sicherung leer | Abbruch **vor** `git pull`, Commit unverändert |
+| `.env` fehlt schon vorher | Abbruch, kein Byte angefasst |
+| `.env` verschwindet oder ändert sich beim Pull | aus der Sicherung wiederhergestellt (gleiche Prüfsumme, Modus 600), die vorgefundene Fassung bleibt als `*.abweichend` liegen |
+| Dienst steht still | Kopie aus dem Volume samt `-wal`/`-shm`; zurückgespielt liest sie 5 000 Positionen |
+| Aufräumen | alte Stände weg, Datenbank und Zugangsdaten desselben Standes zusammen |
