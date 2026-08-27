@@ -256,6 +256,24 @@ Bestand gegen den vorherigen. Mitgesichert werden `.env` und
 und ohne sie käme niemand mehr an den Dienst — ein neues Token müsste in
 jeden Client nachgetragen werden.
 
+## `/v1/status` liegt hinter der Tokenpruefung — auch fuer eigene Abfragen
+
+`erlaubt()` in `src/server.js` steht **vor** dem Pfadverteiler; `/v1/status`
+ist nicht ausgenommen. Ist `AIS_ZUGANG` gesetzt, antwortet der Status ohne
+Token mit 401 — auch von `127.0.0.1` aus, auch aus dem eigenen Container.
+
+Das hat zwei eigene Prüfungen still ausgehebelt, bis es am 27. Aug. 2026
+auffiel: Der **Healthcheck** im `Dockerfile` war seit dem Setzen des Tokens
+dauerhaft rot (Container `unhealthy`, obwohl alles lief), und die Warteschleife
+in `update.sh` meldete nach 180 s „der Dienst meldet keine Schiffe", während
+der Client einwandfrei bediente. Nachgemessen gegen den echten `Server`:
+ohne Token HTTP 401, mit `?token=` HTTP 200.
+
+Beide holen das Token jetzt aus `process.env.AIS_ZUGANG` **im Container** —
+also aus derselben Variablen, aus der der Server sein `konfig.ZUGANG` bildet.
+Sie können damit nicht auseinanderlaufen, und das Token steht auf keiner
+Befehlszeile. Wer eine neue Prüfung gegen `/v1/status` baut, muss dasselbe tun.
+
 ## Der Fehler, der zweimal passiert ist: entpackt statt Leitung messen
 
 Beim Stream und beim Snapshot habe ich zuerst die **entpackte** Größe

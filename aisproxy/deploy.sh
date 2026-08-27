@@ -173,8 +173,13 @@ echo
 echo "Warte auf den ersten Snapshot (bis zu 60 s) …"
 for i in $(seq 1 30); do
   sleep 5
+  # Mit Token: /v1/status liegt hinter derselben Pruefung wie jeder andere
+  # Pfad (src/server.js, erlaubt()). Ohne Token kam 401, und diese Schleife
+  # lief dann bis zum Schluss durch und meldete "keine Schiffe", obwohl der
+  # Dienst tadellos lief. Gelesen wird die Variable in der Umgebung des
+  # Containers - dort steht dieselbe, aus der der Server konfig.ZUGANG bildet.
   if docker compose exec -T proxy node -e \
-      "fetch('http://127.0.0.1:8080/v1/status').then(r=>r.json()).then(s=>{console.log(s.schiffe+' Schiffe, '+(s.strom.verbunden?'Strom steht':'Strom fehlt noch'));process.exit(s.schiffe>0?0:1)}).catch(()=>process.exit(1))" < /dev/null 2>/dev/null; then
+      "const t=process.env.AIS_ZUGANG||'';fetch('http://127.0.0.1:8080/v1/status'+(t?'?token='+encodeURIComponent(t):'')).then(r=>r.json()).then(s=>{console.log(s.schiffe+' Schiffe, '+(s.strom.verbunden?'Strom steht':'Strom fehlt noch'));process.exit(s.schiffe>0?0:1)}).catch(()=>process.exit(1))" < /dev/null 2>/dev/null; then
     echo
     echo "Fertig. https://$DOMAIN/v1/status"
     [[ -f "$ZIEL/zugangsdaten.txt" ]] && cat "$ZIEL/zugangsdaten.txt"
