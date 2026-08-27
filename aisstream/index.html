@@ -1729,6 +1729,20 @@
     localStorage.removeItem("aisstream_server_url");
   }
 
+  // --- Startausrichtung auf den eigenen Standort -------------------------
+  //
+  // Beim Laden wird die Karte auf die erste Ortung ausgerichtet: waagerecht
+  // mittig, senkrecht so, dass das Kreuz auf 20 % der Hoehe ueber dem unteren
+  // Rand sitzt - voraus liegt damit viermal so viel Karte wie achteraus.
+  //
+  // Die Konstanten stehen hier oben, nicht unten beim Standortblock: Die
+  // Hoisting-Falle (Funktionen werden hochgezogen, var-WERTE nicht) hat in
+  // diesem Projekt schon fuenfmal zugeschlagen.
+  var START_SICHT_KM = 90;          // Kartenbreite in km - zweimal der 45-km-Ring
+  var START_STANDORT_UNTEN = 0.20;  // Anteil der Kartenhoehe unter dem Kreuz
+  var standortAusgerichtet = false;
+  var kartenSteuerungDurchNutzer = false;
+
   var map = null;
   var mapAvailable = typeof L !== "undefined";
   if (mapAvailable) {
@@ -1750,6 +1764,12 @@
       "Live-Daten funktionieren trotzdem &ndash; siehe Tabelle unten.</div>";
   } else {
     updateBboxFieldsFromMap();
+
+    // Wer selbst schwenkt oder zoomt, will nicht Sekunden spaeter von der
+    // eintreffenden Ortung weggerissen werden - ein Fix kann dauern. Danach
+    // bleibt die Startausrichtung aus, die Karte gehoert dann dem Nutzer.
+    map.on("dragstart zoomstart", function () { kartenSteuerungDurchNutzer = true; });
+
     var mapMoveTimer = null;
     map.on("moveend", function () {
       clearTimeout(mapMoveTimer);
@@ -2285,6 +2305,47 @@
     });
   }
 
+  // Karte so setzen, dass der Standort waagerecht mittig und senkrecht auf
+  // START_STANDORT_UNTEN der Hoehe ueber dem unteren Rand liegt, bei einer
+  // Kartenbreite von rund START_SICHT_KM.
+  //
+  // Liefert true, wenn es geklappt hat - der Aufrufer merkt sich daran, dass
+  // die Startausrichtung erledigt ist. Bei einer Karte ohne Groesse (noch
+  // nicht im Layout) waere jede Rechnung sinnlos, dann lieber beim naechsten
+  // Ortungssignal noch einmal versuchen.
+  function ansichtAufStandort(lat, lon) {
+    if (!mapAvailable) return false;
+    var groesse = map.getSize();
+    if (!groesse.x || !groesse.y) return false;
+
+    // Meter je Bildpunkt bei Zoom z sind 156543,034 * cos(Breite) / 2^z.
+    // Nach z aufgeloest, damit die Kartenbreite genau die gewuenschten
+    // Kilometer traegt.
+    var z = Math.log(156543.03392 * Math.cos(lat * Math.PI / 180) *
+      groesse.x / (START_SICHT_KM * 1000)) / Math.LN2;
+    z = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), z));
+
+    // Leaflet rastet den Zoom auf ganze Stufen ein (zoomSnap = 1), und eine
+    // ganze Stufe ist Faktor ZWEI. Gerechnet fuer 53,8 Grad Nord: ein Telefon
+    // mit 390 px braucht Zoom 8,65 und bekaeme gerundet 9 - also 70 statt
+    // 90 km; ein 1440 px breiter Schirm braucht 10,53 und bekaeme 11, also
+    // 65 km. Deshalb fuer diesen einen Aufruf die Rasterung aus.
+    //
+    // Danach wieder an: Die Kacheln werden bei krummem Zoom skaliert und
+    // damit leicht weich, und so holt sie der erste Zoomklick des Nutzers von
+    // selbst wieder in ihre native Groesse.
+    var raster = map.options.zoomSnap;
+    map.options.zoomSnap = 0;
+    // In Bildpunkten rechnen, nicht in Grad: Ein fester Gradversatz waere je
+    // nach Zoom mal ein Zentimeter und mal ein halber Schirm.
+    var p = map.project([lat, lon], z);
+    var mitte = map.unproject(
+      p.subtract([0, (0.5 - START_STANDORT_UNTEN) * groesse.y]), z);
+    map.setView(mitte, z, { animate: false });
+    map.options.zoomSnap = raster;
+    return true;
+  }
+
   function mapCenterAsRef() {
     if (!mapAvailable) return null;
     var c = map.getCenter();
@@ -2342,6 +2403,14 @@
     }).addTo(map);
   }
 
+  // Nur die ERSTE Ortung nach dem Laden richtet die Karte aus. watchPosition
+  // meldet sich danach im Sekundentakt weiter - jedes Mal nachzuziehen hiesse,
+  // dem Nutzer die Karte unter den Fingern wegzuziehen.
+  function startausrichtung(lat, lon) {
+    if (standortAusgerichtet || kartenSteuerungDurchNutzer) return;
+    standortAusgerichtet = ansichtAufStandort(lat, lon);
+  }
+
   function hideOwnPos() {
     if (ownPosMarker && mapAvailable) map.removeLayer(ownPosMarker);
     ownPosMarker = null;
@@ -2368,6 +2437,7 @@
     }
     ownPosWatch = navigator.geolocation.watchPosition(function (pos) {
       showOwnPos(pos.coords.latitude, pos.coords.longitude);
+      startausrichtung(pos.coords.latitude, pos.coords.longitude);
       ownPosErrLogged = false;
       if (!ownPosLogged) {
         ownPosLogged = true;

@@ -1095,6 +1095,59 @@ keinen* Callback auf — weder Erfolg noch Fehler, auch nach 12 s nicht. Die
 Fehlercodes muss man per `addInitScript` selbst stellen
 (`scratchpad/ownpos.js`), sonst prüft man Chromium statt der eigenen Logik.
 
+### Startausrichtung: die Karte stellt sich beim Laden auf den Standort ein
+
+Beim Laden richtet die **erste** Ortung die Karte aus (`startausrichtung()` →
+`ansichtAufStandort()`):
+
+- **waagerecht mittig**,
+- **senkrecht auf 20 % der Höhe über dem unteren Rand**
+  (`START_STANDORT_UNTEN`) — voraus liegt damit viermal so viel Karte wie
+  achteraus,
+- **Kartenbreite rund `START_SICHT_KM` = 90 km**, also genau der Durchmesser
+  des äußeren 45-km-Sichtkreises: Der Ring berührt beim Start beide
+  Kartenränder.
+
+**Der senkrechte Versatz wird in Bildpunkten gerechnet, nicht in Grad.** Ein
+fester Gradversatz wäre je nach Zoom mal ein Zentimeter und mal ein halber
+Schirm. Deshalb `map.project(…, z)`, den Versatz abziehen,
+`map.unproject(…, z)`.
+
+**Und der Zoom muss krumm sein dürfen.** Leaflet rastet ihn auf ganze Stufen
+(`zoomSnap = 1`), und eine ganze Stufe ist **Faktor zwei** — gerechnet für
+53,8° N bekäme ein Telefon mit 390 px statt der nötigen 8,65 die Stufe 9 und
+zeigte **70 statt 90 km**, ein 1440 px breiter Schirm statt 10,53 die Stufe 11
+und damit **65 km**. `ansichtAufStandort()` schaltet die Rasterung deshalb für
+diesen einen Aufruf ab und danach wieder ein: Der erste Zoomklick des Nutzers
+holt die Kacheln damit von selbst wieder in ihre native Größe (bei krummem
+Zoom skaliert Leaflet sie und sie werden leicht weich).
+
+**Nur die erste Ortung, und nur ungefragt.** `watchPosition` meldet sich im
+Sekundentakt weiter — jedes Mal nachzuziehen hieße, dem Nutzer die Karte unter
+den Fingern wegzuziehen. Und wer vor dem Fix selbst schwenkt oder zoomt,
+behält seine Ansicht: `map.on("dragstart zoomstart")` setzt
+`kartenSteuerungDurchNutzer`. Ein Fix kann Sekunden brauchen, das Wegreißen
+danach wäre die unangenehmste Variante.
+
+**Gemessen in `scratchpad/standort.js`** — am fertigen Bild, nicht an der
+Formel: Wo sitzt das Kreuz wirklich (Bildschirmkoordinaten), und wie breit ist
+die Karte wirklich (die vier bbox-Felder tragen exakt `map.getBounds()`)?
+Ergebnis auf beiden Formaten **90,0 km, x = 50,0 %, y = 79,5 bzw. 79,8 %**.
+Als unabhängige Gegenrechnung prüft die Probe zusätzlich, dass der 45-km-Ring
+genauso breit ist wie die Karte — stimmt nur eines von beiden, steckt der
+Fehler in der Messung und nicht im Client.
+
+Zwei Fallen bei der Probe selbst:
+
+- **An `map` kommt man nicht heran** — der ganze Client steckt in einer IIFE.
+  Die Probe misst deshalb über Wege, die es auch für den Nutzer gibt: die
+  bbox-Felder und die gezeichneten Kreise.
+- **Leaflet lässt einen Schwenk austrudeln.** Die Gegenprobe verglich nach
+  900 ms zwei falsche Zustände — in „vorher" stand noch die Startansicht, weil
+  die bbox-Felder an `moveend` plus 400 ms Entprellung hängen. Jetzt 2,5 s,
+  und eine zusätzliche Prüfung stellt sicher, dass der Schwenk überhaupt
+  gewirkt hat: Sonst wäre die Gegenprobe stumm grün.
+
 ### Entfernung und Peilung: vom eigenen Standort, in Kilometern
 
 Der Bezugspunkt der Sektion „Relativ zu…" ist **der eigene Standort**, sobald
@@ -2099,7 +2152,7 @@ node lauf.js --live          gegen die ausgelieferte Seite statt localhost
 node lauf.js sortierung ...  nur diese Tests
 ```
 
-25 gepflegte Tests, seriell 586 s. **Parallel ist der große Hebel** — und
+29 gepflegte Tests, seriell 687 s. **Parallel ist der große Hebel** — und
 zwar aus einem messbaren Grund: Ein Seitenaufbau kostet 624 ms (ohne Kacheln
 255 ms), die Laufzeit steckt fast vollständig in festen Wartepausen, und die
 kosten keine CPU.
