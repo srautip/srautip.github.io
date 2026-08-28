@@ -138,6 +138,11 @@ class Speicher {
       CREATE TABLE IF NOT EXISTS ort (
         code TEXT PRIMARY KEY, name TEXT, land TEXT, funktion TEXT, geholt INTEGER
       )`);
+    // Der amtliche Name bleibt daneben stehen. `name` traegt die deutsche
+    // Form, wo es eine gibt ("Kopenhagen"), `amtlich` die aus der UNECE-Liste
+    // ("København"). Beides zu behalten kostet nichts und erlaubt, den Weg
+    // jederzeit zurueckzugehen - ein ueberschriebener Quellwert waere weg.
+    this.spalteErgaenzen("ort", "amtlich", "TEXT");
 
     // Der Bildabzug aus Wikidata. Statt je Schiff zu fragen, wird die
     // vollstaendige Zuordnung einmal geholt und hier gehalten - gemessen
@@ -457,15 +462,22 @@ class Speicher {
   // --- Orte (UN/LOCODE) -------------------------------------------------
 
   ortSchreibe(zeilen) {
+    // Der amtliche Name wird immer aufgefrischt, der angezeigte NICHT
+    // ueberschrieben, wenn schon ein deutscher dasteht: Sonst machte jeder
+    // Abzug aus "Kopenhagen" wieder "København".
     const stmt = this.db.prepare(
-      "INSERT INTO ort (code, name, land, funktion, geholt) VALUES (?, ?, ?, ?, ?) " +
-      "ON CONFLICT(code) DO UPDATE SET name = excluded.name, " +
+      "INSERT INTO ort (code, name, amtlich, land, funktion, geholt) VALUES (?, ?, ?, ?, ?, ?) " +
+      "ON CONFLICT(code) DO UPDATE SET amtlich = excluded.amtlich, " +
+      "name = CASE WHEN ort.name IS NULL OR ort.name = ort.amtlich " +
+      "            THEN excluded.name ELSE ort.name END, " +
       "land = excluded.land, funktion = excluded.funktion, geholt = excluded.geholt");
     const jetzt = Date.now();
     let n = 0;
     this.db.exec("BEGIN");
     try {
-      for (const z of zeilen) { stmt.run(z.code, z.name, z.land, z.funktion || null, jetzt); n++; }
+      for (const z of zeilen) {
+        stmt.run(z.code, z.name, z.name, z.land, z.funktion || null, jetzt); n++;
+      }
       this.db.exec("COMMIT");
     } catch (e) {
       this.db.exec("ROLLBACK");
@@ -489,10 +501,30 @@ class Speicher {
     return out;
   }
 
+  // Deutsche Namen nachtragen. Nur wo es einen gibt - sonst bleibt der
+  // amtliche stehen, und das ist die richtige Auskunft, keine Luecke.
+  ortDeutsch(paare) {
+    const stmt = this.db.prepare("UPDATE ort SET name = ? WHERE code = ? AND name IS NOT ?");
+    let n = 0;
+    this.db.exec("BEGIN");
+    try {
+      for (const [code, name] of paare) {
+        if (stmt.run(name, String(code).toUpperCase(), name).changes) n++;
+      }
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      this.log("Deutsche Ortsnamen schreiben fehlgeschlagen: " + e.message);
+      return 0;
+    }
+    return n;
+  }
+
   ortStand() {
     const r = this.db.prepare(
-      "SELECT COUNT(*) AS n, MAX(geholt) AS geholt FROM ort").get();
-    return { eintraege: r.n, geholt: r.geholt || 0 };
+      "SELECT COUNT(*) AS n, MAX(geholt) AS geholt, " +
+      "SUM(CASE WHEN name IS NOT amtlich THEN 1 ELSE 0 END) AS deutsch FROM ort").get();
+    return { eintraege: r.n, geholt: r.geholt || 0, deutsch: r.deutsch || 0 };
   }
 
   bildIndexSchreibe(art, paare) {

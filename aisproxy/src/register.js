@@ -232,7 +232,10 @@ class Register {
       }
       const n = this.speicher.ortSchreibe(zeilen);
       this.log("Ortsliste: " + n + " Seehaefen uebernommen");
-      this.bericht_.orte = { eintraege: n, zeit: new Date().toISOString() };
+      const deutsch = await this.ortDeutsch(zeilen);
+      const stand = this.speicher.ortStand();
+      this.bericht_.orte = { eintraege: n, deutsch: stand.deutsch,
+                             neuBenannt: deutsch, zeit: new Date().toISOString() };
       return n;
     } catch (e) {
       this.bericht_.fehler++;
@@ -240,6 +243,85 @@ class Register {
       this.bericht_.orte = { fehler: e.message };
       return null;
     }
+  }
+
+  // Deutsche Ortsnamen aus Wikidata nachtragen: "Kopenhagen" statt
+  // "København", "Danzig" statt "Gdansk". Die UNECE fuehrt die amtliche
+  // Schreibweise - richtig fuer die Seekarte, aber in einer deutschen
+  // Oberflaeche fremd.
+  //
+  // Wikidatas deutsche Labels sind dabei genau das, was heute ueblich ist:
+  // Danzig und Stettin ja, Memel und Koenigsberg nein (dort stehen Klaipeda
+  // und Kaliningrad). Es wird also nichts entschieden, was nicht schon
+  // entschieden ist.
+  //
+  // Gefragt wird in Laenderbuendeln, nicht in einem Rutsch: Eine Abfrage
+  // ueber alle Codes lieferte gemessen eine abgeschnittene Antwort. Ein
+  // Buendel, das scheitert, laesst die anderen unberuehrt - und die
+  // vorhandenen Namen bleiben ohnehin stehen.
+  async ortDeutsch(zeilen) {
+    const laender = [...new Set(zeilen.map(z => z.land))].sort();
+    const SCHLECHT = /\b(hafen|port|bahnhof|terminal|flughafen|airport|station|docks?)\b/i;
+    let gesetzt = 0, buendel = 0, fehler = 0;
+    // Zwoelf Laender je Abfrage, nicht dreissig: Gemessen kamen zwei von acht
+    // Antworten abgeschnitten zurueck ("Unterminated string"), weil Wikidata
+    // grosse Ergebnisse kappt. Kleinere Buendel, dafuer mehr davon.
+    for (let i = 0; i < laender.length; i += 12) {
+      const gruppe = laender.slice(i, i + 12);
+      const q = "SELECT ?c ?l WHERE { ?ort wdt:P1937 ?c ; rdfs:label ?l . " +
+        'FILTER(LANG(?l) = "de") FILTER(SUBSTR(?c,1,2) IN (' +
+        gruppe.map(x => '"' + x + '"').join(",") + ")) }";
+      buendel++;
+      try {
+        this.bericht_.wikidata++;
+        const res = await fetch(this.konfig.WIKIDATA_URL + "?format=json&query=" +
+          encodeURIComponent(q), {
+          headers: { "User-Agent": AGENT, "Accept-Encoding": "gzip" },
+          signal: AbortSignal.timeout(180000)
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const json = await res.json();
+        // Mehrere Eintraege je Code kommen vor ("Hamburg", "Hamburger Hafen",
+        // "Hamburg Hauptbahnhof"). Gemeint ist der Ort, nicht die Anlage.
+        const beste = new Map();
+        for (const b of (json.results && json.results.bindings) || []) {
+          const c = b.c.value.toUpperCase(), l = b.l.value;
+          if (SCHLECHT.test(l) || /^Q\d+$/.test(l)) continue;
+          const alt = beste.get(c);
+          if (!alt || l.length < alt.length) beste.set(c, l);
+        }
+        gesetzt += this.speicher.ortDeutsch([...beste]);
+      } catch (e) {
+        // Einmal wiederholen - eine gekappte Antwort ist keine Aussage ueber
+        // die Daten, sondern ueber die Leitung.
+        try {
+          await schlaf(2000);
+          this.bericht_.wikidata++;
+          const res2 = await fetch(this.konfig.WIKIDATA_URL + "?format=json&query=" +
+            encodeURIComponent(q), {
+            headers: { "User-Agent": AGENT, "Accept-Encoding": "gzip" },
+            signal: AbortSignal.timeout(180000)
+          });
+          if (!res2.ok) throw new Error("HTTP " + res2.status);
+          const json2 = await res2.json();
+          const beste2 = new Map();
+          for (const b of (json2.results && json2.results.bindings) || []) {
+            const c = b.c.value.toUpperCase(), l = b.l.value;
+            if (SCHLECHT.test(l) || /^Q\d+$/.test(l)) continue;
+            const alt2 = beste2.get(c);
+            if (!alt2 || l.length < alt2.length) beste2.set(c, l);
+          }
+          gesetzt += this.speicher.ortDeutsch([...beste2]);
+        } catch (e2) {
+          fehler++;
+          this.log("Deutsche Ortsnamen, Buendel " + buendel + ": " + e2.message);
+        }
+      }
+      await schlaf(this.konfig.REGISTER_PAUSE_MS);
+    }
+    this.log("Deutsche Ortsnamen: " + gesetzt + " gesetzt (" + buendel +
+      " Buendel, " + fehler + " fehlgeschlagen)");
+    return gesetzt;
   }
 
   // --- Der Bildabzug: alles auf einmal statt je Schiff --------------------
