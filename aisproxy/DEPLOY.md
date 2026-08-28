@@ -345,12 +345,27 @@ laufen dann über das ion-Asset 2275207 — Cesium schaltet ohne
 Google-Schlüssel von selbst dorthin. Trägt das Konto dieses Asset nicht,
 fällt die Seite **sichtbar** eine Stufe tiefer, mit Angabe des Grundes.
 
-1. Token bzw. Schlüssel unter ⚙ eintragen. Er liegt danach im Browser
-   (`aisstream_ion_token` / `aisstream_google_key`), **nicht** im Quelltext —
-   beide rechnen nach Nutzung ab.
-2. Bei Google zusätzlich **Referrer-Beschränkung** auf
-   `https://srautip.github.io/*` und einen **Kontingentdeckel**, bevor er das
-   erste Mal läuft.
+**Am besten auf dem Proxy hinterlegen** — dann gilt er für jedes Gerät:
+
+```bash
+$EDITOR /opt/aisproxy/.env     # AIS_ION_TOKEN=... eintragen
+docker compose up -d
+```
+
+Der Client holt ihn beim Öffnen der 3D-Seite über `GET /v1/einstellungen`.
+Wer im Browser etwas einträgt, übersteuert damit den hinterlegten.
+
+> **Das ist kein Geheimnis.** Der Proxy gibt den Token an jeden heraus, der
+> das Proxy-Token hat — und das steht auf Entscheidung des Betreibers
+> öffentlich im Client. Der Gewinn ist **eine Stelle zum Wechseln** statt
+> jedes Geräts, nicht Geheimhaltung. Deshalb einen ion-Token nehmen, der
+> **nur lesen darf und nur die benötigten Assets kennt** (2 Luftbild,
+> 1 Gelände, 96188 Gebäude, 2275207 photorealistisch). Bei Google
+> zusätzlich **Referrer-Beschränkung** auf `https://srautip.github.io/*` und
+> einen **Kontingentdeckel**, bevor der Schlüssel das erste Mal läuft.
+
+Ohne Hinterlegung geht es weiterhin je Browser unter ⚙; die Werte liegen dann
+in `aisstream_ion_token` / `aisstream_google_key`.
 
 **Der Proxy darf diese Kacheln nicht zwischenspeichern.** Aus Googles
 Richtlinie: *„you must not pre-fetch, index, store, or cache any Content."*

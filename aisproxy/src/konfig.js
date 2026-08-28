@@ -154,6 +154,15 @@ const konfig = {
   // Leer = offen. Hinter Caddy mit Basic-Auth ist das in Ordnung; steht der
   // Proxy blank im Netz, gehoert hier ein Wert hinein.
   ZUGANG: text("AIS_ZUGANG", ""),
+
+  // Zugaenge fuer die 3D-Ansicht, hier hinterlegt statt in jedem Browser
+  // einzeln. Sie sind KEIN Geheimnis: Der Proxy gibt sie jedem heraus, der
+  // das Proxy-Token hat, und das steht auf Entscheidung des Betreibers
+  // oeffentlich im Client. Der Gewinn ist eine Stelle zum Wechseln, nicht
+  // Geheimhaltung - ein auf Lesezugriff und die benoetigten Assets
+  // beschraenkter ion-Token ist deshalb die richtige Wahl.
+  ION_TOKEN: text("AIS_ION_TOKEN", ""),
+  GOOGLE_KEY: text("AIS_GOOGLE_KEY", ""),
   // Standardtakt der Delta-Auslieferung. Der Client darf ihn beim Abonnieren
   // ueberschreiben.
   TAKT_MS: zahl("AIS_TAKT_MS", 2000),

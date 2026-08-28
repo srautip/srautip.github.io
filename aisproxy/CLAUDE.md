@@ -314,6 +314,28 @@ Drei Dinge, die beim Bauen zaehlten:
 darauf** - nicht die letzte Wiederholung. Fuer die Reihenfolge der
 vergangenen Ziele ist genau das die richtige Angabe.
 
+## Die Zugaenge fuer die 3D-Ansicht liegen hier, nicht in jedem Browser
+
+`GET /v1/einstellungen` gibt `{ ion, google }` aus `AIS_ION_TOKEN` und
+`AIS_GOOGLE_KEY`. Gebeten wurde darum, damit der ion-Token nicht auf jedem
+Geraet neu eingetragen werden muss.
+
+**Es ist kein Geheimnis, und das gehoert dazugesagt.** Der Pfad liegt hinter
+derselben Tokenpruefung wie alles andere - aber dieses Token steht auf
+Entscheidung des Betreibers oeffentlich im Client. Wer den Client lesen kann,
+kann auch den ion-Token lesen. Der Gewinn ist **eine Stelle zum Wechseln**
+statt jedes Geraets; die Absicherung leistet ein ion-Token, der nur lesen darf
+und nur die benoetigten Assets kennt.
+
+Zwei Kleinigkeiten mit Absicht:
+
+- **`null` statt `""`.** „Hier ist keiner hinterlegt" ist eine Aussage; ein
+  leerer String saehe im Client wie ein leeres Feld aus und liesse offen, ob
+  gefragt wurde.
+- **Der Pfad musste in den Caddyfile-Matcher.** `test/caddy.test.js` hat das
+  beim ersten Lauf gemeldet, bevor irgendjemand es haette merken koennen -
+  genau der Fall, fuer den die Probe nach dem `/v1/ort`-Vorfall gebaut wurde.
+
 ## Der Typ kommt aus drei Quellen - und keine ist sicher
 
 Gemeldet: „Warum fehlt bei MMSI 309436000 der Typ?" (Liberty of the Seas,

@@ -337,3 +337,33 @@ test("/v1/ship nennt die frueheren Ziele", async () => {
     assert.strictEqual(o.zielVerlauf, undefined);
   } finally { abbau(s); }
 });
+
+test("/v1/einstellungen liefert die hinterlegten Zugaenge - und sagt, wenn keiner da ist", async () => {
+  // Hinterlegt, damit der ion-Token nicht in jedem Browser einzeln
+  // eingetragen werden muss. Ein Geheimnis ist er dadurch nicht: Wer das
+  // Proxy-Token hat, bekommt ihn - und das steht oeffentlich im Client.
+  const s = await starte(aufbau({ ION_TOKEN: "ion-abc", GOOGLE_KEY: "" }));
+  try {
+    const r = await (await fetch(s.basis + "/v1/einstellungen")).json();
+    assert.strictEqual(r.ion, "ion-abc");
+    assert.strictEqual(r.google, null,
+      "null heisst ausdruecklich 'keiner hinterlegt' - ein leerer String saehe " +
+      "im Client wie ein leeres Feld aus");
+  } finally { abbau(s); }
+
+  const leer = await starte(aufbau());
+  try {
+    const r = await (await fetch(leer.basis + "/v1/einstellungen")).json();
+    assert.deepStrictEqual(r, { ion: null, google: null });
+  } finally { abbau(leer); }
+});
+
+test("/v1/einstellungen liegt hinter der Tokenpruefung", async () => {
+  // Sonst gaebe der Proxy den Zugang an jeden heraus, der die Adresse kennt.
+  const s = await starte(aufbau({ ZUGANG: "geheim", ION_TOKEN: "ion-abc" }));
+  try {
+    assert.strictEqual((await fetch(s.basis + "/v1/einstellungen")).status, 401);
+    const r = await (await fetch(s.basis + "/v1/einstellungen?token=geheim")).json();
+    assert.strictEqual(r.ion, "ion-abc");
+  } finally { abbau(s); }
+});

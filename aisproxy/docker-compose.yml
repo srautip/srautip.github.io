@@ -27,6 +27,11 @@ services:
       # das hier schuetzt zusaetzlich den direkten Port.
       AIS_ZUGANG: "${AIS_ZUGANG:-}"
       AIS_HISTORIE_TAGE: "7"
+      # Zugaenge fuer die 3D-Ansicht, damit sie nicht in jedem Browser
+      # einzeln eingetragen werden muessen. Leer lassen, wenn keiner da ist -
+      # der Client fragt dann wie bisher selbst danach.
+      AIS_ION_TOKEN: "${AIS_ION_TOKEN:-}"
+      AIS_GOOGLE_KEY: "${AIS_GOOGLE_KEY:-}"
       TZ: "Europe/Berlin"
     volumes:
       - daten:/daten

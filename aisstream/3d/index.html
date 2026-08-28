@@ -116,9 +116,9 @@
   <input id="googleKey" type="password" autocomplete="off" spellcheck="false"
          placeholder="AIza…">
   <button class="knopf" id="keyUebernehmen" style="margin-top:.5rem">Übernehmen</button>
-  <p>Beides kostet nach Nutzung Geld und steht deshalb <b>im Browser, nicht im
-     Quelltext</b>. Ein Google-Schlüssel hat Vorrang; ohne ihn läuft der
-     photorealistische Weg über ion (Asset 2275207).</p>
+  <p>Leer lassen, wenn auf dem Proxy einer hinterlegt ist — der gilt dann für
+     jedes Gerät. Was hier steht, hat Vorrang. Ein Google-Schlüssel geht dem
+     ion-Weg vor; ohne ihn läuft das photorealistische Asset über ion (2275207).</p>
 
   <div id="werte"></div>
 </div>
@@ -228,6 +228,15 @@
         return r.json();
       });
   }
+  // Was auf dem Proxy hinterlegt ist, damit der Token nicht in jedem Browser
+  // einzeln eingetragen werden muss. Ein hier eingetragener hat Vorrang -
+  // sonst koennte man den hinterlegten nie uebersteuern.
+  function holeEinstellungen() {
+    return fetch(mitToken(proxyBasis() + "/einstellungen"))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+  }
+
   function holeSchiff() {
     return fetch(mitToken(proxyBasis() + "/ship/" + encodeURIComponent(MMSI)))
       .then(function (r) { return r.ok ? r.json() : null; })
@@ -273,6 +282,7 @@
   var viewer = null, Cesium = null, spurPunkte = [], schiff = null;
   var bodenEntity = null, schiffEntity = null;
   var googleTileset = null, bauTileset = null;
+  var vomProxy = { ion: null, google: null };
 
   function farbeFuerTyp(typ) {
     // Dieselben Kategoriefarben wie die Karte im Hauptclient - ein Schiff
@@ -545,7 +555,7 @@
     // Gemessen an api.cesium.com: 401 ohne oder mit falschem Token, und der
     // Unterschied dazwischen ist genau die Frage, ob einer eingetragen ist.
     var code = (e && e.statusCode) || Number((t.match(/Status Code:\s*(\d+)/) || [])[1]) || 0;
-    var hatIon = !!(el.ionToken.value || "").trim();
+    var hatIon = !!ionZugang();
     if (code === 401) return hatIon ? "ion-Token ungültig" : "kein ion-Token";
     if (code === 403) return "ion kennt den Token, aber nicht für dieses Asset";
     if (code === 404) return "Asset nicht gefunden";
@@ -553,6 +563,11 @@
     if (/InvalidCredentials|No authorization token/i.test(t)) return "kein ion-Token";
     return (code ? "HTTP " + code + ": " : "") + t.slice(0, 70) || "unbekannter Fehler";
   }
+
+  // Der eine Ort, an dem "welcher Zugang gilt" beantwortet wird. Zwei Stellen
+  // waeren zwei Antworten, sobald eine davon vergessen wird.
+  function ionZugang() { return (el.ionToken.value || "").trim() || vomProxy.ion || ""; }
+  function googleZugang() { return (el.googleKey.value || "").trim() || vomProxy.google || ""; }
 
   function stufeName(stufe) {
     var o = el.untergrund.querySelector('option[value="' + stufe + '"]');
@@ -567,7 +582,7 @@
     if (stufe === "foto") {
       untergrundAbraeumen();
       // Mit Google-Schluessel geht es direkt zu Google, ohne ueber ion.
-      var gk = (el.googleKey.value || "").trim();
+      var gk = googleZugang();
       Cesium.GoogleMaps.defaultApiKey = gk || undefined;
       return Cesium.createGooglePhotorealistic3DTileset(undefined, kachelRiegel())
         .then(function (ts) {
@@ -599,23 +614,37 @@
   // Ohne diesen dritten Parameter ueberschrieb die zuletzt gelungene Stufe
   // die Begruendung: Am Ende stand "OSM-Karte", und warum das photorealistische
   // Bild fehlte, sah niemand mehr - gemessen in der Probe, nicht vermutet.
-  function untergrundSetzen(stufe, tiefer, grundVorher) {
+  var untergrundLauf = 0;
+
+  function untergrundSetzen(stufe, tiefer, grundVorher, lauf) {
     if (!viewer) return Promise.resolve(false);
-    var ion = (el.ionToken.value || "").trim();
-    var google = (el.googleKey.value || "").trim();
+    // Zwei Aufbauten koennen sich ueberholen - Stufe waehlen und gleich
+    // "Uebernehmen" druecken genuegt. Der aeltere Lauf raeumte dann ab, was
+    // der neuere gebaut hatte, und ueberschrieb dessen Begruendung mit einem
+    // harmlosen "OSM-Karte". In der Probe genau so passiert.
+    if (!lauf) lauf = ++untergrundLauf;
+    if (lauf !== untergrundLauf) return Promise.resolve(false);
+    var ion = ionZugang();
+    var google = googleZugang();
     Cesium.Ion.defaultAccessToken = ion || "";
 
     if (stufe !== "osm" && !ion && !google) {
       keyZustand("warn", "kein Token — OSM-Karte");
       return stufeBauen("osm").then(function () {
-        el.untergrund.value = "osm";
+        if (lauf !== untergrundLauf) return false;
         viewer.scene.requestRender();
         return false;
       });
     }
     keyZustand("warn", "wird geprüft…");
     return stufeBauen(stufe).then(function () {
-      el.untergrund.value = stufe;
+      if (lauf !== untergrundLauf) return false;
+      // Der Waehler zeigt weiter, was GEWUENSCHT ist - die Zustandszeile
+      // sagt, was traegt. Umgekehrt war es falsch: Der Rueckfall schrieb den
+      // Waehler auf "osm", und "Uebernehmen" versuchte danach genau das
+      // statt der eigentlichen Wahl - samt harmlosem "OSM-Karte" als
+      // Begruendung. In der Probe genau so aufgefallen.
+      if (!grundVorher) el.untergrund.value = stufe;
       if (grundVorher) {
         // Angekommen, aber tiefer als gewollt: Der Grund bleibt stehen.
         keyZustand("warn", grundVorher + " → " + stufeName(stufe));
@@ -628,6 +657,7 @@
       viewer.scene.requestRender();
       return true;
     }).catch(function (e) {
+      if (lauf !== untergrundLauf) return false;
       var naechste = STUFEN[STUFEN.indexOf(stufe) + 1];
       var grund = grundVorher || ursache(e);
       if (!naechste || tiefer > 3) {
@@ -635,7 +665,7 @@
         return false;
       }
       keyZustand("schlecht", grund + " → " + stufeName(naechste));
-      return untergrundSetzen(naechste, (tiefer || 0) + 1, grund);
+      return untergrundSetzen(naechste, (tiefer || 0) + 1, grund, lauf);
     });
   }
 
@@ -680,10 +710,13 @@
     meldung("Wird geladen…", "Spur wird geholt");
     bauViewer();
     werteTakt();
-    return Promise.all([holeSpur(), holeSchiff()]);
+    return Promise.all([holeSpur(), holeSchiff(), holeEinstellungen()]);
   }).then(function (beides) {
     spurPunkte = punkteLesen(beides[0]);
     schiff = beides[1];
+    // Muss VOR untergrundSetzen() stehen: Sonst entschiede die Seite ueber
+    // den Untergrund, bevor sie weiss, welcher Zugang gilt.
+    vomProxy = beides[2] || { ion: null, google: null };
     if (schiff && schiff.name) el.titel.textContent = schiff.name;
     el.unter.textContent = "MMSI " + MMSI +
       (schiff && schiff.imo ? " · IMO " + schiff.imo : "") +
@@ -702,8 +735,11 @@
 
     el.ionToken.value = hole("aisstream_ion_token") || "";
     el.googleKey.value = hole("aisstream_google_key") || "";
-    var hatToken = !!(el.ionToken.value || el.googleKey.value);
-    // Vorgabe: das Beste, was der vorhandene Token hergeben kann.
+    // Sichtbar machen, woher ein Zugang kommt - sonst steht da ein leeres
+    // Feld, und niemand weiss, warum die Kacheln trotzdem laden.
+    if (vomProxy.ion) el.ionToken.placeholder = "auf dem Proxy hinterlegt";
+    if (vomProxy.google) el.googleKey.placeholder = "auf dem Proxy hinterlegt";
+    var hatToken = !!(ionZugang() || googleZugang());
     // Vorgabe "gebaeude": im Betrieb die beste Stufe - Luftbild, Gelaende und
     // Gebaeude, alles aus ion. "foto" bleibt waehlbar.
     var stufe = hole("aisstream_3d_untergrund") || (hatToken ? "gebaeude" : "osm");

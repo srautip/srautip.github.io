@@ -107,6 +107,7 @@ class Server {
       if (url.pathname === "/v1/replay") return this.replay(url, res);
       if (url.pathname === "/v1/track") return this.track(url, res);
       if (url.pathname === "/v1/ort") return this.ort(url, res);
+      if (url.pathname === "/v1/einstellungen") return this.einstellungen(res);
       if (url.pathname.startsWith("/v1/ship/")) return this.ship(url, res);
       if (url.pathname.startsWith("/v1/foto/")) {
         if (req.method === "POST") return this.fotoNimm(url, req, res);
@@ -117,7 +118,7 @@ class Server {
           dienst: "aisproxy", region: this.konfig.REGION,
           endpunkte: ["/v1/snapshot", "/v1/live (WebSocket)", "/v1/replay",
                       "/v1/track", "/v1/ship/{mmsi}", "/v1/foto/{datei}",
-                      "/v1/ort?codes=", "/v1/status"]
+                      "/v1/ort?codes=", "/v1/einstellungen", "/v1/status"]
         });
       }
       return jsonAus(res, 404, { fehler: "unbekannter Pfad" });
@@ -190,6 +191,18 @@ class Server {
     const antwort = {};
     for (const c of codes) antwort[c] = namen[c] || null;
     return jsonAus(res, 200, antwort);
+  }
+
+  // Was der Client nicht selbst wissen kann: die Zugaenge fuer die
+  // 3D-Ansicht. Hinterlegt, damit sie nicht in jedem Browser einzeln
+  // eingetragen werden muessen - siehe konfig.js, warum das kein Geheimnis
+  // ist. `null` statt "" heisst ausdruecklich "hier ist keiner hinterlegt";
+  // ein leerer String saehe im Client wie ein leeres Feld aus.
+  einstellungen(res) {
+    return jsonAus(res, 200, {
+      ion: this.konfig.ION_TOKEN || null,
+      google: this.konfig.GOOGLE_KEY || null
+    });
   }
 
   ship(url, res) {
