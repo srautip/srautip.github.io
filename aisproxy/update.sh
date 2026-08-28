@@ -465,18 +465,46 @@ if [[ -n "$VOR_PUNKTE" ]]; then
   fi
 fi
 
-# Zum Schluss der Registerstand: Was der letzte Lauf gebracht hat, und wie
-# viele Fotos noch offen sind. Der erste Lauf startet 90 s nach dem Start,
-# direkt nach dem Update steht hier also meist noch nichts.
+# Zum Schluss der Bilderstand - und zwar der aus der DATENBANK. Die Zaehler
+# des Registers leben im Prozess und stehen nach jedem Neustart auf null;
+# "Register: 0 Laeufe, 0 Fotos" direkt nach einem Update ist deshalb keine
+# Aussage ueber die Fotoarbeit, sondern nur ueber die letzten 20 Sekunden.
+# Genau das hat schon einmal wie ein Ausfall ausgesehen.
 docker compose exec -T proxy node -e '
   const t = process.env.AIS_ZUGANG || "";
   fetch("http://127.0.0.1:8080/v1/status" +
         (t ? "?token=" + encodeURIComponent(t) : "")).then(r => r.json()).then(s => {
-    const r2 = s.register || {};
-    console.log("    Register: " + (r2.laeufe || 0) + " Laeufe, " +
-      (r2.fotos || 0) + " Fotos, " + (r2.fotoOffen || 0) + " offen" +
-      (r2.wege ? ", Wege " + JSON.stringify(r2.wege) : ""));
+    const sp = s.speicher || {}, r2 = s.register || {};
+    console.log("    Bilder: " + (sp.fotos || 0) + " Schiffe haben eines" +
+      (sp.fotosEigen ? " (" + sp.fotosEigen + " davon selbst beigesteuert)" : "") +
+      ", von " + (sp.stammEintraege || 0) + " im Bestand");
+    if (r2.abzug) {
+      console.log("    Bildabzug: " + (r2.abzug.imo || 0) + " ueber die IMO, " +
+        (r2.abzug.mmsi || 0) + " ueber die MMSI" +
+        (r2.abzug.uebersprungen ? " (vorhanden, " + r2.abzug.alterStunden + " h alt)" : ""));
+    }
+    if (r2.laeufe) {
+      console.log("    Register: " + r2.laeufe + " Lauf/Laeufe, " + (r2.fotos || 0) +
+        " Fotos geholt, " + (r2.fotoOffen || 0) + " offen");
+    } else {
+      console.log("    Register: noch kein Lauf in DIESEM Prozess - der erste" +
+        " startet 90 s nach dem Start.");
+    }
   }).catch(() => {})' < /dev/null 2>/dev/null || true
+
+# Der Hinweis steht hier und NICHT im Node-Schnipsel: ein Befehl mit
+# Anfuehrungszeichen, in einer einfach zitierten Zeichenkette, in einem
+# einfach zitierten node -e - genau die Stelle, an der es beim Schreiben
+# schon einmal auseinandergeflogen ist. Ein Hierdokument hat dieses Problem
+# nicht.
+cat <<'HINWEIS'
+    Registerstand spaeter nachsehen:
+      cd /opt/aisproxy && docker compose exec -T proxy node -e '
+        const t = process.env.AIS_ZUGANG || "";
+        fetch("http://127.0.0.1:8080/v1/status" + (t ? "?token=" + t : ""))
+          .then(r => r.json())
+          .then(s => console.log(JSON.stringify(s.register, null, 1)))' < /dev/null
+HINWEIS
 
 # Aufgeraeumt wurde schon vor der Sicherung (Schritt 2). Hier steht bewusst
 # nichts mehr: Ein zweiter Durchgang koennte nur den gerade erzeugten Stand
