@@ -326,6 +326,9 @@
     // sich ueber das DOM nichts messen - eine Polylinie hat keinen Knoten.
     // Lesend, und es haengt nichts daran.
     window.__viewer = viewer;
+    // Messgriff wie __viewer: An einer laufenden Kamera laesst sich der
+    // geglaettete Kurs sonst nirgends ablesen.
+    window.__kurs = function () { return { glatt: kursGlatt, ziel: kursZiel }; };
 
     viewer.scene.globe.depthTestAgainstTerrain = true;
     // Dunst und Bodenatmosphaere AUS. Beide sind fuer den Blick auf einen
@@ -408,7 +411,20 @@
         return Cesium.Cartesian3.fromRadians(c.longitude, c.latitude,
           flaecheHoehe(c), undefined, ergebnis);
       }, false),
-      orientation: new Cesium.VelocityOrientationProperty(pos),
+      // Dieselbe Quelle wie die Kamera. VelocityOrientationProperty leitet die
+      // Richtung zwar auch aus der Bewegung ab, aber ungeglaettet und im
+      // Stand gar nicht - dann liefen Rumpf und Blickrichtung auseinander.
+      orientation: new Cesium.CallbackProperty(function (t, ergebnis) {
+        var p = pos.getValue(t);
+        if (!p || kursGlatt == null) return undefined;
+        // MINUS 90 Grad, und das ist kein Zauberwert: Cesiums HPR-Rahmen kommt
+        // aus eastNorthUpToFixedFrame, dessen +X nach OSTEN zeigt. Ein Kurs
+        // von 110 Grad landete damit bei 200 - gemessen, nicht vermutet. Die
+        // Laengsachse des Kastens ist +X, sie soll auf den Kurs zeigen.
+        return Cesium.Transforms.headingPitchRollQuaternion(p,
+          new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(kursGlatt - 90), 0, 0),
+          Cesium.Ellipsoid.WGS84, Cesium.Transforms.eastNorthUpToFixedFrame, ergebnis);
+      }, false),
       // Ein Kasten in den echten Massen des Schiffs - kein Modell, das eine
       // Bauform vortaeuscht, die AIS gar nicht hergibt.
       box: {
@@ -462,24 +478,80 @@
   // zu brauchen.
   var fpvLaeuft = false;
 
-  // Der Kurs zum Zeitpunkt t (ms). DIESELBE Regel wie im 2D-Client: Die
-  // Fahrtdaten kommen vom VORDEREN Stuetzpunkt, nicht interpoliert -
-  // zwischen zwei gemeldeten Kursen zu mitteln waere erfunden, die Position
-  // dazwischen ist eine Schaetzung, der Kurs war ein Messwert. Ohne cog
-  // traegt die Streckenrichtung.
-  function kursBei(t) {
+  // Der Kurs UEBER GRUND zum Zeitpunkt t (ms): die Richtung der Strecke, die
+  // gerade gefahren wird - nicht der gemeldete `cog`.
+  //
+  // Hier gilt bewusst das GEGENTEIL der Regel im 2D-Client. Dort traegt der
+  // gemeldete Kurs, weil der Richtungspfeil einen Messwert zeigt. Die Kamera
+  // dagegen bewegt sich entlang der interpolierten Bahn: Blickte sie nach dem
+  // gemeldeten Feld, fuehre sie sichtbar seitwaerts.
+  //
+  // An drei echten 6-Stunden-Spuren gemessen (Stuetzpunkte 60 s): Der
+  // gemeldete COG weicht im Median nur 1 bis 4 Grad von der gefahrenen
+  // Peilung ab, im 90. Perzentil aber bis 61 Grad.
+  //
+  // Die 10 m sind die Grenze zum Rauschen: Bei 60 s Abstand sind das rund
+  // 0,3 kn. Darunter ist die Peilung zwischen zwei Punkten Positionsrauschen -
+  // daher die 178-Grad-Ausreisser in derselben Messung.
+  var MIN_STRECKE = 10;
+  var KURS_TAU = 0.8;        // Sekunden Wanduhrzeit, Glaettung
+  var KURS_SPRUNG = 800;     // Meter: weiter als das = Zeitregler, nicht Fahrt
+
+  function kursUeberGrund(t) {
     var n = spurPunkte.length;
-    if (!n) return 0;
+    if (!n) return null;
     var lo = 0, hi = n - 1;
     while (lo < hi) {
       var m = (lo + hi + 1) >> 1;
       if (spurPunkte[m].t <= t) lo = m; else hi = m - 1;
     }
-    var p = spurPunkte[lo];
-    if (p.cog != null) return p.cog;
-    var b = spurPunkte[Math.min(lo + 1, n - 1)];
-    if (b === p && lo > 0) { b = p; p = spurPunkte[lo - 1]; }
-    return b === p ? 0 : peilung(p, b);
+    // Vom aktuellen Abschnitt aus nach aussen suchen, bis eine Strecke lang
+    // genug ist, um eine Richtung herzugeben.
+    for (var d = 0; d < n; d++) {
+      var i = lo - d;
+      if (i >= 0 && i + 1 < n && meter(spurPunkte[i], spurPunkte[i + 1]) >= MIN_STRECKE) {
+        return peilung(spurPunkte[i], spurPunkte[i + 1]);
+      }
+      var j = lo + d;
+      if (d && j + 1 < n && meter(spurPunkte[j], spurPunkte[j + 1]) >= MIN_STRECKE) {
+        return peilung(spurPunkte[j], spurPunkte[j + 1]);
+      }
+    }
+    // Das Schiff liegt: Jetzt ist der gemeldete Kurs die bessere Auskunft.
+    return spurPunkte[lo].cog == null ? null : spurPunkte[lo].cog;
+  }
+
+  // Geglaettet wird der RICHTUNGSVEKTOR, nicht der Winkel: Ein Tiefpass auf
+  // Grad liefe bei 359 -> 1 die falsche Runde herum.
+  //
+  // Ohne Glaettung springt die Blickrichtung an jedem Stuetzpunkt - gemessen
+  // im 90. Perzentil um 19 Grad, bei 60-fachem Abspielen also jede Sekunde
+  // ein Ruck. Das waere nicht realistischer, nur hakeliger.
+  var kursGlatt = null, kursZiel = null;
+  var letzterOrt = null, letzteWand = 0;
+
+  function kursTakt(uhr) {
+    if (!schiffEntity || !viewer) return;
+    var ort = schiffEntity.position.getValue(uhr.currentTime);
+    if (!ort) return;
+    var ziel = kursUeberGrund(Cesium.JulianDate.toDate(uhr.currentTime).getTime());
+    if (ziel == null) return;
+    kursZiel = ziel;
+    var jetzt = Date.now();
+    var dt = letzteWand ? Math.min(0.5, (jetzt - letzteWand) / 1000) : 0;
+    letzteWand = jetzt;
+    // Beim Ziehen am Zeitregler springt der Ort. Ein Schwenk ueber den halben
+    // Hafen waere kein realistischer Uebergang, sondern ein Fehler.
+    var sprung = !letzterOrt || Cesium.Cartesian3.distance(ort, letzterOrt) > KURS_SPRUNG;
+    letzterOrt = Cesium.Cartesian3.clone(ort, letzterOrt);
+    if (kursGlatt == null || sprung || !dt) { kursGlatt = ziel; return; }
+    var a = 1 - Math.exp(-dt / KURS_TAU);
+    var gr = Math.PI / 180;
+    var gx = Math.sin(kursGlatt * gr), gy = Math.cos(kursGlatt * gr);
+    var zx = Math.sin(ziel * gr), zy = Math.cos(ziel * gr);
+    var nx = gx + (zx - gx) * a, ny = gy + (zy - gy) * a;
+    if (!nx && !ny) return;
+    kursGlatt = (Math.atan2(nx, ny) * 180 / Math.PI + 360) % 360;
   }
 
   function fpvTakt(uhr) {
@@ -509,7 +581,7 @@
       destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude,
         flaecheHoehe(c) + AUGENHOEHE),
       orientation: {
-        heading: Cesium.Math.toRadians(kursBei(Cesium.JulianDate.toDate(uhr.currentTime).getTime())),
+        heading: Cesium.Math.toRadians(kursGlatt == null ? 0 : kursGlatt),
         pitch: Cesium.Math.toRadians(FPV_NEIGUNG),
         roll: 0
       }
@@ -748,6 +820,18 @@
         zeilen.push("Kamera: <b>" + Math.round(kc.height - fl) + " m</b> über der Fläche" +
           (Math.abs(fl) > 1 ? " (Fläche " + Math.round(fl) + " m)" : ""));
       } catch (e) {}
+      // Der Unterschied, um den es geht, direkt ablesbar.
+      if (kursGlatt != null) {
+        var gem = null;
+        try {
+          var jt = Cesium.JulianDate.toDate(viewer.clock.currentTime).getTime();
+          for (var q = spurPunkte.length - 1; q >= 0; q--) {
+            if (spurPunkte[q].t <= jt) { gem = spurPunkte[q].cog; break; }
+          }
+        } catch (e) {}
+        zeilen.push("Kurs: <b>" + Math.round(kursGlatt) + "°</b> über Grund" +
+          (gem == null ? "" : " (gemeldet " + Math.round(gem) + "°)"));
+      }
       zeilen.push("<b>" + spurPunkte.length + "</b> Spurpunkte über " + STUNDEN + " h");
       el.werte.innerHTML = zeilen.join("<br>");
     }, 1000);
@@ -786,6 +870,9 @@
     zeichneSpur();
     bauSchiff();
     kameraAufSpur();
+    // Der Kurs wird bei JEDEM Takt fortgeschrieben, auch ohne Mitfahrt:
+    // Sonst stuende der Rumpf auf einem alten Wert, sobald der Schalter aus ist.
+    viewer.clock.onTick.addEventListener(kursTakt);
     viewer.clock.onTick.addEventListener(fpvTakt);
     meldungWeg();
 

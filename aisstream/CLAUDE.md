@@ -1850,11 +1850,12 @@ blickt in Fahrtrichtung, 8° nach unten geneigt.
 - **Nur während des Abspielens.** Beim Laden gibt es die Übersicht; Pause
   gibt die Kamera frei zum Umsehen. Das spart einen zweiten Schalter: „läuft"
   und „ich will mitfahren" sind im Betrieb dasselbe.
-- **Der Kurs kommt vom vorderen Stützpunkt, nicht interpoliert** — dieselbe
-  Regel wie beim Richtungspfeil des 2D-Clients: Zwischen zwei gemeldeten
-  Kursen zu mitteln wäre erfunden, die Position dazwischen ist eine
-  Schätzung, der Kurs war ein Messwert. Ohne `cog` trägt die
-  Streckenrichtung (`peilung()`).
+- **Der Kurs kommt aus dem gefahrenen Weg, nicht aus dem gemeldeten Feld** —
+  und das ist **bewusst die Umkehr der 2D-Regel**. Dort trägt der gemeldete
+  `cog`, weil der Richtungspfeil einen Messwert zeigt. Die Kamera dagegen
+  bewegt sich entlang der interpolierten Bahn: Blickte sie nach dem
+  gemeldeten Feld, führe sie sichtbar seitwärts. Siehe den eigenen Abschnitt
+  unten.
 - **`requestRenderMode` muss während der Fahrt aus.** Sonst zeichnet die
   Seite nur alle `maximumRenderTimeChange` Sekunden Simulationszeit ein Bild
   und die Fahrt ruckelt. Beim Pausieren wird es wieder eingeschaltet — ein
@@ -1898,6 +1899,49 @@ in einem fremden Rahmen gelesen".
 **Und die Tafel nennt jetzt die Kamerahöhe über der Fläche.** Damit ist die
 nächste Rückmeldung eine Zahl statt eines Eindrucks.
 
+#### „Das Schiff dreht mit dem AIS-Kurswert" — Kurs über Grund statt Meldung
+
+Gemeldet, und zutreffend. `kursUeberGrund(t)` nimmt jetzt die **Richtung der
+Strecke, die gerade gefahren wird**, statt des gemeldeten `cog`.
+
+**An drei echten 6-Stunden-Spuren nachgemessen** (MADRID MAERSK, BREMERHAVEN,
+LUNA-B; Stützpunkte 60 s, nur Abschnitte mit ≥ 5 m Fahrt):
+
+| | Median | 90 % | max |
+|---|---|---|---|
+| \|gemeldeter COG − gefahrene Peilung\| | 1,0–4,2° | 5–**61°** | ~178° |
+| Richtungssprung an einem Stützpunkt | 1,1–5,6° | 7,7–**18,9°** | ~178° |
+
+Beide Zeilen tragen je eine Entscheidung:
+
+- **Meist stimmen beide überein, manchmal überhaupt nicht.** Der Unterschied
+  ist kein Rundungsfehler.
+- **Umschalten allein genügt nicht.** Die gefahrene Richtung springt an jedem
+  Stützpunkt, bei 60-fachem Abspielen also jede Sekunde. Deshalb wird
+  geglättet — und zwar über den **Richtungsvektor**, nicht über den Winkel:
+  Ein Tiefpass auf Grad liefe bei 359° → 1° die falsche Runde.
+  `alpha = 1 − exp(−dt/τ)` mit τ = 0,8 s **Wanduhrzeit**, damit die Glättung
+  nicht an der Bildrate hängt.
+- **Geschnappt statt geschwenkt**, wenn der Ort um mehr als 800 m springt
+  (Zeitregler) — ein Schwenk über den halben Hafen wäre kein Übergang,
+  sondern ein Fehler.
+- **Die 10-m-Grenze** trennt Fahrt von Rauschen: Bei 60 s Abstand sind das
+  rund 0,3 kn. Genau darunter entstehen die 178°-Ausreißer der Messung.
+- **Im Stand gilt die zuletzt gefahrene Richtung**, nicht der gemeldete Kurs:
+  Ein liegendes Schiff dreht sich nicht, und COG ist bei 0 kn unbrauchbar.
+  Der gemeldete Wert trägt nur, wenn die Spur sich **nie** bewegt hat.
+
+**Keine Hermite-Bahn.** Das wäre die andere Antwort auf „realistischer" —
+dagegen sprechen dieselben Daten: Bei fast stillliegenden Schiffen enthält
+die Spur Richtungswechsel bis 178°, eine Kurve zöge daraus Schleifen.
+
+**Rumpf und Kamera aus einer Quelle.** Der Kasten hing an
+`VelocityOrientationProperty` — auch aus der Bewegung, aber ungeglättet und
+im Stand undefiniert. Jetzt trägt ihn dieselbe Zahl, über
+`Transforms.headingPitchRollQuaternion` — **minus 90°**, und das ist kein
+Zauberwert: Cesiums HPR-Rahmen kommt aus `eastNorthUpToFixedFrame`, dessen
+**+X nach Osten** zeigt. Ein Kurs von 110° landete gemessen bei 200°.
+
 #### Warum die Probe das durchgehen ließ
 
 Sie maß `heading` und `pitch` — **nicht `roll` und nicht die Blickrichtung
@@ -1920,7 +1964,7 @@ beim Richtungspfeil und beim Tallinn-Foto: **ansehen, nicht ableiten.**
 | **Die Kopfzeile** hatte einen Verlauf nach Dunkel — über einer hellen Luftaufnahme war die Unterzeile unlesbar. Jetzt ein Kasten, der auf jedem Grund trägt |
 | **Die Kamera** stand genau von Norden: Die Wand war von der Kante gesehen ein Strich, und die dritte Dimension zeigte sich gar nicht. Jetzt −35° Kurs, −28° Neigung |
 
-### Gemessen in `scratchpad/drei.js` (58 Prüfungen)
+### Gemessen in `scratchpad/drei.js` (64 Prüfungen)
 
 Gegen einen **echten** aisproxy, dessen Datenbank vorher mit **seiner eigenen
 `Speicher`-Klasse** gefüllt wird — ein nachgebauter Endpunkt hätte genau die
@@ -1944,6 +1988,21 @@ Formatfragen offengelassen, auf die es ankommt.
   also nicht zu unterscheiden. Mit einem **gestellten Gelände von 40 m**
   (`globe.getHeight` überschrieben) steigt die Kamera gemessen auf **90 m**
   und der Kasten auf **40 m**.
+- **Der Kurs über Grund braucht absichtlich widersprüchliche Testdaten** —
+  ausnahmsweise, sonst prüft er nichts: Die zweite Hälfte der Probenspur
+  **fährt** nach 110°, **meldet** aber 200°. Gemessen 110,0 — mit dem alten
+  Stand waren es 200,0, das ist die Gegenprobe. Am Ende liegt das Schiff und
+  meldet 300°: Die Kamera behält die zuletzt gefahrenen 110°.
+- **Die Glättung wird an der DAUER gemessen, nicht an Grad je Probe.** Die
+  Zahl der Zwischenwerte hängt an der Bildrate, und die liegt in dieser
+  Sandbox bei **2 Bildern/s** (Software-Rendering) — ein Bild ist hier eine
+  halbe Sekunde. Die Dauer ist davon unabhängig; ohne Glättung wäre sie
+  **null**, ein einziger Schritt von 90°.
+- **Rumpf und Kamera zeigen dieselbe Richtung** (< 3°) — die Prüfung, die
+  den 90°-Versatz der HPR-Achse gefunden hat.
+- **Der Multiplikator gehört ins `clockViewModel`.** `clock.multiplier`
+  allein blieb wirkungslos: Das Animationswidget schreibt seinen eigenen Wert
+  bei jedem Bild zurück, gemessen lief die Uhr rund 500-fach statt 60-fach.
 - **Die Vorgabe wird an den angefragten ion-Assets gemessen**, nicht am Wert
   des Wählers: Mit ungültigem Token fällt der ohnehin auf `osm` zurück. Die
   Seite fragt **2 und 1** (Luftbild, Gelände) und **nicht** 2275207.
