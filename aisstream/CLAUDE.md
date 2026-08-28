@@ -1798,17 +1798,50 @@ entscheidet deshalb am Code, und der Unterschied zwischen „kein Token" und
 **Beide Zugänge stehen im Browser, nicht im Quelltext** (`aisstream_ion_token`,
 `aisstream_google_key`) — anders als das Proxy-Token, das nichts kostet.
 
-### Die dritte Dimension muss etwas bedeuten
+### Die dritte Dimension trägt die Fahrt, nicht ein Diagramm
 
-Alle AIS-Punkte liegen auf Höhe 0. Ein Band flach über dem Wasser wäre 3D
-ohne Aussage. Die **Höhe trägt die Zeit** (älteste Punkte unten), umschaltbar
-auf **Geschwindigkeit** oder **flach**. Dazu eine halbdurchsichtige Wand
-hinunter zum Wasser: Ohne sie schwebt ein Band im Raum, und niemand sieht,
-über welcher Stelle es steht.
+Hier stand einmal ein aufsteigendes Band: Die **Höhe** der Spur trug die Zeit
+(umschaltbar auf Geschwindigkeit), dazu eine Wand hinunter zum Wasser. Die
+Begründung war gut — alle AIS-Punkte liegen auf Höhe 0, ein flaches Band wäre
+3D ohne Aussage. **Im Betrieb stand es trotzdem im Weg**, gemeldet als „die
+Tracklinie soll nicht aus dem Wasser herauskommen". Beide Höhenmodi sind
+ersatzlos entfallen.
 
-**Die Bandhöhe ist keine feste Zahl.** Mit festen 500 m stand über einer
-1,5-km-Fahrt eine fast senkrechte Wand — auf dem Schirmfoto ein Strich, keine
-Kurve. Sie ist jetzt **28 % der Ausdehnung der Spur** (60 bis 900 m).
+Übrig ist **eine** Linie, die am Untergrund klebt (`clampToGround`), mit
+`classificationType: BOTH` statt nur `TERRAIN`: In der Stufe `foto` ist der
+Globus aus, und eine nur ans Gelände geklebte Linie hätte dort nichts, worauf
+sie liegen könnte. **Diese eine Stelle ist ohne Token nicht messbar.**
+
+Die dritte Dimension trägt jetzt die **Fahrt**.
+
+#### Mitfahren: Blick von der Brücke
+
+Beim Abspielen sitzt die Kamera **20 m über dem Schiff** (`AUGENHOEHE`) und
+blickt in Fahrtrichtung, 8° nach unten geneigt.
+
+- **Nur während des Abspielens.** Beim Laden gibt es die Übersicht; Pause
+  gibt die Kamera frei zum Umsehen. Das spart einen zweiten Schalter: „läuft"
+  und „ich will mitfahren" sind im Betrieb dasselbe.
+- **Der Kurs kommt vom vorderen Stützpunkt, nicht interpoliert** — dieselbe
+  Regel wie beim Richtungspfeil des 2D-Clients: Zwischen zwei gemeldeten
+  Kursen zu mitteln wäre erfunden, die Position dazwischen ist eine
+  Schätzung, der Kurs war ein Messwert. Ohne `cog` trägt die
+  Streckenrichtung (`peilung()`).
+- **`requestRenderMode` muss während der Fahrt aus.** Sonst zeichnet die
+  Seite nur alle `maximumRenderTimeChange` Sekunden Simulationszeit ein Bild
+  und die Fahrt ruckelt. Beim Pausieren wird es wieder eingeschaltet — ein
+  liegengelassener Tab soll nicht dauerhaft rendern.
+- **Der eigene Rumpf wird ausgeblendet.** Die Kamera sitzt 20 m über der
+  *Mitte* des Kastens; bei 180 m Länge und 8 m Höhe füllte er auf dem
+  Schirmfoto die halbe Sicht und verdeckte die Spur voraus. In der Mitfahrt
+  **ist** man das Schiff. Wieder eingeblendet wird er beim Pausieren.
+- **Vorgabe des Untergrunds ist `gebaeude`** (Luftbild + Gelände + Gebäude,
+  alles aus ion) — im Betrieb die beste Stufe. `foto` bleibt wählbar.
+
+**Offen:** Die 20 m gelten über der WGS84-Ellipsoide. Ob der Meeresspiegel im
+ion-Weltgelände genau dort liegt, ist ohne Token nicht prüfbar; in der Stufe
+`osm` (kein Gelände) ist er es, und dort wird gemessen. Sitzt die Kamera im
+Gebäudemodus zu hoch oder zu tief, ist es diese eine Konstante.
 
 ### Drei Mängel, die erst das Schirmfoto gezeigt hat
 
@@ -1821,7 +1854,7 @@ beim Richtungspfeil und beim Tallinn-Foto: **ansehen, nicht ableiten.**
 | **Die Kopfzeile** hatte einen Verlauf nach Dunkel — über einer hellen Luftaufnahme war die Unterzeile unlesbar. Jetzt ein Kasten, der auf jedem Grund trägt |
 | **Die Kamera** stand genau von Norden: Die Wand war von der Kante gesehen ein Strich, und die dritte Dimension zeigte sich gar nicht. Jetzt −35° Kurs, −28° Neigung |
 
-### Gemessen in `scratchpad/drei.js` (37 Prüfungen)
+### Gemessen in `scratchpad/drei.js` (48 Prüfungen)
 
 Gegen einen **echten** aisproxy, dessen Datenbank vorher mit **seiner eigenen
 `Speicher`-Klasse** gefüllt wird — ein nachgebauter Endpunkt hätte genau die
@@ -1830,24 +1863,31 @@ Formatfragen offengelassen, auf die es ankommt.
 - **Das Bild wird an Bildpunkten geprüft.** „Keine Fehler in der Konsole" ist
   bei einer 3D-Szene kein Beweis. Gemessen: **1 029 verschiedene Farben** mit
   Boden gegen **42** ohne. Deshalb werden die OSM-Kacheln über Node
-  umgeleitet und **mitgezählt** (69) — ohne das misst der Test nur den Himmel.
-- **Höhe = Zeit** gegen **Höhe = Geschwindigkeit** ergibt nachweislich
-  verschiedene Kurven (0→790 m gegen 70→405 m bei derselben Spur), und die
-  Höhe wird gegen die **unabhängig nachgerechnete** Bodenausdehnung geprüft,
-  nicht gegen eine feste Zahl.
+  umgeleitet und **mitgezählt** — ohne das misst der Test nur den Himmel.
+- **Die Spur bleibt unten:** genau eine Polylinie, geklebt, keine Wand, und
+  die größte Höhe aller Stützpunkte ist **0,00 m** (vorher 790 m).
+- **Die FPV an den echten Kamerawerten:** Die Probenspur macht einen
+  **Kurswechsel** (erste Hälfte 20°, zweite 110°, Positionen passend — eine
+  Probe mit widersprüchlichen Daten verdeckte den Rückfall auf die
+  Streckenrichtung). Gemessen: Augenhöhe **20,0 m**, Abstand zum Schiff
+  **20,0 m**, Kurs **20,0° → 110,0°**, Neigung **−8,0°**; in der Pause bleibt
+  die Kamera stehen, mit ausgeschaltetem Schalter auch beim Abspielen.
+- **Die Vorgabe wird an den angefragten ion-Assets gemessen**, nicht am Wert
+  des Wählers: Mit ungültigem Token fällt der ohnehin auf `osm` zurück. Die
+  Seite fragt **2 und 1** (Luftbild, Gelände) und **nicht** 2275207.
 - `window.__viewer` ist der Griff dafür: An einer 3D-Szene lässt sich über
   das DOM nichts messen, eine Polylinie hat keinen Knoten.
 - iPhone 15 und iPad Pro 11 quer: kommt hoch, keine Überbreite, 44-px-Ziele.
 - Der Link aus der Detailansicht trägt MMSI und Zeitfenster und **bleibt
   derselbe Knoten**, während Meldungen laufen.
 
-**Vier Fehler der Probe, alle vom Lauf gefunden:** der Regler wurde
+**Fünf Fehler der Probe, alle vom Lauf gefunden:** der Regler wurde
 angesprochen, ohne die Tafel zu öffnen („element is not visible"); die
 Spannweite maß die 3D-Diagonale, in der die gesuchte Höhe schon steckt; im
 Client-Teil fehlte der HTTPS-Umleiter, also lud Leaflet nicht und die Tabelle
-blieb leer („Schiff nicht in der Tabelle" meinte die Probe selbst); und der
-Client zeigt nur, was im **heißen** Zustand des Proxys steht — die Historie in
-der Datenbank allein genügt ihm nicht, es braucht einen echten Strom.
+blieb leer („Schiff nicht in der Tabelle" meinte die Probe selbst); der
+Client zeigt nur, was im **heißen** Zustand des Proxys steht; und zwei Läufe
+unmittelbar hintereinander scheitern, weil der Vorgänger die Ports noch hält.
 
 ### Was hier NICHT geprüft werden kann
 
