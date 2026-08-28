@@ -15,7 +15,15 @@
 	# (AIS_ZUGANG, als ?token= oder Bearer-Header) - das kann der Client
 	# mitschicken. Basic-Auth bleibt fuer das, was ein Mensch im Browser
 	# aufruft.
-	@schnittstelle path /v1/live* /v1/snapshot* /v1/replay* /v1/track* /v1/ship/* /v1/foto/*
+	#
+	# ACHTUNG, hier ist schon einmal etwas vergessen worden: Diese Liste muss
+	# JEDEN Pfad enthalten, den der Client aufruft. /v1/ort kam spaeter dazu
+	# und fehlte hier - Caddy antwortete dem Browser mit 401, bevor der Proxy
+	# ueberhaupt gefragt wurde, und der Client schrieb Zielangaben wie "CIABJ"
+	# unaufgeloest hin. Auffallen konnte das nur bei Haefen ausserhalb seiner
+	# eigenen Rueckfalltabelle, hier Abidjan. test/caddy.test.js vergleicht die
+	# Liste deshalb mit den Routen in server.js.
+	@schnittstelle path /v1/live* /v1/snapshot* /v1/replay* /v1/track* /v1/ship/* /v1/foto/* /v1/ort*
 	handle @schnittstelle {
 		reverse_proxy proxy:8080
 	}

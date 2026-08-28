@@ -228,6 +228,45 @@ Kaliningrad. Es wird also nichts entschieden, was nicht schon entschieden
 ist. Wo es keine deutsche Form gibt, bleibt der amtliche Name stehen; das ist
 die richtige Auskunft, keine Luecke.
 
+### Der Weg dorthin muss auch offenstehen
+
+Gemeldet: „Warum wird bei MMSI 247091500 CIABJ im Ziel nicht aufgeloest?" —
+CIABJ ist Abidjan, steht mit `Function = 1--45---` in der UNECE-Liste und
+haette aufgeloest werden muessen. Nachgemessen an der laufenden Anlage:
+
+| Pfad | ohne Basic-Auth, nur mit Token |
+|---|---|
+| `/v1/ship/247091500` | **200** |
+| `/v1/snapshot` | **200** |
+| `/v1/ort?codes=CIABJ` | **401** |
+
+`/v1/ort` kam nach der `Caddyfile` dazu und stand nicht im
+`@schnittstelle`-Matcher. Caddy verlangte dafuer Basic-Auth, die ein
+Browser-`fetch` nicht mitschickt, und antwortete mit 401 — **der Proxy wurde
+nie gefragt**. Auffallen konnte das nur bei Haefen ausserhalb der 163 Eintraege
+des Client-Rueckfalls: Hamburg, Rotterdam und Danzig loest der Client selbst
+auf, Abidjan nicht.
+
+Drei Dinge sind daraufhin geaendert worden, und alle drei braucht es:
+
+- **Der Pfad steht jetzt im Matcher.** `test/caddy.test.js` vergleicht die
+  Liste mit den Routen in `server.js` und faellt durch, wenn einer fehlt —
+  mit zurueckgebautem Eintrag meldet er genau `/v1/ort`.
+- **`update.sh` laedt Caddy neu.** Die `Caddyfile` ist eingehaengt, nicht ins
+  Abbild gebaut: `up -d --build` tauscht den Container nicht aus, wenn sich
+  nur diese Datei aendert. Der Fix waere sonst nach dem Update in der Datei
+  gestanden und trotzdem wirkungslos geblieben.
+- **Der Client meldet den 401.** Vorher verschluckte er jede fehlgeschlagene
+  Antwort (`r.ok ? r.json() : null`), und der einzige Hinweis war ein
+  Ortsname, der roh stehenblieb. Jetzt steht die Ursache im Protokoll —
+  einmal, nicht bei jeder Zielangabe.
+
+Dazu eine vierte Aenderung, dieselbe Familie: Der Client merkte sich
+**Fehlanzeigen dauerhaft**. Ein „kenne ich nicht" aus einem Moment, in dem das
+Ortsregister noch leer war, waere damit fuer immer stehengeblieben. Gemerkt
+werden jetzt nur die Treffer; die Fehlanzeige gilt fuer die Sitzung, und das
+reicht, um den Client von wiederholten Fragen abzuhalten.
+
 **Der Rueckfall im Client folgt derselben Regel** - und **nur Seehaefen**.
 Beim Nachziehen der deutschen Namen waren vier Binnenorte hineingeraten:
 DEBHV (Bruchhausen-Vilsen), DEBKM (Bruckmuehl), DENOK (Nordkirchen), DEODE

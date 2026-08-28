@@ -461,6 +461,30 @@ Drei Entscheidungen, jede mit einem Grund:
   bleibt die Flagge leer). Gemessen betrifft das **110 von 17 596 Häfen**,
   also 0,6 %.
 
+#### Ein 401 auf `/v1/ort` sah aus wie „der Ort ist unbekannt"
+
+Gemeldet: *„Warum wird bei MMSI 247091500 CIABJ im Ziel nicht aufgelöst?"* —
+Abidjan, größter Hafen Westafrikas, steht ordentlich in der UNECE-Liste. Der
+Fehler lag **nicht** im Client und nicht in der Liste: `/v1/ort` fehlte im
+`@schnittstelle`-Matcher der `Caddyfile`, Caddy verlangte dafür Basic-Auth —
+die ein `fetch` nicht mitschickt — und antwortete mit 401. Gemessen an der
+laufenden Anlage: `/v1/ship` und `/v1/snapshot` **200**, `/v1/ort` **401**.
+
+Auffallen konnte das nur bei Häfen außerhalb der 163 Einträge des Rückfalls;
+Hamburg, Rotterdam und Danzig löst der Client selbst auf. Zwei Lehren für
+diese Datei:
+
+- **Ein stiller Fehlschlag ist der teuerste.** `ortHolen()` hatte
+  `r.ok ? r.json() : null` und schwieg. Jetzt steht die Ursache im Protokoll —
+  **einmal**, nicht bei jeder Zielangabe (dasselbe Muster wie
+  `snapshotTickFehler` und `ownPosErrLogged`).
+- **Fehlanzeigen werden nicht mehr dauerhaft gemerkt.** Ein „kenne ich nicht"
+  aus einem Moment, in dem der Proxy nicht antwortete oder sein Ortsregister
+  noch leer war, wäre sonst für immer in `aisstream_orte` stehengeblieben.
+  Persistiert werden nur Treffer; die Fehlanzeige gilt für die Sitzung und
+  hält den Client dort von wiederholten Fragen ab. Alte Einträge mit `null`
+  werden beim Lesen verworfen.
+
 `reiseInfo()` liefert Text und Länder **in einem Durchlauf**: Zweimal zu
 zerlegen wäre zweimal dieselbe Falle, und die beiden könnten auseinanderlaufen.
 
