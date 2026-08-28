@@ -526,10 +526,25 @@ Ausdruck — sonst frisst `->` den Anfang von `<-->` und übrig bleibt
 „DEHAM<-". Der Bindestrich trennt nur, wenn **alle** Teile wie ein Code
 aussehen, sonst zerfiele „SPODSBJERG-TAARS".
 
-Gemessen in `scratchpad/reiseprobe.js` gegen einen echten Proxy, 21
-Prüfungen an drei Schiffen: `NOMSS>DEHAM` (Nachfrage beim Proxy, Länder,
-Verlauf), `BRAKE` (die Falle) und `DECUX-DEHGL-DECUX` (Bindestrich und ein
-Land dreimal).
+**Und Leerzeichen um den Strich gehören dazu.** Gemeldet für MMSI 431549000:
+`DEWVN - DEBRV` blieb stehen, während `DEKEL-DERSK` längst auflöste — die
+Prüfregel verlangte den Strich ohne Leerzeichen. Am laufenden Snapshot
+nachgezählt (1 590 Zielangaben, 76 mit Bindestrich):
+
+| Form | Anzahl |
+|---|---|
+| löste schon auf (`DECUX-DEHGL-DECUX`) | 7 |
+| **neu**: mit Leerzeichen (`DEWVN - DEBRV`) | 1 |
+| bleibt roh, und das ist richtig (`HAMBURG-HAFEN`, `EMDEN-BORKUM`, `BRHV-T2-BRHV`) | 68 |
+
+Ein einziger Fall also — aber einer, den die Regel schon gemeint hat. Die
+68 anderen bleiben unangetastet: Ihre Teile sehen nicht wie Codes aus, und
+genau daran hängt die Regel.
+
+Gemessen in `scratchpad/reiseprobe.js` gegen einen echten Proxy, 23
+Prüfungen an vier Schiffen: `NOMSS>DEHAM` (Nachfrage beim Proxy, Länder,
+Verlauf), `BRAKE` (die Falle), `DECUX-DEHGL-DECUX` (Bindestrich und ein Land
+dreimal) und `DEWVN - DEBRV` (Strich mit Leerzeichen).
 **Der Code im Test darf nicht im Rückfall stehen** — sonst löst der Client
 ihn selbst auf, es geht keine Abfrage raus, und die Probe ist grün, ohne den
 Proxyweg berührt zu haben. Deshalb zählt sie die `/v1/ort`-Anfragen mit: eine

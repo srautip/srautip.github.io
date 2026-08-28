@@ -3157,8 +3157,14 @@
     var stuecke = roh.split(REISE_TRENNER);
     // Der Bindestrich trennt nur, wenn ALLE Teile wie ein Code aussehen -
     // sonst zerlegte er "SPODSBJERG-TAARS" oder einen Ortsnamen mit Strich.
-    if (stuecke.length === 1 && /^[A-Z]{2}[A-Z0-9]{3}(-[A-Z]{2}[A-Z0-9]{3})+$/.test(roh)) {
-      stuecke = roh.split(/(-)/);
+    //
+    // Leerzeichen um den Strich gehoeren dazu: "DEWVN - DEBRV" kam so aus dem
+    // Betrieb und blieb unaufgeloest stehen, waehrend "DEKEL-DERSK" laengst
+    // ging. Gemessen an 1 590 Zielangaben ist das ein einziger Fall - aber
+    // einer, den die Regel schon gemeint hat.
+    if (stuecke.length === 1 &&
+        /^[A-Z]{2}[A-Z0-9]{3}(\s*-\s*[A-Z]{2}[A-Z0-9]{3})+$/.test(roh)) {
+      stuecke = roh.split(/\s*(-)\s*/);
     }
     var teile = [], offen = [];
     stuecke.forEach(function (t) {
