@@ -252,6 +252,27 @@ Volumes überleben, weil der Projektname in der `docker-compose.yml` fest
 steht (`name: aisproxy`) und nicht aus dem Verzeichnisnamen abgeleitet wird.
 Läuft alles, kann `/opt/aisproxy.alt*` weg.
 
+## Eigene Schiffsbilder nachtragen
+
+Die automatischen Quellen decken gemessen 65 von 134 Schiffen ab. Der Rest
+geht von Hand — und zwar so, dass der Browser das Bild holt und der Proxy es
+nur ablegt:
+
+- **Einzeln:** Schiff im Client anklicken, beim Platzhalter „Bild hinzufügen"
+  wählen — oder ein Bild kopieren und mit **Strg+V** einfügen.
+- **Stapelweise:** Dateien nach der MMSI benennen (`211224140.jpg`) und in den
+  Client ziehen.
+- **Ganzer Ordner:**
+
+  ```bash
+  ./bilder-hochladen.sh ~/schiffsbilder https://<domain>/v1 <token>
+  ```
+
+Der Proxy prüft jede Datei: Token, Größengrenze (`AIS_FOTO_UPLOAD_MAX`, 6 MB,
+geprüft **während** des Lesens) und die ersten Bytes — nur echtes JPEG oder
+PNG. Ein selbst beigesteuertes Bild trägt `foto_quelle: "eigen"` und wird vom
+automatischen Fotolauf nicht mehr angefasst.
+
 ## Sichern
 
 `update.sh` macht das bei jedem Lauf mit. Von Hand:

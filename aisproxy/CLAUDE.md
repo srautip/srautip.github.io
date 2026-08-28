@@ -346,6 +346,13 @@ ersten Bytes - die Angabe des Absenders zaehlt nicht. Eine als `image/jpeg`
 etikettierte HTML-Datei bekommt 415 und wird nicht abgelegt; die Probe dazu
 steht in `test/server.test.js`.
 
+**Stapelweise geht es auch**, denn einzeln anklicken ist der eigentliche
+Aufwand: Mehrere Dateien lassen sich in den Client ziehen, die Zuordnung
+kommt dann aus dem Dateinamen (neun Ziffern am Stueck: `211224140.jpg`,
+`211224140 nordsee.png`, `foto_211224140_2.jpg`). Fuer einen ganzen Ordner
+gibt es `bilder-hochladen.sh`. Beide melden am Ende, was **nicht** zugeordnet
+werden konnte - eine stille Uebergehung liest sich wie "alles geladen".
+
 Ein eigenes Bild traegt `foto_quelle: "eigen"`. Der Fotolauf fasst es nicht
 mehr an, weil `fotoFaellig()` jedes Schiff mit `foto_datei` ueberspringt.
 
