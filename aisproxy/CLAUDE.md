@@ -329,6 +329,34 @@ Die Regel dahinter ist dieselbe wie bei der stillen Kappung: **Ein Bericht,
 der Untaetigkeit und laufende Arbeit gleich aussehen laesst, ist schlimmer als
 gar keiner** - er laedt dazu ein, an einer funktionierenden Anlage zu suchen.
 
+### Eigene Bilder: der einzige Weg mit Trefferquote 1
+
+`POST /v1/foto/<mmsi>`, der reine Bildinhalt im Rumpf. Der Client bietet ihn
+im Detailfenster an - Datei waehlen oder ein kopiertes Bild mit Strg+V
+einfuegen. **Der Browser holt das Bild, der Proxy legt es nur ab**; auf fremde
+Seiten greift kein Automat zu. Fuer Seiten, die automatisiertes Auslesen in
+ihrer robots.txt untersagen (VesselFinder nennt `*/ship-photos/*` und
+`*/uploads/ship-photo/*` und antwortet Nicht-Browsern mit 403), ist das der
+Weg, der bleibt.
+
+Drei Riegel, weil ein Schreibpfad auf einem oeffentlich erreichbaren Dienst
+sonst eine offene Tuer ist: Token wie ueberall, eine Groessengrenze, die
+**waehrend** des Lesens greift (`FOTO_UPLOAD_MAX`, 6 MB), und ein Blick auf die
+ersten Bytes - die Angabe des Absenders zaehlt nicht. Eine als `image/jpeg`
+etikettierte HTML-Datei bekommt 415 und wird nicht abgelegt; die Probe dazu
+steht in `test/server.test.js`.
+
+Ein eigenes Bild traegt `foto_quelle: "eigen"`. Der Fotolauf fasst es nicht
+mehr an, weil `fotoFaellig()` jedes Schiff mit `foto_datei` ueberspringt.
+
+**Dabei aufgefallen:** Der Client hat jede Proxyantwort weggeworfen, deren
+`register` nicht `"gefunden"` war - also jedes Bild, das ueber die
+Commons-Kategorie oder Flickr zu einem Schiff **ohne** Wikidata-Eintrag kam.
+Die Datei lag auf dem Server und war trotzdem unsichtbar. Jetzt reicht ein
+Foto allein. Und `photoUrl()` hebt fremde Adressen weiter auf https, laesst
+die des eigenen Proxys aber in Ruhe: Ein Proxy im eigenen Netz laeuft
+womoeglich auf http, und ein umgeschriebener Bildlink scheitert stumm.
+
 ### Eine Obergrenze je Lauf, und sie wird gemeldet
 
 `FOTO_MAX_PRO_LAUF` = 300. Ohne sie liefe der erste Lauf über 2 900 Schiffe

@@ -31,6 +31,16 @@ function bboxAus(text, vorgabe) {
            latMax: Math.max(t[0], t[2]), lonMax: Math.max(t[1], t[3]) };
 }
 
+// Die ersten Bytes entscheiden, nicht der Content-Type des Absenders: Ein
+// beliebiger Inhalt mit "image/jpeg" davor waere sonst eine Datei, die der
+// Proxy jedem Client als Bild ausliefert.
+function bildArt(buf) {
+  if (buf.length < 12) return null;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "jpg";
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "png";
+  return null;
+}
+
 function jsonAus(res, code, daten) {
   const koerper = Buffer.from(JSON.stringify(daten));
   res.writeHead(code, {
@@ -84,6 +94,7 @@ class Server {
     if (req.method === "OPTIONS") {
       res.writeHead(204, {
         "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
         "Access-Control-Allow-Headers": "Authorization,Content-Type"
       });
       return res.end();
@@ -96,7 +107,10 @@ class Server {
       if (url.pathname === "/v1/replay") return this.replay(url, res);
       if (url.pathname === "/v1/track") return this.track(url, res);
       if (url.pathname.startsWith("/v1/ship/")) return this.ship(url, res);
-      if (url.pathname.startsWith("/v1/foto/")) return this.foto(url, res);
+      if (url.pathname.startsWith("/v1/foto/")) {
+        if (req.method === "POST") return this.fotoNimm(url, req, res);
+        return this.foto(url, res);
+      }
       if (url.pathname === "/" || url.pathname === "/v1") {
         return jsonAus(res, 200, {
           dienst: "aisproxy", region: this.konfig.REGION,
@@ -170,6 +184,71 @@ class Server {
     antwort.register = !stamm || !stamm.geprueft ? "offen"
       : stamm.gefunden ? "gefunden" : "nichts gefunden";
     return jsonAus(res, 200, antwort);
+  }
+
+  // Ein selbst beigesteuertes Bild annehmen: POST /v1/foto/<mmsi>, der reine
+  // Bildinhalt im Rumpf.
+  //
+  // Warum es das gibt: Die automatischen Wege (Wikidata-Abzug, Commons,
+  // Flickr) finden gemessen 65 von 134 Schiffen. Fuer den Rest ist das eigene
+  // Bild der einzige Weg mit Trefferquote 1 - und der einzige, der ohne
+  // fremde Seiten auskommt.
+  //
+  // Drei Riegel, weil ein Schreibpfad auf einem oeffentlich erreichbaren
+  // Dienst sonst eine offene Tuer ist:
+  //   - Token wie ueberall (erlaubt() laeuft schon davor),
+  //   - Groessengrenze, und zwar WAEHREND des Lesens, nicht danach,
+  //   - der Inhalt muss wirklich ein JPEG oder PNG sein. Die Angabe des
+  //     Absenders zaehlt nicht; gelesen werden die ersten Bytes.
+  fotoNimm(url, req, res) {
+    const mmsi = Number(path.basename(url.pathname));
+    if (!Number.isFinite(mmsi) || mmsi <= 0) {
+      return jsonAus(res, 400, { fehler: "mmsi unlesbar" });
+    }
+    const grenze = this.konfig.FOTO_UPLOAD_MAX;
+    const teile = [];
+    let n = 0, abgebrochen = false;
+    req.on("data", (b) => {
+      if (abgebrochen) return;
+      n += b.length;
+      if (n > grenze) {
+        abgebrochen = true;
+        jsonAus(res, 413, { fehler: "Bild groesser als " + Math.round(grenze / 1048576) + " MB" });
+        req.destroy();
+        return;
+      }
+      teile.push(b);
+    });
+    req.on("end", () => {
+      if (abgebrochen) return;
+      const buf = Buffer.concat(teile);
+      const art = bildArt(buf);
+      if (!art) return jsonAus(res, 415, { fehler: "kein JPEG und kein PNG" });
+      try {
+        fs.mkdirSync(this.konfig.FOTO_VERZEICHNIS, { recursive: true });
+        // Ein eigenes Bild ersetzt ein geholtes - und umgekehrt nie: Der
+        // Fotolauf ueberspringt jedes Schiff, das schon eine Datei hat.
+        for (const alt of ["jpg", "png"]) {
+          const weg = path.join(this.konfig.FOTO_VERZEICHNIS, mmsi + "." + alt);
+          if (alt !== art && fs.existsSync(weg)) fs.unlinkSync(weg);
+        }
+        const datei = mmsi + "." + art;
+        fs.writeFileSync(path.join(this.konfig.FOTO_VERZEICHNIS, datei), buf);
+        this.speicher.stammSetze(mmsi, {
+          foto_datei: datei,
+          foto_credit: (url.searchParams.get("credit") || "eigene Sammlung").slice(0, 200),
+          foto_seite: (url.searchParams.get("seite") || "").slice(0, 500) || null,
+          foto_quelle: "eigen",
+          foto_geprueft: Date.now()
+        });
+        this.log("Foto uebernommen: " + datei + " (" + Math.round(buf.length / 1024) + " KB)");
+        return jsonAus(res, 200, { mmsi, foto: "/v1/foto/" + datei, bytes: buf.length });
+      } catch (e) {
+        this.log("Foto uebernehmen fehlgeschlagen: " + e.message);
+        return jsonAus(res, 500, { fehler: e.message });
+      }
+    });
+    req.on("error", () => { if (!abgebrochen) jsonAus(res, 400, { fehler: "Abbruch beim Lesen" }); });
   }
 
   foto(url, res) {

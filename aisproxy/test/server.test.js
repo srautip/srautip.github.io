@@ -227,3 +227,75 @@ test("Fotos werden ausgeliefert, und Pfadtricks laufen ins Leere", async () => {
     assert.strictEqual(versuch.status, 404);
   } finally { abbau(s); }
 });
+
+// Ein echtes, winziges JPEG und PNG - erfundene Bytes pruefen nur die eigene
+// Annahme darueber, wie ein Bild anfaengt.
+const JPEG = Buffer.from(
+  "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0a" +
+  "HBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAA" +
+  "AAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==", "base64");
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmM" +
+  "IQAAAABJRU5ErkJggg==", "base64");
+
+test("eigenes Foto annehmen - und nur, was wirklich eins ist", async () => {
+  const s = await starte(aufbau({ ZUGANG: "geheim", FOTO_UPLOAD_MAX: 6 * 1024 * 1024 }));
+  try {
+    const hin = (kopf, koerper) => fetch(s.basis + "/v1/foto/211000001" + kopf,
+      { method: "POST", body: koerper });
+
+    // Ohne Token faellt der Weg wie jeder andere Pfad aus.
+    assert.strictEqual((await hin("", JPEG)).status, 401);
+
+    const ok = await hin("?token=geheim&credit=" + encodeURIComponent("Foto: ich") +
+                         "&seite=" + encodeURIComponent("https://beispiel/x"), JPEG);
+    assert.strictEqual(ok.status, 200);
+    const antwort = await ok.json();
+    assert.strictEqual(antwort.foto, "/v1/foto/211000001.jpg");
+    assert.ok(fs.existsSync(path.join(s.konfig.FOTO_VERZEICHNIS, "211000001.jpg")));
+
+    // Der Stammsatz haelt Herkunft und Quelle fest - "eigen" ist der Vermerk,
+    // an dem der Fotolauf spaeter nichts mehr aendert.
+    const stamm = s.speicher.stammHole(211000001);
+    assert.strictEqual(stamm.foto_datei, "211000001.jpg");
+    assert.strictEqual(stamm.foto_quelle, "eigen");
+    assert.strictEqual(stamm.foto_credit, "Foto: ich");
+    assert.strictEqual(stamm.foto_seite, "https://beispiel/x");
+
+    // Und es kommt auch wieder heraus.
+    const zurueck = await fetch(s.basis + "/v1/foto/211000001.jpg?token=geheim");
+    assert.strictEqual(zurueck.status, 200);
+    assert.strictEqual(zurueck.headers.get("content-type"), "image/jpeg");
+
+    // PNG ersetzt das JPEG - sonst laegen zwei Dateien fuer dasselbe Schiff da
+    // und der Stammsatz zeigte auf die falsche.
+    const png = await fetch(s.basis + "/v1/foto/211000001?token=geheim",
+      { method: "POST", body: PNG });
+    assert.strictEqual(png.status, 200);
+    assert.ok(fs.existsSync(path.join(s.konfig.FOTO_VERZEICHNIS, "211000001.png")));
+    assert.ok(!fs.existsSync(path.join(s.konfig.FOTO_VERZEICHNIS, "211000001.jpg")));
+
+    // Der Content-Type des Absenders zaehlt NICHT. Ein Skript mit
+    // "image/jpeg" davor koennte sonst beliebige Dateien ablegen, die der
+    // Proxy jedem Client als Bild ausliefert.
+    const falsch = await fetch(s.basis + "/v1/foto/211000002?token=geheim", {
+      method: "POST", headers: { "Content-Type": "image/jpeg" },
+      body: Buffer.from("<html>kein Bild, aber richtig etikettiert</html>")
+    });
+    assert.strictEqual(falsch.status, 415);
+    assert.strictEqual(s.speicher.stammHole(211000002), null);
+  } finally { abbau(s); }
+});
+
+test("zu grosses Bild wird beim Lesen abgebrochen, nicht erst danach", async () => {
+  // Die Grenze muss WAEHREND des Lesens greifen: Wer sie erst hinterher
+  // prueft, hat die Datei schon im Speicher - bei einem Schreibpfad im Netz
+  // ist genau das der Hebel.
+  const s = await starte(aufbau({ ZUGANG: "", FOTO_UPLOAD_MAX: 64 * 1024 }));
+  try {
+    const gross = Buffer.concat([JPEG, Buffer.alloc(200 * 1024, 0x41)]);
+    const r = await fetch(s.basis + "/v1/foto/211000003", { method: "POST", body: gross });
+    assert.strictEqual(r.status, 413);
+    assert.ok(!fs.existsSync(path.join(s.konfig.FOTO_VERZEICHNIS, "211000003.jpg")));
+  } finally { abbau(s); }
+});
