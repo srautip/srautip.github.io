@@ -2965,30 +2965,86 @@
     return hit ? hit : "Status " + code;
   }
 
-  // UN/LOCODE -> Ortsname. Die Zielangabe im AIS ist Freitext, und die Schiffe
-  // schreiben mal "DEHAM", mal "HAMBURG", mal "BE ANR > DE HAM". In der
-  // Tabelle bleibt die Rohform (kurz und wie gesendet), im Detailfenster wird
-  // sie aufgelöst.
+  // UN/LOCODE -> Ortsname.
   //
-  // Woher die Liste kommt: Wikidata (P1937), zugeschnitten auf die Länder um
-  // Nord- und Ostsee plus alles, was im echten Verkehr dieser Region auftaucht
-  // — gemessen an 1 538 Zielangaben von 3 001 Schiffen. 1 113 Einträge,
-  // 17 KB. Die vollständige Liste hat 20 442 Codes und 338 KB; die wären
-  // dreimal so groß wie der ausgelieferte Client.
+  // Das Zielfeld im AIS ist Freitext (ITU-R M.1371, 20 Zeichen): Die Crew
+  // tippt ein, was sie will. Viele halten sich freiwillig an den UN/LOCODE,
+  // viele schreiben "HAMBURG", "FOR ORDERS" oder verschreiben sich. Gemessen
+  // an 1 538 Zielangaben aus dem Betrieb: 320 reine Codes, 84 Routen, 55
+  // Codes mit Leerzeichen — und 1 079 Klartext.
   //
-  // Deutsche Namen, wo es sie gibt: "Antwerpen", nicht "Antwerp".
-  var LOCODE_ROH = "BEANR Antwerpen|BEBBG Blankenberge|BEGNE Gent|BENIE Nieuwpoort|BEOST Ostende|BERUI Ruisbroek|BEZEE Zeebrugge|DE74D Wendeburg|DE75D Niedernwöhren|DE75E Rodenberg|DEAND Andernach|DEBAM Bamberg|DEBBS Berenbusch|DEBDF Rheinhafen Bendorf|DEBEN Bensersiel|DEBES Bad Essen|DEBHV Bruchhausen-Vilsen|DEBKE Brake|DEBKM Bruckmühl|DEBMK Borkum|DEBNK Brinker Hafen|DEBOH Bohmte|DEBON Bonn|DEBRB Brunsbüttel|DEBRE Bremen|DEBRV Bremerhaven|DEBSK Burgstaaken|DEBTA Wendeburg|DEBUM Büsum|DEBUT Butjadingen|DEBWE Braunschweig|DEBXS Spandau|DEBYN Bülstringen|DECGN Köln|DECUX Cuxhaven|DECVO Calvörde|DEDEG Deggendorf|DEDTF Lände Dietfurt|DEDUI Duisburg|DEECK Eckernförde|DEEME Emden|DEEMM Emmerich am Rhein|DEEOM Eggolsheim|DEERL Erlangen|DEFAU Frauenaurach|DEFLF Flensburg|DEFLG Flechtingen|DEFUE Fürth|DEGEM Gemünden am Main|DEGER Germersheim|DEGHM Gernsheim|DEGIF Gifhorn|DEGLU Glückstadt|DEHAJ Hannover|DEHAM Hamburg|DEHAO Hasloch|DEHAU Hanau|DEHBU Husum|DEHGE Hooge|DEHGL Helgoland|DEHHF Heiligenhafen|DEHIE Hille|DEHIL Hildesheim|DEHLH Haldensleben|DEHMM Hamm|DEHOJ Hohenhameln|DEHUS Husum|DEIBB Ibbenbüren|DEKAE Karlsruhe|DEKAP Kappeln|DEKDU Rheinhafen Krefeld|DEKEH Kehl|DEKEL Kiel|DEKEM Kelheim|DEKIT Kitzingen|DEKOB Koblenz|DEKRE Krefeld|DEKSD Karlstadt am Main|DELAH Lahnstein|DELBC Lübeck|DELBE Lübbecke|DELEE Leer|DELIS List auf Sylt|DELWR Ports of Ludwigshafen Rhein|DEMAI Mainz|DEMHG Mannheim|DEMIB Misburger Hafen|DEMID Minden|DEMKT Marktbreit|DEMRU Mehrum|DEMTT Mettingen|DEMUH Mülheim an der Ruhr|DEMUK Fährhafen Sassnitz|DENDT Neustadt|DENHA Nordenham|DENHL Niehl I|DENOK Nordkirchen|DENRD Norderney|DENUE Nürnberg|DEOCF Ochsenfurt|DEODE Odenthal|DEORS Orsoy|DEORT Orth|DEPAP Papenburg|DEPAS Passau|DEPEI Peine|DEPLL Pollhagen|DEPOL Preußisch Oldendorf|DEPUT Puttgarden|DERCK Recke|DEREG Regensburg|DEREN Rendsburg|DERFN Rheinfelden (Baden)|DERSA Riesa|DERSK Rostock|DERTH Roth|DERUB Rusbend|DESES Schiersteiner Hafen|DESNE Sehnde|DESPE Speyer|DESTA Stade|DESTB Straubing|DESTD Strande|DESTL Stralsund|DESZE Seelze|DETFS Triefenstein|DETRV Travemünde|DEWAR Warnemünde|DEWES Wesel|DEWEW Wewelsfleth|DEWHV Wilhelmshaven|DEWIS Wismar|DEWLR Weil am Rhein|DEWOB Wolfsburg|DEWOE Wörth am Rhein|DEWOL Wolgast|DEWOR Worms|DEWUE Würzburg|DEWUN Wunstorf|DEWVN Wilhelmshaven|DK2NK Refsvindinge|DKAAB Aabenraa|DKAAF Aalbaek|DKAAH Barrit|DKAAJ Ebberup|DKAAL Aalborg|DKAAN Glesborg|DKAAO Hurup|DKAAP Aarup|DKAAR Aarhus|DKAAS Vorbasse|DKAAU Langholt|DKAAV Oure|DKABE Auning|DKABJ Kirke Hyllinge|DKABT Albertslund|DKADN Arden|DKAEY Aalestrup|DKAGD Agerbæk|DKANB Ans|DKANS Ansager|DKARK Ærøskøbing|DKARL Årslev|DKASA Asaa|DKASS Asnæs|DKAUB Augustenborg|DKAZS Aars|DKBAG Bagenkop|DKBBG Bøvlingbjerg|DKBDD Bedsted|DKBDG Bording|DKBDX Bandholm|DKBED Beder|DKBES Bedsted|DKBEV Beftoft|DKBGO Bågø|DKBGR Brejning|DKBGS Bagsværd|DKBGZ Bogense|DKBID Bindslev|DKBIL Billum|DKBJB Bjerringbro|DKBKH Blokhus|DKBKK Bække|DKBKM Bækmarksbro|DKBLG Balling|DKBLL Billund|DKBLP Ballerup|DKBMG Bramming|DKBML Blommenslyst|DKBOE Boeslunde|DKBOL Bollersleben|DKBOR Borup|DKBRA Brande|DKBRD Bredsten|DKBRE Bredebro|DKBRG Broacker|DKBRO Brønderslev|DKBRP Brørup|DKBRT Brovst|DKCNL Sindal|DKCPH Kopenhagen|DKCSO Christiansø|DKDAL Dalmose|DKDAS Dansk Salt harbour|DKDGP Gadstrup|DKDIA Dianalund|DKDLD Dronninglund|DKDN6 Dannemare|DKDRA Dragør|DKDRP Durup|DKDYB Dybvad|DKEBJ Esbjerg|DKEBT Ebeltoft|DKEDL Endelave|DKEGV Egtved|DKEND Egernsund|DKENV Engesvang|DKETH Ejstrupholm|DKFAA Faaborg|DKFAK Faxe Ladeplads|DKFDH Frederikshavn|DKFDS Frederikssund|DKFDV Frederiksværk|DKFEJ Fejø|DKFER Ferritslev|DKFJE Fjenneslev|DKFJV Fjerritslev|DKFMK Fensmark|DKFMO Femø|DKFRA Fraugde|DKFRC Fredericia|DKFRE Fredensborg|DKFRM Farum|DKFRS Frøstrup|DKFSO Farsø|DKFUG Fuglebjerg|DKFUH Fur|DKFVG Fårvang|DKFVJ Fårevejle Kirkeby|DKFYH Fynshav|DKGBJ Gadbjerg|DKGDB Guldborg|DKGDM Gudhjem|DKGDS Gedsted|DKGDV Gedved|DKGED Gedser|DKGES Gesten|DKGIL Gislev|DKGIS Gislinge|DKGIV Give|DKGJN Gjern|DKGJR Gjerlev|DKGLD Gelsted|DKGLE Gilleleje|DKGLJ Glejbjerg|DKGLM Glamsbjerg|DKGLO Ganløse|DKGLT Galten|DKGLV Gørlev|DKGLY Glyngøre|DKGNN Grønninghoved|DKGRA Gråsten|DKGRD Gredstedbro|DKGRI Grimstrup|DKGRL Gørløse|DKGRM Gram|DKGRS Græsted|DKGSP Gistrup|DKGUD Gudbjerg|DKGUM Gudme|DKHAA Hårlev|DKHAD Haderslev|DKHAN Hanstholm|DKHAP Havdrup|DKHAS Hals|DKHAU Harndrup|DKHAV Havndal|DKHBA Humlebæk|DKHBL Humble|DKHBO Hobro|DKHBY Haarby|DKHDP Haderup|DKHDS Hadsten|DKHED Hedensted|DKHEJ Hejls|DKHEL Helsinge|DKHEM Hemmet|DKHER Herning|DKHEU Herlufmagle|DKHFE Herfølge|DKHHM Hørsholm|DKHHV Hammerhavn|DKHIR Hirtshals|DKHJA Hjallerup|DKHJE Hoyer|DKHJG Hjørring|DKHJM Hjerm|DKHJN Hejnsvig|DKHLE Hellested|DKHLG Hesselager|DKHLS Helsingör|DKHLV Harlev|DKHME Hammel|DKHNB Havneby|DKHND Hundslund|DKHNG Høng|DKHNN Hinnerup|DKHNS Hornslet|DKHOB Horbelev|DKHOL Holeby|DKHOO Holme-Olstrup|DKHOR Horsens|DKHOS Horslunde|DKHOV Hovedgård|DKHPN Hampen|DKHRE Hørve|DKHRN Hørning|DKHRS Herskind|DKHRV Herlev|DKHSB Holstebro|DKHSL Hasle|DKHST Holsted|DKHSU Hadsund|DKHSV Haslev|DKHSY Hornsyld|DKHTT Hatting|DKHUN Hundested|DKHVA Hvalpsund|DKHVB Hovborg|DKHVG Havnegade|DKHVN Havnsø|DKHVS Hvide Sande|DKHVT Hellebæk|DKIDE Idestrup|DKIKA Ikast|DKJAN Janderup|DKJEL Jelling|DKJGP Jægerspris|DKJOK Hjortshøj|DKJOR Jordrup|DKJRD Jordløse|DKJRP Jyderup|DKJSL Jerslev|DKJUE Juelsminde|DKJUP Jerup|DKJYL Jyllinge|DKJYS Jystrup|DKKAB Karby|DKKAG Kagerup|DKKAI Karise|DKKAL Kalundborg|DKKAV Kalvehave|DKKBK Karrebæksminde|DKKBY Kyndby Huse|DKKIB Kibæk|DKKJE Kjellerup|DKKLA Klampenborg|DKKLE Klemensker|DKKLI Klippinge|DKKLR Klarup|DKKOG Køge|DKKOL Kolding|DKKOY Kongens Lyngby|DKKPV Kliplev|DKKRB Kirkeby|DKKRP Karup|DKKRR Korsør|DKKRS Kruså|DKKT4 Kettinge|DKKTD Kerteminde|DKKTP Kastrup|DKKVB Klovborg|DKKVG Kvistgård|DKKVR Kværndrup|DKLAA Låsby|DKLAN Langå|DKLEJ Lejre|DKLGR Løgstør|DKLGS Langeskov|DKLIS Liseleje|DKLKO Lügumkloster|DKLLS Lille Skensved|DKLMM Lemming|DKLND Lunderskov|DKLNE Lynge|DKLOG Løgstrup|DKLOH Lohals|DKLUN Lundeborg|DKLVG Lemvig|DKLYN Lyngby|DKMAR Marslev|DKMBJ Munke Bjergby|DKMER Mern|DKMES Mesinge|DKMID Middelfart|DKMKE Mørke|DKMLG Malling|DKMLL Millinge|DKMNK Munkebo|DKMRD Morud|DKMRR Mariager|DKMRS Marstal|DKMRU Mundelstrup|DKMRV Maribo|DKNAG Nørager|DKNAK Nakskov|DKNBE Nørreballe|DKNBG Nyborg|DKNBR Nordborg|DKNEX Neksø|DKNIB Nibe|DKNIM Nimtofte|DKNKV Nordenskov|DKNR4 Nyrup|DKNRE Nørre Aaby|DKNRS Nørresundby|DKNSD Nørre Snede|DKNTD Nysted|DKNVD Næstved|DKNYF Nykøbing Falster|DKNYM Nykøbing Mors|DKNYS Nykøbing Sjælland|DKODE Odense|DKODX Odder|DKOKB Østbirk|DKOLG Ølgod Kommune|DKOOT Charlottenlund|DKOP2 Outrup|DKORE Orehoved|DKORO Orø|DKOSD Øster Snede|DKOTK Ølstykke|DKOTT Otterup|DKOTV Øster Tørslev|DKPAN Pandrup|DKPAO Padborg|DKPJE Pjedsted|DKPRS Præstø|DKRAN Randers|DKRDB Rødkærsbro|DKRDG Rødding|DKRDK Rødekro|DKREY Ry|DKRIB Ribe|DKRIN Ringe|DKRKB Rudkøbing|DKRKE Roskilde|DKRKG Ringkøbing|DKRND Rønde|DKRNG Ringsted|DKRNM Ranum|DKRNN Rønne|DKROD Rødbyhavn|DKROF Rødby|DKRON Rønnede|DKROR Aalborg Portland cement plant|DKRRV Rørvig|DKRSL Roslev|DKRSN Resenbro|DKRYM Ryomgård|DKRYN Rynkeby|DKRYS Ryslinge|DKSAB Sabro|DKSAE Sæby|DKSAL Saltum|DKSAU Saunte|DKSAX Sakskøbing|DKSB2 Strøby|DKSBK Stubbekøbing|DKSD7 Sandved|DKSDD Snedsted|DKSDS Søndersø|DKSEO Sejerø|DKSFG Sønder Felding|DKSGD Sonderburg|DKSH6 Store Heddinge|DKSJO Sjællands Odde|DKSK3 Skodsborg|DKSKA Skagen|DKSKD Skovlund|DKSKE Skævinge|DKSKG Skanderborg|DKSKJ Skjern|DKSKL Skals|DKSKM Skamby|DKSKO Skodborg|DKSKP Skørping|DKSKR Skrydstrup|DKSKS Vojens|DKSKV Skive|DKSKY Skibby|DKSLA Slangerup|DKSLB Silkeborg|DKSLE Stenløse|DKSLG Slagelse|DKSM6 Store Merløse|DKSMA Stokkemarke|DKSMG Slimminge|DKSN7 Stensved|DKSNE Snekkersten|DKSNN Svinninge|DKSNO Strynø|DKSOD Sommersted|DKSOK Kongerslev|DKSOL Solrød Strand|DKSOM Sønder Omme|DKSPE Spentrup|DKSPJ Spjald|DKSRO Sorø|DKSSK Skælskør|DKSSV Studstrup|DKSTD Strandby|DKSTE Stege|DKSTR Struer|DKSUS Sunds|DKSVA Svaneke|DKSVB Svebølle|DKSVE Svendborg|DKSVL Skovlunde|DKSVN Svenstrup|DKTB4 Toreby|DKTBA Taarbæk|DKTBY Tårnby|DKTED Thisted|DKTER Terndrup|DKTFT Toftlund|DKTGV Tinglev|DKTHM Them|DKTHN Thyborøn|DKTIM Tim|DKTIS Tistrup|DKTKB Tikøb|DKTLV Taulov|DKTN3 Tune|DKTNO Tunø|DKTOE Tørring|DKTOL Tølløse|DKTOM Tommerup|DKTON Tønder|DKTOR Torup|DKTPN Tappernøje|DKTRI Trige|DKTRM Tarm|DKTRN Tranebjerg|DKTRO Troense|DKTRS Tårs|DKTSV Tisvilde|DKTUB Tuborg Havn|DKTYL Tylstrup|DKULB Ulfborg|DKULD Uldum|DKULL Ullerslev|DKULS Ulstrup|DKVAD Vadum|DKVB2 Vejby|DKVBG Vissenbjerg|DKVBI Viby|DKVBJ Vestbjerg|DKVBK Vedbæk|DKVDE Varde|DKVDL Vandel|DKVDP Vamdrup|DKVG4 Væggerløse|DKVIB Viborg|DKVID Videbæk|DKVIG Vig|DKVIR Virum|DKVJN Vejen|DKVJT Vejstrup|DKVK7 Veksø|DKVLD Vildbjerg|DKVMB Vemb|DKVNR Vinderup|DKVOK Vodskov|DKVOR Vordingborg|DKVPP Vipperød|DKVRA Vrå|DKYRP Bryrup|EEAEN Aegna|EEHAA Vanasadam|EEHUN Hundipea Port|EEKAS Kalasadam|EELEN Tallinner Wasserflugzeughafen|EELHS Lahesuu|EEMUG Muuga|EENAR Narwa|EENOB Noblessner Port|EEPAR Patareisadam|EEPAS Paljassaare Harbour|EEPLA Paldiski North Harbour|EEPLS Paldiski South Harbour|EEPRN Pärnu|EESLM Sillamäe|EESMA Saaremaa Harbour|EETAY Tartu|EETLL Tallinn|EEVAN Old City Harbour|EEVIL Viljandi|EEVIN Viinistu harbour|EEVLG Valga|EGPSD Port Said|ESALC Alicante|ESBCN Barcelona|ESLCG A Coruña|ESLCR Los Cristianos|ESLPA Las Palmas|ESMPG Marín|ESMTO Mataró|ESPAS Pasajes|ESPEV Pontevedra Marina|ESPMI de Palma|ESSAT Puerto de Salinetas|ESSCI San Cibrao|ESVGO Vigo|ESVLC Valencia|ESZJP de Premià|FIAAN Äänekoski|FIAJI Alajärvi|FIALV Alavus|FIANJ Anjalankoski|FIECK Berghamn Harbour|FIES2 Espoo|FIFSF Forssa|FIHAA Haapajärvi|FIHEA Heinola|FIHEL Helsinki|FIHKO Hanko|FIHMN Hamina|FIHPS Haapavesi|FIHRJ Harjavalta|FIHUN Huittinen|FIIMA Imatra|FIINK Inkoo|FIJKS Juankoski|FIJYV Jyväskylä|FIKAI Karigasniemi|FIKAO Kuusamo|FIKAS Kaskinen|FIKAU Kauhava|FIKEM Kemi|FIKEU Keuruu|FIKIN Kauniainen|FIKJI Kemijärvi|FIKJO Kalajoki|FIKLU Klaukkala|FIKMI Kokemäki|FIKNS Kannus|FIKOK Kokkola|FIKTK Kotka|FIKTQ Kitee|FIKUH Kuhmo|FIKVA Kaavi|FIKVI Kiuruvesi|FIKVO Kouvola|FILAN Langnas Port|FILEO Lieto|FILHK Luhtajoki|FILIK Lieksa|FILMA Loimaa|FILOV Loviisa|FILPP Lappeenranta|FILSA Akaa|FIMHQ Mariehamn|FIMUO Muonio|FINLI Naantali|FINOK Nokia|FINUR Nurmes|FINVA Nivala|FIOLA Oulainen|FIOMA Orimattila|FIORV Orivesi|FIOUK Outokumpu|FIOUL Oulu|FIPAO Parkano|FIPOR Pori|FIPRS Pietarsaari|FIPRV Porvoo|FIPSM Pieksämäki|FIRAO Raisio|FIRAU Rauma|FIRIA Riihimäki|FIROY Tornio|FISAI Saarijärvi|FISAL Salo|FISAS Sastamala|FISJY Seinäjoki|FISKV Sköldvik|FISLI Suolahti|FISLL Salla|FISRO Somero|FISUJ Suonenjoki|FISVL Savonlinna harbour|FITKU Turku|FITMP Tampere|FIUKI Uusikaupunki|FIULV Ulvila|FIUUS Kloster Uusi Valamo|FIVAA Vaasa|FIVAI Vainikkala|FIVAT Vantaa|FIVKK Valkeakoski|FIVRK Varkaus|FIVSI Viitasaari|FIVSS Vuosaari Hafen|FIYJA Ylöjärvi|FIYLI Ylivieska|FIYTO Ylitornio|FRAGK Agde|FRAMS Ambès|FRANT Antibes|FRBES Brest|FRBIA Bastia Port|FRBON Bonifacio Port|FRCQF Calais|FRDON de Donges|FRFEC de Fécamp|FRGFR Granville Port|FRLEH Le Havre|FRLTR Le Tréport|FRMRS Marseille|FRMTX Montoir-de-Bretagne LNG terminal|FRNCE Nizza|FRNTE Nantes|FROXA Frouard|FRPOV Port-Vendres|FRPRP Propriano Port|FRRCO Rochefort|FRSET de Sète|FRSNR de Saint-Nazaire|FRTLN Toulon|FRTON Tonnay-Charente|GBABD Aberdeen Harbour|GBAVO Avonmouth|GBAYR Ayr|GBB4R Barrow|GBBAD Barry Docks|GBBEL Belfast|GBBHR Barrow upon Humber|GBBLY Blyth|GBBRS Bristol|GBBSN Baltasound|GBCDF Cardiff Docks|GBCTM Chatham|GBCYN Cairnryan Harbour|GBDVR Dover|GBESH Shoreham-by-Sea|GBFXT Felixstowe|GBGSY Grimsby|GBGTN Garston|GBHAY Hayle|GBHLY Holyhead|GBHRW Harwich International Port|GBHST Hunterston Terminal|GBHUL Hull|GBHYM Heysham|GBIMM Immingham|GBINV Inverness|GBIPS Ipswich|GBKLN King's Lynn Docks|GBLAN Lancaster|GBLAR Larne Port|GBLDY Foyle Port|GBLEI Leith|GBLGP London Gateway|GBLIV Liverpool|GBLON Londoner Hafen|GBLOW Lowestoft|GBLYM Lymington|GBMSC Salford|GBMTH Methil Docks|GBNHV Newhaven|GBNPT Newport Docks|GBNQY Newquay|GBPBM Birkenhead Port|GBPGG Glasgow|GBPLV Porthleven|GBPLY Plymouth|GBPME Portsmouth|GBPOO Poole|GBPRH Portland Harbour|GBPTB Port Talbot|GBPTL Portland|GBRCS Rochester|GBRER Redcar|GBRMG Ramsgate|GBRUN Runcorn|GBSFY Salford|GBSHS Sheerness|GBSHV Shell Haven|GBSOU Southampton|GBSWD Southwold|GBTEE Teesport|GBTHP London Thamesport|GBTIL Tilbury|GBTYN Tyne|GBWTB Whitby|IEAUG Aughinish|IEDUB Dublin Port|IELMK Shannon Foynes Port|IEORK Cork|IEROS Rosslare Europort|IEWAT Waterford|ITANZ Anzio|ITAOL Acciaroli|ITATX Arbatax Port|ITAUG Augusta|ITBDS Brindisi|ITCAG Cagliari|ITCLF Porto di Carloforte|ITCTA Cataina|ITCVV Civitavecchia|ITGHE Porto Marghera|ITGIT Gioia Tauro|ITGOA Genua|ITLIC Licata|ITLIV Livorno|ITMOL Porto Molfetta|ITNAP Neapel|ITOLB Olbia|ITPES Pesaro|ITPFX Porto Foxi|ITPLN Palinuro|ITPMO Palermo|ITPMZ harbour of Imperia-Porto Maurizio|ITPNL Porto di Pantelleria|ITPNZ Ponza Port|ITPSR Pescara|ITPVE Portovesme|ITPZL Pozzallo|ITQCZ Catanzaro|ITRAN Ravenna|ITREG Reggio|ITSAL Salerno|ITSDB San Benedetto del Tronto|ITSVN Savona|ITTAR Tarent|ITTMI harbour of Termoli|ITTPS Trapani|ITTRI Termini Imerese|ITVDL Vado Ligure|ITVSO Vasto|LTAYS Alytus|LTBET Betygala|LTGLV Garliava|LTIGL Ignalina|LTJIE Jieznas|LTJNA Jonava|LTJUR Jurbarkas|LTKLJ Klaipėda|LTKLO Klovainiai|LTKRE Kretinga|LTKUN Kaunas|LTKYB Kybartai|LTLAZ Lazdijai|LTLEN Lentvaris|LTMNK Musninkai|LTNID Nida|LTPKJ Pakruojis|LTPLQ Palanga|LTPRI Prienai|LTPVS Pasvalys|LTRAS Raseiniai|LTRKL Rukla|LTRTS Rietavas|LTSIL Šilutė|LTSKU Skuodas|LTSQQ Šiauliai|LTTKI Trakai|LTUTA Utena|LTVEN Venta|LTVEV Vievis|LTVIS Visaginas|LTVNO Vilnius|LTZAR Zarasai|LTZQA Kalvarija|LVAIZ Aizkraukle|LVAPP Ape|LVBAU Bauska|LVBNH Ludsen|LVDGP Daugavpils|LVDOB Dobele|LVGUL Gulbene|LVJGA Jelgava|LVLPX Libau|LVMAD Madona|LVMRX Mērsrags Port|LVOLA Olaine|LVORE Ogre|LVRIX Riga|LVSDS Saldus|LVSGD Sigulda|LVSKT Saulkrasti|LVSPS Salaspils|LVSTE Smiltene|LVTKM Tukums|LVTSI Talsi|LVVAL Valka|LVVNT Ventspils|LVZKE Koknese|LVZLP Zilupe|NLDZL Delfzijl|NLEEM Eemshaven|NLGRQ Groningen|NLHAR Harlingen|NLMSV Maasvlakte|NLRTM Rotterdam|NLTNZ Terneuzen|NLUTC Utrecht|NLVLI Vlissingen|NLWAL Waalhaven|NOADN Andenes|NOAES Ålesund|NOAND Åndalsnes|NOBER Berg|NOBGO Bergen|NOBNN Brønnøysund|NOBOO Bodø|NOBSY Vestby|NODOM Dombås|NODRM Drammen|NOEGE Egersund|NOFND Finneid|NOFOS Fosnavåg|NOFRE Fræna|NOFTL Fortun|NOGAU Gaular|NOHAU Haugesund|NOHFT Hammerfest|NOHME Hemne|NOHUR Hurum|NOKKN Kirkenes|NOKRS Kristiansand Port|NOKRY Kråkerøy|NOKSU Kristiansund|NOLAR Larvik Port|NOLRI Leirvik|NOMOL Molde|NOMQN Mo i Rana|NOMSS Moss|NOMYO Myre|NONES Nesflaten|NONVK Narvik|NOOSL Oslo|NORAY Radøy|NOSAS Sandnes|NOSET Sem|NOSKN Stokmarknes|NOSKS Skatval|NOSSJ Sandnessjøen|NOSVD Schweinesund|NOSVG Stavanger|NOSVJ Svolvær|NOTOS Tromsø|NOTRD Trondheim|NOTUS Tustna|NOVGY Vågsøy|NOVRR Verran|PLGDN Danzig|PLGDY Gdynia|PLNOW Nowy Port|PLSZZ Stettin|PLTMO Tolkmicko|PTCNL Caniçal|PTLEI Puerto de Leixões|RUAER Sochi|RUAMV Amderma|RUARH Arkhangelsk|RUASF Astrakhan|RUAZO Azov|RUBEM Belomorsk port|RUBER Beringovskiy, Port|RUBNK Bronka|RUBRK in Lomonosov|RUDKS Dikson|RUDUD Dudinka|RUDYR Anadyr|RUEGV Egvekinot|RUEKO Arkhangelsk|RUFIP Vladivostok|RUHTG Hatanga|RUIAA Igarka|RUIAR Yaroslavl|RUIKS Tiksi|RUKAN Kandalaksha|RUKEM Kem|RUKGD Königsberger Hafen|RUKHO Kholmsk|RUKJA Krasnojarsk|RUKOR Korsakov|RUKZP Kavkaz|RULAZ Lazarev|RULED Ports of Saint Petersburg|RUMAG Magadan|RUMEZ Mezen'|RUMMK Murmansk|RUMVO Moskalvo|RUNAC Naberezhnyye Chelny|RUNIA Nikolayevsk-na-Amure|RUNJK Nakhodka|RUNNM Naryan Mar|RUNVS Novorossiysk|RUOHO Okhotsk|RUOLP Ol'ga|RUONG Onega|RUOYA Olya|RUPES Petrozavodsk|RUPGN Prigorodnoje|RUPKC Petropavlovsk-Kamchatsky|RUPRI Primorsk|RUPRN Poronaisk|RUPSE Pos'yet|RUPTN Plastun Port|RUPVS Provideniya|RUPWE Pevek|RURDP Rudnaya Pristan|RURND Rostov-on-Don|RUSAB Sabetta|RUSEW Severodvinsk|RUSHA Shakhtersk|RUSKA Slavyanka|RUTAG Taganrog|RUTMR Temryuk|RUTTI Togliatti river port|RUTUA Tuapse|RUUGL Uglegorsk|RUULU Ust-Luga Multimodal Complex|RUULY Ulyanovsk river port|RUVAR Varandey|RUVIT Vitino|RUVNN Vanino|RUVVO Vladivostok|RUVYG Vyborg|RUVYP Vostochny Port|RUYEY Yeysk|RUZAR Zarubino|RUZEM Zeleniy Mys|SEADG Arild|SEAGH Ängelholm-Helsingborg Airport|SEALF Alfredshem|SEARD Årstadal|SEARN Stockholm Arlanda Airport|SEBMA Stockholm Bromma Airport|SEBMM Bromma|SEBOM Borgholm|SEFAG Falkenberg|SEFLX Flaxenvik|SEFSB Falsterbo|SEGGE Grangärde|SEGOT Göteborg|SEGSP Gullspång|SEGVX Gävle|SEHAA Haparanda|SEHAB Habo|SEHAD Halmstad|SEHBA Backa|SEHEJ Herrljunga|SEHEL Helsingborg|SEHJO Hjo|SEHNB Hörneborg, Örnsköldsvik|SEHND Härnösand|SEHOG Höganäs|SEHSQ Huskvarna|SEJAT Stora Jättersön|SEKAA Karlskrona|SEKAN Karlshamn|SEKBG Karlsborg|SEKGR Kungsör|SEKIA Kinna|SEKLR Kalmar|SEKPS Kapellskär|SEKUB Kubikenborg|SEKVH Kopparverkshamnen|SELDK Lidköping|SELLA Luleå|SELPI Linköping|SEMAN Marsviken coastal water body|SEMJB Mjölby|SEMMA Malmö|SEMMX Malmö Airport|SEMND Mölndal|SEMRA Mora|SENJA SSAB Luleå|SENOR Norrbyskären|SENRK Norrköping|SEORB Örebro|SEOSK Oskarshamn|SEOVE Övertorneå|SEOXI Oxie|SESAK Seskarö|SESAN Sandviken|SESBB Boo|SESDL Sundsvall|SESES Seskarö|SESJA Svenljunga|SESL2 Sälen|SESMD Strömstad|SESMS Salmis|SESPA Spånga|SESPH Sparreholm|SESTO Stockholm|SETAO Tranemo|SETIB Tibro|SETOB Töreboda|SETRG Trelleborg|SEUDD Uddevalla|SEULR Ulricehamn|SEUPP Uppsala|SEVAG Varberg Port|SEVAY Vällingby|SEVIV Vivstavarv|SEVRG Vårgårda|SEVST Västerås";
-  var locodeTabelle = null;
-  function locodeName(code) {
-    if (!locodeTabelle) {
-      locodeTabelle = {};
-      var teile = LOCODE_ROH.split("|");
-      for (var i = 0; i < teile.length; i++) {
-        var t = teile[i], p = t.indexOf(" ");
-        if (p > 0) locodeTabelle[t.slice(0, p)] = t.slice(p + 1);
-      }
+  // Aufgelöst wird deshalb ausschließlich gegen die offizielle Liste der
+  // UNECE, und die liegt im Proxy: 116 213 Zeilen, davon 17 596 Seehäfen.
+  // Hier steht nur ein kleiner Rückfall für den Betrieb ohne Proxy — die
+  // Häfen, die im Verkehr dieser Region wirklich vorkommen, plus die großen
+  // Welthäfen. 163 Einträge statt 289 KB.
+  var ORT_RUECKFALL = "AEJEA Jebel Ali|BEANR Antwerpen|BEGNE Gent (Ghent)|BEOST Oostende (Ostend)|BERUI Ruisbroek|BEZEE Zeebrugge|BRSSZ Santos|CAMTR Montreal|CNSHG Shanghai Pt|CVMIN Mindelo|DEBEN Bensersiel|DEBKE Brake|DEBMK Borkum|DEBRB Brunsbüttel|DEBRE Bremen|DEBRV Bremerhaven|DEBSK Burgstaaken/Fehmarn|DEBUM Büsum|DEBUT Butjadingen|DECUX Cuxhaven|DEECK Eckernförde|DEEME Emden|DEFLF Flensburg|DEGLU Glückstadt|DEHAM Hamburg|DEHGE Hooge|DEHGL Helgoland|DEHSX Harlesiel|DEHUS Husum|DEKEL Kiel|DELBC Lübeck|DELEE Leer|DENHA Nordenham|DEPAP Papenburg|DEPUT Puttgarden|DEREN Rendsburg|DERSK Rostock|DESAS Sassnitz|DESLQ Schluettsiel|DESTA Stade|DESTD Strande|DETRV Travemünde|DEWEW Wewelsfleth|DEWIS Wismar|DEWVN Wilhelmshaven|DKAAB Åbenrå|DKAAR Aarhus|DKCPH København|DKEBJ Esbjerg|DKFDS Frederikssund|DKFDV Frederiksværk|DKFRC Fredericia|DKGED Gedser|DKGFH Gulfhavn|DKGRE Grenaa|DKHIR Hirtshals|DKHOR Horsens|DKKAL Kalundborg|DKKOG Køge|DKKOL Kolding|DKKRR Korsør|DKLIN Lindø Havn|DKNAK Nakskov|DKNYB Nyborg Lystbådehavn|DKODE Odense|DKORE Orehoved, Falster|DKROD Rødbyhavn|DKSGD Sønderborg|DKSIT Stigsnaes Inter Terminal|DKSKA Skagen|DKVEJ Vejle|EEKND Kunda|EESLM Sillamäe|EETLL Tallinn|EGPSD Port Said|ESALG Algeciras|ESBCN Barcelona|ESCAD Cadiz|ESVLC Valencia|FIHEL Helsingfors (Helsinki)|FIKTK Kotka|FIRAU Rauma (Raumo)|FITKU Turku (Åbo)|FIVAA Vaasa (Vasa)|FRBES Brest|FRDKK Dunkerque|FRLEH Le Havre|FRMRS Marseille|FRROU Roubaix|FRSNR Saint-Nazaire|GBABD Aberdeen|GBFXT Felixstowe|GBGRG Grangemouth|GBHUL Hull|GBIMM Immingham|GBLIV Liverpool|GBLON London|GBSOU Southampton|GBTEE Teesport|GIGIB Gibraltar|GRPIR Piraeus|IEDUB Dublin|ISREY Reykjavík|ITGOA Genova|ITRAN Ravenna|LTKLJ Klaipeda|LVLPX Liepaja|LVRIX Riga|LVVNT Ventspils|MACAS Casablanca|MAJFL Jorf Lasfar|MAPTM Tanger Med|MTMAR Marsaxlokk|NGLOS Lagos|NLAMS Amsterdam|NLDZL Delfzijl|NLEEM Eemshaven|NLHAR Harlingen|NLIJM IJmuiden/Velsen|NLLAN Lauwersoog|NLRTM Rotterdam|NLTNZ Terneuzen|NLVLI Vlissingen|NOBGO Bergen|NOHAL Halden|NOJEL Jelsa|NOKRS Kristiansand|NOLAO Langøya|NOOSL Oslo|NOREK Rekefjord|NOSVG Stavanger|NOTRD Trondheim|NOVER Verdal|PLGDN Gdansk|PLGDY Gdynia|PLSWI Swinoujscie|PLSZZ Szczecin|PTLIS Lisboa|RUKGD Kaliningrad|RULED Saint Petersburg (ex Leningrad)|RUULU Ust'-Luga|SEAHU Åhus|SEBAC Bäckviken|SEGOT Göteborg|SEGVX Gävle|SEHEL Helsingborg|SEHLD Holmsund|SEIGG Iggesund|SELAA Landskrona|SELDK Lidköping|SEMMA Malmö|SENRK Norrköping|SEOXE Oxelösund|SESTO Stockholm|SETRG Trelleborg|SEVBY Visby|SEVST Västerås|SGSIN Singapore|SNDKR Dakar|TRISK Iskenderun|USHOU Houston|USNYC New York|ZADUR Durban";
+  var ortNamen = null;      // Code -> Name, oder null fuer "gefragt, unbekannt"
+  var ortOffen = {};        // laufende Abfragen, damit keine doppelt geht
+  var ortGeholt = {};       // nur die Antworten des Proxys - die werden gemerkt
+
+  function ortTabelle() {
+    if (ortNamen) return ortNamen;
+    ortNamen = {};
+    var teile = ORT_RUECKFALL.split("|");
+    for (var i = 0; i < teile.length; i++) {
+      var t = teile[i], p = t.indexOf(" ");
+      if (p > 0) ortNamen[t.slice(0, p)] = t.slice(p + 1);
     }
-    return locodeTabelle[code] || null;
+    // Was der Proxy schon einmal beantwortet hat, überlebt das Neuladen.
+    try {
+      var roh = localStorage.getItem("aisstream_orte");
+      if (roh) {
+        ortGeholt = JSON.parse(roh) || {};
+        for (var k in ortGeholt) {
+          if (Object.prototype.hasOwnProperty.call(ortGeholt, k)) ortNamen[k] = ortGeholt[k];
+        }
+      }
+    } catch (e) {}
+    return ortNamen;
+  }
+
+  function locodeName(code) {
+    var t = ortTabelle();
+    return Object.prototype.hasOwnProperty.call(t, code) ? t[code] : undefined;
+  }
+
+  // Unbekannte Codes beim Proxy nachfragen - gesammelt, nicht einzeln, und
+  // das Ergebnis wird gemerkt. Auch die Fehlanzeige: Sonst fragt der Client
+  // denselben Fantasiecode bei jedem Öffnen erneut.
+  function ortHolen(codes, danach) {
+    if (!proxyAktiv() || !proxyBasis()) return;
+    var t = ortTabelle();
+    var fehlen = codes.filter(function (c) {
+      return !Object.prototype.hasOwnProperty.call(t, c) && !ortOffen[c];
+    });
+    if (!fehlen.length) return;
+    fehlen.forEach(function (c) { ortOffen[c] = 1; });
+    var url = proxyBasis().replace(/\/v1$/, "") + "/v1/ort?codes=" +
+      encodeURIComponent(fehlen.join(","));
+    fetch(proxyMitToken(url))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d) return;
+        for (var k in d) if (Object.prototype.hasOwnProperty.call(d, k)) {
+          t[k] = d[k];
+          ortGeholt[k] = d[k];
+        }
+        // Gemerkt wird NUR, was vom Proxy kam: Der Rückfall steht ohnehin im
+        // Code, ihn mitzuschreiben füllte den lokalen Speicher doppelt.
+        try {
+          var schluessel = Object.keys(ortGeholt);
+          if (schluessel.length > 2000) {
+            var neu2 = {};
+            schluessel.slice(-2000).forEach(function (k) { neu2[k] = ortGeholt[k]; });
+            ortGeholt = neu2;
+          }
+          localStorage.setItem("aisstream_orte", JSON.stringify(ortGeholt));
+        } catch (e) {}
+        if (danach) danach();
+      })
+      .catch(function () {})
+      .then(function () { fehlen.forEach(function (c) { delete ortOffen[c]; }); });
   }
 
   // Trenner, wie sie wirklich vorkommen: "<>", "<=>", "><", ">>", ">", "-".
@@ -3014,6 +3070,7 @@
       stuecke = roh.split(/(-)/);
     }
     var geaendert = false;
+    var offen = [];
     var aus = stuecke.map(function (t) {
       var k = t.trim();
       if (!k) return t;
@@ -3021,10 +3078,20 @@
         return /^(<-->|<->|<=>|<>|><)$/.test(k) ? " ⇄ " : " → ";
       }
       // "DE HAM" schreiben manche mit Leerzeichen.
-      var name = locodeName(k.replace(/\s+/g, ""));
+      var code = k.replace(/\s+/g, "");
+      var name = locodeName(code);
       if (name) { geaendert = true; return name; }
+      // Noch nie gefragt und sieht wie ein Code aus? Dann beim Proxy
+      // nachschlagen und die Ansicht auffrischen, wenn die Antwort da ist.
+      if (name === undefined && /^[A-Z]{2}[A-Z0-9]{3}$/.test(code)) offen.push(code);
       return k;
     }).join("");
+    if (offen.length) {
+      ortHolen(offen, function () {
+        var e = selectedMmsi && ships.get(selectedMmsi);
+        if (e) renderDetail(e);
+      });
+    }
     if (!geaendert) return roh;
     // Die Rohform bleibt sichtbar: Sie steht so auf der Leitung, und wer sie
     // sucht, soll sie nicht erst zurückübersetzen müssen.

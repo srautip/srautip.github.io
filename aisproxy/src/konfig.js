@@ -106,6 +106,12 @@ const konfig = {
   // Obergrenze fuer ein selbst beigesteuertes Bild. 6 MB nimmt ein Foto aus
   // dem Telefon auf, ist aber klein genug, dass ein Schreibpfad im Netz nicht
   // zur Ablage wird.
+  // Die offizielle UN/LOCODE-Liste der UNECE, ueber den Datensatz-Spiegel von
+  // Open Knowledge. 7 MB CSV, 116 213 Zeilen - geholt wird sie hoechstens
+  // alle 90 Tage, die Liste erscheint zweimal im Jahr.
+  ORT_URL: text("AIS_ORT_URL",
+    "https://raw.githubusercontent.com/datasets/un-locode/main/data/code-list.csv"),
+  ORT_ABZUG_MS: zahl("AIS_ORT_ABZUG_MS", 90 * 24 * 3600 * 1000),
   FOTO_UPLOAD_MAX: zahl("AIS_FOTO_UPLOAD_MAX", 6 * 1024 * 1024),
   FOTO_BREITE: zahl("AIS_FOTO_BREITE", 480),
   FOTO_VERZEICHNIS: text("AIS_FOTO_VERZEICHNIS", "./daten/fotos"),

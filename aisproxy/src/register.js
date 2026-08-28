@@ -34,7 +34,7 @@ class Register {
     this.bericht_ = { laeufe: 0, wikidata: 0, wdTreffer: 0, digitraffic: 0,
                       fotos: 0, fotoFehler: 0, fehler: 0,
                       faellig: 0, fotoFaellig: 0, fotoVersucht: 0, fotoOffen: 0,
-                      abzug: null, wege: null,
+                      abzug: null, orte: null, wege: null,
                       letzterLauf: null, laeuftSeit: null, dauerMs: 0 };
     this.bilder = opt.bilder || new Bilder({ konfig: this.konfig, log: this.log });
     fs.mkdirSync(this.konfig.FOTO_VERZEICHNIS, { recursive: true });
@@ -188,6 +188,58 @@ class Register {
       return datei;
     }
     return null;
+  }
+
+  // --- Die Ortsliste: einmal holen, dann Jahre still ---------------------
+  //
+  // Das Zielfeld im AIS ist Freitext (ITU-R M.1371, 20 Zeichen). Viele Crews
+  // schreiben freiwillig einen UN/LOCODE hinein, viele aber auch "HAMBURG",
+  // "FOR ORDERS" oder einen Tippfehler. Gemessen an 1 538 Zielangaben aus dem
+  // Betrieb: 320 reine Codes, 84 Routen mit Trenner, 55 Codes mit
+  // Leerzeichen - und 1 079 Klartext.
+  //
+  // Aufgeloest wird deshalb NUR gegen die offizielle Liste. Sie hat 116 213
+  // Zeilen; behalten werden die 17 596 Seehaefen (Function beginnt mit 1) -
+  // ein Schiff faehrt keinen Bahnhof an, und die Auswahl haelt die Tabelle
+  // klein, ohne bei der Abdeckung etwas zu kosten (gemessen 84 % gegen 86 %
+  // mit allen Codes).
+  async ortAbzug() {
+    const stand = this.speicher.ortStand();
+    if (stand.eintraege && Date.now() - stand.geholt < this.konfig.ORT_ABZUG_MS) {
+      this.bericht_.orte = {
+        eintraege: stand.eintraege, uebersprungen: true,
+        zeit: new Date(stand.geholt).toISOString()
+      };
+      return null;
+    }
+    try {
+      const res = await fetch(this.konfig.ORT_URL, {
+        headers: { "User-Agent": AGENT, "Accept-Encoding": "gzip" },
+        signal: AbortSignal.timeout(120000)
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const text = await res.text();
+      const zeilen = [];
+      // Handgeschriebener CSV-Leser statt einer Abhaengigkeit: Die Datei hat
+      // genau ein Format, und Namen mit Komma stehen in Anfuehrungszeichen.
+      for (const zeile of text.split("\n")) {
+        const f = csvFelder(zeile);
+        if (f.length < 8) continue;
+        const [, land, ort, name, , , , funktion] = f;
+        if (!land || !ort || !name) continue;
+        if ((funktion || "")[0] !== "1") continue;      // nur Seehaefen
+        zeilen.push({ code: land + ort, name, land, funktion });
+      }
+      const n = this.speicher.ortSchreibe(zeilen);
+      this.log("Ortsliste: " + n + " Seehaefen uebernommen");
+      this.bericht_.orte = { eintraege: n, zeit: new Date().toISOString() };
+      return n;
+    } catch (e) {
+      this.bericht_.fehler++;
+      this.log("Ortsliste holen fehlgeschlagen: " + e.message);
+      this.bericht_.orte = { fehler: e.message };
+      return null;
+    }
   }
 
   // --- Der Bildabzug: alles auf einmal statt je Schiff --------------------
@@ -396,6 +448,8 @@ class Register {
       //    Fotofrage fuer den halben Bestand ohne eine einzige Abfrage je
       //    Schiff.
       await this.bildAbzug();
+      // Die Ortsliste steht daneben: einmal geholt, dann 90 Tage still.
+      await this.ortAbzug();
 
       const faellig = this.speicher.stammFaellig(alle);
       if (!faellig.length) {
@@ -505,4 +559,24 @@ class Register {
   }
 }
 
-module.exports = { Register };
+// Eine CSV-Zeile in Felder zerlegen. Anfuehrungszeichen umschliessen Felder
+// mit Komma ("Saint Petersburg (ex Leningrad), Port"), doppelte
+// Anfuehrungszeichen stehen fuer eines.
+function csvFelder(zeile) {
+  const out = [];
+  let feld = "", inAnf = false;
+  for (let i = 0; i < zeile.length; i++) {
+    const c = zeile[i];
+    if (inAnf) {
+      if (c === '"') {
+        if (zeile[i + 1] === '"') { feld += '"'; i++; } else inAnf = false;
+      } else feld += c;
+    } else if (c === '"') inAnf = true;
+    else if (c === ",") { out.push(feld); feld = ""; }
+    else if (c !== "\r") feld += c;
+  }
+  out.push(feld);
+  return out;
+}
+
+module.exports = { Register, csvFelder };

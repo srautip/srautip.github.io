@@ -299,3 +299,24 @@ test("zu grosses Bild wird beim Lesen abgebrochen, nicht erst danach", async () 
     assert.ok(!fs.existsSync(path.join(s.konfig.FOTO_VERZEICHNIS, "211000003.jpg")));
   } finally { abbau(s); }
 });
+
+test("/v1/ort loest Codes auf - und sagt auch, wenn es einen nicht kennt", async () => {
+  const s = await starte(aufbau());
+  try {
+    s.speicher.ortSchreibe([
+      { code: "DEHAM", name: "Hamburg", land: "DE", funktion: "1-3-----" },
+      { code: "BEANR", name: "Antwerpen", land: "BE", funktion: "12345---" }
+    ]);
+    const r = await (await fetch(s.basis + "/v1/ort?codes=DEHAM,beanr,XXZZZ")).json();
+    assert.strictEqual(r.DEHAM, "Hamburg");
+    assert.strictEqual(r.BEANR, "Antwerpen", "Kleinschreibung wird gehoben");
+    assert.strictEqual(r.XXZZZ, null,
+      "die Fehlanzeige gehoert mit in die Antwort - sonst fragt der Client " +
+      "denselben unbekannten Code bei jedem Oeffnen erneut");
+
+    // Was nicht wie ein Code aussieht, wird gar nicht erst gesucht.
+    const leer = await fetch(s.basis + "/v1/ort?codes=HAMBURG,FOR%20ORDERS");
+    assert.strictEqual(leer.status, 400);
+    assert.strictEqual(s.speicher.ortStand().eintraege, 2);
+  } finally { abbau(s); }
+});

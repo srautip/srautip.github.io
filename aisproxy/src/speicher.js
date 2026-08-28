@@ -127,6 +127,18 @@ class Speicher {
     this.spalteErgaenzen("schiff", "foto_quelle", "TEXT");
     this.spalteErgaenzen("schiff", "foto_seite", "TEXT");
 
+    // Die Ortstabelle: UN/LOCODE -> Name, aus der offiziellen Liste der UNECE.
+    //
+    // Warum im Proxy und nicht im Client: Die Liste hat 116 213 Zeilen, davon
+    // 17 596 Seehaefen (Function beginnt mit 1). Als Zeichenkette im Client
+    // waeren das 289 KB - fast so viel wie der ganze ausgelieferte Client.
+    // Hier kostet sie nichts und deckt die ganze Welt ab; der Client fragt
+    // nur die Codes ab, die er gerade sieht, und merkt sie sich lokal.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS ort (
+        code TEXT PRIMARY KEY, name TEXT, land TEXT, funktion TEXT, geholt INTEGER
+      )`);
+
     // Der Bildabzug aus Wikidata. Statt je Schiff zu fragen, wird die
     // vollstaendige Zuordnung einmal geholt und hier gehalten - gemessen
     // 17 144 Zeilen IMO->Bild in EINER Abfrage (0,89 MB, 9,8 s) und 8 638
@@ -440,6 +452,47 @@ class Speicher {
       this.db.prepare(`UPDATE schiff SET ${keys.map(k => k + " = ?").join(", ")} WHERE mmsi = ?`)
         .run(...keys.map(k => daten[k]), Number(mmsi));
     }
+  }
+
+  // --- Orte (UN/LOCODE) -------------------------------------------------
+
+  ortSchreibe(zeilen) {
+    const stmt = this.db.prepare(
+      "INSERT INTO ort (code, name, land, funktion, geholt) VALUES (?, ?, ?, ?, ?) " +
+      "ON CONFLICT(code) DO UPDATE SET name = excluded.name, " +
+      "land = excluded.land, funktion = excluded.funktion, geholt = excluded.geholt");
+    const jetzt = Date.now();
+    let n = 0;
+    this.db.exec("BEGIN");
+    try {
+      for (const z of zeilen) { stmt.run(z.code, z.name, z.land, z.funktion || null, jetzt); n++; }
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      this.log("Ortsliste schreiben fehlgeschlagen: " + e.message);
+      return 0;
+    }
+    return n;
+  }
+
+  ortHole(codes) {
+    const out = {};
+    if (!codes || !codes.length) return out;
+    // Einzelabfragen statt IN (...): Bei hoechstens ein paar Dutzend Codes je
+    // Anfrage ist der Unterschied nicht messbar, und eine zusammengebaute
+    // IN-Liste waere die Stelle, an der eine Eingabe in die Abfrage geriete.
+    const stmt = this.db.prepare("SELECT name FROM ort WHERE code = ?");
+    for (const c of codes) {
+      const r = stmt.get(String(c).toUpperCase());
+      if (r) out[String(c).toUpperCase()] = r.name;
+    }
+    return out;
+  }
+
+  ortStand() {
+    const r = this.db.prepare(
+      "SELECT COUNT(*) AS n, MAX(geholt) AS geholt FROM ort").get();
+    return { eintraege: r.n, geholt: r.geholt || 0 };
   }
 
   bildIndexSchreibe(art, paare) {

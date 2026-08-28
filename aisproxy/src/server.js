@@ -106,6 +106,7 @@ class Server {
       if (url.pathname === "/v1/snapshot") return this.snapshot(url, res);
       if (url.pathname === "/v1/replay") return this.replay(url, res);
       if (url.pathname === "/v1/track") return this.track(url, res);
+      if (url.pathname === "/v1/ort") return this.ort(url, res);
       if (url.pathname.startsWith("/v1/ship/")) return this.ship(url, res);
       if (url.pathname.startsWith("/v1/foto/")) {
         if (req.method === "POST") return this.fotoNimm(url, req, res);
@@ -115,7 +116,8 @@ class Server {
         return jsonAus(res, 200, {
           dienst: "aisproxy", region: this.konfig.REGION,
           endpunkte: ["/v1/snapshot", "/v1/live (WebSocket)", "/v1/replay",
-                      "/v1/track", "/v1/ship/{mmsi}", "/v1/foto/{datei}", "/v1/status"]
+                      "/v1/track", "/v1/ship/{mmsi}", "/v1/foto/{datei}",
+                      "/v1/ort?codes=", "/v1/status"]
         });
       }
       return jsonAus(res, 404, { fehler: "unbekannter Pfad" });
@@ -168,6 +170,26 @@ class Server {
       form: ["t", "lat_1e6", "lon_1e6", "sog_01", "cog_01"],
       punkte: this.speicher.spur(mmsi, von, bis)
     });
+  }
+
+  // UN/LOCODE aufloesen: /v1/ort?codes=DEHAM,BEANR -> { DEHAM: "Hamburg", ... }
+  //
+  // Der Client fragt nur, was er gerade sieht, und merkt sich die Antwort
+  // lokal. Deshalb ein Sammelabruf und keine Einzelabfrage je Code: Ein
+  // Detailfenster nennt bis zu drei Orte, eine Tabellenseite ein paar Dutzend.
+  ort(url, res) {
+    const roh = (url.searchParams.get("codes") || "").toUpperCase();
+    // Obergrenze, damit die Abfrage nicht zum Abzug der ganzen Tabelle wird -
+    // wer die Liste will, holt sie bei der UNECE.
+    const codes = roh.split(",").map(c => c.trim())
+      .filter(c => /^[A-Z]{2}[A-Z0-9]{3}$/.test(c)).slice(0, 100);
+    if (!codes.length) return jsonAus(res, 400, { fehler: "keine brauchbaren Codes" });
+    const namen = this.speicher.ortHole(codes);
+    // Auch die Fehlanzeige ist eine Antwort: Ohne sie fragt der Client
+    // denselben unbekannten Code bei jedem Oeffnen erneut.
+    const antwort = {};
+    for (const c of codes) antwort[c] = namen[c] || null;
+    return jsonAus(res, 200, antwort);
   }
 
   ship(url, res) {
