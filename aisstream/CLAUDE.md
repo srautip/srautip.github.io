@@ -1795,8 +1795,36 @@ entscheidet deshalb am Code, und der Unterschied zwischen „kein Token" und
 | 403 | ion kennt den Token, aber nicht für dieses Asset |
 | 404 | Asset nicht gefunden |
 
-**Beide Zugänge stehen im Browser, nicht im Quelltext** (`aisstream_ion_token`,
-`aisstream_google_key`) — anders als das Proxy-Token, das nichts kostet.
+#### Woher der Zugang kommt
+
+Der Proxy kann ihn **hinterlegen** (`GET /v1/einstellungen`, aus
+`AIS_ION_TOKEN`) — gebeten darum, damit er nicht auf jedem Gerät neu
+eingetragen werden muss. `ionZugang()` und `googleZugang()` sind die eine
+Stelle, die „welcher gilt?" beantwortet: **was im Feld steht, hat Vorrang**,
+sonst der hinterlegte. Ist einer hinterlegt, sagt das der Platzhalter des
+Feldes — sonst stünde dort ein leeres Feld, und niemand wüsste, warum die
+Kacheln trotzdem laden.
+
+Der Abruf gehört in dasselbe `Promise.all` wie Spur und Schiff und **muss vor
+`untergrundSetzen()` fertig sein**: Sonst entschiede die Seite über den
+Untergrund, bevor sie weiß, welcher Zugang gilt.
+
+Geheim ist der hinterlegte Token nicht (siehe `aisproxy/CLAUDE.md`) — der
+Gewinn ist eine Stelle zum Wechseln. Was im Browser eingetragen wird, liegt
+weiterhin nur dort (`aisstream_ion_token`, `aisstream_google_key`).
+
+#### Der Wähler zeigt die Wahl, die Zustandszeile das Ergebnis
+
+Zwei Fehler derselben Familie, beide von der Probe gefunden:
+
+- **Der Rückfall schrieb den Wähler um.** Danach las „Übernehmen" die
+  *zurückgefallene* Stufe statt der gewünschten und baute seelenruhig OSM auf
+   — samt harmlosem „OSM-Karte" als Begründung. Jetzt bleibt der Wähler auf
+  der Wahl stehen; was wirklich trägt, sagt die Zustandszeile.
+- **Zwei Aufbauten konnten sich überholen.** Stufe wählen und gleich
+  „Übernehmen" drücken genügt: Der ältere Lauf räumte ab, was der neuere
+  gebaut hatte. `untergrundLauf` ist ein Zähler; nur der neueste Lauf darf
+  Zustand und Speicher schreiben.
 
 ### Die dritte Dimension trägt die Fahrt, nicht ein Diagramm
 
@@ -1854,7 +1882,7 @@ beim Richtungspfeil und beim Tallinn-Foto: **ansehen, nicht ableiten.**
 | **Die Kopfzeile** hatte einen Verlauf nach Dunkel — über einer hellen Luftaufnahme war die Unterzeile unlesbar. Jetzt ein Kasten, der auf jedem Grund trägt |
 | **Die Kamera** stand genau von Norden: Die Wand war von der Kante gesehen ein Strich, und die dritte Dimension zeigte sich gar nicht. Jetzt −35° Kurs, −28° Neigung |
 
-### Gemessen in `scratchpad/drei.js` (48 Prüfungen)
+### Gemessen in `scratchpad/drei.js` (53 Prüfungen)
 
 Gegen einen **echten** aisproxy, dessen Datenbank vorher mit **seiner eigenen
 `Speicher`-Klasse** gefüllt wird — ein nachgebauter Endpunkt hätte genau die
