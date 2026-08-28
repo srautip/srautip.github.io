@@ -149,7 +149,7 @@
   // Die Spur liegt auf dem Wasser. Ein aufsteigendes Band (Hoehe = Zeit oder
   // Geschwindigkeit) stand hier einmal und ist auf Wunsch wieder raus: Im
   // Betrieb stand es im Weg. Die dritte Dimension traegt jetzt die FAHRT.
-  var AUGENHOEHE = 20;          // Meter ueber dem Wasser, Blick von der Bruecke
+  var AUGENHOEHE = 50;          // Meter UEBER DER FLAECHE, Blick von der Bruecke
   var FPV_NEIGUNG = -8;         // Grad, leicht nach unten - sonst sieht man nur Himmel
 
   function hole(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -394,7 +394,20 @@
       availability: new Cesium.TimeIntervalCollection([
         new Cesium.TimeInterval({ start: t0, stop: t1 })
       ]),
-      position: pos,
+      // Der Sampler liegt auf Hoehe 0 (Ellipsoide), gezeigt wird er auf der
+      // gemessenen Flaeche: Bei einem Geoidversatz laege der Kasten sonst
+      // unter Wasser - derselbe Fehler wie bei der Kamera, nur unbemerkt,
+      // weil er in der Mitfahrt ohnehin ausgeblendet ist.
+      //
+      // Die Ausrichtung bleibt am Sampler: Ein konstanter Hoehenversatz
+      // aendert die Fahrtrichtung nicht.
+      position: new Cesium.CallbackPositionProperty(function (t, ergebnis) {
+        var p = pos.getValue(t);
+        if (!p) return undefined;
+        var c = Cesium.Cartographic.fromCartesian(p);
+        return Cesium.Cartesian3.fromRadians(c.longitude, c.latitude,
+          flaecheHoehe(c), undefined, ergebnis);
+      }, false),
       orientation: new Cesium.VelocityOrientationProperty(pos),
       // Ein Kasten in den echten Massen des Schiffs - kein Modell, das eine
       // Bauform vortaeuscht, die AIS gar nicht hergibt.
@@ -412,6 +425,34 @@
     viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
     viewer.clock.multiplier = 60;
     if (viewer.timeline) viewer.timeline.zoomTo(t0, t1);
+  }
+
+  // Wie hoch liegt die Oberflaeche hier? EINE Stelle, weil sonst Kamera und
+  // Schiff auseinanderlaufen.
+  //
+  // Der Grund: Hoehen in Cesium zaehlen ab der WGS84-Ellipsoide, nicht ab dem
+  // Wasser. In der Deutschen Bucht liegt der Meeresspiegel rund 40 m ueber
+  // ihr. Eine Kamera auf "20 m" sass mit ion-Weltgelaende also gut 20 m
+  // UNTER Wasser - man blickte von unten gegen die Unterseite des Gelaendes,
+  // und genau das liest sich wie eine Kamera, die auf dem Kopf steht.
+  // Gemeldet als "die Kamera steht auf dem Kopf" und "20 m ist zu flach";
+  // beides dieselbe Ursache.
+  function flaecheHoehe(carto) {
+    if (!viewer) return 0;
+    if (viewer.scene.globe.show) {
+      var h = viewer.scene.globe.getHeight(carto);
+      if (h !== undefined && isFinite(h)) return h;
+    }
+    // Stufe "foto": kein Globus, aber 3D-Kacheln mit eigener Geometrie.
+    if (viewer.scene.sampleHeight) {
+      try {
+        var s3 = viewer.scene.sampleHeight(carto);
+        if (s3 !== undefined && isFinite(s3)) return s3;
+      } catch (e) {}
+    }
+    // Nichts geladen: wie bisher die Ellipsoide. Falsch waere es nur dort,
+    // wo ohnehin noch kein Untergrund da ist.
+    return 0;
   }
 
   // --- Mitfahren: Blick von der Bruecke --------------------------------
@@ -458,8 +499,15 @@
       schiffEntity.show = false;
     }
     var c = Cesium.Cartographic.fromCartesian(ort);
+    // Absicherung, keine bekannte Ursache: Steht ein Bezugsrahmen an der
+    // Kamera, laese setView Kurs, Neigung und Rollen in DIESEM Rahmen statt
+    // im oertlichen. flyToBoundingSphere raeumt ihn zwar selbst weg (im
+    // Bundle nachgelesen) - die Zeile kostet nichts und schliesst die ganze
+    // Fehlerklasse aus.
+    viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
     viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, AUGENHOEHE),
+      destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude,
+        flaecheHoehe(c) + AUGENHOEHE),
       orientation: {
         heading: Cesium.Math.toRadians(kursBei(Cesium.JulianDate.toDate(uhr.currentTime).getTime())),
         pitch: Cesium.Math.toRadians(FPV_NEIGUNG),
@@ -692,6 +740,14 @@
       // eine erfundene Zahl waere schlimmer als ein Strich.
       var m = performance.memory;
       zeilen.push("Heap: " + (m ? Math.round(m.usedJSHeapSize / 1048576) + " MB" : "—"));
+      // Die Zahl, an der man sofort sieht, ob die Kamera ueber dem Wasser
+      // sitzt oder darunter - beim ion-Gelaende der entscheidende Wert.
+      try {
+        var kc = Cesium.Cartographic.fromCartesian(viewer.camera.positionWC);
+        var fl = flaecheHoehe(kc);
+        zeilen.push("Kamera: <b>" + Math.round(kc.height - fl) + " m</b> über der Fläche" +
+          (Math.abs(fl) > 1 ? " (Fläche " + Math.round(fl) + " m)" : ""));
+      } catch (e) {}
       zeilen.push("<b>" + spurPunkte.length + "</b> Spurpunkte über " + STUNDEN + " h");
       el.werte.innerHTML = zeilen.join("<br>");
     }, 1000);
