@@ -172,12 +172,29 @@ vor. "BRAKE" als BR+AKE zu lesen und zu Brasilien zu machen waere schlimmer
 als der rohe Text - deshalb wird **ausschliesslich** aufgeloest, was in der
 Tabelle steht, und alles andere bleibt unangetastet.
 
-Die Tabelle stammt aus Wikidata (P1937), zugeschnitten auf die Laender um
-Nord- und Ostsee plus alles, was im Verkehr dieser Region auftaucht: **1 113
-Eintraege, 17 KB**. Die vollstaendige Liste hat 20 442 Codes und 338 KB -
-dreimal der ausgelieferte Client. Deutsche Namen, wo es sie gibt
-("Antwerpen", nicht "Antwerp"); Anlagennamen werden zugunsten des Ortsnamens
-verworfen ("Hamburg" statt "Hamburger Hafen").
+### Die Liste kommt von der UNECE, nicht aus Wikidata
+
+Erst stand hier eine aus Wikidata (P1937) gebaute Tabelle. Gemessen deckte
+sie **76 %** der Codes im echten Verkehr ab und fuehrte Namen wie "Hamburger
+Hafen" statt "Hamburg"; Eemshaven (NLEEM) und Aabenraa (DKAAB) fehlten ganz.
+
+Die **offizielle Liste** der UNECE hat 116 213 Zeilen und eine Spalte, die
+alles einfacher macht: `Function`. Beginnt sie mit `1`, ist es ein Seehafen -
+**17 596 weltweit**. Gemessen deckt diese Auswahl **84 %** ab (alle Codes
+zusammen 86 %; die Luecke sind Klartextnamen wie EMDEN, BRAKE, STADE, die nur
+wie ein Code aussehen). Import: 1,0 s fuer die 7-MB-Datei, danach 17 520
+Zeilen in der Tabelle `ort`.
+
+**Sie liegt im Proxy, nicht im Client**: 289 KB waeren fast so viel wie der
+ganze ausgelieferte Client. Der Client fragt ueber `/v1/ort?codes=…` nur die
+Codes ab, die er gerade sieht, merkt sich die Antwort lokal - **auch die
+Fehlanzeige**, sonst fragt er denselben Fantasiecode bei jedem Oeffnen erneut -
+und traegt fuer den Betrieb ohne Proxy einen Rueckfall von 163 Haefen bei sich
+(2,5 KB): die der Region plus die grossen Welthaefen.
+
+Die Namen sind die amtlichen: "København", nicht "Kopenhagen". Das ist die
+Schreibweise auf der Seekarte, und sie stammt aus der Quelle statt aus einer
+Uebersetzung.
 
 Die Trennerliste kommt ebenfalls aus den Daten, nicht aus der Vorstellung:
 `<>`, `<=>`, `<-->`, `<->`, `><`, `>>`, `>`, `-`. Der Bindestrich trennt nur,

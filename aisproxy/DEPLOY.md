@@ -273,6 +273,14 @@ geprüft **während** des Lesens) und die ersten Bytes — nur echtes JPEG oder
 PNG. Ein selbst beigesteuertes Bild trägt `foto_quelle: "eigen"` und wird vom
 automatischen Fotolauf nicht mehr angefasst.
 
+## Die Ortsliste
+
+Der Proxy löst UN/LOCODEs für den Client auf (`/v1/ort?codes=DEHAM,BEANR`).
+Die Liste holt er sich beim ersten Registerlauf selbst — 7 MB CSV von der
+UNECE, daraus 17 596 Seehäfen, Dauer rund eine Sekunde. Danach bleibt sie
+90 Tage still (`AIS_ORT_ABZUG_MS`). Im Status steht der Stand unter
+`register.orte`.
+
 ## Sichern
 
 `update.sh` macht das bei jedem Lauf mit. Von Hand:
