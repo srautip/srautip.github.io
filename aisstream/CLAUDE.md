@@ -1694,6 +1694,116 @@ Vorher lagen 35 und 55 zusammen mit Schleppern und Lotsenbooten im Topf
 korrekt („Militär"), nur Kartenfarbe und Filter kannten die Unterscheidung
 nicht. 56, 57 und 59 hatten überhaupt kein Label und standen als „Typ 56" da.
 
+## Die 3D-Ansicht: eine eigene Seite, mit Absicht
+
+`aisstream/3d/index.html`, aufgerufen aus der Detailansicht („3D" neben
+MarineTraffic) mit `?mmsi=…&stunden=…`. Zeigt die Spur **eines** Schiffs über
+einem Hafen, mit Cesiums eingebauter Uhr zum Abspielen.
+
+**Warum eine eigene Seite und nicht ein Umschalter im Client:** CesiumJS wiegt
+**1 408 KB auf der Leitung** (gzip, gemessen 28. Aug. 2026; zum Vergleich:
+Leaflet 41 KB, deck.gl 356 KB, three.js 77 KB). Eingebaut zahlte das jeder
+Seitenaufruf — auch das Telefon, das die Ansicht nie öffnet. Als Link kostet
+sie nur, wer sie aufruft. Der Hauptclient ändert sich dafür an **einer**
+Stelle: dem `#detailLinks`-Block, der ohnehin schon einmal je Schiff gebaut
+wird.
+
+### Was auf iOS trägt
+
+| | iOS Safari | global |
+|---|---|---|
+| **WebGL2** | seit **15.0** (2021) | 95,7 % |
+| WebGPU | erst seit **26.0** | 84,0 % |
+
+Cesium rendert auf WebGL — **nichts hier darf WebGPU voraussetzen**, das
+schlösse jedes iPad unter iPadOS 26 aus.
+
+### `CESIUM_BASE_URL` muss vor dem Skript stehen
+
+Cesium lädt zur Laufzeit **100 Worker- und 205 Asset-Dateien** nach. Steht
+die Basis-URL nicht, bleibt der Globus schwarz und in der Konsole stehen
+404er auf Dateien, die niemand von Hand einbindet. (Der Pfad aus älteren
+Anleitungen, `Workers/cesiumWorkerBootstrapper.js`, ist heute **404** — die
+Worker heißen anders.)
+
+Für eine fremde Herkunft baut Cesium einen Blob-Worker (`import "<url>"`) —
+das CDN trägt also, solange es CORS schickt. `?cesium=` ist der Haken für die
+Probe: In der Sandbox kommt Chromium per HTTPS nirgends hin, dort liegt ein
+ausgepacktes Cesium unter demselben Ursprung.
+
+### Kein Cesium ion, keine zweite Anmeldung
+
+Der Viewer wird ohne ion gebaut: `baseLayer` ist ein
+`UrlTemplateImageryProvider` auf OSM-Rasterkacheln, `baseLayerPicker` und
+`geocoder` sind aus — **beide brauchen ion**. Sonst liefe die Seite in eine
+Tokenwarnung, obwohl niemand ion benutzt.
+
+Mit Google-Schlüssel kommt `createGooglePhotorealistic3DTileset()` dazu und
+`globe.show = false` — sonst sticht der Globus durch die Gebäude.
+
+### Die dritte Dimension muss etwas bedeuten
+
+Alle AIS-Punkte liegen auf Höhe 0. Ein Band flach über dem Wasser wäre 3D
+ohne Aussage. Die **Höhe trägt die Zeit** (älteste Punkte unten), umschaltbar
+auf **Geschwindigkeit** oder **flach**. Dazu eine halbdurchsichtige Wand
+hinunter zum Wasser: Ohne sie schwebt ein Band im Raum, und niemand sieht,
+über welcher Stelle es steht.
+
+**Die Bandhöhe ist keine feste Zahl.** Mit festen 500 m stand über einer
+1,5-km-Fahrt eine fast senkrechte Wand — auf dem Schirmfoto ein Strich, keine
+Kurve. Sie ist jetzt **28 % der Ausdehnung der Spur** (60 bis 900 m).
+
+### Drei Mängel, die erst das Schirmfoto gezeigt hat
+
+Die Zahlen waren alle grün, das Bild war unbrauchbar — dieselbe Lehre wie
+beim Richtungspfeil und beim Tallinn-Foto: **ansehen, nicht ableiten.**
+
+| | |
+|---|---|
+| **Dunst und Bodenatmosphäre** wuschen die Luftaufnahme zu einem weißen Schleier aus. 44 Kacheln waren geladen, vom Kai war nichts zu sehen. `fog.enabled = false`, `showGroundAtmosphere = false`, `skyAtmosphere.show = false` |
+| **Die Kopfzeile** hatte einen Verlauf nach Dunkel — über einer hellen Luftaufnahme war die Unterzeile unlesbar. Jetzt ein Kasten, der auf jedem Grund trägt |
+| **Die Kamera** stand genau von Norden: Die Wand war von der Kante gesehen ein Strich, und die dritte Dimension zeigte sich gar nicht. Jetzt −35° Kurs, −28° Neigung |
+
+### Gemessen in `scratchpad/drei.js` (30 Prüfungen)
+
+Gegen einen **echten** aisproxy, dessen Datenbank vorher mit **seiner eigenen
+`Speicher`-Klasse** gefüllt wird — ein nachgebauter Endpunkt hätte genau die
+Formatfragen offengelassen, auf die es ankommt.
+
+- **Das Bild wird an Bildpunkten geprüft.** „Keine Fehler in der Konsole" ist
+  bei einer 3D-Szene kein Beweis. Gemessen: **1 029 verschiedene Farben** mit
+  Boden gegen **42** ohne. Deshalb werden die OSM-Kacheln über Node
+  umgeleitet und **mitgezählt** (69) — ohne das misst der Test nur den Himmel.
+- **Höhe = Zeit** gegen **Höhe = Geschwindigkeit** ergibt nachweislich
+  verschiedene Kurven (0→790 m gegen 70→405 m bei derselben Spur), und die
+  Höhe wird gegen die **unabhängig nachgerechnete** Bodenausdehnung geprüft,
+  nicht gegen eine feste Zahl.
+- `window.__viewer` ist der Griff dafür: An einer 3D-Szene lässt sich über
+  das DOM nichts messen, eine Polylinie hat keinen Knoten.
+- iPhone 15 und iPad Pro 11 quer: kommt hoch, keine Überbreite, 44-px-Ziele.
+- Der Link aus der Detailansicht trägt MMSI und Zeitfenster und **bleibt
+  derselbe Knoten**, während Meldungen laufen.
+
+**Vier Fehler der Probe, alle vom Lauf gefunden:** der Regler wurde
+angesprochen, ohne die Tafel zu öffnen („element is not visible"); die
+Spannweite maß die 3D-Diagonale, in der die gesuchte Höhe schon steckt; im
+Client-Teil fehlte der HTTPS-Umleiter, also lud Leaflet nicht und die Tabelle
+blieb leer („Schiff nicht in der Tabelle" meinte die Probe selbst); und der
+Client zeigt nur, was im **heißen** Zustand des Proxys steht — die Historie in
+der Datenbank allein genügt ihm nicht, es braucht einen echten Strom.
+
+### Was hier NICHT geprüft werden kann
+
+- **Die photorealistischen Kacheln.** Sie brauchen einen Google-Schlüssel;
+  ohne ihn läuft die Seite auf OSM-Rasterkacheln weiter und sagt sichtbar,
+  warum. Gemessen: `tile.googleapis.com` antwortet ohne Schlüssel **403**,
+  mit ungültigem **400**.
+- **Die Leistung auf echtem Gerät.** Chromium rendert hier per Software
+  (SwiftShader); jede Bildrate von hier wäre eine Zahl über die Sandbox. Die
+  Anzeige dafür ist eingebaut (Bilder/s, Kacheln, Heap) — `performance.memory`
+  gibt es nur in Chromium, auf iOS steht dort ein Strich statt einer
+  erfundenen Zahl.
+
 ## Namen kommen verzögert — `syncMarker()` ist die einzige Nachziehstelle
 
 Ein Schiffsname trudelt aus bis zu fünf Quellen ein, zeitlich versetzt:

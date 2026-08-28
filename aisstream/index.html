@@ -6802,6 +6802,12 @@
           '" target="_blank" rel="noopener">VesselFinder</a>' +
         '<a class="l-bild" href="' + esc(bildersucheUrl(entry.mmsi)) +
           '" target="_blank" rel="noopener">Bildersuche</a>' +
+        // Die 3D-Ansicht ist eine eigene Seite, und das ist Absicht: CesiumJS
+        // wiegt 1 408 KB auf der Leitung. Als Link kostet sie nur, wer sie
+        // öffnet — eingebaut zahlte jeder Seitenaufruf dafür.
+        '<a class="l-3d" href="3d/?mmsi=' + mmsiQuery + '&stunden=' +
+          encodeURIComponent(trackStundenAus()) +
+          '" target="_blank" rel="noopener">3D</a>' +
         '<a class="l-osm" target="_blank" rel="noopener" hidden>OpenStreetMap</a>';
     }
     var osmLink = detailLinks.querySelector(".l-osm");
