@@ -485,12 +485,23 @@ class Speicher {
       if (s && s.foto_datei) continue;              // hat eins, fertig
       if (!s || !s.foto_geprueft) { out.push(mmsi); continue; }
       // "teil" heisst: gesucht wurde ohne IMO, der Versuch war unvollstaendig.
-      // Der haelt nur kurz - die IMO kann jede Minute per ShipStaticData
-      // eintreffen und aus einem aussichtslosen Fall einen aussichtsreichen
-      // machen. Genau dieses Muster hat im Client den Fall MAERSK VIRGINIA
-      // geloest.
-      const frist = s.foto_quelle === "teil"
-        ? this.konfig.FOTO_TEIL_MS : this.konfig.FOTO_FEHL_MS;
+      // Frueher stand hier eine kurze Frist ("die IMO kann jede Minute per
+      // ShipStaticData eintreffen"). Nachgemessen am laufenden Server
+      // (28. Aug. 2026) kostete das mehr, als es brachte: Jede Stunde lief
+      // dieselbe Suche ueber die MMSI erneut mit - 243 Commons-Abrufe fuer
+      // 1 Bild, 281 Flickr-Abrufe fuer 6 - und das Kontingent von 300
+      // Versuchen je Lauf ging dafuer drauf. Der Rueckstand blieb bei 1 587
+      // offenen Schiffen stehen.
+      //
+      // Jetzt entscheidet der ANLASS, nicht die Uhr: Wieder faellig wird ein
+      // solches Schiff, sobald die IMO wirklich da ist (dann lohnen
+      // Kategorie- und Volltextweg) oder der Bildabzug es ueber die MMSI
+      // kennt (dann ist es ein Download ohne jede Suche). Ohne beides bleibt
+      // es liegen - aber nicht fuer immer: Nach der langen Frist wird noch
+      // einmal gefragt, denn Wikidata waechst.
+      const anlass = s.foto_quelle === "teil" &&
+        !!(s.imo || this.bildIndexHole("mmsi", String(mmsi)));
+      const frist = anlass ? this.konfig.FOTO_TEIL_MS : this.konfig.FOTO_FEHL_MS;
       if (jetzt - s.foto_geprueft > frist) out.push(mmsi);
     }
     return out;

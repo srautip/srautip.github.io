@@ -220,10 +220,29 @@ Stand**: `foto_geprueft`, `foto_quelle`, `foto_seite` und `fotoFaellig()`.
 `holeFoto()` **wirft** bei einem gescheiterten Abruf, statt `null` zu
 liefern; nur „gibt es nicht" wird vermerkt.
 
-Zwei Fristen, wie im Client: Lief die Suche **ohne IMO**, ist sie
-unvollständig (`foto_quelle = "teil"`, `FOTO_TEIL_MS` = 1 h) — die IMO kann
-jede Minute per `ShipStaticData` eintreffen. Mit IMO war es eine vollständige
-Suche, die hält `FOTO_FEHL_MS` = 7 Tage.
+Zwei Fristen: Lief die Suche **ohne IMO**, ist sie unvollständig
+(`foto_quelle = "teil"`), mit IMO war sie vollständig (`FOTO_FEHL_MS` = 7 Tage).
+
+**Korrektur vom 28. Aug. 2026:** Der „teil"-Fall war zunächst an eine kurze
+Uhr gehängt (`FOTO_TEIL_MS` = 1 h) mit der Begründung, die IMO könne jede
+Minute eintreffen. Am laufenden Server gemessen kostete das mehr, als es
+brachte:
+
+| Weg | Abrufe | Bilder |
+|---|---|---|
+| `commonsMmsi` | 243 | **1** |
+| `flickrMmsi` | 281 | **6** |
+
+524 Abrufe für 7 Bilder, und weil dieselben Schiffe stündlich wieder fällig
+wurden, ging das Kontingent von 300 Versuchen je Lauf dafür drauf — der
+Rückstand stand unverändert bei `fotoOffen: 1587`.
+
+Jetzt entscheidet der **Anlass**, nicht die Uhr: Ein „teil"-Schiff wird wieder
+fällig, sobald es **wirklich eine IMO hat** (dann lohnen Kategorie- und
+Volltextweg) oder der **Bildabzug es über die MMSI kennt** (dann ist es ein
+Download ohne jede Suche). Ohne beides bleibt es bis zur langen Frist liegen —
+nicht für immer, denn Wikidata wächst. `FOTO_TEIL_MS` ist damit die Frist für
+den Anlassfall, nicht mehr der Takt einer Wiederholung.
 
 **3. Der Proxy hatte nur den schwächsten Commons-Weg.** Gemessen im Client:
 Kategorie **24 von 25**, Volltext **6 von 25**. Der Proxy kannte nur den
