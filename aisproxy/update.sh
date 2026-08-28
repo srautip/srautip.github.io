@@ -20,6 +20,11 @@
 # das nicht und soll es auch nie tun.
 set -euo pipefail
 
+# Damit ein Abbruch nie mehr stumm passiert: Jeder unerwartete Fehlschlag
+# nennt die Zeile. Die beabsichtigten Ausstiege gehen ueber "exit" und loesen
+# das hier nicht aus.
+trap 'echo "    Unerwarteter Abbruch in Zeile $LINENO (Exitcode $?). Bitte melden." >&2' ERR
+
 # --- Sich selbst aus dem Weg raeumen ----------------------------------------
 #
 # Dieses Skript liegt IM Repo, das es gleich aktualisiert. Bash liest ein
@@ -33,7 +38,7 @@ if [[ "${AIS_UPDATE_KOPIE:-}" != "1" ]]; then
   cat "$0" > "$kopie"
   AIS_UPDATE_KOPIE=1 exec bash "$kopie" "$@"
 fi
-[[ "$0" == /tmp/aisproxy-update-* ]] && rm -f "$0"
+[[ "$0" == /tmp/aisproxy-update-* ]] && rm -f "$0" || true
 
 ZIEL="${AIS_ZIEL:-/opt/aisproxy}"
 SICHERUNGEN="${AIS_SICHERUNGEN:-/opt/aisproxy-sicherungen}"
@@ -97,6 +102,59 @@ kennzahlen() {
 # < /dev/null hinter jedem "docker compose exec": Ohne das schluckt das Kind
 # den Rest dieses Skripts, wenn es ueber "curl | bash" laeuft.
 
+laeuft() { docker compose ps --status running proxy 2>/dev/null | grep -q proxy; }
+
+# Alte Staende wegraeumen. Das passiert VOR der neuen Sicherung, nicht danach:
+# Erst 146 MB dazuzulegen und dann aufzuraeumen heisst, den Spitzenbedarf um
+# einen ganzen Stand hoeher zu legen - auf einer knappen Platte genau der
+# Unterschied. Der JUENGSTE Stand bleibt dabei immer stehen, auch wenn die
+# Grenze rechnerisch 0 ergaebe: Waehrend des Updates ohne jede Sicherung
+# dazustehen ist das eine, was nicht passieren darf.
+aufraeumen() {
+  local behalten="$1"
+  [[ "$behalten" -lt 1 ]] && behalten=1
+  ls -1t "$SICHERUNGEN"/ais-*.db 2>/dev/null | tail -n +$((behalten + 1)) | \
+    while read -r alt; do
+      local stempel
+      stempel="$(basename "$alt" .db)"; stempel="${stempel#ais-}"
+      rm -f "$alt" "$alt"-wal "$alt"-shm \
+            "$SICHERUNGEN/env-$stempel" "$SICHERUNGEN/env-$stempel.abweichend" \
+            "$SICHERUNGEN/zugangsdaten-$stempel.txt" \
+            "$SICHERUNGEN/zugangsdaten-$stempel.txt.abweichend"
+      echo "    entfernt: Stand $stempel"
+    done
+}
+
+# Freier Platz in KB auf dem Dateisystem, auf dem der Pfad liegt.
+#
+# Zwei Fallen, beide beim Pruefen aufgetreten: df kennt nur vorhandene
+# Verzeichnisse (also erst hocharbeiten), und ein gescheitertes df reisst
+# wegen "set -o pipefail" die ganze Zuweisung mit - das Skript starb dann
+# mitten im Schritt 2, ohne ein Wort. Deshalb endet die Funktion auf "|| true"
+# und liefert im Zweifel eine leere Zeichenkette, die der Aufrufer als
+# "unbekannt" behandelt.
+freiKB() {
+  local pfad="$1"
+  while [[ -n "$pfad" && "$pfad" != "/" && ! -d "$pfad" ]]; do pfad="$(dirname "$pfad")"; done
+  df -Pk "${pfad:-/}" 2>/dev/null | awk 'NR == 2 { print $4 }' || true
+}
+
+# Groesse der Datenbank in Byte - aus dem Container, denn auf dem Host liegt
+# sie in einem Docker-Volume. Der laufende Dienst wird gefragt, sonst startet
+# "compose run" kurz einen Wegwerf-Container aus DEMSELBEN Image. Kein
+# alpine-Abruf: Auf einer vollen Platte scheitert schon der Download, und dann
+# steht da eine Fehlermeldung ueber ein fremdes Image statt ueber den Platz.
+dbGroesse() {
+  local z
+  if laeuft; then
+    z="$(docker compose exec -T proxy sh -c 'stat -c %s "${AIS_DB:-/daten/ais.db}"' < /dev/null 2>/dev/null | tr -d '\r' | tail -1)"
+  else
+    z="$(docker compose run --rm --no-deps -T --entrypoint sh proxy \
+         -c 'stat -c %s "${AIS_DB:-/daten/ais.db}"' < /dev/null 2>/dev/null | tr -d '\r' | tail -1)"
+  fi
+  [[ "$z" =~ ^[0-9]+$ ]] && echo "$z" || echo 0
+}
+
 echo "==> 1/6 Stand vor dem Umbau"
 VOR_HEAD="$(git rev-parse HEAD)"
 echo "    Repo: ${VOR_HEAD:0:8} ($(git log -1 --format=%s))"
@@ -117,7 +175,7 @@ if ! grep -q '^AIS_ZUGANG=.' "$ZIEL/.env"; then
 fi
 
 VOR_PUNKTE=""; VOR_TAGE=""; VOR_STAMM=""; VOR_SCHIFFE=""
-if docker compose ps --status running proxy 2>/dev/null | grep -q proxy; then
+if laeuft; then
   rc=0; werte="$(kennzahlen)" || rc=$?
   if [[ $rc -eq 0 ]]; then
     read -r VOR_PUNKTE VOR_TAGE VOR_STAMM VOR_SCHIFFE <<< "$werte"
@@ -142,7 +200,50 @@ chmod 700 "$SICHERUNGEN"
 STEMPEL="$(date +%Y%m%d-%H%M%S)"
 SICHERUNG="$SICHERUNGEN/ais-$STEMPEL.db"
 
-if docker compose ps --status running proxy 2>/dev/null | grep -q proxy; then
+# Erst Platz machen: einen Stand weniger behalten, damit der neue hineinpasst.
+aufraeumen $((BEHALTEN - 1))
+
+# Und dann nachsehen, ob es reicht. Grund: Am 28. Aug. 2026 stand der Dienst
+# mit "disk I/O error" beim Oeffnen der Datenbank - SQLite konnte das WAL
+# nicht anlegen. Ein Sicherungsskript, das die Platte vollschreibt, ist das
+# Gegenteil dessen, wofuer es gebaut ist.
+#
+# Zweimal die Groesse: VACUUM INTO legt die Sicherung zuerst IM Volume an
+# (Dateisystem von Docker), danach wandert sie nach $SICHERUNGEN. Beide Seiten
+# brauchen den Platz, mit einem Aufschlag von 30 % fuer alles andere.
+DB_BYTE="$(dbGroesse)"
+if [[ "$DB_BYTE" -gt 0 ]]; then
+  NOETIG_KB=$(( DB_BYTE / 1024 * 13 / 10 ))
+  DOCKER_WURZEL="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || echo /var/lib/docker)"
+  FREI_ZIEL="$(freiKB "$SICHERUNGEN")"
+  FREI_DOCKER="$(freiKB "$DOCKER_WURZEL")"
+  mb() { [[ -n "$1" ]] && echo "$(( $1 / 1024 )) MB" || echo "unbekannt"; }
+  echo "    Datenbank $(( DB_BYTE / 1048576 )) MB; frei: $(mb "$FREI_ZIEL") unter $SICHERUNGEN," \
+       "$(mb "$FREI_DOCKER") unter $DOCKER_WURZEL"
+  knapp=""
+  if [[ -n "$FREI_ZIEL" && "$FREI_ZIEL" -lt "$NOETIG_KB" ]]; then
+    knapp="$SICHERUNGEN"
+  fi
+  if [[ -n "$FREI_DOCKER" && "$FREI_DOCKER" -lt "$NOETIG_KB" ]]; then
+    knapp="${knapp:+$knapp und }$DOCKER_WURZEL"
+  fi
+  if [[ -n "$knapp" ]]; then
+    cat <<HINWEIS
+    Zu wenig Platz auf $knapp - gebraucht werden rund $(( NOETIG_KB / 1024 )) MB.
+    Es wird NICHTS gesichert und NICHTS aktualisiert; der Dienst bleibt, wie er ist.
+
+    Platz schaffen (die juengste Sicherung bleibt absichtlich liegen):
+        du -sh $SICHERUNGEN/* | sort -h | tail
+        docker system prune -f
+        docker image prune -a -f
+    Und wenn die Historie der Grund ist, hilft eine kuerzere Aufbewahrung:
+        AIS_HISTORIE_TAGE in der docker-compose.yml kleiner setzen.
+HINWEIS
+    exit 1
+  fi
+fi
+
+if laeuft; then
   # VACUUM INTO statt cp. Die Datenbank laeuft im WAL-Modus: Neben ais.db
   # liegt ais.db-wal mit allem, was seit dem letzten Checkpoint geschrieben
   # wurde. Ein blosses cp der Hauptdatei laesst genau diesen Teil liegen -
@@ -186,12 +287,26 @@ if docker compose ps --status running proxy 2>/dev/null | grep -q proxy; then
 else
   # Bei stehendem Dienst gibt es keinen Schreiber; dann reicht das Kopieren
   # der Dateien - aber samt -wal und -shm, sonst fehlt derselbe Teil wie oben.
-  echo "    Dienst steht - Dateien aus dem Volume kopieren …"
-  docker run --rm -v aisproxy_daten:/daten -v "$SICHERUNGEN":/aus alpine:3 \
-    sh -c "cp /daten/ais.db /aus/ais-$STEMPEL.db 2>/dev/null &&
-           for e in -wal -shm; do
-             [ -f /daten/ais.db\$e ] && cp /daten/ais.db\$e /aus/ais-$STEMPEL.db\$e
-           done; true" < /dev/null
+  # Bei stehendem Dienst gibt es keinen Schreiber; dann reicht das Kopieren
+  # der Dateien - aber samt -wal und -shm, sonst fehlt derselbe Teil wie oben.
+  #
+  # "docker compose cp" arbeitet auch an einem gestoppten Container und
+  # braucht damit KEIN fremdes Image. Der frueher hier benutzte alpine-Abruf
+  # scheiterte auf einer vollen Platte als Erstes - und die Fehlermeldung
+  # handelte dann von einem Image statt vom eigentlichen Problem.
+  echo "    Dienst steht - Dateien aus dem Container kopieren …"
+  if ! docker compose cp proxy:/daten/ais.db "$SICHERUNG" >/dev/null 2>&1; then
+    echo "    Kein Container zum Kopieren - Rueckfall auf ein Hilfsimage."
+    docker run --rm -v aisproxy_daten:/daten -v "$SICHERUNGEN":/aus alpine:3 \
+      sh -c "cp /daten/ais.db /aus/ais-$STEMPEL.db 2>/dev/null &&
+             for e in -wal -shm; do
+               [ -f /daten/ais.db\$e ] && cp /daten/ais.db\$e /aus/ais-$STEMPEL.db\$e
+             done; true" < /dev/null
+  else
+    for e in -wal -shm; do
+      docker compose cp "proxy:/daten/ais.db$e" "$SICHERUNG$e" >/dev/null 2>&1 || true
+    done
+  fi
   S_PUNKTE=""; S_TAGE=""; S_STAMM=""
 fi
 
@@ -363,20 +478,9 @@ docker compose exec -T proxy node -e '
       (r2.wege ? ", Wege " + JSON.stringify(r2.wege) : ""));
   }).catch(() => {})' < /dev/null 2>/dev/null || true
 
-# Alte Sicherungen wegraeumen. Ohne das laeuft die Platte irgendwann voll -
-# und ein voller Datentraeger sieht aus wie ein kaputter Proxy. Die
-# Zugangsdaten desselben Standes gehen mit: Ein Datenbankstand ohne die
-# passenden Zugangsdaten waere nur eine halbe Sicherung, und umgekehrt liegen
-# Geheimnisse sonst unbegrenzt lange herum.
-ls -1t "$SICHERUNGEN"/ais-*.db 2>/dev/null | tail -n +$((BEHALTEN + 1)) | \
-  while read -r alt; do
-    stempel="$(basename "$alt" .db)"; stempel="${stempel#ais-}"
-    rm -f "$alt" "$alt"-wal "$alt"-shm \
-          "$SICHERUNGEN/env-$stempel" "$SICHERUNGEN/env-$stempel.abweichend" \
-          "$SICHERUNGEN/zugangsdaten-$stempel.txt" \
-          "$SICHERUNGEN/zugangsdaten-$stempel.txt.abweichend"
-    echo "    entfernt: Stand $stempel"
-  done
+# Aufgeraeumt wurde schon vor der Sicherung (Schritt 2). Hier steht bewusst
+# nichts mehr: Ein zweiter Durchgang koennte nur den gerade erzeugten Stand
+# treffen - und der ist der einzige, der zu diesem Update gehoert.
 
 echo
 echo "Fertig. Sicherung: $SICHERUNG"

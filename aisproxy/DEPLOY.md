@@ -186,10 +186,20 @@ Was es tut, und warum es mehr ist als `git pull && docker compose up`:
 
 1. **Stand notieren** — Git-Commit und `/v1/status` (Positionen, Tagestabellen,
    Stammdaten).
-2. **Sichern und die Sicherung gegenlesen** — `VACUUM INTO`, danach wird die
-   Sicherung sofort wieder geöffnet und gezählt. Dazu `.env` und
-   `zugangsdaten.txt`. Alles nach `/opt/aisproxy-sicherungen` (Modus 700,
-   die Dateien 600). Scheitert hier etwas, wird **nichts** aktualisiert.
+2. **Aufräumen, Platz prüfen, sichern.** In dieser Reihenfolge:
+   - Alte Stände weg, bis einer weniger übrig ist als `AIS_BEHALTEN` erlaubt —
+     **der jüngste bleibt immer stehen**, auch bei `AIS_BEHALTEN=1`. Ohne
+     Sicherung dazustehen ist das eine, was während eines Updates nicht
+     passieren darf.
+   - Dann nachrechnen: Ist auf `/opt/aisproxy-sicherungen` **und** unter dem
+     Docker-Verzeichnis je das 1,3-fache der Datenbankgröße frei? Sonst
+     Abbruch, bevor irgendetwas geschrieben wird. Beide Seiten brauchen den
+     Platz, weil `VACUUM INTO` die Sicherung erst im Volume anlegt und sie
+     danach herauskopiert wird.
+   - `VACUUM INTO`, danach wird die Sicherung sofort wieder geöffnet und
+     gezählt. Dazu `.env` und `zugangsdaten.txt`. Alles nach
+     `/opt/aisproxy-sicherungen` (Modus 700, die Dateien 600). Scheitert hier
+     etwas, wird **nichts** aktualisiert.
 3. `git pull --ff-only`, dann prüfen, ob die Zugangsdaten noch dieselben sind —
    sonst werden sie aus der Sicherung von eben zurückgeschrieben, **vor** dem
    Neubau.
@@ -201,8 +211,10 @@ Was es tut, und warum es mehr ist als `git pull && docker compose up`:
    `AIS_HISTORIE_TAGE` ausgelaufen, das ist Pflege und kein Verlust.
 
 Zum Schluss stehen der Registerstand (Fotos, offene, Bildwege) und die Pfade
-der Sicherungen da. Die letzten sieben Stände bleiben liegen, ältere räumt das
-Skript weg — Datenbank und zugehörige Zugangsdaten zusammen.
+der Sicherungen da. Aufgeräumt wird **vor** der Sicherung, nicht danach:
+Erst 146 MB dazuzulegen und dann zu räumen hebt den Spitzenbedarf um einen
+ganzen Stand — auf einer knappen Platte genau der Unterschied. Datenbank und
+zugehörige Zugangsdaten gehen dabei zusammen.
 
 Stellschrauben als Umgebungsvariablen: `AIS_ZIEL`, `AIS_SICHERUNGEN`,
 `AIS_BEHALTEN`, `AIS_WARTE_RUNDEN` (× 5 s).
@@ -286,6 +298,8 @@ Die Fotos darunter sind Wikimedia- und Flickr-Bilder und jederzeit neu holbar
 | Alles läuft, aber der Browser bekommt nichts | Ohne `Access-Control-Allow-Origin` kommt keine Antwort an — der Proxy setzt ihn selbst, aber ein vorgeschalteter Reverse-Proxy darf ihn nicht abschneiden |
 | `update.sh` bricht mit „das sieht nach Verlust aus" ab | Der Bestand ist kleiner als vor dem Update, ohne dass eine Tagestabelle ausgelaufen wäre. Das Skript hat den Weg zurück ausgegeben; die Sicherung von wenigen Minuten vorher liegt unter `/opt/aisproxy-sicherungen` |
 | `update.sh` meldet „Nach 180 s meldet der Dienst noch keine Schiffe", der Client läuft aber | Fassung vom ersten Tag: `/v1/status` liegt hinter der Tokenprüfung, die Statusabfrage schickte keins und bekam 401. Behoben — `cd /opt/aisproxy && git pull && ./update.sh`. Dieselbe Ursache hatte der dauerhaft rote Healthcheck (`docker compose ps` zeigte `unhealthy`) |
+| Der Proxy startet nicht mehr, im Protokoll `disk I/O error` in `speicher.js` | Das ist `PRAGMA journal_mode = WAL`, der erste **Schreib**zugriff: SQLite kann `/daten/ais.db-wal` nicht anlegen. Zwei Ursachen — **Platte voll** (`df -h /`, `df -i /`) oder **Rechte** in `/daten` (der Container läuft als UID 1000): `docker run --rm -v aisproxy_daten:/daten alpine:3 chown -R 1000:1000 /daten` |
+| `update.sh` bricht mit „Zu wenig Platz" ab | Genau dafür ist die Prüfung da: Es wurde **nichts** gesichert und nichts aktualisiert, der Dienst läuft weiter. Platz schaffen (`docker system prune -f`, alte Sicherungen bis auf die jüngste), dann erneut starten |
 | `update.sh` sagt „In /opt/aisproxy fehlt die .env" | Die Zugangsdaten fehlen schon vor dem Update — es wird bewusst nichts angefasst. Aus `/opt/aisproxy-sicherungen/env-*` zurückkopieren; gibt es keine, legt ein erneuter Lauf von `deploy.sh` neue an, und der Client braucht dann das neue Token |
 
 ## Was hier nicht getestet ist
@@ -320,5 +334,7 @@ der nie feuert, beweist nichts:
 | `.env` fehlt schon vorher | Abbruch, kein Byte angefasst |
 | `.env` verschwindet oder ändert sich beim Pull | aus der Sicherung wiederhergestellt (gleiche Prüfsumme, Modus 600), die vorgefundene Fassung bleibt als `*.abweichend` liegen |
 | Dienst steht still | Kopie aus dem Volume samt `-wal`/`-shm`; zurückgespielt liest sie 5 000 Positionen |
-| Aufräumen | alte Stände weg, Datenbank und Zugangsdaten desselben Standes zusammen |
+| Aufräumen | alte Stände weg, Datenbank und Zugangsdaten desselben Standes zusammen; bei `AIS_BEHALTEN=1` bleibt der jüngste vorhandene Stand stehen und der neue kommt dazu |
+| Zu wenig Platz | gegen ein 20-MB-Dateisystem gemessen: Abbruch mit Exitcode 1 **vor** der Sicherung, Git-Stand unverändert, die vorhandene Sicherung unangetastet |
+| Dienst steht | Kopie über `docker compose cp` aus dem gestoppten Container — ohne fremdes Image, denn auf einer vollen Platte scheiterte vorher zuerst der `alpine`-Abruf und die Meldung handelte dann vom Image statt vom Platz |
 | Status hinter der Tokenprüfung | mit Token aus der Containerumgebung: Zahlen und Code 0; ohne: Code 2, eigene Meldung statt „keine Schiffe", Abbruch nach 7 s statt 180 s — gemessen gegen den echten `Server` aus `src/server.js`, nicht gegen eine Attrappe |
