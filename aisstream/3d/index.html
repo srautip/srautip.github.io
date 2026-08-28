@@ -100,6 +100,15 @@
   <p style="margin-top:.3rem">Gilt beim Abspielen. In der Pause ist die Kamera
      frei zum Umsehen.</p>
 
+  <h2 style="margin-top:.9rem">Verkehr</h2>
+  <label style="display:flex;align-items:center;gap:.5rem;margin:.1rem 0 0">
+    <input type="checkbox" id="umgebung" checked style="width:auto">
+    <span>Die anderen Schiffe zeigen</span>
+  </label>
+  <p style="margin-top:.3rem">Alle Schiffe, die dem eigenen im Zeitfenster
+     näher als 5 km kommen — als Rümpfe, <b>ohne</b> Spurlinien. Abschalten,
+     wenn es auf dem Gerät ruckelt.</p>
+
   <h2 style="margin-top:.9rem">Untergrund</h2>
   <select id="untergrund">
     <option value="osm">OSM-Karte — ohne Schlüssel</option>
@@ -175,6 +184,7 @@
     tafel: document.getElementById("tafel"),
     tafelKnopf: document.getElementById("tafelKnopf"),
     fpv: document.getElementById("fpv"),
+    umgebung: document.getElementById("umgebung"),
     googleKey: document.getElementById("googleKey"),
     ionToken: document.getElementById("ionToken"),
     untergrund: document.getElementById("untergrund"),
@@ -328,7 +338,17 @@
     window.__viewer = viewer;
     // Messgriff wie __viewer: An einer laufenden Kamera laesst sich der
     // geglaettete Kurs sonst nirgends ablesen.
-    window.__kurs = function () { return { glatt: kursGlatt, ziel: kursZiel }; };
+    window.__kurs = function () { return { glatt: eigenKurs.glatt, ziel: eigenKurs.ziel }; };
+    // Dasselbe fuer die Umgebung: Die Nachbarn haben keinen DOM-Knoten, an
+    // dem sich Zahl, Masse oder Kurs ablesen liessen.
+    window.__umgebung = function () {
+      return umgebung.map(function (n) {
+        return { mmsi: n.mmsi, nah: Math.round(n.nah),
+                 laenge: n.stamm && n.stamm.laenge || null,
+                 kurs: n.kurs.glatt, ziel: n.kurs.ziel,
+                 sichtbar: !!n.entity.show };
+      });
+    };
 
     viewer.scene.globe.depthTestAgainstTerrain = true;
     // Dunst und Bodenatmosphaere AUS. Beide sind fuer den Blick auf einen
@@ -416,13 +436,13 @@
       // Stand gar nicht - dann liefen Rumpf und Blickrichtung auseinander.
       orientation: new Cesium.CallbackProperty(function (t, ergebnis) {
         var p = pos.getValue(t);
-        if (!p || kursGlatt == null) return undefined;
+        if (!p || eigenKurs.glatt == null) return undefined;
         // MINUS 90 Grad, und das ist kein Zauberwert: Cesiums HPR-Rahmen kommt
         // aus eastNorthUpToFixedFrame, dessen +X nach OSTEN zeigt. Ein Kurs
         // von 110 Grad landete damit bei 200 - gemessen, nicht vermutet. Die
         // Laengsachse des Kastens ist +X, sie soll auf den Kurs zeigen.
         return Cesium.Transforms.headingPitchRollQuaternion(p,
-          new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(kursGlatt - 90), 0, 0),
+          new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(eigenKurs.glatt - 90), 0, 0),
           Cesium.Ellipsoid.WGS84, Cesium.Transforms.eastNorthUpToFixedFrame, ergebnis);
       }, false),
       // Ein Kasten in den echten Massen des Schiffs - kein Modell, das eine
@@ -497,28 +517,32 @@
   var KURS_TAU = 0.8;        // Sekunden Wanduhrzeit, Glaettung
   var KURS_SPRUNG = 800;     // Meter: weiter als das = Zeitregler, nicht Fahrt
 
-  function kursUeberGrund(t) {
-    var n = spurPunkte.length;
+  //
+  // Nimmt die Stuetzpunkte als Argument: Dieselbe Regel gilt fuer das eigene
+  // Schiff UND fuer jeden Nachbarn - ein Nachbar, der seitwaerts faehrt,
+  // faellt aus 200 m Abstand genauso auf wie der eigene Rumpf.
+  function kursUeberGrund(punkte, t) {
+    var n = punkte.length;
     if (!n) return null;
     var lo = 0, hi = n - 1;
     while (lo < hi) {
       var m = (lo + hi + 1) >> 1;
-      if (spurPunkte[m].t <= t) lo = m; else hi = m - 1;
+      if (punkte[m].t <= t) lo = m; else hi = m - 1;
     }
     // Vom aktuellen Abschnitt aus nach aussen suchen, bis eine Strecke lang
     // genug ist, um eine Richtung herzugeben.
     for (var d = 0; d < n; d++) {
       var i = lo - d;
-      if (i >= 0 && i + 1 < n && meter(spurPunkte[i], spurPunkte[i + 1]) >= MIN_STRECKE) {
-        return peilung(spurPunkte[i], spurPunkte[i + 1]);
+      if (i >= 0 && i + 1 < n && meter(punkte[i], punkte[i + 1]) >= MIN_STRECKE) {
+        return peilung(punkte[i], punkte[i + 1]);
       }
       var j = lo + d;
-      if (d && j + 1 < n && meter(spurPunkte[j], spurPunkte[j + 1]) >= MIN_STRECKE) {
-        return peilung(spurPunkte[j], spurPunkte[j + 1]);
+      if (d && j + 1 < n && meter(punkte[j], punkte[j + 1]) >= MIN_STRECKE) {
+        return peilung(punkte[j], punkte[j + 1]);
       }
     }
     // Das Schiff liegt: Jetzt ist der gemeldete Kurs die bessere Auskunft.
-    return spurPunkte[lo].cog == null ? null : spurPunkte[lo].cog;
+    return punkte[lo].cog == null ? null : punkte[lo].cog;
   }
 
   // Geglaettet wird der RICHTUNGSVEKTOR, nicht der Winkel: Ein Tiefpass auf
@@ -527,31 +551,52 @@
   // Ohne Glaettung springt die Blickrichtung an jedem Stuetzpunkt - gemessen
   // im 90. Perzentil um 19 Grad, bei 60-fachem Abspielen also jede Sekunde
   // ein Ruck. Das waere nicht realistischer, nur hakeliger.
-  var kursGlatt = null, kursZiel = null;
-  var letzterOrt = null, letzteWand = 0;
+  //
+  // Je Schiff ein eigener Zustand: Der eigene Rumpf und die Nachbarn drehen
+  // unabhaengig voneinander, sonst zoege einer den anderen mit.
+  function kursZustand() { return { glatt: null, ziel: null, ort: null }; }
+  var eigenKurs = kursZustand();
+  var letzteWand = 0, wandDt = 0;
 
-  function kursTakt(uhr) {
-    if (!schiffEntity || !viewer) return;
-    var ort = schiffEntity.position.getValue(uhr.currentTime);
-    if (!ort) return;
-    var ziel = kursUeberGrund(Cesium.JulianDate.toDate(uhr.currentTime).getTime());
+  function kursSchritt(z, punkte, ort, tms, dt) {
+    var ziel = kursUeberGrund(punkte, tms);
     if (ziel == null) return;
-    kursZiel = ziel;
-    var jetzt = Date.now();
-    var dt = letzteWand ? Math.min(0.5, (jetzt - letzteWand) / 1000) : 0;
-    letzteWand = jetzt;
+    z.ziel = ziel;
     // Beim Ziehen am Zeitregler springt der Ort. Ein Schwenk ueber den halben
     // Hafen waere kein realistischer Uebergang, sondern ein Fehler.
-    var sprung = !letzterOrt || Cesium.Cartesian3.distance(ort, letzterOrt) > KURS_SPRUNG;
-    letzterOrt = Cesium.Cartesian3.clone(ort, letzterOrt);
-    if (kursGlatt == null || sprung || !dt) { kursGlatt = ziel; return; }
+    var sprung = !z.ort || Cesium.Cartesian3.distance(ort, z.ort) > KURS_SPRUNG;
+    z.ort = Cesium.Cartesian3.clone(ort, z.ort);
+    if (z.glatt == null || sprung || !dt) { z.glatt = ziel; return; }
     var a = 1 - Math.exp(-dt / KURS_TAU);
     var gr = Math.PI / 180;
-    var gx = Math.sin(kursGlatt * gr), gy = Math.cos(kursGlatt * gr);
+    var gx = Math.sin(z.glatt * gr), gy = Math.cos(z.glatt * gr);
     var zx = Math.sin(ziel * gr), zy = Math.cos(ziel * gr);
     var nx = gx + (zx - gx) * a, ny = gy + (zy - gy) * a;
     if (!nx && !ny) return;
-    kursGlatt = (Math.atan2(nx, ny) * 180 / Math.PI + 360) % 360;
+    z.glatt = (Math.atan2(nx, ny) * 180 / Math.PI + 360) % 360;
+  }
+
+  function kursTakt(uhr) {
+    if (!viewer) return;
+    // EIN Zeitschritt je Bild, fuer alle Schiffe derselbe: Die Glaettung
+    // haengt an der Wanduhr, nicht an der Zahl der Rumpfe.
+    var jetzt = Date.now();
+    wandDt = letzteWand ? Math.min(0.5, (jetzt - letzteWand) / 1000) : 0;
+    letzteWand = jetzt;
+    var tms = Cesium.JulianDate.toDate(uhr.currentTime).getTime();
+    if (schiffEntity) {
+      var ort = schiffEntity.position.getValue(uhr.currentTime);
+      if (ort) {
+        kursSchritt(eigenKurs, spurPunkte, ort, tms, wandDt);
+        // EINE Hoehenabfrage je Bild, an der eigenen Position - die Nachbarn
+        // liegen hoechstens UMGEBUNG_RADIUS entfernt auf demselben Wasser.
+        // Je Schiff einzeln zu fragen waere hundertmal dieselbe Zahl.
+        try {
+          flaecheJetzt = flaecheHoehe(Cesium.Cartographic.fromCartesian(ort));
+        } catch (e) {}
+      }
+    }
+    umgebungTakt(uhr, tms);
   }
 
   function fpvTakt(uhr) {
@@ -581,7 +626,7 @@
       destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude,
         flaecheHoehe(c) + AUGENHOEHE),
       orientation: {
-        heading: Cesium.Math.toRadians(kursGlatt == null ? 0 : kursGlatt),
+        heading: Cesium.Math.toRadians(eigenKurs.glatt == null ? 0 : eigenKurs.glatt),
         pitch: Cesium.Math.toRadians(FPV_NEIGUNG),
         roll: 0
       }
@@ -594,6 +639,229 @@
     // Ein liegengelassener Tab soll nicht dauerhaft rendern.
     if (viewer) viewer.scene.requestRenderMode = true;
     if (schiffEntity) schiffEntity.show = true;
+  }
+
+  // --- Die Umgebung: die anderen Schiffe, ohne Spurlinien ---------------
+  //
+  // Aus der Bruecke heraus ist ein leerer Hafen falsch. Gezeigt werden die
+  // Schiffe, die dem eigenen waehrend des Zeitfensters wirklich nahe kommen -
+  // jedes als Rumpf in seinen eigenen Massen, mit seinem eigenen Kurs ueber
+  // Grund. KEINE Spurlinien: 130 Linien uebereinander waeren ein Knaeuel,
+  // und die eine Spur, um die es geht, ginge darin unter.
+  var UMGEBUNG_RAND = 3000;      // Meter Rand um die eigene Spur fuer die Abfrage
+  var UMGEBUNG_RADIUS = 5000;    // Meter: so nah muss ein Schiff einmal kommen
+  var UMGEBUNG_MAX = 150;        // Riegel, kein Regelfall - siehe unten
+  var UMGEBUNG_SCHRITT = 60;     // Sekunden, dasselbe Raster wie der Speicher
+  var UMGEBUNG_STAMM_GLEICH = 8; // gleichzeitige /v1/ship-Abrufe
+
+  var umgebung = [], umgebungAn = true, umgebungGeholt = false;
+  var umgebungStand = "", flaecheJetzt = 0;
+  var hilfsN = null;
+
+  function umgebungTakt(uhr, tms) {
+    if (!umgebung.length) return;
+    for (var i = 0; i < umgebung.length; i++) {
+      var n = umgebung[i];
+      var ort = n.pos.getValue(uhr.currentTime);
+      if (!ort) continue;
+      kursSchritt(n.kurs, n.punkte, ort, tms, wandDt);
+    }
+  }
+
+  // Der Kasten eines Nachbarn wird auf die Flaeche gehoben wie der eigene -
+  // aber ENTLANG DER FLAECHENNORMALEN statt ueber Cartographic. Bei 130
+  // Schiffen je Bild waere die Umrechnung der teuerste Posten der ganzen
+  // Umgebung; der Unterschied zur exakten Loesung liegt im Zehntelmeter.
+  function aufFlaeche(p, ergebnis) {
+    var r = ergebnis || new Cesium.Cartesian3();
+    if (!flaecheJetzt) return Cesium.Cartesian3.clone(p, r);
+    if (!hilfsN) hilfsN = new Cesium.Cartesian3();
+    var nrm = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(p, hilfsN);
+    Cesium.Cartesian3.multiplyByScalar(nrm, flaecheJetzt, hilfsN);
+    return Cesium.Cartesian3.add(p, hilfsN, r);
+  }
+
+  // Der Kasten um die eigene Spur, mit Rand. Die Abfrage kann nur ein
+  // Rechteck; der Korridor entsteht danach ueber die Annaeherung.
+  function spurBbox(rand) {
+    var laMin = 90, laMax = -90, loMin = 180, loMax = -180;
+    for (var i = 0; i < spurPunkte.length; i++) {
+      var p = spurPunkte[i];
+      if (p.lat < laMin) laMin = p.lat;
+      if (p.lat > laMax) laMax = p.lat;
+      if (p.lon < loMin) loMin = p.lon;
+      if (p.lon > loMax) loMax = p.lon;
+    }
+    var mitte = (laMin + laMax) / 2;
+    var dLa = rand / 111320;
+    var dLo = rand / (111320 * Math.max(0.2, Math.cos(mitte * Math.PI / 180)));
+    return [laMin - dLa, loMin - dLo, laMax + dLa, loMax + dLo]
+      .map(function (x) { return x.toFixed(5); }).join(",");
+  }
+
+  // Wie nah kommt ein Schiff der eigenen Spur - ZUR SELBEN ZEIT? Ein Schiff,
+  // das vier Stunden spaeter durch dieselbe Stelle faehrt, war nie in Sicht.
+  // Deshalb wird die eigene Position zum Zeitpunkt des fremden Stuetzpunkts
+  // interpoliert und nicht bloss der Abstand zweier Linien gemessen.
+  function naechsteAnnaeherung(punkte) {
+    var n = spurPunkte.length;
+    if (n < 2) return Infinity;
+    var min = Infinity, j = 0;
+    for (var i = 0; i < punkte.length; i++) {
+      var q = punkte[i];
+      if (q.t < spurPunkte[0].t || q.t > spurPunkte[n - 1].t) continue;
+      while (j + 1 < n && spurPunkte[j + 1].t < q.t) j++;
+      var a = spurPunkte[j], b = spurPunkte[Math.min(j + 1, n - 1)];
+      var f = b.t === a.t ? 0 : (q.t - a.t) / (b.t - a.t);
+      var d = meter({ lat: a.lat + (b.lat - a.lat) * f,
+                      lon: a.lon + (b.lon - a.lon) * f }, q);
+      if (d < min) min = d;
+    }
+    return min;
+  }
+
+  // Zwei Drittel der Nachbarn stehen im Schnappschuss; der Rest hat den
+  // heissen Zustand verlassen, seit er hier durchgefahren ist (gemessen 107
+  // von 163). Ohne die Einzelabrufe bekaeme ein Drittel der Umgebung eine
+  // erfundene Groesse - und in einem Hafen IST die Groesse das Bild.
+  function stammHolen(mmsis, bbox) {
+    var karte = {};
+    return fetch(mitToken(proxyBasis() + "/snapshot?bbox=" + bbox))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (sn) {
+        var da = (sn && sn.schiffe) || [];
+        for (var i = 0; i < da.length; i++) karte[da[i].mmsi] = da[i];
+        var fehlt = mmsis.filter(function (m) { return !karte[m]; });
+        var k = 0;
+        function runde() {
+          if (k >= fehlt.length) return karte;
+          var teil = fehlt.slice(k, k + UMGEBUNG_STAMM_GLEICH);
+          k += UMGEBUNG_STAMM_GLEICH;
+          return Promise.all(teil.map(function (m) {
+            return fetch(mitToken(proxyBasis() + "/ship/" + m))
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .then(function (d) { if (d) karte[m] = d; })
+              .catch(function () {});
+          })).then(runde);
+        }
+        return runde();
+      });
+  }
+
+  function bauUmgebung(liste) {
+    var ohneMasse = 0;
+    for (var i = 0; i < liste.length; i++) {
+      var n = liste[i], pts = n.punkte;
+      var pos = new Cesium.SampledPositionProperty();
+      for (var k = 0; k < pts.length; k++) {
+        pos.addSample(Cesium.JulianDate.fromDate(new Date(pts[k].t)),
+          Cesium.Cartesian3.fromDegrees(pts[k].lon, pts[k].lat, 0));
+      }
+      pos.setInterpolationOptions({
+        interpolationDegree: 1,
+        interpolationAlgorithm: Cesium.LinearApproximation
+      });
+      n.pos = pos;
+      n.kurs = kursZustand();
+      var st = n.stamm || {};
+      if (!st.laenge) ohneMasse++;
+      var laenge = st.laenge || 40, breite = st.breite || 8;
+      n.entity = viewer.entities.add({
+        // Eine eigene Kennung, damit die Umgebung vom eigenen Schiff zu
+        // trennen ist - im Code wie in der Probe.
+        id: "umg-" + n.mmsi,
+        // Nur zu seiner eigenen Zeit da: Ein Schiff, dessen Spur erst in der
+        // letzten Stunde beginnt, stuende sonst fuenf Stunden lang an seinem
+        // ersten Punkt herum.
+        availability: new Cesium.TimeIntervalCollection([
+          new Cesium.TimeInterval({
+            start: Cesium.JulianDate.fromDate(new Date(pts[0].t)),
+            stop: Cesium.JulianDate.fromDate(new Date(pts[pts.length - 1].t))
+          })
+        ]),
+        position: new Cesium.CallbackPositionProperty((function (pos) {
+          return function (t, ergebnis) {
+            var p = pos.getValue(t);
+            return p ? aufFlaeche(p, ergebnis) : undefined;
+          };
+        })(pos), false),
+        orientation: new Cesium.CallbackProperty((function (pos, z) {
+          return function (t, ergebnis) {
+            var p = pos.getValue(t);
+            if (!p || z.glatt == null) return undefined;
+            return Cesium.Transforms.headingPitchRollQuaternion(p,
+              new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(z.glatt - 90), 0, 0),
+              Cesium.Ellipsoid.WGS84, Cesium.Transforms.eastNorthUpToFixedFrame,
+              ergebnis);
+          };
+        })(pos, n.kurs), false),
+        box: {
+          dimensions: new Cesium.Cartesian3(laenge, breite, Math.max(6, breite * 0.6)),
+          material: Cesium.Color.fromCssColorString(farbeFuerTyp(st.typ)),
+          outline: true,
+          outlineColor: Cesium.Color.BLACK.withAlpha(0.6)
+        },
+        show: umgebungAn
+      });
+      umgebung.push(n);
+    }
+    umgebungStand = "<b>" + umgebung.length + "</b> Schiffe" +
+      (ohneMasse ? " (" + ohneMasse + " ohne Maße)" : "");
+    if (viewer) viewer.scene.requestRender();
+  }
+
+  function holeUmgebung() {
+    if (!spurPunkte.length) return Promise.resolve();
+    var bbox = spurBbox(UMGEBUNG_RAND);
+    var von = Math.floor(spurPunkte[0].t / 1000);
+    var bis = Math.ceil(spurPunkte[spurPunkte.length - 1].t / 1000);
+    umgebungStand = "wird geholt…";
+    return fetch(mitToken(proxyBasis() + "/replay?bbox=" + bbox +
+      "&von=" + von + "&bis=" + bis + "&schritt=" + UMGEBUNG_SCHRITT))
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (d) {
+        var spuren = (d && d.spuren) || [];
+        var kand = [];
+        for (var i = 0; i < spuren.length; i++) {
+          if (String(spuren[i].mmsi) === MMSI) continue;
+          var pts = punkteLesen(spuren[i]);
+          if (pts.length < 2) continue;
+          var nah = naechsteAnnaeherung(pts);
+          if (!(nah <= UMGEBUNG_RADIUS)) continue;
+          kand.push({ mmsi: spuren[i].mmsi, punkte: pts, nah: nah });
+        }
+        kand.sort(function (a, b) { return a.nah - b.nah; });
+        // Der Radius macht die Arbeit; die Obergrenze ist nur ein Riegel
+        // gegen eine Reede, auf der vierhundert Schiffe liegen. Zweimal in
+        // Bremerhaven gemessen: 122 und 130 Schiffe, beide darunter.
+        if (kand.length > UMGEBUNG_MAX) kand = kand.slice(0, UMGEBUNG_MAX);
+        if (!kand.length) { umgebungStand = "keine anderen Schiffe"; return; }
+        umgebungStand = kand.length + " Schiffe, Maße werden geholt…";
+        return stammHolen(kand.map(function (k) { return k.mmsi; }), bbox)
+          .then(function (karte) {
+            // Erst bauen, wenn die Masse da sind: Sonst waechst ein Kasten
+            // ein paar Sekunden nach dem Erscheinen von 40 auf 300 m, und
+            // das sieht aus wie ein Fehler.
+            for (var i = 0; i < kand.length; i++) {
+              kand[i].stamm = karte[kand[i].mmsi] || null;
+            }
+            bauUmgebung(kand);
+          });
+      })
+      .catch(function (e) {
+        umgebungStand = "nicht geladen (" + (e && e.message || e) + ")";
+      });
+  }
+
+  function umgebungZeigen(an) {
+    umgebungAn = an;
+    for (var i = 0; i < umgebung.length; i++) umgebung[i].entity.show = an;
+    if (viewer) viewer.scene.requestRender();
+    if (an && !umgebungGeholt) { umgebungGeholt = true; holeUmgebung(); }
   }
 
   function kameraAufSpur() {
@@ -821,7 +1089,7 @@
           (Math.abs(fl) > 1 ? " (Fläche " + Math.round(fl) + " m)" : ""));
       } catch (e) {}
       // Der Unterschied, um den es geht, direkt ablesbar.
-      if (kursGlatt != null) {
+      if (eigenKurs.glatt != null) {
         var gem = null;
         try {
           var jt = Cesium.JulianDate.toDate(viewer.clock.currentTime).getTime();
@@ -829,10 +1097,11 @@
             if (spurPunkte[q].t <= jt) { gem = spurPunkte[q].cog; break; }
           }
         } catch (e) {}
-        zeilen.push("Kurs: <b>" + Math.round(kursGlatt) + "°</b> über Grund" +
+        zeilen.push("Kurs: <b>" + Math.round(eigenKurs.glatt) + "°</b> über Grund" +
           (gem == null ? "" : " (gemeldet " + Math.round(gem) + "°)"));
       }
       zeilen.push("<b>" + spurPunkte.length + "</b> Spurpunkte über " + STUNDEN + " h");
+      zeilen.push("Umgebung: " + (el.umgebung.checked ? (umgebungStand || "—") : "aus"));
       el.werte.innerHTML = zeilen.join("<br>");
     }, 1000);
   }
@@ -876,6 +1145,11 @@
     viewer.clock.onTick.addEventListener(fpvTakt);
     meldungWeg();
 
+    // Nach der eigenen Spur, nicht davor: Die Ansicht soll stehen, bevor der
+    // Verkehr geholt wird - und die Umgebung braucht die eigene Spur ohnehin
+    // fuer Kasten und Annaeherung.
+    if (el.umgebung.checked) { umgebungGeholt = true; holeUmgebung(); }
+
     el.ionToken.value = hole("aisstream_ion_token") || "";
     el.googleKey.value = hole("aisstream_google_key") || "";
     // Sichtbar machen, woher ein Zugang kommt - sonst steht da ein leeres
@@ -897,6 +1171,11 @@
   el.fpv.addEventListener("change", function () {
     setze("aisstream_3d_fpv", el.fpv.checked ? "1" : "0");
     if (!el.fpv.checked) fpvAus();
+  });
+  el.umgebung.checked = hole("aisstream_3d_umgebung") !== "0";
+  el.umgebung.addEventListener("change", function () {
+    setze("aisstream_3d_umgebung", el.umgebung.checked ? "1" : "0");
+    umgebungZeigen(el.umgebung.checked);
   });
   el.untergrund.addEventListener("change", function () {
     untergrundSetzen(el.untergrund.value, 0);
