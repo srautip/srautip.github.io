@@ -133,6 +133,10 @@ const konfig = {
   // die IMO kann jede Minute per ShipStaticData eintreffen. Mit IMO war es
   // eine vollstaendige Suche, die haelt lange.
   FOTO_TEIL_MS: zahl("AIS_FOTO_TEIL_MS", 60 * 60 * 1000),
+  // Wie viele frueherere Ziele je Schiff aufgehoben werden. Mehr liest
+  // niemand, und ein Transponder mit wechselndem Freitext fuellte die Tabelle
+  // sonst unbegrenzt.
+  ZIEL_VERLAUF_MAX: zahl("AIS_ZIEL_VERLAUF_MAX", 12),
   FOTO_FEHL_MS: zahl("AIS_FOTO_FEHL_MS", 7 * 24 * 3600 * 1000),
   // Obergrenze je Lauf. Ohne sie liefe der erste Lauf ueber 2900 Schiffe mal
   // bis zu fuenf Abrufen mal einer Sekunde Pause - Stunden. Was nicht drankam,

@@ -2990,6 +2990,9 @@
   var ortOffen = {};        // laufende Abfragen, damit keine doppelt geht
   var ortGeholt = {};       // nur die Treffer des Proxys - die werden gemerkt
   var ortFehlerGemeldet = false;
+  // So viele vergangene Ziele stehen in der Zeile. Der Proxy hebt mehr auf
+  // (ZIEL_VERLAUF_MAX = 12); acht sind das, was sich noch lesen laesst.
+  var ZIEL_VERLAUF_ZEIGEN = 8;
 
   function ortTabelle() {
     if (ortNamen) return ortNamen;
@@ -3145,6 +3148,49 @@
   // der Tabelle steht: "EMDEN" und "BRAKE" sehen wie ein LOCODE aus (fünf
   // Buchstaben), sind aber schon der Ortsname - und "BRAKE" als BR+AKE zu
   // lesen und zu Brasilien zu machen wäre schlimmer als der rohe Text.
+  // Zerlegt eine Zielangabe in Trenner und Orte und löst auf, was in der
+  // Ortstabelle steht. **Eine** Stelle, weil die Falle („BRAKE" ist ein
+  // Ortsname, kein Code) sonst zweimal existierte — und die zweite Fassung
+  // sie irgendwann nicht mehr kennte. Genutzt vom aktuellen Ziel und von den
+  // vergangenen.
+  function reiseZerlege(roh) {
+    var stuecke = roh.split(REISE_TRENNER);
+    // Der Bindestrich trennt nur, wenn ALLE Teile wie ein Code aussehen -
+    // sonst zerlegte er "SPODSBJERG-TAARS" oder einen Ortsnamen mit Strich.
+    if (stuecke.length === 1 && /^[A-Z]{2}[A-Z0-9]{3}(-[A-Z]{2}[A-Z0-9]{3})+$/.test(roh)) {
+      stuecke = roh.split(/(-)/);
+    }
+    var teile = [], offen = [];
+    stuecke.forEach(function (t) {
+      var k = t.trim();
+      if (!k) return;
+      if (/^(<-->|<->|<=>|<--|-->|<>|><|>>|=>|->|→|<|>|-|TO|VIA)$/.test(k)) {
+        teile.push({ trenner: /^(<-->|<->|<=>|<>|><)$/.test(k) ? " ⇄ " : " → " });
+        return;
+      }
+      // "DE HAM" schreiben manche mit Leerzeichen.
+      var code = k.replace(/\s+/g, "");
+      var name = locodeName(code);
+      if (name) {
+        // Das Land nur zu einem Code, der wirklich in der Tabelle steht:
+        // "BRAKE" ist ein Ortsname, kein Code, und waere hier Brasilien.
+        teile.push({ roh: k, code: code, name: name, land: landZuLocode(code) });
+        return;
+      }
+      // Noch nie gefragt und sieht wie ein Code aus? Dann beim Proxy
+      // nachschlagen und die Ansicht auffrischen, wenn die Antwort da ist.
+      if (name === undefined && /^[A-Z]{2}[A-Z0-9]{3}$/.test(code)) offen.push(code);
+      teile.push({ roh: k });
+    });
+    if (offen.length) {
+      ortHolen(offen, function () {
+        var e = selectedMmsi && ships.get(selectedMmsi);
+        if (e) renderDetail(e);
+      });
+    }
+    return teile;
+  }
+
   // Liefert beides auf einmal: den ausgeschriebenen Text und die Laender, die
   // dabei herausgekommen sind. Zweimal zu zerlegen waere zweimal dieselbe
   // Falle - und die beiden koennten auseinanderlaufen.
@@ -3153,47 +3199,20 @@
     if (!ziel) return leer;
     var roh = String(ziel).trim();
     if (!roh) return leer;
-    var stuecke = roh.split(REISE_TRENNER);
-    // Der Bindestrich trennt nur, wenn ALLE Teile wie ein Code aussehen -
-    // sonst zerlegte er "SPODSBJERG-TAARS" oder einen Ortsnamen mit Strich.
-    if (stuecke.length === 1 && /^[A-Z]{2}[A-Z0-9]{3}(-[A-Z]{2}[A-Z0-9]{3})+$/.test(roh)) {
-      stuecke = roh.split(/(-)/);
-    }
+    var teile = reiseZerlege(roh);
     var geaendert = false;
-    var offen = [];
     var laender = [];
-    var aus = stuecke.map(function (t) {
-      var k = t.trim();
-      if (!k) return t;
-      if (/^(<-->|<->|<=>|<--|-->|<>|><|>>|=>|->|→|<|>|-|TO|VIA)$/.test(k)) {
-        return /^(<-->|<->|<=>|<>|><)$/.test(k) ? " ⇄ " : " → ";
+    var aus = teile.map(function (p) {
+      if (p.trenner) return p.trenner;
+      if (!p.name) return p.roh;
+      geaendert = true;
+      if (p.land) {
+        var schon = false;
+        for (var j = 0; j < laender.length; j++) if (laender[j].iso === p.land.iso) schon = true;
+        if (!schon) laender.push(p.land);
       }
-      // "DE HAM" schreiben manche mit Leerzeichen.
-      var code = k.replace(/\s+/g, "");
-      var name = locodeName(code);
-      if (name) {
-        geaendert = true;
-        // Das Land nur zu einem Code, der wirklich in der Tabelle steht:
-        // "BRAKE" ist ein Ortsname, kein Code, und waere hier Brasilien.
-        var land = landZuLocode(code);
-        if (land) {
-          var schon = false;
-          for (var j = 0; j < laender.length; j++) if (laender[j].iso === land.iso) schon = true;
-          if (!schon) laender.push(land);
-        }
-        return name;
-      }
-      // Noch nie gefragt und sieht wie ein Code aus? Dann beim Proxy
-      // nachschlagen und die Ansicht auffrischen, wenn die Antwort da ist.
-      if (name === undefined && /^[A-Z]{2}[A-Z0-9]{3}$/.test(code)) offen.push(code);
-      return k;
+      return p.name;
     }).join("");
-    if (offen.length) {
-      ortHolen(offen, function () {
-        var e = selectedMmsi && ships.get(selectedMmsi);
-        if (e) renderDetail(e);
-      });
-    }
     if (!geaendert) return { text: roh, laender: null };
     // Die Laender stehen in einer eigenen Zeile, nicht hinter jedem Ort: Eine
     // Fahrt Cuxhaven-Helgoland-Cuxhaven bekaeme sonst dreimal "(Deutschland)"
@@ -3205,6 +3224,36 @@
     // Die Rohform bleibt sichtbar: Sie steht so auf der Leitung, und wer sie
     // sucht, soll sie nicht erst zurückübersetzen müssen.
     return { text: aus + " (" + roh + ")", laender: landText };
+  }
+
+  // Ein vergangenes Ziel in Kurzform: Flagge und Ortsname, ohne die Rohform.
+  // In einer Aufzaehlung von bis zu acht Eintraegen waere sie Ballast — beim
+  // aktuellen Ziel steht sie weiter dabei, dort gibt es nur eine.
+  function zielKurz(roh) {
+    var teile = reiseZerlege(roh);
+    var aus = teile.map(function (p) {
+      if (p.trenner) return p.trenner;
+      if (!p.name) return p.roh;
+      return (p.land && p.land.flagge ? p.land.flagge + " " : "") + p.name;
+    }).join("");
+    return aus || roh;
+  }
+
+  // Wohin das Schiff frueher unterwegs war. Der Proxy fuehrt den Verlauf mit,
+  // weil das AIS-Zielfeld immer nur den aktuellen Stand traegt.
+  function vergangeneZiele(entry) {
+    var liste = entry.zielVerlauf;
+    if (!liste || !liste.length) return null;
+    // Das aktuelle Ziel steht im Verlauf mit drin - es gehoert aber in seine
+    // eigene Zeile darueber, nicht noch einmal unter "vergangene".
+    var jetzt = String(entry.destination || "").trim().toUpperCase();
+    var aus = [];
+    for (var i = 0; i < liste.length && aus.length < ZIEL_VERLAUF_ZEIGEN; i++) {
+      var roh = String(liste[i].ziel || "").trim();
+      if (!roh || roh.toUpperCase() === jetzt) continue;
+      aus.push(zielKurz(roh));
+    }
+    return aus.length ? aus.join(", ") : null;
   }
 
   function fixTypeLabel(code) {
@@ -6582,6 +6631,7 @@
         // sonst sprengt ein "Antwerpen ⇄ Hamburg (BEANR<>DEHAM)" die Spalte.
         ["Ziel", reise.text],
         ["Länder", reise.laender],
+        ["Vergangene Ziele", vergangeneZiele(entry)],
         ["ETA", entry.eta]
       ]) +
       section("Personen an Bord (Binnen-AIS)", [
@@ -6821,6 +6871,10 @@
     // muessen also zurueck in die Gegenwart, und zwar sofort.
     if (!replayLive()) replayAnwenden();
     if (autoEnrichInput.checked) enrichShip(mmsi, false);
+    // Wohin es frueher unterwegs war — und zwar NACH enrichShip: Laeuft die
+    // Registerabfrage, holt sie /v1/ship ohnehin und bringt den Verlauf mit.
+    // Davor aufgerufen fragte der Client dieselbe Adresse zweimal.
+    zielVerlaufHolen(mmsi);
   }
 
   function closeDetail() {
@@ -7508,7 +7562,42 @@
   // Stammdaten und Register in einem Zug: Der Proxy hat den ganzen Bestand
   // vorgewärmt, die Antwort kommt also ohne Wartezeit. Findet er nichts,
   // läuft die gewohnte Kette (Digitraffic/Wikidata/Commons) als Rückfall.
+  // Der Zielverlauf laeuft NICHT ueber den Anreicherungs-Cache. Der haelt
+  // Treffer 30 Tage — richtig fuer Baujahr und Werft, falsch fuer eine Liste,
+  // die mit jeder Reise waechst: Ein Schiff, das seither in drei Haefen war,
+  // zeigte einen Monat lang den alten Stand. Geholt wird deshalb je Sitzung
+  // einmal, und nur fuer ein Schiff, das wirklich geoeffnet wird.
+  var zielVerlaufDa = {};      // schon geholt in dieser Sitzung
+  var zielVerlaufOffen = {};   // laufende Abfrage
+
+  function zielVerlaufSetze(mmsi, liste) {
+    mmsi = String(mmsi);
+    zielVerlaufDa[mmsi] = 1;
+    var e = ships.get(mmsi);
+    if (e) e.zielVerlauf = liste && liste.length ? liste : null;
+  }
+
+  function zielVerlaufHolen(mmsi) {
+    mmsi = String(mmsi);
+    if (!proxyAktiv() || !proxyBasis()) return;
+    if (zielVerlaufDa[mmsi] || zielVerlaufOffen[mmsi]) return;
+    zielVerlaufOffen[mmsi] = 1;
+    fetch(proxyMitToken(proxyBasis() + "/ship/" + encodeURIComponent(mmsi)))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d) return;
+        zielVerlaufSetze(mmsi, d.zielVerlauf);
+        var e = ships.get(mmsi);
+        if (e && selectedMmsi === mmsi) renderDetail(e);
+      })
+      .catch(function () {})
+      .then(function () { delete zielVerlaufOffen[mmsi]; });
+  }
+
   function proxyRegister(mmsi) {
+    // Diese Abfrage bringt den Zielverlauf mit - solange sie laeuft, braucht
+    // ihn niemand ein zweites Mal zu holen.
+    zielVerlaufOffen[String(mmsi)] = 1;
     return fetch(proxyMitToken(proxyBasis() + "/ship/" + encodeURIComponent(mmsi)))
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
@@ -7516,6 +7605,9 @@
       })
       .then(function (d) {
         if (!d) return null;
+        // Der Zielverlauf haengt nicht am Registertreffer: Er kommt aus dem
+        // AIS-Strom, nicht aus Wikidata. Deshalb VOR dem Ausstieg unten.
+        zielVerlaufSetze(mmsi, d.zielVerlauf);
         // „gefunden" heißt: Wikidata-Treffer. Ein FOTO kann auch ohne einen
         // solchen dasein — der Proxy findet Bilder über die Commons-Kategorie
         // und über Flickr, beides an der IMO. Hier stand vorher nur die
@@ -7555,7 +7647,11 @@
                               page: d.foto_seite || null };
         }
         return out;
-      });
+      })
+      // Auch bei Fehlschlag: Sonst bliebe der Verlauf fuer die ganze Sitzung
+      // gesperrt, weil niemand mehr fragen darf.
+      .then(function (out) { delete zielVerlaufOffen[String(mmsi)]; return out; },
+            function (e) { delete zielVerlaufOffen[String(mmsi)]; throw e; });
   }
 
   function sendSubscription() {
