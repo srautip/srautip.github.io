@@ -92,12 +92,13 @@
 </header>
 
 <div id="tafel">
-  <h2>Höhe der Spur</h2>
-  <select id="hoehenModus">
-    <option value="zeit">Zeit — älteste Punkte unten</option>
-    <option value="sog">Geschwindigkeit</option>
-    <option value="flach">flach auf dem Wasser</option>
-  </select>
+  <h2>Kamera</h2>
+  <label style="display:flex;align-items:center;gap:.5rem;margin:.1rem 0 0">
+    <input type="checkbox" id="fpv" checked style="width:auto">
+    <span>Mitfahren — Blick von der Brücke</span>
+  </label>
+  <p style="margin-top:.3rem">Gilt beim Abspielen. In der Pause ist die Kamera
+     frei zum Umsehen.</p>
 
   <h2 style="margin-top:.9rem">Untergrund</h2>
   <select id="untergrund">
@@ -145,13 +146,11 @@
   var CESIUM_BASIS = P.get("cesium") ||
     "https://cdn.jsdelivr.net/npm/cesium@1.123.1/Build/Cesium/";
 
-  // Die Bandhoehe ist KEINE feste Zahl, sondern ein Anteil der Ausdehnung der
-  // Spur. Mit festen 500 m stand ueber einer 1,5-km-Fahrt eine fast
-  // senkrechte Wand - auf dem Schirmfoto ein Strich, keine Kurve.
-  var HOEHE_ANTEIL = 0.28;      // vom Durchmesser der Spur
-  var HOEHE_MIN = 60, HOEHE_OBEN = 900;
-  var hoeheMax = 300;           // wird aus der Spur gerechnet
-  var SOG_MAX = 25;             // Knoten, Bezug fuer den Geschwindigkeitsmodus
+  // Die Spur liegt auf dem Wasser. Ein aufsteigendes Band (Hoehe = Zeit oder
+  // Geschwindigkeit) stand hier einmal und ist auf Wunsch wieder raus: Im
+  // Betrieb stand es im Weg. Die dritte Dimension traegt jetzt die FAHRT.
+  var AUGENHOEHE = 20;          // Meter ueber dem Wasser, Blick von der Bruecke
+  var FPV_NEIGUNG = -8;         // Grad, leicht nach unten - sonst sieht man nur Himmel
 
   function hole(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function setze(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -175,7 +174,7 @@
     unter: document.getElementById("unter"),
     tafel: document.getElementById("tafel"),
     tafelKnopf: document.getElementById("tafelKnopf"),
-    hoehenModus: document.getElementById("hoehenModus"),
+    fpv: document.getElementById("fpv"),
     googleKey: document.getElementById("googleKey"),
     ionToken: document.getElementById("ionToken"),
     untergrund: document.getElementById("untergrund"),
@@ -254,16 +253,6 @@
     return aus;
   }
 
-  function hoeheFuer(p, modus, t0, t1) {
-    if (modus === "flach") return 0;
-    if (modus === "sog") {
-      var s = p.sog == null ? 0 : Math.min(p.sog, SOG_MAX);
-      return (s / SOG_MAX) * hoeheMax;
-    }
-    if (t1 <= t0) return 0;
-    return ((p.t - t0) / (t1 - t0)) * hoeheMax;
-  }
-
   // Grobe Entfernung in Metern - fuer den Massstab reicht die Naeherung.
   function meter(a, b) {
     var dLat = (b.lat - a.lat) * 111320;
@@ -271,23 +260,18 @@
     return Math.sqrt(dLat * dLat + dLon * dLon);
   }
 
-  function hoeheEichen() {
-    if (spurPunkte.length < 2) { hoeheMax = HOEHE_MIN; return; }
-    var latMin = 90, latMax = -90, lonMin = 180, lonMax = -180;
-    for (var i = 0; i < spurPunkte.length; i++) {
-      var p = spurPunkte[i];
-      if (p.lat < latMin) latMin = p.lat;
-      if (p.lat > latMax) latMax = p.lat;
-      if (p.lon < lonMin) lonMin = p.lon;
-      if (p.lon > lonMax) lonMax = p.lon;
-    }
-    var d = meter({ lat: latMin, lon: lonMin }, { lat: latMax, lon: lonMax });
-    hoeheMax = Math.max(HOEHE_MIN, Math.min(HOEHE_OBEN, d * HOEHE_ANTEIL));
+  // Rechtweisender Kurs von a nach b, in Grad.
+  function peilung(a, b) {
+    var y = Math.sin((b.lon - a.lon) * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180);
+    var x = Math.cos(a.lat * Math.PI / 180) * Math.sin(b.lat * Math.PI / 180) -
+            Math.sin(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) *
+            Math.cos((b.lon - a.lon) * Math.PI / 180);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
   }
 
   // --- Aufbau -----------------------------------------------------------
   var viewer = null, Cesium = null, spurPunkte = [], schiff = null;
-  var bandEntity = null, wandEntity = null, bodenEntity = null, schiffEntity = null;
+  var bodenEntity = null, schiffEntity = null;
   var googleTileset = null, bauTileset = null;
 
   function farbeFuerTyp(typ) {
@@ -346,55 +330,30 @@
   }
 
   function zeichneSpur() {
-    var modus = el.hoehenModus.value;
     if (!spurPunkte.length) return;
-    var t0 = spurPunkte[0].t, t1 = spurPunkte[spurPunkte.length - 1].t;
     var farbe = Cesium.Color.fromCssColorString(farbeFuerTyp(schiff && schiff.typ));
-
-    var grade = [], wandMax = [], boden = [];
+    var boden = [];
     for (var i = 0; i < spurPunkte.length; i++) {
-      var p = spurPunkte[i];
-      var h = hoeheFuer(p, modus, t0, t1);
-      grade.push(p.lon, p.lat, h);
-      wandMax.push(h);
-      boden.push(p.lon, p.lat);
+      boden.push(spurPunkte[i].lon, spurPunkte[i].lat);
     }
-
-    if (bandEntity) viewer.entities.remove(bandEntity);
-    if (wandEntity) viewer.entities.remove(wandEntity);
     if (bodenEntity) viewer.entities.remove(bodenEntity);
 
-    bandEntity = viewer.entities.add({
-      polyline: {
-        positions: Cesium.Cartesian3.fromDegreesArrayHeights(grade),
-        width: 6,
-        material: new Cesium.PolylineOutlineMaterialProperty({
-          color: farbe, outlineColor: Cesium.Color.BLACK.withAlpha(0.65), outlineWidth: 2
-        })
-      }
-    });
-
-    // Die Wand macht die Hoehe ablesbar: Ohne sie schwebt ein Band im Raum,
-    // und niemand sieht, wo ueber dem Wasser es steht.
-    if (modus !== "flach") {
-      wandEntity = viewer.entities.add({
-        wall: {
-          positions: Cesium.Cartesian3.fromDegreesArray(boden),
-          maximumHeights: wandMax,
-          minimumHeights: wandMax.map(function () { return 0; }),
-          material: farbe.withAlpha(0.28),
-          outline: false
-        }
-      });
-    }
-
-    // Und die echte Spur auf dem Wasser, damit der Weg selbst sichtbar bleibt.
+    // EINE Linie, und die liegt auf dem Wasser. Hier stand einmal ein Band,
+    // dessen Hoehe die Zeit trug, samt Wand hinunter zur Oberflaeche - im
+    // Betrieb stand es im Weg. Die dritte Dimension traegt jetzt die Fahrt.
+    //
+    // classificationType BOTH, nicht nur TERRAIN: In der Stufe "foto" ist der
+    // Globus aus, und eine nur ans Gelaende geklebte Linie haette dort
+    // nichts, worauf sie liegen koennte.
     bodenEntity = viewer.entities.add({
       polyline: {
         positions: Cesium.Cartesian3.fromDegreesArray(boden),
-        width: 3,
+        width: 4,
         clampToGround: true,
-        material: farbe.withAlpha(0.75)
+        classificationType: Cesium.ClassificationType.BOTH,
+        material: new Cesium.PolylineOutlineMaterialProperty({
+          color: farbe, outlineColor: Cesium.Color.BLACK.withAlpha(0.5), outlineWidth: 1
+        })
       }
     });
   }
@@ -443,6 +402,68 @@
     viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
     viewer.clock.multiplier = 60;
     if (viewer.timeline) viewer.timeline.zoomTo(t0, t1);
+  }
+
+  // --- Mitfahren: Blick von der Bruecke --------------------------------
+  //
+  // Nur waehrend des Abspielens. In der Pause bleibt die Kamera stehen, wo
+  // sie ist - so kann man sich umsehen, ohne einen zweiten Schalter dafuer
+  // zu brauchen.
+  var fpvLaeuft = false;
+
+  // Der Kurs zum Zeitpunkt t (ms). DIESELBE Regel wie im 2D-Client: Die
+  // Fahrtdaten kommen vom VORDEREN Stuetzpunkt, nicht interpoliert -
+  // zwischen zwei gemeldeten Kursen zu mitteln waere erfunden, die Position
+  // dazwischen ist eine Schaetzung, der Kurs war ein Messwert. Ohne cog
+  // traegt die Streckenrichtung.
+  function kursBei(t) {
+    var n = spurPunkte.length;
+    if (!n) return 0;
+    var lo = 0, hi = n - 1;
+    while (lo < hi) {
+      var m = (lo + hi + 1) >> 1;
+      if (spurPunkte[m].t <= t) lo = m; else hi = m - 1;
+    }
+    var p = spurPunkte[lo];
+    if (p.cog != null) return p.cog;
+    var b = spurPunkte[Math.min(lo + 1, n - 1)];
+    if (b === p && lo > 0) { b = p; p = spurPunkte[lo - 1]; }
+    return b === p ? 0 : peilung(p, b);
+  }
+
+  function fpvTakt(uhr) {
+    if (!el.fpv.checked || !schiffEntity || !viewer) { fpvAus(); return; }
+    if (!uhr.shouldAnimate) { fpvAus(); return; }
+    var ort = schiffEntity.position.getValue(uhr.currentTime);
+    if (!ort) return;
+    if (!fpvLaeuft) {
+      fpvLaeuft = true;
+      // Sonst zeichnet die Seite nur alle maximumRenderTimeChange Sekunden
+      // Simulationszeit ein Bild - die Fahrt ruckelte.
+      viewer.scene.requestRenderMode = false;
+      // Der Kasten wird ausgeblendet: Die Kamera sitzt 20 m ueber SEINER
+      // Mitte, ein 180-m-Rumpf reicht bis 8 m hoch - auf dem Schirmfoto
+      // fuellte er die halbe Sicht und verdeckte die Spur voraus. In der
+      // Mitfahrt IST man das Schiff.
+      schiffEntity.show = false;
+    }
+    var c = Cesium.Cartographic.fromCartesian(ort);
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, AUGENHOEHE),
+      orientation: {
+        heading: Cesium.Math.toRadians(kursBei(Cesium.JulianDate.toDate(uhr.currentTime).getTime())),
+        pitch: Cesium.Math.toRadians(FPV_NEIGUNG),
+        roll: 0
+      }
+    });
+  }
+
+  function fpvAus() {
+    if (!fpvLaeuft) return;
+    fpvLaeuft = false;
+    // Ein liegengelassener Tab soll nicht dauerhaft rendern.
+    if (viewer) viewer.scene.requestRenderMode = true;
+    if (schiffEntity) schiffEntity.show = true;
   }
 
   function kameraAufSpur() {
@@ -673,17 +694,19 @@
         STUNDEN + " Stunden keine Positionen.");
       return;
     }
-    hoeheEichen();
     zeichneSpur();
     bauSchiff();
     kameraAufSpur();
+    viewer.clock.onTick.addEventListener(fpvTakt);
     meldungWeg();
 
     el.ionToken.value = hole("aisstream_ion_token") || "";
     el.googleKey.value = hole("aisstream_google_key") || "";
     var hatToken = !!(el.ionToken.value || el.googleKey.value);
     // Vorgabe: das Beste, was der vorhandene Token hergeben kann.
-    var stufe = hole("aisstream_3d_untergrund") || (hatToken ? "foto" : "osm");
+    // Vorgabe "gebaeude": im Betrieb die beste Stufe - Luftbild, Gelaende und
+    // Gebaeude, alles aus ion. "foto" bleibt waehlbar.
+    var stufe = hole("aisstream_3d_untergrund") || (hatToken ? "gebaeude" : "osm");
     el.untergrund.value = stufe;
     if (hatToken || stufe !== "osm") untergrundSetzen(stufe, 0);
     else keyZustand("warn", "kein Token — OSM-Karte");
@@ -691,9 +714,10 @@
     meldung("Das ging schief", String(e && e.message || e));
   });
 
-  el.hoehenModus.addEventListener("change", function () {
-    zeichneSpur();
-    if (viewer) viewer.scene.requestRender();
+  el.fpv.checked = hole("aisstream_3d_fpv") !== "0";
+  el.fpv.addEventListener("change", function () {
+    setze("aisstream_3d_fpv", el.fpv.checked ? "1" : "0");
+    if (!el.fpv.checked) fpvAus();
   });
   el.untergrund.addEventListener("change", function () {
     untergrundSetzen(el.untergrund.value, 0);

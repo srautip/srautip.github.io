@@ -327,7 +327,11 @@ und das ist richtig so.
 über einem Hafen (CesiumJS). **Der Proxy ist daran nur mit `/v1/track` und
 `/v1/ship` beteiligt** — beides gibt es längst, es gibt nichts einzurichten.
 
-Der Untergrund hat vier Stufen, wählbar unter ⚙:
+Beim Abspielen sitzt die Kamera **20 m über dem Schiff und blickt in
+Fahrtrichtung** — Pause gibt sie wieder frei zum Umsehen. Abschaltbar unter ⚙.
+
+Der Untergrund hat vier Stufen, wählbar unter ⚙ — **Vorgabe ist
+„Luftbild + Gelände + Gebäude"**:
 
 | Stufe | Braucht |
 |---|---|
