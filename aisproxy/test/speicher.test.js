@@ -190,16 +190,23 @@ test("der Fotostand haengt NICHT am Registerstand", () => {
     "fuer das Foto nicht");
 });
 
-test("zwei Fristen: ohne IMO kurz, mit IMO lang", () => {
+test("die kurze Frist gilt nur mit Anlass, nicht nach der Uhr", () => {
+  // Diese Probe hiess frueher "zwei Fristen: ohne IMO kurz, mit IMO lang" und
+  // hat genau das Gegenteil geprueft. Sie ist bewusst umgedreht: Am laufenden
+  // Server kostete die stuendliche Wiederholung 524 Abrufe fuer 7 Bilder und
+  // hielt den Rueckstand bei 1 587 Schiffen fest. Eine kurze Frist ohne
+  // Aussicht ist kein Vorteil, sondern eine Tretmuehle.
   const s = neu();
   const jetzt = Date.now();
-  // "teil" heisst: gesucht wurde ohne IMO. Die kann jede Minute per
-  // ShipStaticData kommen, also bald wieder fragen.
   s.stammSetze(1, { foto_geprueft: jetzt - 2 * 3600 * 1000, foto_quelle: "teil" });
   s.stammSetze(2, { foto_geprueft: jetzt - 2 * 3600 * 1000, foto_quelle: "nichts" });
-  assert.deepStrictEqual(s.fotoFaellig([1, 2], jetzt), [1]);
-  // Nach einer Woche ist auch die vollstaendige Suche wieder dran.
-  assert.deepStrictEqual(s.fotoFaellig([1, 2], jetzt + 8 * TAG), [1, 2]);
+  s.stammSetze(3, { foto_geprueft: jetzt - 2 * 3600 * 1000, foto_quelle: "teil",
+                    imo: 9330032 });
+  // Ohne IMO: liegen lassen. Mit IMO: sofort, denn jetzt lohnen die
+  // Kategorie- und Volltextwege.
+  assert.deepStrictEqual(s.fotoFaellig([1, 2, 3], jetzt), [3]);
+  // Nach einer Woche ist alles wieder dran - Wikidata waechst.
+  assert.deepStrictEqual(s.fotoFaellig([1, 2, 3], jetzt + 8 * TAG), [1, 2, 3]);
 });
 
 test("wer ein Bild hat, wird nicht mehr gefragt", () => {
@@ -288,5 +295,42 @@ test("neue Spalte wd_typ merkt vorhandene Registersaetze zum Nachfragen vor", ()
   // Anlegen der Spalte, nicht an ihrem Inhalt.
   sp = new Speicher({ konfig, log: () => {} });
   assert.strictEqual(sp.stammFaellig([211000001]).length, 0);
+  sp.stopp();
+});
+
+test("ein Schiff ohne IMO wird erst wieder faellig, wenn es einen Anlass gibt", () => {
+  // Gemessen am laufenden Server: Die MMSI-Wege kosteten 524 Abrufe fuer 7
+  // Bilder, und weil "teil" jede Stunde erneut faellig wurde, ging das
+  // Kontingent von 300 Fotoversuchen je Lauf dafuer drauf - der Rueckstand
+  // blieb bei 1 587 stehen.
+  const sp = neu();
+  const vorZweiStunden = Date.now() - 2 * 3600 * 1000;
+  const vorAchtTagen = Date.now() - 8 * 24 * 3600 * 1000;
+
+  // a) Ohne IMO, vor zwei Stunden geprueft: bleibt liegen.
+  sp.stammSetze(211000001, { foto_geprueft: vorZweiStunden, foto_quelle: "teil" });
+  assert.deepStrictEqual(sp.fotoFaellig([211000001]), [],
+    "die aussichtslose MMSI-Suche darf nicht stuendlich wiederholt werden");
+
+  // b) Dieselbe Lage, aber die IMO ist inzwischen eingetroffen: sofort faellig.
+  sp.stammSetze(211000002, { foto_geprueft: vorZweiStunden, foto_quelle: "teil",
+                             imo: 9330032 });
+  assert.deepStrictEqual(sp.fotoFaellig([211000002]), [211000002],
+    "mit IMO lohnen Kategorie- und Volltextweg - das ist der Anlass");
+
+  // c) Keine IMO, aber der Bildabzug kennt die MMSI: ein Download ohne Suche.
+  sp.stammSetze(211000003, { foto_geprueft: vorZweiStunden, foto_quelle: "teil" });
+  sp.bildIndexSchreibe("mmsi", [["211000003", "https://bild/x.jpg"]]);
+  assert.deepStrictEqual(sp.fotoFaellig([211000003]), [211000003]);
+
+  // d) Und "liegen bleiben" heisst nicht "nie wieder": Nach der langen Frist
+  //    wird auch ohne Anlass noch einmal gefragt - Wikidata waechst.
+  sp.stammSetze(211000004, { foto_geprueft: vorAchtTagen, foto_quelle: "teil" });
+  assert.deepStrictEqual(sp.fotoFaellig([211000004]), [211000004]);
+
+  // e) Ein vorhandenes Bild bleibt in Ruhe, egal was sonst gilt.
+  sp.stammSetze(211000005, { foto_geprueft: vorAchtTagen, foto_quelle: "teil",
+                             foto_datei: "211000005.jpg", imo: 123 });
+  assert.deepStrictEqual(sp.fotoFaellig([211000005]), []);
   sp.stopp();
 });
