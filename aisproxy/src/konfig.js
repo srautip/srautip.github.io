@@ -103,6 +103,10 @@ const konfig = {
   // die IMO kann jede Minute per ShipStaticData eintreffen und die Lage aendern.
   REGISTER_TREFFER_MS: zahl("AIS_REGISTER_TREFFER_MS", 30 * 24 * 3600 * 1000),
   REGISTER_FEHL_MS: zahl("AIS_REGISTER_FEHL_MS", 3 * 24 * 3600 * 1000),
+  // Obergrenze fuer ein selbst beigesteuertes Bild. 6 MB nimmt ein Foto aus
+  // dem Telefon auf, ist aber klein genug, dass ein Schreibpfad im Netz nicht
+  // zur Ablage wird.
+  FOTO_UPLOAD_MAX: zahl("AIS_FOTO_UPLOAD_MAX", 6 * 1024 * 1024),
   FOTO_BREITE: zahl("AIS_FOTO_BREITE", 480),
   FOTO_VERZEICHNIS: text("AIS_FOTO_VERZEICHNIS", "./daten/fotos"),
   REGISTER_AN: text("AIS_REGISTER", "1") !== "0",

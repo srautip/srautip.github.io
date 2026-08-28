@@ -531,6 +531,17 @@
     border: 1px solid var(--border);
     display: block;
   }
+  #detailSuche .eigen {
+    display: flex; align-items: center; gap: 0.5rem;
+    margin-top: 0.35rem; flex-wrap: wrap;
+  }
+  #detailSuche .eigen button {
+    font: inherit; font-size: 0.72rem; padding: 0.15rem 0.5rem;
+    border: 1px solid var(--line); border-radius: 4px;
+    background: var(--panel); color: var(--fg); cursor: pointer;
+  }
+  #detailSuche .eigen button:hover { border-color: var(--accent); }
+  #detailSuche .eigen .hinweis { font-size: 0.68rem; color: var(--muted); }
   .enrich-photo-credit {
     font-size: 0.68rem;
     color: var(--muted);
@@ -4525,6 +4536,13 @@
 
   function photoUrl(raw) {
     if (!raw) return "";
+    // Bilder vom eigenen Proxy bleiben, wie sie sind: Das http→https unten
+    // gilt fremden Adressen (Wikidata gibt http aus, das wäre auf einer
+    // https-Seite Mischinhalt). Ein Proxy im eigenen Netz läuft aber
+    // womöglich auf http — dann zeigte der umgeschriebene Link ins Leere,
+    // und zwar stumm, weil ein Bild keine Fehlermeldung hat.
+    var basis = proxyBasis && proxyBasis();
+    if (basis && String(raw).indexOf(basis.replace(/\/v1$/, "")) === 0) return String(raw);
     var url = String(raw).replace(/^http:\/\//i, "https://");
     if (/[?&]width=/.test(url)) return url;
     // Commons liefert über die API bereits eine fertige Thumbnail-URL auf
@@ -6435,7 +6453,15 @@
       // eingeschaltet ist - eine Aussage ueber das Register waere dann falsch.
       detailSuche.innerHTML = "Kein Foto vorhanden. " +
         '<a href="' + esc(bildersucheUrl(entry.mmsi)) + '" target="_blank" rel="noopener">' +
-        "Bildersuche bei Google: MMSI " + esc(entry.mmsi) + "</a>";
+        "Bildersuche bei Google: MMSI " + esc(entry.mmsi) + "</a>" +
+        // Der eigene Weg: Die automatischen Quellen decken gemessen 65 von
+        // 134 Schiffen ab. Für den Rest ist das selbst beigesteuerte Bild der
+        // einzige mit Trefferquote 1 - und der einzige, der ohne fremde
+        // Seiten auskommt.
+        '<div class="eigen">' +
+        '<button type="button" data-eigen="datei">Bild hinzufügen</button>' +
+        '<span class="hinweis">oder Bild kopieren und hier Strg+V</span>' +
+        '<span class="hinweis" data-eigen="stand"></span></div>';
     }
     detailSuche.classList.toggle("an", !wantImage);
 
@@ -6673,6 +6699,92 @@
   // Das Token geht als Abfrageparameter mit, nicht als Header: Beim
   // WebSocket gibt es keinen anderen Weg, und fuer die Abrufe dieselbe Form
   // zu nehmen erspart einen CORS-Vorabflug je Anfrage.
+  // --- Eigenes Foto beisteuern ----------------------------------------
+  //
+  // Zwei Wege, beide ohne Automat auf fremden Seiten: eine Datei auswählen,
+  // oder ein Bild in die Zwischenablage kopieren und hier einfügen. Der
+  // Browser holt das Bild, der Proxy legt es nur ab.
+  var fotoDatei = null;
+
+  function eigenStand(text, fehler) {
+    var el = detailSuche.querySelector('[data-eigen="stand"]');
+    if (!el) return;
+    el.textContent = text || "";
+    el.style.color = fehler ? "var(--bad, #e06c6c)" : "";
+  }
+
+  function fotoHochladen(mmsi, blob, seite) {
+    if (!proxyAktiv() || !proxyBasis()) {
+      eigenStand("Dafür muss der Proxy eingeschaltet sein.", true);
+      return Promise.resolve(false);
+    }
+    if (!blob || !/^image\//.test(blob.type || "")) {
+      eigenStand("Das war kein Bild.", true);
+      return Promise.resolve(false);
+    }
+    eigenStand("wird übertragen …");
+    var ziel = proxyBasis().replace(/\/v1$/, "") + "/v1/foto/" + encodeURIComponent(mmsi);
+    if (seite) ziel += "?seite=" + encodeURIComponent(seite);
+    return fetch(proxyMitToken(ziel), { method: "POST", body: blob })
+      .then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (d) {
+          if (!res.ok) throw new Error(d.fehler || ("HTTP " + res.status));
+          return d;
+        });
+      })
+      .then(function (d) {
+        eigenStand("gespeichert (" + Math.round((d.bytes || 0) / 1024) + " KB)");
+        // Den Registersatz neu holen statt die Anzeige von Hand zu setzen:
+        // So landet das Bild auf demselben Weg wie jedes andere - samt
+        // Zwischenspeicher, und nach dem Neuladen ist es immer noch da.
+        return enrichShip(mmsi, true).then(function () { return true; });
+      })
+      .catch(function (e) {
+        eigenStand("Fehlgeschlagen: " + e.message, true);
+        log("Foto hochladen: " + e.message);
+        return false;
+      });
+  }
+
+  detailSuche.addEventListener("click", function (ev) {
+    var knopf = ev.target.closest && ev.target.closest('[data-eigen="datei"]');
+    if (!knopf) return;
+    if (!fotoDatei) {
+      fotoDatei = document.createElement("input");
+      fotoDatei.type = "file";
+      fotoDatei.accept = "image/jpeg,image/png";
+      fotoDatei.style.display = "none";
+      fotoDatei.addEventListener("change", function () {
+        var f = fotoDatei.files && fotoDatei.files[0];
+        var mmsi = detailSuche.dataset.mmsi;
+        fotoDatei.value = "";
+        if (f && mmsi) fotoHochladen(mmsi, f, null);
+      });
+      document.body.appendChild(fotoDatei);
+    }
+    fotoDatei.click();
+  });
+
+  // Einfügen: Das ist der Weg, der aus "Bild im Browser kopieren" zwei Klicks
+  // macht. Nur wenn ein Schiff offen ist und gerade kein Textfeld den Fokus
+  // hat - sonst kapert das Einfügen jede Suche.
+  document.addEventListener("paste", function (ev) {
+    if (!selectedMmsi) return;
+    var aktiv = document.activeElement;
+    if (aktiv && /^(INPUT|TEXTAREA)$/.test(aktiv.tagName)) return;
+    var d = ev.clipboardData;
+    if (!d) return;
+    for (var i = 0; i < d.items.length; i++) {
+      if (d.items[i].kind !== "file") continue;
+      var f = d.items[i].getAsFile();
+      if (f && /^image\//.test(f.type)) {
+        ev.preventDefault();
+        fotoHochladen(selectedMmsi, f, null);
+        return;
+      }
+    }
+  });
+
   function proxyMitToken(url) {
     var t = proxyToken();
     if (!t) return url;
@@ -7088,7 +7200,14 @@
         return res.json();
       })
       .then(function (d) {
-        if (!d || d.register !== "gefunden") return null;
+        if (!d) return null;
+        // „gefunden" heißt: Wikidata-Treffer. Ein FOTO kann auch ohne einen
+        // solchen dasein — der Proxy findet Bilder über die Commons-Kategorie
+        // und über Flickr, beides an der IMO. Hier stand vorher nur die
+        // Registerprüfung, und damit warf der Client jede Antwort weg, die
+        // „nur" ein Bild enthielt: Es lag auf dem Server und war trotzdem
+        // nicht zu sehen. Dasselbe galt für ein selbst beigesteuertes Bild.
+        if (d.register !== "gefunden" && !d.foto) return null;
         var out = { sources: ["Proxy"] };
         if (d.name) out.name = d.name;
         if (d.imo) out.imo = String(d.imo);
