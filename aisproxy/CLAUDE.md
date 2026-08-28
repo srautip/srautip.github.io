@@ -151,6 +151,40 @@ Client "ELBE APPROACH LIGHTBUOY / Leuchttonne / 8x6", im Detailfenster als
 Seezeichen gefuehrt - 16 Pruefungen, dazu die Gegenprobe, dass die Tonne
 keine Positionspunkte bekommt und das Schiff daneben schon.
 
+## Zielangaben: Kuerzel in der Tabelle, Klartext im Detailfenster
+
+Das Zielfeld im AIS ist Freitext, und die Schiffe schreiben, was sie wollen.
+Gemessen an **1 538 Zielangaben** aus dem laufenden Betrieb (765 verschiedene):
+
+| Form | Anteil |
+|---|---|
+| Klartext ("HAMBURG", "FISHING GROUNDS", "FOR ORDERS") | 1 079 |
+| reiner UN/LOCODE ("DEHAM") | 320 |
+| Route mit Trenner ("SEMMA<>DETRV", "BE ANR > DE HAM") | 84 |
+| LOCODE mit Leerzeichen ("DE HAM") | 55 |
+
+Aufgeloest wird **nur im Detailfenster** - in der Tabelle bliebe von der
+Spalte nichts uebrig, wenn dort "Antwerpen ⇄ Hamburg (BEANR<>DEHAM)" stuende.
+
+**Die Falle: Ein fuenfstelliger Ortsname sieht aus wie ein LOCODE.** "EMDEN",
+"BRAKE", "STADE", "RODBY", "VAREL" und "TAARS" kommen alle im echten Verkehr
+vor. "BRAKE" als BR+AKE zu lesen und zu Brasilien zu machen waere schlimmer
+als der rohe Text - deshalb wird **ausschliesslich** aufgeloest, was in der
+Tabelle steht, und alles andere bleibt unangetastet.
+
+Die Tabelle stammt aus Wikidata (P1937), zugeschnitten auf die Laender um
+Nord- und Ostsee plus alles, was im Verkehr dieser Region auftaucht: **1 113
+Eintraege, 17 KB**. Die vollstaendige Liste hat 20 442 Codes und 338 KB -
+dreimal der ausgelieferte Client. Deutsche Namen, wo es sie gibt
+("Antwerpen", nicht "Antwerp"); Anlagennamen werden zugunsten des Ortsnamens
+verworfen ("Hamburg" statt "Hamburger Hafen").
+
+Die Trennerliste kommt ebenfalls aus den Daten, nicht aus der Vorstellung:
+`<>`, `<=>`, `<-->`, `<->`, `><`, `>>`, `>`, `-`. Der Bindestrich trennt nur,
+wenn **alle** Teile wie ein Code aussehen, sonst zerfiele "SPODSBJERG-TAARS".
+Und die Reihenfolge im regulaeren Ausdruck ist laengster Trenner zuerst -
+sonst frisst `->` den Anfang von `<-->` und uebrig bleibt "DEHAM<-".
+
 ## Der Typ kommt aus drei Quellen - und keine ist sicher
 
 Gemeldet: „Warum fehlt bei MMSI 309436000 der Typ?" (Liberty of the Seas,
