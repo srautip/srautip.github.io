@@ -321,6 +321,27 @@ Schiff sein Ziel *wechselt*; rückwirkend gibt es ihn nicht, die alten Stände
 waren ja überschrieben. Direkt nach dem ersten Update ist die Tabelle leer,
 und das ist richtig so.
 
+## Die 3D-Ansicht und der Google-Schlüssel
+
+`https://srautip.github.io/aisstream/3d/?mmsi=…` zeigt die Spur eines Schiffs
+über einem Hafen (CesiumJS). **Der Proxy ist daran nur mit `/v1/track` und
+`/v1/ship` beteiligt** — beides gibt es längst, es gibt nichts einzurichten.
+
+Ohne Schlüssel läuft sie auf OSM-Rasterkacheln. Photorealistische Gebäude
+brauchen einen Google-Maps-Schlüssel, und **der kostet Geld**:
+
+1. Schlüssel im Cloud Console anlegen, **Referrer-Beschränkung** auf
+   `https://srautip.github.io/*` — die einzige Sperre, die bei einem
+   Schlüssel in einer öffentlichen Seite wirklich trägt.
+2. **Kontingentdeckel setzen, bevor er das erste Mal läuft.**
+3. Auf der Seite unter ⚙ eintragen. Er liegt danach im Browser
+   (`aisstream_google_key`), **nicht** im Quelltext.
+
+**Der Proxy darf diese Kacheln nicht zwischenspeichern.** Aus Googles
+Richtlinie: *„you must not pre-fetch, index, store, or cache any Content."*
+Sie gehen direkt vom Browser zu Google und kommen hier nie vorbei — für ein
+Projekt, das sonst alles cacht, die wichtigste Einschränkung.
+
 ## Die Ortsliste
 
 Der Proxy löst UN/LOCODEs für den Client auf (`/v1/ort?codes=DEHAM,BEANR`).
