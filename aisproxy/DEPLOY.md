@@ -290,6 +290,37 @@ geprüft **während** des Lesens) und die ersten Bytes — nur echtes JPEG oder
 PNG. Ein selbst beigesteuertes Bild trägt `foto_quelle: "eigen"` und wird vom
 automatischen Fotolauf nicht mehr angefasst.
 
+## Wohin die Schiffe fahren: der Zielverlauf
+
+Das AIS-Zielfeld trägt immer nur den aktuellen Stand. Der Proxy schreibt
+deshalb jeden **Wechsel** mit (`ziel_verlauf`, zwölf je Schiff), und der
+Client zeigt sie im Detailfenster unter „Vergangene Ziele".
+
+Nachsehen, zu welchen Schiffen schon etwas zusammengekommen ist:
+
+```bash
+./zielverlauf.sh          # mindestens 2 Ziele, 25 Zeilen
+./zielverlauf.sh 4        # nur die mit mindestens 4
+./zielverlauf.sh 2 100    # mehr Zeilen
+./zielverlauf.sh 1        # auch die mit einem einzigen Ziel
+```
+
+```
+4 Schiffe haben einen Zielverlauf; 3 davon mit mindestens 2 Zielen:
+
+MMSI       Name                  Ziele  Zeitraum  juengstes zuerst
+211000001  GRANDE SAN PAOLO      5      12 Tage   ESALG, CIABJ, BEANR, NLRTM, DEHAM
+211000004  EMSMOON               2      6 Tage    NLDZL, DEEME
+```
+
+Gelesen wird nur (`readOnly`) — der Proxy schreibt nebenher weiter, und im
+WAL-Modus stört eine zweite lesende Verbindung ihn nicht.
+
+**Rechne in Tagen, nicht in Minuten.** Ein Eintrag entsteht erst, wenn ein
+Schiff sein Ziel *wechselt*; rückwirkend gibt es ihn nicht, die alten Stände
+waren ja überschrieben. Direkt nach dem ersten Update ist die Tabelle leer,
+und das ist richtig so.
+
 ## Die Ortsliste
 
 Der Proxy löst UN/LOCODEs für den Client auf (`/v1/ort?codes=DEHAM,BEANR`).
