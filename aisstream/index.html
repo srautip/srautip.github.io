@@ -2988,7 +2988,8 @@
   var ORT_RUECKFALL = "AEJEA Dschabal Ali|BEANR Antwerpen|BEGNE Gent|BEOST Ostende|BERUI Ruisbroek|BEZEE Zeebrugge|BRSSZ Santos|CAMTR Montreal|CNSHG Shanghai Pt|CVMIN Mindelo|DEBEN Bensersiel|DEBKE Brake|DEBMK Borkum|DEBRB Brunsbüttel|DEBRE Bremen|DEBRV Bremerhaven|DEBSK Burgstaaken|DEBUM Büsum|DEBUT Butjadingen|DECUX Cuxhaven|DEECK Eckernförde|DEEME Emden|DEFLF Flensburg|DEGLU Glückstadt|DEHAM Hamburg|DEHGE Hooge|DEHGL Helgoland|DEHSX Harlesiel|DEHUS Husum|DEKEL Kiel|DELBC Lübeck|DELEE Leer|DENHA Nordenham|DEPAP Papenburg|DEPUT Puttgarden|DEREN Rendsburg|DERSK Rostock|DESAS Sassnitz|DESLQ Schluettsiel|DESTA Stade|DESTD Strande|DETRV Travemünde|DEWEW Wewelsfleth|DEWIS Wismar|DEWVN Wilhelmshaven|DKAAB Åbenrå|DKAAR Aarhus|DKCPH Kopenhagen|DKEBJ Esbjerg|DKFDS Frederikssund|DKFDV Frederiksværk|DKFRC Fredericia|DKGED Gedser|DKGFH Gulfhavn|DKGRE Grenaa|DKHIR Hirtshals|DKHOR Horsens|DKKAL Kalundborg|DKKOG Køge|DKKOL Kolding|DKKRR Korsør|DKLIN Lindø Havn|DKNAK Nakskov|DKNYB Nyborg Lystbådehavn|DKODE Odense|DKORE Orehoved, Falster|DKROD Rødbyhavn|DKSGD Sonderburg|DKSIT Stigsnaes Inter Terminal|DKSKA Skagen|DKVEJ Vejle|EEKND Kunda|EESLM Sillamäe|EETLL Tallinn|EGPSD Port Said|ESALG Algeciras|ESBCN Barcelona|ESCAD Cadiz|ESVLC Valencia|FIHEL Helsinki|FIKTK Kotka|FIRAU Raumo (Rauma)|FITKU Turku|FIVAA Vasa (Vaasa)|FRBES Brest|FRDKK Dunkerque|FRLEH Le Havre|FRMRS Marseille|FRROU Roubaix|FRSNR Saint-Nazaire|GBABD Aberdeen|GBFXT Felixstowe|GBGRG Grangemouth|GBHUL Hull|GBIMM Immingham|GBLIV Liverpool|GBLON London|GBSOU Southampton|GBTEE Teesport|GIGIB Gibraltar|GRPIR Piräus|IEDUB Dublin|ISREY Reykjavík|ITGOA Genua|ITRAN Ravenna|LTKLJ Klaipeda|LVLPX Libau|LVRIX Riga|LVVNT Ventspils|MACAS Casablanca|MAJFL Jorf Lasfar|MAPTM Tanger-Med|MTMAR Marsaxlokk|NGLOS Lagos|NLAMS Amsterdam|NLDZL Delfzijl|NLEEM Eemshaven|NLHAR Harlingen|NLIJM IJmuiden|NLLAN Lauwersoog|NLRTM Rotterdam|NLTNZ Terneuzen|NLVLI Vlissingen|NOBGO Bergen|NOHAL Halden|NOJEL Jelsa|NOKRS Kristiansand|NOLAO Langøya|NOOSL Oslo|NOREK Rekefjord|NOSVG Stavanger|NOTRD Trondheim|NOVER Verdal|PLGDN Danzig|PLGDY Gdynia|PLSWI Swinoujscie|PLSZZ Stettin|PTLIS Lissabon|RUKGD Kaliningrad|RULED Sankt Petersburg|RUULU Ust'-Luga|SEAHU Åhus|SEBAC Bäckviken|SEGOT Göteborg|SEGVX Gävle|SEHEL Helsingborg|SEHLD Holmsund|SEIGG Iggesund|SELAA Landskrona|SELDK Lidköping|SEMMA Malmö|SENRK Norrköping|SEOXE Oxelösund|SESTO Stockholm|SETRG Trelleborg|SEVBY Visby|SEVST Västerås|SGSIN Singapur|SNDKR Dakar|TRISK İskenderun|USHOU Houston|USNYC New York City|ZADUR Durban";
   var ortNamen = null;      // Code -> Name, oder null fuer "gefragt, unbekannt"
   var ortOffen = {};        // laufende Abfragen, damit keine doppelt geht
-  var ortGeholt = {};       // nur die Antworten des Proxys - die werden gemerkt
+  var ortGeholt = {};       // nur die Treffer des Proxys - die werden gemerkt
+  var ortFehlerGemeldet = false;
 
   function ortTabelle() {
     if (ortNamen) return ortNamen;
@@ -3002,9 +3003,16 @@
     try {
       var roh = localStorage.getItem("aisstream_orte");
       if (roh) {
-        ortGeholt = JSON.parse(roh) || {};
-        for (var k in ortGeholt) {
-          if (Object.prototype.hasOwnProperty.call(ortGeholt, k)) ortNamen[k] = ortGeholt[k];
+        var gelesen = JSON.parse(roh) || {};
+        ortGeholt = {};
+        for (var k in gelesen) {
+          // Frueher wurden auch Fehlanzeigen dauerhaft gemerkt. Ein "kenne ich
+          // nicht" aus einem Moment, in dem der Proxy nicht antwortete, waere
+          // sonst fuer immer stehengeblieben.
+          if (Object.prototype.hasOwnProperty.call(gelesen, k) && gelesen[k] != null) {
+            ortGeholt[k] = gelesen[k];
+            ortNamen[k] = gelesen[k];
+          }
         }
       }
     } catch (e) {}
@@ -3030,12 +3038,36 @@
     var url = proxyBasis().replace(/\/v1$/, "") + "/v1/ort?codes=" +
       encodeURIComponent(fehlen.join(","));
     fetch(proxyMitToken(url))
-      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (r) {
+        // Ein stiller Fehlschlag hat einmal lange gekostet: Caddy verlangte
+        // fuer /v1/ort Basic-Auth, die ein fetch nicht mitschickt, und
+        // antwortete mit 401 — der Proxy wurde nie gefragt. Sichtbar war das
+        // nur daran, dass ein Hafen ausserhalb der Rueckfalltabelle roh
+        // stehenblieb. Einmal melden, nicht bei jeder Zielangabe erneut.
+        if (!r.ok) {
+          if (!ortFehlerGemeldet) {
+            ortFehlerGemeldet = true;
+            log("Ortsnamen: der Proxy antwortet auf /v1/ort mit HTTP " + r.status +
+              (r.status === 401
+                ? " — steht /v1/ort im @schnittstelle-Matcher des Caddyfile?"
+                : "") + " Zielangaben bleiben als Kürzel stehen.");
+          }
+          return null;
+        }
+        ortFehlerGemeldet = false;
+        return r.json();
+      })
       .then(function (d) {
         if (!d) return;
         for (var k in d) if (Object.prototype.hasOwnProperty.call(d, k)) {
+          // Die Fehlanzeige gilt nur fuer diese Sitzung: Sie haelt den Client
+          // davon ab, denselben Fantasiecode bei jedem Oeffnen erneut zu
+          // fragen — dauerhaft gemerkt waere sie aber eine Behauptung ueber
+          // den Proxy, die von einem einzigen Moment stammt. Genau so haette
+          // ein Abruf waehrend eines noch leeren Ortsregisters "Abidjan gibt
+          // es nicht" fuer immer festgeschrieben.
           t[k] = d[k];
-          ortGeholt[k] = d[k];
+          if (d[k] != null) ortGeholt[k] = d[k];
         }
         // Gemerkt wird NUR, was vom Proxy kam: Der Rückfall steht ohnehin im
         // Code, ihn mitzuschreiben füllte den lokalen Speicher doppelt.

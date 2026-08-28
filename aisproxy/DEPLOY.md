@@ -164,6 +164,23 @@ Ein Browser kann bei einem WebSocket keine Header setzen — Basic-Auth ist für
 Startseite). Die Schnittstellenpfade schützt das Token des Proxys selbst
 (`AIS_ZUGANG`), das der Client als `?token=` mitschickt.
 
+> **Wer einen Pfad ergänzt, ergänzt ihn auch im `@schnittstelle`-Matcher.**
+> Genau das ist einmal vergessen worden: `/v1/ort` kam nach der `Caddyfile`
+> dazu, Caddy verlangte dafür Basic-Auth und antwortete dem Browser mit 401 —
+> der Proxy wurde nie gefragt. Sichtbar war das nur daran, dass ein Hafen
+> außerhalb der kleinen Rückfalltabelle des Clients unaufgelöst stehenblieb
+> („CIABJ" statt „Abidjan"); europäische Häfen kennt der Client selbst.
+> `test/caddy.test.js` vergleicht die Liste seither mit den Routen in
+> `server.js` und fällt durch, wenn ein Pfad fehlt.
+>
+> **Und ein geänderter `Caddyfile` wirkt nicht von allein.** Die Datei ist
+> eingehängt, nicht ins Abbild gebaut — `docker compose up -d --build` tauscht
+> den Container also nicht aus, und Caddy läuft mit der Fassung weiter, die es
+> beim Start gelesen hat. `update.sh` lädt sie deshalb neu; von Hand:
+> ```bash
+> docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+> ```
+
 Auf der Technikseite des Clients gehört also **nur das Token** aus
 `zugangsdaten.txt` hinein. Benutzername und Passwort sind für den
 Browseraufruf und für `curl` da:
@@ -324,6 +341,7 @@ Die Fotos darunter sind Wikimedia- und Flickr-Bilder und jederzeit neu holbar
 | Basic-Auth wird abgewiesen, auch mit richtigem Passwort | Der bcrypt-Hash steckt voller `$`, und Docker Compose deutet `$` in der `.env` als Variable — der Hash kommt zerstückelt am Container an. Prüfen mit `docker compose config \| grep PASSWORT`; im `.env` jedes `$` verdoppeln (`$$`) |
 | `git pull` sagt „not a git repository" | Installation aus einer frühen Skriptfassung ohne `.git`. Siehe *Aktualisieren* — einmalig umstellen, Zugangsdaten bleiben |
 | Der Client verbindet sich nicht, obwohl das Token stimmt | Alte `Caddyfile` mit Basic-Auth über allen Pfaden. Ein Browser kann bei einem WebSocket keine Header setzen, also kommt er nie durch. `git pull && docker compose up -d --build` |
+| Ein Zielort bleibt als Kürzel stehen (`CIABJ` statt `Abidjan`) | Der Pfad fehlt im `@schnittstelle`-Matcher der `Caddyfile`, Caddy antwortet mit 401. Prüfen mit `curl -s -o /dev/null -w '%{http_code}' 'https://<domain>/v1/ort?codes=CIABJ&token=<token>'` — 200 ist richtig, 401 heißt Matcher. Der Client schreibt es seit dem Fix auch ins Protokoll |
 | Alles läuft, aber der Browser bekommt nichts | Ohne `Access-Control-Allow-Origin` kommt keine Antwort an — der Proxy setzt ihn selbst, aber ein vorgeschalteter Reverse-Proxy darf ihn nicht abschneiden |
 | `update.sh` bricht mit „das sieht nach Verlust aus" ab | Der Bestand ist kleiner als vor dem Update, ohne dass eine Tagestabelle ausgelaufen wäre. Das Skript hat den Weg zurück ausgegeben; die Sicherung von wenigen Minuten vorher liegt unter `/opt/aisproxy-sicherungen` |
 | `update.sh` meldet „Nach 180 s meldet der Dienst noch keine Schiffe", der Client läuft aber | Fassung vom ersten Tag: `/v1/status` liegt hinter der Tokenprüfung, die Statusabfrage schickte keins und bekam 401. Behoben — `cd /opt/aisproxy && git pull && ./update.sh`. Dieselbe Ursache hatte der dauerhaft rote Healthcheck (`docker compose ps` zeigte `unhealthy`) |

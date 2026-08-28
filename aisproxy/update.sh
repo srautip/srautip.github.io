@@ -404,6 +404,30 @@ if ! docker compose up -d --build; then
   exit 1
 fi
 
+# Der Caddyfile ist eingehaengt, nicht ins Abbild gebaut: "up -d --build"
+# tauscht den Container also NICHT aus, wenn sich nur diese Datei aendert -
+# Caddy laeuft mit der Fassung weiter, die es beim Start gelesen hat. Genau
+# das ist einmal teuer geworden: Der Pfad /v1/ort kam neu dazu, stand nach
+# einem Update in der Datei, und Caddy verlangte trotzdem weiter Basic-Auth
+# dafuer. Ein Neuladen kostet nichts und ist ohne Aenderung wirkungslos.
+if docker compose ps --status running --services 2>/dev/null | grep -qx caddy; then
+  if docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile \
+       --adapter caddyfile < /dev/null > /dev/null 2>&1; then
+    if docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile \
+         --adapter caddyfile < /dev/null > /dev/null 2>&1; then
+      echo "    Caddy hat seine Konfiguration neu gelesen"
+    else
+      echo "    ACHTUNG: Caddy hat das Neuladen abgelehnt. Die alte Konfiguration"
+      echo "    laeuft weiter - die Seite ist also erreichbar, aber Aenderungen am"
+      echo "    Caddyfile wirken nicht. Von Hand: docker compose restart caddy"
+    fi
+  else
+    echo "    ACHTUNG: Der Caddyfile ist fehlerhaft, es wurde NICHT neu geladen."
+    echo "    Die alte Konfiguration laeuft weiter. Pruefen mit:"
+    echo "    docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile"
+  fi
+fi
+
 echo "==> 5/6 Warten, bis der Dienst wieder Schiffe meldet"
 NACH=""; ABGEWIESEN=0
 for i in $(seq 1 "$WARTE_RUNDEN"); do
