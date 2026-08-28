@@ -1847,6 +1847,10 @@ Die dritte Dimension trägt jetzt die **Fahrt**.
 Beim Abspielen sitzt die Kamera **50 m über der Fläche** (`AUGENHOEHE`) und
 blickt in Fahrtrichtung, 8° nach unten geneigt.
 
+- **Der Verkehr fährt mit.** Die Nachbarn sind nicht an die Mitfahrt
+  gebunden — sie bewegen sich auch in der Übersicht, und in der Mitfahrt
+  bleiben sie stehen, während der eigene Rumpf ausgeblendet wird. Siehe
+  „Die Umgebung" unten.
 - **Nur während des Abspielens.** Beim Laden gibt es die Übersicht; Pause
   gibt die Kamera frei zum Umsehen. Das spart einen zweiten Schalter: „läuft"
   und „ich will mitfahren" sind im Betrieb dasselbe.
@@ -1942,6 +1946,105 @@ im Stand undefiniert. Jetzt trägt ihn dieselbe Zahl, über
 Zauberwert: Cesiums HPR-Rahmen kommt aus `eastNorthUpToFixedFrame`, dessen
 **+X nach Osten** zeigt. Ein Kurs von 110° landete gemessen bei 200°.
 
+#### Die Umgebung: die anderen Schiffe, ohne Spurlinien
+
+Gewünscht: *„Zeige auch die Bewegungen der umliegenden Schiffe in der 3d
+Ansicht, allerdings ohne Tracklinien."* Aus 50 m Augenhöhe ist ein leerer
+Hafen falsch — und die Ausnahme („ohne Tracklinien") ist der Kern, nicht die
+Fußnote: 120 Spuren übereinander wären ein Knäuel, und die **eine** Spur, um
+die es geht, ginge darin unter. Die Probe zählt deshalb ausdrücklich
+**genau eine** Polylinie, auch mit voller Umgebung.
+
+**Zwei Endpunkte, beide schon live** — es braucht keinen neuen:
+`GET /v1/replay?bbox=…&von=&bis=&schritt=60` für die Spuren,
+`GET /v1/snapshot?bbox=…` für die Maße, und für den Rest `/v1/ship/{mmsi}`.
+
+##### Wer dazugehört: der Korridor, nicht der Kasten
+
+Die Abfrage kann nur ein Rechteck (eigene Spur + 3 km). Ausgewählt wird
+danach über die **nächste Annäherung zur selben Zeit**: Die eigene Position
+wird auf den Zeitstempel des fremden Stützpunkts interpoliert, und nur wer
+einmal unter **5 km** kommt, wird gebaut.
+
+Die 5 km sind nicht gegriffen: Aus 50 m Augenhöhe reicht der Horizont 25 km
+weit, ein 100-m-Schiff misst auf 5 km aber nur noch 1,1° — dahinter tragen
+weitere Rümpfe nichts zum Bild bei und kosten trotzdem.
+
+**Der Radius macht die Arbeit, nicht die Obergrenze.** An zwei echten Spuren
+in Bremerhaven gemessen:
+
+| eigene Spur | im Kasten | davon unter 5 km |
+|---|---|---|
+| 2,5 km (im Hafen) | 134 | **122** |
+| 23 km (bis vor die Weser) | 384 | **130** |
+
+Beide landen bei ~125, obwohl der Kasten um den Faktor sechs auseinanderliegt.
+`UMGEBUNG_MAX` = 150 ist deshalb ein **Riegel** gegen eine Reede mit
+vierhundert Schiffen, kein Regelfall.
+
+**Zur selben Zeit ist der zweite Teil, und der ist leicht zu übersehen.** Ein
+Schiff, das vier Stunden später durch dieselbe Stelle fährt, war nie in
+Sicht — als *Linie* liegt es genau auf der eigenen Spur. Die Probe hat dafür
+einen eigenen Nachbarn (`SPAETER`), der die eigene Spur Punkt für Punkt
+nachfährt, nur drei Stunden versetzt: Abstand Linie zu Linie **null**,
+Abstand zur selben Zeit **7,1 km**. Er muss draußen bleiben.
+
+##### Die Maße kommen aus dem Register, nicht aus einer Annahme
+
+In einem Hafen **ist** die Größe das Bild — ein 366-m-Containerschiff als
+40-m-Kasten wäre kein Nachbar, sondern eine Behauptung. Der Schnappschuss
+deckt das meiste in **einem** Abruf ab; wer den heißen Zustand inzwischen
+verlassen hat, wird einzeln nachgeholt, acht gleichzeitig. Am laufenden
+Betrieb gemessen: von 120 Nachbarn blieben **2 ohne Maße** (31 Abrufe
+insgesamt). Die stehen als Ersatzkasten da, und die Tafel sagt es.
+
+**Gebaut wird erst, wenn die Maße da sind.** Ein Kasten, der Sekunden nach
+dem Erscheinen von 40 auf 300 m wächst, sieht aus wie ein Fehler. Die
+Umgebung steht dadurch gemessen nach **10 bis 11 s** — die eigene Spur und
+die Ansicht sind längst da, der Verkehr kommt nach.
+
+##### Kurs und Höhe: dieselbe Regel, aber je Schiff ein eigener Zustand
+
+`kursUeberGrund()` nimmt die Stützpunkte jetzt als **Argument**, und der
+geglättete Kurs liegt in einem Zustandsobjekt je Schiff. Ein Nachbar, der
+seitwärts führe, fiele aus 400 m Abstand genauso auf wie der eigene Rumpf.
+Gemessen: Der Probennachbar fährt nach 270° und **meldet 45°** — sein Rumpf
+zeigt 270,0°.
+
+**Die Flächenhöhe wird einmal je Bild abgefragt**, an der eigenen Position,
+und alle Nachbarn benutzen sie: Sie liegen höchstens 5 km entfernt auf
+demselben Wasser, 120 Einzelabfragen wären hundertzwanzigmal dieselbe Zahl.
+Angehoben wird **entlang der Flächennormalen** statt über `Cartographic` —
+bei 120 Rümpfen je Bild wäre die Umrechnung der teuerste Posten, und der
+Unterschied zur exakten Lösung liegt im Zehntelmeter.
+
+##### Was das kostet
+
+| | gemessen |
+|---|---|
+| JS je Bild für 120 Nachbarn (Ort + Ausrichtung) | **0,32–0,34 ms** |
+| Bildzeit mit gegen ohne (SwiftShader, ~700 ms je Bild) | Faktor 1,01–1,18 — **Rauschen** |
+| Daten | 762 KB entpackt, auf der Leitung gzip (der Umleiter im Test packt aus, der Browser bekäme weniger) |
+
+**Die Bildzeit aus dieser Sandbox trägt nicht.** Hier rastert Software mit
+700 ms je Bild; darin verschwindet alles. Die 0,32 ms sind dagegen
+übertragbar — sie sagen, dass die **Rechenseite** der Umgebung nichts kostet.
+Was 120 zusätzliche Zeichenaufrufe auf einem echten Telefon kosten, ist von
+hier aus nicht messbar; **deshalb der Schalter** („Verkehr — die anderen
+Schiffe zeigen", gemerkt in `aisstream_3d_umgebung`).
+
+##### Bewusst nicht enthalten
+
+- **Kein `dim`-Versatz.** Der Kasten sitzt mittig auf der gemeldeten
+  Position, wie beim eigenen Schiff. AIS liefert mit `dim {A,B,C,D}` zwar
+  den Abstand der Antenne zu Bug und Heck — das anzuwenden gehörte dann an
+  **beide** Stellen und ist eine eigene Änderung, keine Beigabe zu dieser.
+- **Keine Namen an den Rümpfen.** In der Mitfahrt wären 120 Beschriftungen
+  vor dem Horizont genau das Knäuel, das bei den Spurlinien vermieden wird.
+- **Liegende Schiffe bleiben drin.** Gefragt waren die Bewegungen; ein Hafen
+  ohne die Schiffe an den Kaien wäre trotzdem falsch. Gemessen liegen 46 von
+  163 Spuren unter 200 m Gesamtweg — sie stehen einfach da, wie in echt.
+
 #### Warum die Probe das durchgehen ließ
 
 Sie maß `heading` und `pitch` — **nicht `roll` und nicht die Blickrichtung
@@ -1964,7 +2067,7 @@ beim Richtungspfeil und beim Tallinn-Foto: **ansehen, nicht ableiten.**
 | **Die Kopfzeile** hatte einen Verlauf nach Dunkel — über einer hellen Luftaufnahme war die Unterzeile unlesbar. Jetzt ein Kasten, der auf jedem Grund trägt |
 | **Die Kamera** stand genau von Norden: Die Wand war von der Kante gesehen ein Strich, und die dritte Dimension zeigte sich gar nicht. Jetzt −35° Kurs, −28° Neigung |
 
-### Gemessen in `scratchpad/drei.js` (64 Prüfungen)
+### Gemessen in `scratchpad/drei.js` (83 Prüfungen)
 
 Gegen einen **echten** aisproxy, dessen Datenbank vorher mit **seiner eigenen
 `Speicher`-Klasse** gefüllt wird — ein nachgebauter Endpunkt hätte genau die
@@ -2003,6 +2106,22 @@ Formatfragen offengelassen, auf die es ankommt.
 - **Der Multiplikator gehört ins `clockViewModel`.** `clock.multiplier`
   allein blieb wirkungslos: Das Animationswidget schreibt seinen eigenen Wert
   bei jedem Bild zurück, gemessen lief die Uhr rund 500-fach statt 60-fach.
+- **Die Umgebung wird an zwei Nachbarn gemessen, die durchfallen müssen.**
+  Vier liegen im Abfragekasten: `NAH` (410 m, fährt 270° und meldet 45°) und
+  `OHNE` (586 m, ohne Stammdatensatz) müssen erscheinen, `FERN` (7,2 km) und
+  `SPAETER` (dieselbe Linie, drei Stunden später, 7,1 km) nicht. Ohne die
+  beiden letzten prüfte der Abschnitt nur, dass überhaupt etwas erscheint.
+  **Die eigene Probenspur musste dafür von 4 auf 20 km wachsen** — bei einer
+  kurzen Spur liegt jeder Punkt des Kastens näher als 5 km, und der
+  Radiusfilter hätte nichts zu tun gehabt.
+- **Und dann noch: genau EINE Polylinie**, mit 120 Nachbarn wie mit zweien.
+  Das ist die eigentliche Anforderung, und sie wird an derselben Zahl
+  gemessen wie vorher.
+- **Cesium blendet bei einem Zeichenfehler ein eigenes Fenster ein** und legt
+  sich damit über die Bedienung. Ohne eine Prüfung darauf meldet erst der
+  nächste Klick einen Zeitablauf, und die Ursache steht nirgends — beim
+  Umbau auf den Zustand je Schiff genau so passiert: Fünf Stellen lasen noch
+  `kursGlatt`, und die Fehlermeldung stand nur in diesem Fenster.
 - **Die Vorgabe wird an den angefragten ion-Assets gemessen**, nicht am Wert
   des Wählers: Mit ungültigem Token fällt der ohnehin auf `osm` zurück. Die
   Seite fragt **2 und 1** (Luftbild, Gelände) und **nicht** 2275207.
