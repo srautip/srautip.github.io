@@ -178,24 +178,30 @@ Statt `liste.Count(Function(x) ...)` also `liste.Where(...).Count`.
 ## Viewer-Artifacts (der Vorschau-Kanal)
 
 Seit GitHub Pages nicht mehr gepflegt wird, sind die Claude-Artifacts
-der EINZIGE Vorschau-Kanal: private, stabil verlinkte Seiten fuer
-Zwischenstaende direkt nach einem Lauf - und ohne Merge nach `main`.
+der EINZIGE Vorschau-Kanal: private, stabil verlinkte Seiten - ohne
+Merge nach `main`.
+
+**Die drei Beispiel-Artifacts werden NICHT mehr aktualisiert**
+(Nutzerentscheidung 28.08.2026). Sie sind damit ein eingefrorener
+Altstand, so wie die GitHub-Pages-Kopien seit dem 23.08. Nicht
+nachziehen, auch nicht nach einem `run`-Lauf, und nicht danach fragen.
+Wer eine aktuelle Ansicht braucht, öffnet
+`tests/<schule>/output/stundentafel.html` per Doppelklick - der
+Doppelklick-Betrieb ist eine zugesicherte Betriebsart (arc42 8.10) und
+per Test abgesichert.
 
 - Grundschule: https://claude.ai/code/artifact/d644d791-48e1-4bbd-89fa-02d2cf13fe09
 - GMS: https://claude.ai/code/artifact/ae942861-a1ae-4664-a1f5-51ac9ce702d1
 - Klassenbildung Grundschule: https://claude.ai/code/artifact/d00f8a57-75ca-4809-9690-19613dd071a1
-  (Quelle: tests/bw-grundschule-beispiel/output/klassenbildung.html,
-  Titel "Klassenbildung Grundschule", Favicon 🧩)
-- Designsystem-Muster: https://claude.ai/code/artifact/44e7835c-6ceb-467e-b7d8-234be0185cdb
-  (Favicon 🎨) - KEIN Generat aus dem Repo, sondern die Entwurfsseite zu
-  arc42 8.16: Palette, Typo-Skala, Komponenten und Symbolsatz mit
-  Umschaltern fuer Dichte und Vorher/Nachher. Wird nur bei einer
-  Aenderung AM DESIGNSYSTEM nachgezogen, nicht nach einem Lauf.
 
-Aktualisierung nach jedem `run`-Lauf: den aeusseren Dokumentrahmen der
-generierten `output/stundentafel.html` strippen (doctype/html/head/
-body-Tags entfernen - das Artifact ergaenzt den Rahmen selbst; den
-`<title>` dabei auf "Stundentafel Grundschule" bzw. "Stundentafel GMS"
-setzen) und per Artifact-Tool mit `url` = obiger Link publizieren -
-NIE ohne `url` (das erzeugte ein neues, separates Artifact). Favicons
-stabil halten: Grundschule 🎒, GMS 🏫.
+Stand der drei: vor Stufe G2. Ihnen fehlt die Aktionsleiste der
+Brücke (+111 Zeilen je Stundentafel) und der Freigabe-Knopf im
+Board. Sichtbar wäre der Unterschied ohnehin nicht - ohne
+WebView2-Host bleibt beides verborgen.
+
+- Designsystem-Muster: https://claude.ai/code/artifact/44e7835c-6ceb-467e-b7d8-234be0185cdb
+  (Favicon 🎨) - KEIN Generat aus dem Repo, sondern die Entwurfsseite
+  zu arc42 8.16: Palette, Typo-Skala, Komponenten und Symbolsatz mit
+  Umschaltern für Dichte und Vorher/Nachher. Dieses eine wird bei
+  einer Änderung AM DESIGNSYSTEM weiterhin nachgezogen - es bildet
+  keinen Lauf ab, sondern den Entwurf.
