@@ -192,9 +192,49 @@ Fehlanzeige**, sonst fragt er denselben Fantasiecode bei jedem Oeffnen erneut -
 und traegt fuer den Betrieb ohne Proxy einen Rueckfall von 163 Haefen bei sich
 (2,5 KB): die der Region plus die grossen Welthaefen.
 
-Die Namen sind die amtlichen: "København", nicht "Kopenhagen". Das ist die
-Schreibweise auf der Seekarte, und sie stammt aus der Quelle statt aus einer
-Uebersetzung.
+### Angezeigt wird der deutsche Name, daneben steht der amtliche
+
+Erst standen hier die amtlichen Namen - "København", "Gdansk", "Szczecin".
+Das ist die Schreibweise auf der Seekarte, in einer deutschen Oberflaeche
+aber fremd. Gewuenscht war die deutsche Form, und die holt `ortDeutsch()`
+aus Wikidata (P1937 zum Code, `rdfs:label` mit `FILTER(LANG(?l) = "de")`).
+
+**Gemessen beim ersten Lauf: 726 der 17 596 Seehaefen bekommen einen
+deutschen Namen, in 41 s, kein Buendel fehlgeschlagen.** Danach steht dort
+Kopenhagen statt København, Danzig statt Gdansk, Stettin statt Szczecin,
+Sankt Petersburg statt "Saint Petersburg (ex Leningrad)" und Genua statt
+Genova.
+
+Vier Dinge daran sind Absicht:
+
+- **Beide Namen bleiben stehen.** `name` traegt die angezeigte Form,
+  `amtlich` die aus der UNECE-Liste. Ein ueberschriebener Quellwert waere
+  weg, und `ortStand().deutsch` kann nur zaehlen, solange es beide gibt.
+- **Der naechste Listenabzug ueberschreibt den deutschen Namen nicht.** Die
+  Liste wird alle 90 Tage neu geholt; ohne die `CASE`-Bedingung im Upsert
+  waere aus Kopenhagen nach 90 Tagen wieder København. Der Test dazu faellt
+  mit zurueckgebautem Upsert durch - er misst also wirklich etwas.
+- **Anlagen fallen raus.** Zu einem Code stehen mehrere Labels ("Hamburg",
+  "Hamburger Hafen", "Hamburg Hauptbahnhof"). Gemeint ist der Ort: Labels mit
+  Hafen/Bahnhof/Terminal/Station werden verworfen, vom Rest gewinnt das
+  kuerzeste.
+- **Gefragt wird in Buendeln von zwoelf Laendern.** Eine Abfrage ueber alle
+  Codes kam gekappt zurueck ("Unterminated string"); ein gescheitertes
+  Buendel laesst die anderen unberuehrt, und wiederholt wird einmal.
+
+Wikidatas deutsche Labels sind dabei genau das, was heute ueblich ist:
+Danzig und Stettin ja, Memel und Koenigsberg nein - dort stehen Klaipeda und
+Kaliningrad. Es wird also nichts entschieden, was nicht schon entschieden
+ist. Wo es keine deutsche Form gibt, bleibt der amtliche Name stehen; das ist
+die richtige Auskunft, keine Luecke.
+
+**Der Rueckfall im Client folgt derselben Regel** - und **nur Seehaefen**.
+Beim Nachziehen der deutschen Namen waren vier Binnenorte hineingeraten:
+DEBHV (Bruchhausen-Vilsen), DEBKM (Bruckmuehl), DENOK (Nordkirchen), DEODE
+(Odenthal). Ihre `Function` beginnt nicht mit `1`, der Proxy kennt sie also
+gar nicht - der Client haette Codes ausgeschrieben, zu denen der Proxy `null`
+sagt. Besonders daneben: "DENOK" meint auf der Leitung den Nord-Ostsee-Kanal.
+**Wer die Tabelle neu baut, filtert wieder auf `Function[0] === "1"`.**
 
 Die Trennerliste kommt ebenfalls aus den Daten, nicht aus der Vorstellung:
 `<>`, `<=>`, `<-->`, `<->`, `><`, `>>`, `>`, `-`. Der Bindestrich trennt nur,

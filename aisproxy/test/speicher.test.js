@@ -349,3 +349,32 @@ test("der Bericht nennt die Zahl der Bilder - die einzige dauerhafte", () => {
   assert.strictEqual(b.stammEintraege, 3);
   sp.stopp();
 });
+
+test("ein deutscher Ortsname ueberlebt den naechsten Listenabzug", () => {
+  // Die UNECE-Liste wird alle 90 Tage neu geholt. Schriebe sie `name`
+  // bedingungslos zurueck, machte jeder Abzug aus "Kopenhagen" wieder
+  // "København" - die deutsche Arbeit waere nach 90 Tagen weg.
+  const sp = neu();
+  sp.ortSchreibe([
+    { code: "DKCPH", name: "København", land: "DK", funktion: "1234----" },
+    { code: "PLGDN", name: "Gdansk", land: "PL", funktion: "12345---" }
+  ]);
+  assert.strictEqual(sp.ortDeutsch([["dkcph", "Kopenhagen"]]), 1,
+    "kleingeschriebene Codes werden gehoben");
+  assert.strictEqual(sp.ortStand().deutsch, 1);
+
+  // Derselbe Abzug noch einmal, mit unveraendertem amtlichem Namen.
+  sp.ortSchreibe([
+    { code: "DKCPH", name: "København", land: "DK", funktion: "1234----" },
+    { code: "PLGDN", name: "Gdansk", land: "PL", funktion: "12345---" }
+  ]);
+  const nach = sp.ortHole(["DKCPH", "PLGDN"]);
+  assert.strictEqual(nach.DKCPH, "Kopenhagen", "der deutsche Name bleibt stehen");
+  assert.strictEqual(nach.PLGDN, "Gdansk",
+    "wo es keinen deutschen gibt, traegt weiter der amtliche");
+
+  // Ein zweiter Durchlauf setzt nichts noch einmal - so ist die Zahl im
+  // Bericht die Zahl der wirklich neuen Namen, nicht die der Versuche.
+  assert.strictEqual(sp.ortDeutsch([["DKCPH", "Kopenhagen"]]), 0);
+  sp.stopp();
+});

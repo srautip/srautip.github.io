@@ -404,6 +404,46 @@ der Nutzer das Token, und es passierte minutenlang nichts.
 `proxyNeuVerbinden()` setzt den Rückzug deshalb zurück. Gefunden hat das die
 Gegenprobe im Test, nicht das Lesen.
 
+### Zielangaben: Kürzel in der Tabelle, Klartext im Detailfenster
+
+Aus `PLGDN>DEHAM` wird unter „Reise" **Danzig → Hamburg (PLGDN>DEHAM)**. In
+der **Tabelle** bleibt die Kurzform stehen — von der Spalte bliebe sonst
+nichts übrig.
+
+- **Die Rohform bleibt sichtbar**, in Klammern dahinter: Sie steht so auf der
+  Leitung, und wer sie sucht, soll sie nicht zurückübersetzen müssen.
+- **Aufgelöst wird nur, was in der Tabelle steht.** „EMDEN", „BRAKE",
+  „STADE", „VAREL" und „TAARS" kommen im echten Verkehr als *Klartext* vor
+  und sehen trotzdem wie ein LOCODE aus. „BRAKE" als BR+AKE zu lesen und zu
+  Brasilien zu machen wäre schlimmer als der rohe Text.
+- **Die Namen sind deutsch**, wo es eine gebräuchliche deutsche Form gibt
+  (Kopenhagen, Danzig, Stettin, Genua), sonst amtlich. Die Übersetzung macht
+  der Proxy, nicht der Client (`aisproxy/CLAUDE.md`).
+- **Die Liste liegt im Proxy** — 17 596 Seehäfen wären 289 KB und damit fast
+  so viel wie der ganze Client. Gefragt wird gesammelt über
+  `GET /v1/ort?codes=…`, und die Antwort wird in `aisstream_orte` gemerkt,
+  **auch die Fehlanzeige**: Sonst fragt der Client denselben Fantasiecode bei
+  jedem Öffnen erneut.
+- `ORT_RUECKFALL` trägt 163 Häfen für den Betrieb **ohne** Proxy (2,5 KB) —
+  die der Region plus die großen Welthäfen. **Nur Seehäfen**, dieselbe Regel
+  wie im Proxy (`Function` beginnt mit `1`): Vier Binnenorte waren beim
+  Nachziehen der deutschen Namen hineingeraten (DEBHV, DEBKM, DENOK, DEODE),
+  und „DENOK" als „Nordkirchen" auszuschreiben, wo auf der Leitung der
+  Nord-Ostsee-Kanal gemeint ist, wäre schlechter als der rohe Code.
+
+Die Trennerliste kommt aus den Daten, nicht aus der Vorstellung: `<>`, `<=>`,
+`<-->`, `<->`, `><`, `>>`, `>`, `-`. **Längster Trenner zuerst** im regulären
+Ausdruck — sonst frisst `->` den Anfang von `<-->` und übrig bleibt
+„DEHAM<-". Der Bindestrich trennt nur, wenn **alle** Teile wie ein Code
+aussehen, sonst zerfiele „SPODSBJERG-TAARS".
+
+Gemessen in `scratchpad/reiseprobe.js` gegen einen echten Proxy: Die Tabelle
+zeigt `NOMSS>DEHAM` unverändert, im Detailfenster steht „Moss → Hamburg
+(NOMSS>DEHAM)". **Der Code im Test darf nicht im Rückfall stehen** — sonst
+löst der Client ihn selbst auf, es geht keine Abfrage raus, und die Probe ist
+grün, ohne den Proxyweg berührt zu haben. Deshalb zählt sie die
+`/v1/ort`-Anfragen mit: eine beim ersten Mal, **null** nach dem Neuladen.
+
 ### Das Drahtformat muss auf beiden Seiten dasselbe sein
 
 22 Byte je Schiff, gespiegelt in `proxyEntpacke()` hier und
