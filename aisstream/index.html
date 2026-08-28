@@ -6460,7 +6460,8 @@
         // Seiten auskommt.
         '<div class="eigen">' +
         '<button type="button" data-eigen="datei">Bild hinzufügen</button>' +
-        '<span class="hinweis">oder Bild kopieren und hier Strg+V</span>' +
+        '<span class="hinweis">oder Strg+V &middot; mehrere Dateien ' +
+        'benennen wie <code>211224140.jpg</code> und hierher ziehen</span>' +
         '<span class="hinweis" data-eigen="stand"></span></div>';
     }
     detailSuche.classList.toggle("an", !wantImage);
@@ -6713,7 +6714,7 @@
     el.style.color = fehler ? "var(--bad, #e06c6c)" : "";
   }
 
-  function fotoHochladen(mmsi, blob, seite) {
+  function fotoHochladen(mmsi, blob, seite, stumm) {
     if (!proxyAktiv() || !proxyBasis()) {
       eigenStand("Dafür muss der Proxy eingeschaltet sein.", true);
       return Promise.resolve(false);
@@ -6722,7 +6723,7 @@
       eigenStand("Das war kein Bild.", true);
       return Promise.resolve(false);
     }
-    eigenStand("wird übertragen …");
+    if (!stumm) eigenStand("wird übertragen …");
     var ziel = proxyBasis().replace(/\/v1$/, "") + "/v1/foto/" + encodeURIComponent(mmsi);
     if (seite) ziel += "?seite=" + encodeURIComponent(seite);
     return fetch(proxyMitToken(ziel), { method: "POST", body: blob })
@@ -6733,17 +6734,67 @@
         });
       })
       .then(function (d) {
-        eigenStand("gespeichert (" + Math.round((d.bytes || 0) / 1024) + " KB)");
+        if (!stumm) eigenStand("gespeichert (" + Math.round((d.bytes || 0) / 1024) + " KB)");
         // Den Registersatz neu holen statt die Anzeige von Hand zu setzen:
         // So landet das Bild auf demselben Weg wie jedes andere - samt
         // Zwischenspeicher, und nach dem Neuladen ist es immer noch da.
         return enrichShip(mmsi, true).then(function () { return true; });
       })
       .catch(function (e) {
-        eigenStand("Fehlgeschlagen: " + e.message, true);
+        if (!stumm) eigenStand("Fehlgeschlagen: " + e.message, true);
         log("Foto hochladen: " + e.message);
         return false;
       });
+  }
+
+  // Aus einem Dateinamen die MMSI lesen: "211224140.jpg", "211224140 nordsee.jpg",
+  // "foto_211224140_2.png" - neun Ziffern am Stück, das ist eindeutig genug.
+  function mmsiAusName(name) {
+    var m = /(^|[^0-9])([2-7][0-9]{8})([^0-9]|$)/.exec(String(name || ""));
+    return m ? m[2] : null;
+  }
+
+  // Mehrere Bilder auf einmal: Wer eine Handvoll Schiffe nachträgt, will sie
+  // nicht einzeln anklicken. Die Zuordnung kommt aus dem Dateinamen; nur wenn
+  // eine EINZELNE Datei ohne MMSI im Namen kommt, gilt das offene Schiff.
+  function fotoStapel(dateien, offenesSchiff) {
+    if (!dateien.length) return Promise.resolve();
+    var ohne = [];
+    var paare = [];
+    dateien.forEach(function (f) {
+      var mmsi = mmsiAusName(f.name);
+      if (mmsi) paare.push([mmsi, f]);
+      else ohne.push(f);
+    });
+    if (!paare.length && ohne.length === 1 && offenesSchiff) {
+      paare.push([offenesSchiff, ohne.shift()]);
+    }
+    // Die Meldung über Übersprungenes gehört ans ENDE, zusammen mit dem
+    // Ergebnis - sonst überschreibt sie der nächste Zwischenstand und
+    // niemand erfährt, dass etwas liegen geblieben ist.
+    var uebrig = ohne.length ? ", " + ohne.length + " ohne MMSI im Namen" : "";
+    if (!paare.length) {
+      eigenStand("Nichts zuzuordnen" + uebrig +
+        " - Dateien wie 211224140.jpg benennen.", true);
+      return Promise.resolve();
+    }
+    var gut = 0, schlecht = 0, i = 0;
+    // Nacheinander, nicht alle auf einmal: Der Proxy schreibt die Dateien
+    // synchron, und ein Schwall von fünfzig gleichzeitigen Uploads bringt
+    // nichts als Gedränge.
+    function weiter() {
+      if (i >= paare.length) {
+        eigenStand(gut + " von " + paare.length + " gespeichert" +
+          (schlecht ? ", " + schlecht + " fehlgeschlagen" : "") + uebrig,
+          schlecht > 0 || ohne.length > 0);
+        return Promise.resolve();
+      }
+      var p = paare[i++];
+      if (paare.length > 1) eigenStand("überträgt " + i + " von " + paare.length + " …");
+      return fotoHochladen(p[0], p[1], null, paare.length > 1)
+        .then(function (erfolg) { erfolg ? gut++ : schlecht++; return weiter(); });
+    }
+    return weiter();
   }
 
   detailSuche.addEventListener("click", function (ev) {
@@ -6753,16 +6804,32 @@
       fotoDatei = document.createElement("input");
       fotoDatei.type = "file";
       fotoDatei.accept = "image/jpeg,image/png";
+      fotoDatei.multiple = true;
       fotoDatei.style.display = "none";
       fotoDatei.addEventListener("change", function () {
-        var f = fotoDatei.files && fotoDatei.files[0];
-        var mmsi = detailSuche.dataset.mmsi;
+        var dateien = [].slice.call(fotoDatei.files || []);
         fotoDatei.value = "";
-        if (f && mmsi) fotoHochladen(mmsi, f, null);
+        fotoStapel(dateien, detailSuche.dataset.mmsi);
       });
       document.body.appendChild(fotoDatei);
     }
     fotoDatei.click();
+  });
+
+  // Ziehen und fallen lassen - der schnellste Weg für einen ganzen Ordner.
+  // Angenommen wird auf der ganzen Seite, sonst muss man ein kleines Ziel
+  // treffen; abgewiesen wird nichts, was kein Bild ist.
+  ["dragover", "drop"].forEach(function (typ) {
+    document.addEventListener(typ, function (ev) {
+      if (!ev.dataTransfer) return;
+      var hatDatei = [].slice.call(ev.dataTransfer.types || []).indexOf("Files") !== -1;
+      if (!hatDatei) return;
+      ev.preventDefault();
+      if (typ !== "drop") return;
+      var bilder = [].slice.call(ev.dataTransfer.files || [])
+        .filter(function (f) { return /^image\//.test(f.type); });
+      if (bilder.length) fotoStapel(bilder, selectedMmsi);
+    });
   });
 
   // Einfügen: Das ist der Weg, der aus "Bild im Browser kopieren" zwei Klicks
