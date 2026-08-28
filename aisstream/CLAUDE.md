@@ -1844,7 +1844,7 @@ Die dritte Dimension trägt jetzt die **Fahrt**.
 
 #### Mitfahren: Blick von der Brücke
 
-Beim Abspielen sitzt die Kamera **20 m über dem Schiff** (`AUGENHOEHE`) und
+Beim Abspielen sitzt die Kamera **50 m über der Fläche** (`AUGENHOEHE`) und
 blickt in Fahrtrichtung, 8° nach unten geneigt.
 
 - **Nur während des Abspielens.** Beim Laden gibt es die Übersicht; Pause
@@ -1866,10 +1866,48 @@ blickt in Fahrtrichtung, 8° nach unten geneigt.
 - **Vorgabe des Untergrunds ist `gebaeude`** (Luftbild + Gelände + Gebäude,
   alles aus ion) — im Betrieb die beste Stufe. `foto` bleibt wählbar.
 
-**Offen:** Die 20 m gelten über der WGS84-Ellipsoide. Ob der Meeresspiegel im
-ion-Weltgelände genau dort liegt, ist ohne Token nicht prüfbar; in der Stufe
-`osm` (kein Gelände) ist er es, und dort wird gemessen. Sitzt die Kamera im
-Gebäudemodus zu hoch oder zu tief, ist es diese eine Konstante.
+#### „Die Kamera steht auf dem Kopf" — sie stand unter Wasser
+
+Genau der offene Punkt, der hier als „ohne Token nicht prüfbar" notiert war,
+ist eingetreten. **Höhen zählen in Cesium ab der WGS84-Ellipsoide, nicht ab
+dem Wasser.** In der Deutschen Bucht liegt der Meeresspiegel rund **40 m über
+ihr** (Geoidundulation) — eine Kamera auf „20 m" saß mit ion-Weltgelände also
+gut 20 m **unter** Wasser. Man blickte von unten gegen die Unterseite des
+Geländes, und das liest sich wie eine gekippte Kamera. Es erklärt zugleich,
+warum 20 m „zu flach" wirkten: Beide Meldungen, eine Ursache.
+
+**Zwei Verdächtige wurden vorher ausgeschlossen**, im Bundle nachgelesen
+statt vermutet: `flyToBoundingSphere` beginnt mit
+`this._setTransform(M.IDENTITY)` und fliegt in Weltkoordinaten — ein
+hängengebliebener Bezugsrahmen war es nicht. Und `roll` meldet Cesium
+gelegentlich als **360°** statt 0; das ist ein Umlauf, kein Kippen.
+
+`flaecheHoehe(carto)` ist jetzt die **eine** Stelle, die „wie hoch liegt hier
+die Oberfläche?" beantwortet: `globe.getHeight()` → `scene.sampleHeight()`
+(Stufe `foto`, Globus aus) → 0. Kamera **und** Schiffskasten hängen daran —
+der Kasten über eine `CallbackPositionProperty`, die den Sampler auf Höhe 0
+nimmt und die Fläche daraufsetzt. Ohne das läge er bei Geoidversatz unter
+Wasser: derselbe Fehler an der zweiten Stelle, nur unbemerkt, weil er in der
+Mitfahrt ausgeblendet ist. Die Ausrichtung bleibt am Sampler — ein konstanter
+Höhenversatz ändert die Fahrtrichtung nicht.
+
+Dazu `camera.lookAtTransform(Matrix4.IDENTITY)` vor jedem `setView`: **keine**
+bekannte Ursache, sondern eine Zeile gegen die ganze Fehlerklasse „HPR werden
+in einem fremden Rahmen gelesen".
+
+**Und die Tafel nennt jetzt die Kamerahöhe über der Fläche.** Damit ist die
+nächste Rückmeldung eine Zahl statt eines Eindrucks.
+
+#### Warum die Probe das durchgehen ließ
+
+Sie maß `heading` und `pitch` — **nicht `roll` und nicht die Blickrichtung
+„oben"**. Eine verdrehte Kamera wäre grün durchgelaufen. Der direkte,
+frame-unabhängige Test steht jetzt drin: Der `up`-Vektor muss von der
+Erdmitte weg zeigen (`dot(camera.up, geodetischeNormale) > 0,9`; bei −8°
+Neigung sind es gemessen **0,990** = cos 8°).
+
+**Merke:** Wer eine Kamera setzt, prüft nicht nur, wohin sie schaut, sondern
+auch, wo bei ihr oben ist.
 
 ### Drei Mängel, die erst das Schirmfoto gezeigt hat
 
@@ -1882,7 +1920,7 @@ beim Richtungspfeil und beim Tallinn-Foto: **ansehen, nicht ableiten.**
 | **Die Kopfzeile** hatte einen Verlauf nach Dunkel — über einer hellen Luftaufnahme war die Unterzeile unlesbar. Jetzt ein Kasten, der auf jedem Grund trägt |
 | **Die Kamera** stand genau von Norden: Die Wand war von der Kante gesehen ein Strich, und die dritte Dimension zeigte sich gar nicht. Jetzt −35° Kurs, −28° Neigung |
 
-### Gemessen in `scratchpad/drei.js` (53 Prüfungen)
+### Gemessen in `scratchpad/drei.js` (58 Prüfungen)
 
 Gegen einen **echten** aisproxy, dessen Datenbank vorher mit **seiner eigenen
 `Speicher`-Klasse** gefüllt wird — ein nachgebauter Endpunkt hätte genau die
@@ -1897,9 +1935,15 @@ Formatfragen offengelassen, auf die es ankommt.
 - **Die FPV an den echten Kamerawerten:** Die Probenspur macht einen
   **Kurswechsel** (erste Hälfte 20°, zweite 110°, Positionen passend — eine
   Probe mit widersprüchlichen Daten verdeckte den Rückfall auf die
-  Streckenrichtung). Gemessen: Augenhöhe **20,0 m**, Abstand zum Schiff
-  **20,0 m**, Kurs **20,0° → 110,0°**, Neigung **−8,0°**; in der Pause bleibt
-  die Kamera stehen, mit ausgeschaltetem Schalter auch beim Abspielen.
+  Streckenrichtung). Gemessen: **50,0 m über der Fläche**, Abstand zum Schiff
+  50,0 m, Kurs **20,0° → 110,0°**, Neigung −8,0°, Rollen 0,0°, `up`·Normale
+  **0,990**; in der Pause bleibt die Kamera stehen, mit ausgeschaltetem
+  Schalter auch beim Abspielen.
+- **Gegenprobe zur Flächenhöhe**, sonst prüfte sie nichts: In der Sandbox
+  liegt die Fläche bei 0, „50 m über der Fläche" und „50 m absolut" wären
+  also nicht zu unterscheiden. Mit einem **gestellten Gelände von 40 m**
+  (`globe.getHeight` überschrieben) steigt die Kamera gemessen auf **90 m**
+  und der Kasten auf **40 m**.
 - **Die Vorgabe wird an den angefragten ion-Assets gemessen**, nicht am Wert
   des Wählers: Mit ungültigem Token fällt der ohnehin auf `osm` zurück. Die
   Seite fragt **2 und 1** (Luftbild, Gelände) und **nicht** 2275207.
