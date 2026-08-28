@@ -320,3 +320,20 @@ test("/v1/ort loest Codes auf - und sagt auch, wenn es einen nicht kennt", async
     assert.strictEqual(s.speicher.ortStand().eintraege, 2);
   } finally { abbau(s); }
 });
+
+test("/v1/ship nennt die frueheren Ziele", async () => {
+  const s = await starte(aufbau());
+  try {
+    s.speicher.stammSetze(211000009, { name: "VERLAUF", ziel: "DEHAM" });
+    s.speicher.stammSetze(211000009, { ziel: "NLRTM" });
+    const r = await (await fetch(s.basis + "/v1/ship/211000009")).json();
+    assert.strictEqual(r.ziel, "NLRTM", "das aktuelle Ziel bleibt, wo es war");
+    assert.deepStrictEqual((r.zielVerlauf || []).map(z => z.ziel), ["NLRTM", "DEHAM"]);
+
+    // Ein Schiff ohne Verlauf traegt das Feld gar nicht - eine leere Liste
+    // waere eine Angabe ueber etwas, das es nicht gibt.
+    s.speicher.stammSetze(211000010, { name: "OHNE" });
+    const o = await (await fetch(s.basis + "/v1/ship/211000010")).json();
+    assert.strictEqual(o.zielVerlauf, undefined);
+  } finally { abbau(s); }
+});

@@ -281,6 +281,39 @@ wenn **alle** Teile wie ein Code aussehen, sonst zerfiele "SPODSBJERG-TAARS".
 Und die Reihenfolge im regulaeren Ausdruck ist laengster Trenner zuerst -
 sonst frisst `->` den Anfang von `<-->` und uebrig bleibt "DEHAM<-".
 
+### Wohin es frueher unterwegs war
+
+Gewuenscht: unter „Reise" nicht nur das aktuelle Ziel, sondern auch die
+bisherigen. Das AIS-Feld traegt immer nur den aktuellen Stand, und
+`stammSetze()` schreibt ihn in dieselbe Spalte - die vorherige Reise war damit
+weg, obwohl der Proxy sie mitgehoert hat. Genau das kann nur der Proxy: Er
+hoert seit Wochen zu, der Browser erst seit dem Oeffnen der Seite.
+
+Eigene Tabelle `ziel_verlauf` (`mmsi`, `ziel`, `zuerst`, `zuletzt`, `folge`),
+gedeckelt auf `ZIEL_VERLAUF_MAX` = 12 je Schiff. Geschrieben wird **nur beim
+Wechsel**, nicht bei jeder Wiederholung: Msg 5 kommt je Schiff alle sechs
+Minuten, ein Upsert je Nachricht waere bei 3 000 Schiffen Arbeit fuer nichts.
+
+Drei Dinge, die beim Bauen zaehlten:
+
+- **Der Puffer schluckte Wechsel.** `merkeStamm()` haelt je Schiff nur die
+  juengste Meldung; drei Ziele innerhalb eines Schreibtakts wurden zu einem,
+  und `stammSetze()` sah die mittleren nie. Im Betrieb liegen Wechsel Stunden
+  auseinander - „faellt selten weg" ist fuer einen Verlauf aber kein Zustand.
+  `merkeStamm()` schreibt das verdraengte Ziel deshalb selbst weg. Gefunden
+  hat das die Browserprobe, nicht das Lesen: Sie schickte drei Ziele in
+  600 ms, und am Ende stand genau eines in der Datenbank.
+- **Sortiert wird nach einem Zaehler, nicht nach der Zeit.** `zuletzt` hat
+  Sekundenaufloesung, und im Test lagen vier Wechsel in derselben Sekunde -
+  die Reihenfolge war dem Zufall ueberlassen. `folge` ist auch gegen eine
+  zurueckgestellte Uhr immun.
+- **Ein Schiff ohne Verlauf bekommt das Feld gar nicht**, keine leere Liste.
+  Eine leere Liste ist eine Angabe ueber etwas, das es nicht gibt.
+
+`zuerst` ist die erste Sichtung dieses Ziels, `zuletzt` der letzte **Wechsel
+darauf** - nicht die letzte Wiederholung. Fuer die Reihenfolge der
+vergangenen Ziele ist genau das die richtige Angabe.
+
 ## Der Typ kommt aus drei Quellen - und keine ist sicher
 
 Gemeldet: „Warum fehlt bei MMSI 309436000 der Typ?" (Liberty of the Seas,

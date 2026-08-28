@@ -127,6 +127,30 @@ class Speicher {
     this.spalteErgaenzen("schiff", "foto_quelle", "TEXT");
     this.spalteErgaenzen("schiff", "foto_seite", "TEXT");
 
+    // Wohin ein Schiff frueher unterwegs war. Das Zielfeld im AIS traegt immer
+    // nur den aktuellen Stand, und die Stammtabelle ueberschreibt ihn - die
+    // vorherige Reise waere damit weg, obwohl der Proxy sie mitgehoert hat.
+    //
+    // Geschrieben wird NUR beim Wechsel (stammSetze), nicht bei jeder
+    // Wiederholung: Msg 5 kommt je Schiff alle sechs Minuten, ein Upsert je
+    // Nachricht waere bei 3 000 Schiffen Arbeit fuer nichts.
+    //
+    // `zuerst` ist die erste Sichtung dieses Ziels, `zuletzt` der letzte
+    // Wechsel DARAUF - nicht die letzte Wiederholung. Fuer die Reihenfolge
+    // der vergangenen Ziele ist genau das die richtige Angabe.
+    //
+    // Sortiert wird trotzdem nach `folge`, einem schlichten Zaehler. Der
+    // Zeitstempel hat Sekundenaufloesung, und im Test lagen vier Wechsel in
+    // derselben Sekunde - die Reihenfolge war damit dem Zufall ueberlassen.
+    // Ein Zaehler ist auch gegen eine zurueckgestellte Uhr immun.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS ziel_verlauf (
+        mmsi INTEGER NOT NULL, ziel TEXT NOT NULL,
+        zuerst INTEGER NOT NULL, zuletzt INTEGER NOT NULL,
+        folge INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (mmsi, ziel)
+      )`);
+
     // Die Ortstabelle: UN/LOCODE -> Name, aus der offiziellen Liste der UNECE.
     //
     // Warum im Proxy und nicht im Client: Die Liste hat 116 213 Zeilen, davon
@@ -219,7 +243,18 @@ class Speicher {
     for (const k of STAMM_SPALTEN) if (s[k] != null) felder[k] = s[k];
     if (!Object.keys(felder).length) return;
     felder.gesehen = Math.floor((s.seen || Date.now()) / 1000);
-    this.stammPuffer.set(Number(s.mmsi), felder);
+    const mmsi = Number(s.mmsi);
+    // Der Puffer haelt je Schiff nur die JUENGSTE Meldung - ein Zielwechsel
+    // innerhalb eines Schreibtakts fiele damit unter den Tisch, und
+    // stammSetze() saehe ihn nie. Im Betrieb liegen Wechsel Stunden
+    // auseinander, aber "faellt selten weg" ist kein Zustand fuer einen
+    // Verlauf. Aufgefallen ist es in der Probe, wo drei Ziele in 600 ms kamen
+    // und am Ende genau eines davon in der Datenbank stand.
+    const vorher = this.stammPuffer.get(mmsi);
+    if (vorher && vorher.ziel && felder.ziel && vorher.ziel !== felder.ziel) {
+      this.zielMerke(mmsi, String(vorher.ziel).trim(), s.seen);
+    }
+    this.stammPuffer.set(mmsi, felder);
   }
 
   schreibeStamm() {
@@ -430,12 +465,50 @@ class Speicher {
 
   // --- Stammdaten -------------------------------------------------------
 
+  // --- Zielverlauf ------------------------------------------------------
+
+  zielMerke(mmsi, ziel, jetzt) {
+    const t = Math.floor((jetzt || Date.now()) / 1000);
+    try {
+      if (this.zielFolge == null) {
+        this.zielFolge = this.db.prepare(
+          "SELECT IFNULL(MAX(folge), 0) AS n FROM ziel_verlauf").get().n;
+      }
+      const folge = ++this.zielFolge;
+      this.db.prepare(
+        "INSERT INTO ziel_verlauf (mmsi, ziel, zuerst, zuletzt, folge) VALUES (?, ?, ?, ?, ?) " +
+        "ON CONFLICT(mmsi, ziel) DO UPDATE SET zuletzt = excluded.zuletzt, folge = excluded.folge")
+        .run(Number(mmsi), ziel, t, t, folge);
+      // Gedeckelt je Schiff. Ein Transponder, der jede Woche etwas anderes
+      // sendet, fuellte die Tabelle sonst unbegrenzt - und mehr als eine
+      // Handvoll frueherer Ziele liest ohnehin niemand.
+      this.db.prepare(
+        "DELETE FROM ziel_verlauf WHERE mmsi = ? AND ziel NOT IN (" +
+        "SELECT ziel FROM ziel_verlauf WHERE mmsi = ? ORDER BY folge DESC LIMIT ?)")
+        .run(Number(mmsi), Number(mmsi), this.konfig.ZIEL_VERLAUF_MAX);
+    } catch (e) {
+      // Ein misslungener Verlaufseintrag darf die Stammdaten nicht mitreissen.
+      this.log("Zielverlauf schreiben fehlgeschlagen: " + e.message);
+    }
+  }
+
+  zielVerlauf(mmsi) {
+    return this.db.prepare(
+      "SELECT ziel, zuerst, zuletzt FROM ziel_verlauf WHERE mmsi = ? " +
+      "ORDER BY folge DESC").all(Number(mmsi));
+  }
+
   stammHole(mmsi) {
     return this.db.prepare("SELECT * FROM schiff WHERE mmsi = ?").get(Number(mmsi)) || null;
   }
 
   stammSetze(mmsi, felder) {
     const vorhanden = this.stammHole(mmsi);
+    // Vor dem Ueberschreiben: Ein gewechseltes Ziel gehoert in den Verlauf.
+    if (typeof felder.ziel === "string" && felder.ziel.trim() &&
+        (!vorhanden || vorhanden.ziel !== felder.ziel)) {
+      this.zielMerke(mmsi, felder.ziel.trim());
+    }
     const erlaubt = ["name", "rufzeichen", "imo", "typ", "laenge", "breite", "tiefgang",
       "dimA", "dimB", "dimC", "dimD", "gesehen",
       "klasse", "geraet", "aisVersion", "dte",

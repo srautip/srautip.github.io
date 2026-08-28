@@ -17,7 +17,8 @@ function neu(ueber) {
     REGISTER_TREFFER_MS: 30 * 24 * 3600 * 1000,
     REGISTER_FEHL_MS: 3 * 24 * 3600 * 1000,
     FOTO_TEIL_MS: 60 * 60 * 1000,
-    FOTO_FEHL_MS: 7 * 24 * 3600 * 1000
+    FOTO_FEHL_MS: 7 * 24 * 3600 * 1000,
+    ZIEL_VERLAUF_MAX: 12
   }, ueber || {});
   const s = new Speicher({ konfig, log: () => {} });
   s.__dir = dir;
@@ -376,5 +377,62 @@ test("ein deutscher Ortsname ueberlebt den naechsten Listenabzug", () => {
   // Ein zweiter Durchlauf setzt nichts noch einmal - so ist die Zahl im
   // Bericht die Zahl der wirklich neuen Namen, nicht die der Versuche.
   assert.strictEqual(sp.ortDeutsch([["DKCPH", "Kopenhagen"]]), 0);
+  sp.stopp();
+});
+
+test("das Zielfeld wird ueberschrieben - der Verlauf haelt fest, wo es hinging", () => {
+  // Msg 5 traegt immer nur das aktuelle Ziel, und stammSetze schreibt es in
+  // dieselbe Spalte. Ohne eigenen Verlauf waere die vorherige Reise weg,
+  // obwohl der Proxy sie mitgehoert hat.
+  const sp = neu();
+  sp.stammSetze(211000001, { name: "TESTER", ziel: "DEHAM" });
+  sp.stammSetze(211000001, { ziel: "DEHAM" });          // Wiederholung
+  sp.stammSetze(211000001, { ziel: "NLRTM" });
+  sp.stammSetze(211000001, { ziel: "DEBRV" });
+
+  assert.strictEqual(sp.stammHole(211000001).ziel, "DEBRV", "aktuell bleibt aktuell");
+  const v = sp.zielVerlauf(211000001);
+  assert.deepStrictEqual(v.map(z => z.ziel), ["DEBRV", "NLRTM", "DEHAM"],
+    "juengster Wechsel zuerst");
+
+  // Zurueck nach Hamburg: derselbe Eintrag, aber wieder vorn.
+  sp.stammSetze(211000001, { ziel: "DEHAM" });
+  assert.deepStrictEqual(sp.zielVerlauf(211000001).map(z => z.ziel),
+    ["DEHAM", "DEBRV", "NLRTM"], "kein zweiter Eintrag, nur neu einsortiert");
+  assert.strictEqual(sp.zielVerlauf(211000001).length, 3);
+
+  // Ein anderes Schiff bleibt unberuehrt.
+  sp.stammSetze(211000002, { ziel: "DKCPH" });
+  assert.deepStrictEqual(sp.zielVerlauf(211000002).map(z => z.ziel), ["DKCPH"]);
+  sp.stopp();
+});
+
+test("der Zielverlauf ist je Schiff gedeckelt", () => {
+  // Ein Transponder mit wechselndem Freitext fuellte die Tabelle sonst
+  // unbegrenzt - und mehr als eine Handvoll liest ohnehin niemand.
+  const sp = neu({ ZIEL_VERLAUF_MAX: 3 });
+  ["A", "B", "C", "D", "E"].forEach(z => sp.stammSetze(211000003, { ziel: z }));
+  assert.deepStrictEqual(sp.zielVerlauf(211000003).map(z => z.ziel), ["E", "D", "C"]);
+  sp.stopp();
+});
+
+test("ein Zielwechsel im selben Schreibtakt geht nicht verloren", () => {
+  // Der Puffer haelt je Schiff nur die juengste Meldung. Ohne eigene
+  // Behandlung saehe stammSetze() den mittleren Wechsel nie - der Verlauf
+  // haette ein Loch, und zwar ein unauffaelliges.
+  const sp = neu();
+  sp.merkeStamm({ mmsi: 211000011, name: "TAKT", ziel: "DEHAM", seen: Date.now() });
+  sp.merkeStamm({ mmsi: 211000011, name: "TAKT", ziel: "NLRTM", seen: Date.now() });
+  sp.merkeStamm({ mmsi: 211000011, name: "TAKT", ziel: "DEBRV", seen: Date.now() });
+  assert.strictEqual(sp.schreibeStamm(), 1, "geschrieben wird trotzdem nur einmal");
+  assert.deepStrictEqual(sp.zielVerlauf(211000011).map(z => z.ziel),
+    ["DEBRV", "NLRTM", "DEHAM"]);
+  assert.strictEqual(sp.stammHole(211000011).ziel, "DEBRV");
+
+  // Eine Wiederholung desselben Ziels legt keinen zweiten Eintrag an.
+  sp.merkeStamm({ mmsi: 211000012, ziel: "DKCPH", seen: Date.now() });
+  sp.merkeStamm({ mmsi: 211000012, ziel: "DKCPH", seen: Date.now() });
+  sp.schreibeStamm();
+  assert.strictEqual(sp.zielVerlauf(211000012).length, 1);
   sp.stopp();
 });

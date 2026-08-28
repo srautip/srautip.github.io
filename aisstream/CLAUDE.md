@@ -488,15 +488,48 @@ diese Datei:
 `reiseInfo()` liefert Text und Länder **in einem Durchlauf**: Zweimal zu
 zerlegen wäre zweimal dieselbe Falle, und die beiden könnten auseinanderlaufen.
 
+#### Vergangene Ziele
+
+```
+Ziel              Moss → Hamburg (NOMSS>DEHAM)
+Länder            🇳🇴 Norwegen, 🇩🇪 Deutschland
+Vergangene Ziele  🇳🇱 Rotterdam, 🇩🇪 Hamburg
+```
+
+Das AIS-Zielfeld trägt immer nur den aktuellen Stand. Den Verlauf führt der
+**Proxy** (`ziel_verlauf`, siehe `aisproxy/CLAUDE.md`) — er hört seit Wochen
+zu, der Browser erst seit dem Öffnen der Seite. Kurzform mit Flagge, ohne die
+Rohform: In einer Aufzählung von bis zu acht Einträgen wäre sie Ballast.
+
+- **Das aktuelle Ziel steht nicht noch einmal darunter.** Es ist im Verlauf
+  mit drin (der Proxy schreibt jeden Wechsel mit), gehört aber in seine
+  eigene Zeile darüber.
+- **Nicht über den Anreicherungs-Cache.** Der hält Treffer 30 Tage — richtig
+  für Baujahr und Werft, falsch für eine Liste, die mit jeder Reise wächst.
+  Geholt wird je Sitzung einmal, und nur für ein Schiff, das wirklich
+  geöffnet wird.
+- **Aber auch nicht doppelt.** Läuft die Registerabfrage, holt sie
+  `/v1/ship` ohnehin und bringt den Verlauf mit; `zielVerlaufHolen()` steht
+  deshalb **nach** `enrichShip()` in `openDetail()` und steigt aus, wenn dort
+  schon eine Abfrage läuft. Die Probe zählt beides: **eine** Abfrage beim
+  ersten Öffnen, und nach einem Neuladen mit Cachetreffer trotzdem wieder
+  eine — sonst fiele der Verlauf still aus.
+
+`reiseZerlege()` ist die eine Stelle, die eine Zielangabe zerlegt und
+auflöst; `reiseInfo()` (aktuelles Ziel) und `zielKurz()` (vergangene) bauen
+darauf auf. Zwei Zerleger hätten die BRAKE-Falle zweimal kennen müssen — und
+der zweite hätte sie irgendwann nicht mehr gekannt.
+
 Die Trennerliste kommt aus den Daten, nicht aus der Vorstellung: `<>`, `<=>`,
 `<-->`, `<->`, `><`, `>>`, `>`, `-`. **Längster Trenner zuerst** im regulären
 Ausdruck — sonst frisst `->` den Anfang von `<-->` und übrig bleibt
 „DEHAM<-". Der Bindestrich trennt nur, wenn **alle** Teile wie ein Code
 aussehen, sonst zerfiele „SPODSBJERG-TAARS".
 
-Gemessen in `scratchpad/reiseprobe.js` gegen einen echten Proxy, 12
-Prüfungen an drei Schiffen: `NOMSS>DEHAM` (Nachfrage beim Proxy), `BRAKE`
-(die Falle) und `DECUX-DEHGL-DECUX` (Bindestrich und ein Land dreimal).
+Gemessen in `scratchpad/reiseprobe.js` gegen einen echten Proxy, 21
+Prüfungen an drei Schiffen: `NOMSS>DEHAM` (Nachfrage beim Proxy, Länder,
+Verlauf), `BRAKE` (die Falle) und `DECUX-DEHGL-DECUX` (Bindestrich und ein
+Land dreimal).
 **Der Code im Test darf nicht im Rückfall stehen** — sonst löst der Client
 ihn selbst auf, es geht keine Abfrage raus, und die Probe ist grün, ohne den
 Proxyweg berührt zu haben. Deshalb zählt sie die `/v1/ort`-Anfragen mit: eine

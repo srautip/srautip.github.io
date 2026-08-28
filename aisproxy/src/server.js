@@ -201,6 +201,11 @@ class Server {
     const antwort = Object.assign({ mmsi }, stamm || {});
     if (heiss) Object.assign(antwort, Zustand.alsStamm(heiss), Zustand.alsDraht(heiss, Date.now()));
     if (stamm && stamm.foto_datei) antwort.foto = "/v1/foto/" + stamm.foto_datei;
+    // Wohin das Schiff frueher unterwegs war. Das aktuelle Ziel steht hier
+    // mit drin - welches davon das aktuelle ist, weiss der Client aus dem
+    // Livestrom besser als der Verlauf, der nur bis zum letzten Wechsel reicht.
+    const verlauf = this.speicher.zielVerlauf(mmsi);
+    if (verlauf.length) antwort.zielVerlauf = verlauf;
     // Ehrlichkeit ueber den Registerstand: "noch nicht gefragt" und
     // "gefragt, nichts gefunden" sind zwei verschiedene Dinge.
     antwort.register = !stamm || !stamm.geprueft ? "offen"
