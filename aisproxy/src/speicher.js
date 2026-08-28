@@ -529,11 +529,19 @@ class Speicher {
     }
     const stamm = this.db.prepare(
       "SELECT COUNT(*) AS n, SUM(gefunden) AS treffer FROM schiff").get();
+    // Die Bilderzahl gehoert in den Bericht, weil sie das Einzige ist, was
+    // die Fotoarbeit DAUERHAFT festhaelt: Die Zaehler im Register leben im
+    // Prozess und stehen nach jedem Neustart auf null. Wer nach einem Update
+    // "0 Fotos" liest, soll daneben sehen, wie viele Bilder wirklich da sind.
+    const bilder = this.db.prepare(
+      "SELECT COUNT(*) AS n, SUM(CASE WHEN foto_quelle = 'eigen' THEN 1 ELSE 0 END) AS eigen " +
+      "FROM schiff WHERE foto_datei IS NOT NULL").get();
     return {
       tage: tage.length, tabellen: tage, punkte: zeilen,
       geschrieben: this.geschrieben, puffer: this.puffer.length,
       stammGeschrieben: this.stammGeschrieben, stammPuffer: this.stammPuffer.size,
-      stammEintraege: stamm.n, stammTreffer: stamm.treffer || 0
+      stammEintraege: stamm.n, stammTreffer: stamm.treffer || 0,
+      fotos: bilder.n, fotosEigen: bilder.eigen || 0
     };
   }
 }

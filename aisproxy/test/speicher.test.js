@@ -334,3 +334,18 @@ test("ein Schiff ohne IMO wird erst wieder faellig, wenn es einen Anlass gibt", 
   assert.deepStrictEqual(sp.fotoFaellig([211000005]), []);
   sp.stopp();
 });
+
+test("der Bericht nennt die Zahl der Bilder - die einzige dauerhafte", () => {
+  // Nach einem Update steht im Register "0 Laeufe, 0 Fotos": Die Zaehler
+  // leben im Prozess. Wer wissen will, ob die Fotoarbeit etwas gebracht hat,
+  // braucht die Zahl aus der Datenbank.
+  const sp = neu();
+  sp.stammSetze(1, { foto_datei: "1.jpg", foto_quelle: "wikidata" });
+  sp.stammSetze(2, { foto_datei: "2.jpg", foto_quelle: "eigen" });
+  sp.stammSetze(3, { foto_geprueft: Date.now(), foto_quelle: "nichts" });
+  const b = sp.bericht();
+  assert.strictEqual(b.fotos, 2, "zwei Schiffe haben ein Bild");
+  assert.strictEqual(b.fotosEigen, 1, "eines davon selbst beigesteuert");
+  assert.strictEqual(b.stammEintraege, 3);
+  sp.stopp();
+});

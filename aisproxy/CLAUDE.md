@@ -348,6 +348,16 @@ Die Regel dahinter ist dieselbe wie bei der stillen Kappung: **Ein Bericht,
 der Untaetigkeit und laufende Arbeit gleich aussehen laesst, ist schlimmer als
 gar keiner** - er laedt dazu ein, an einer funktionierenden Anlage zu suchen.
 
+**Und derselbe Fehler ein drittes Mal, am 28. Aug. 2026:** Nach einem Update
+meldete `update.sh` "Register: 0 Laeufe, 0 Fotos, 0 offen". Der Container war
+zwanzig Sekunden alt, der erste Registerlauf startet nach neunzig. Die Zahl
+war richtig und die Frage falsch. Das Skript liest jetzt die **dauerhafte**
+Zahl aus der Datenbank - `speicher.bericht()` nennt `fotos` und `fotosEigen` -
+und schreibt beim frischen Prozess ausdruecklich hin, dass noch kein Lauf
+stattgefunden hat. Merksatz fuer den naechsten Bericht: **Zaehler im Prozess
+taugen nicht als Antwort auf "hat es funktioniert?"** - dafuer zaehlt nur,
+was auf der Platte steht.
+
 ### Eigene Bilder: der einzige Weg mit Trefferquote 1
 
 `POST /v1/foto/<mmsi>`, der reine Bildinhalt im Rumpf. Der Client bietet ihn
