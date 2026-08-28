@@ -431,18 +431,52 @@ nichts übrig.
   und „DENOK" als „Nordkirchen" auszuschreiben, wo auf der Leitung der
   Nord-Ostsee-Kanal gemeint ist, wäre schlechter als der rohe Code.
 
+#### Die Länder stehen in einer eigenen Zeile
+
+```
+Ziel      Moss → Hamburg (NOMSS>DEHAM)
+Länder    🇳🇴 Norwegen, 🇩🇪 Deutschland
+```
+
+**Das Land steckt schon im Code** — ein UN/LOCODE beginnt mit dem
+ISO-3166-Ländercode. Es braucht dafür also weder eine zweite Abfrage beim
+Proxy noch eine zweite Tabelle: Die Namen stehen bereits in `MID_DATA`, das
+der Client für die Flaggenstaaten der MMSI ohnehin mitführt.
+
+Drei Entscheidungen, jede mit einem Grund:
+
+- **Eigene Zeile, nicht hinter jedem Ort.** Eine Fahrt `DECUX-DEHGL-DECUX`
+  bekäme sonst dreimal „(Deutschland)" in dieselbe Zeile, und die Zielzeile
+  trägt mit der Rohform schon genug. Je Land **einmal**, in der Reihenfolge
+  der Reise.
+- **Nur zu Codes, die wirklich in der Ortstabelle stehen.** „BRAKE" sieht wie
+  ein Code aus und wäre als BR+AKE **Brasilien** — dieselbe Falle wie beim
+  Ausschreiben, nur unauffälliger: Der Ortsname bliebe roh stehen, und allein
+  das Land daneben wäre falsch. Die Gegenprobe mit aufgehobener Beschränkung
+  liefert genau das (`Ziel: BRAKE`, `Länder: 🇧🇷 Brasilien`).
+- **18 Länder von Hand nachgetragen** (`LAND_EXTRA`). 214 der 232 Länder mit
+  Seehäfen haben eine MID; die übrigen sind Nebengebiete, die unter der
+  Flagge des Mutterlandes fahren (Åland, Spitzbergen, Isle of Man) oder gar
+  keine haben (Antarktis, `XZ` = Anlagen in internationalen Gewässern, dort
+  bleibt die Flagge leer). Gemessen betrifft das **110 von 17 596 Häfen**,
+  also 0,6 %.
+
+`reiseInfo()` liefert Text und Länder **in einem Durchlauf**: Zweimal zu
+zerlegen wäre zweimal dieselbe Falle, und die beiden könnten auseinanderlaufen.
+
 Die Trennerliste kommt aus den Daten, nicht aus der Vorstellung: `<>`, `<=>`,
 `<-->`, `<->`, `><`, `>>`, `>`, `-`. **Längster Trenner zuerst** im regulären
 Ausdruck — sonst frisst `->` den Anfang von `<-->` und übrig bleibt
 „DEHAM<-". Der Bindestrich trennt nur, wenn **alle** Teile wie ein Code
 aussehen, sonst zerfiele „SPODSBJERG-TAARS".
 
-Gemessen in `scratchpad/reiseprobe.js` gegen einen echten Proxy: Die Tabelle
-zeigt `NOMSS>DEHAM` unverändert, im Detailfenster steht „Moss → Hamburg
-(NOMSS>DEHAM)". **Der Code im Test darf nicht im Rückfall stehen** — sonst
-löst der Client ihn selbst auf, es geht keine Abfrage raus, und die Probe ist
-grün, ohne den Proxyweg berührt zu haben. Deshalb zählt sie die
-`/v1/ort`-Anfragen mit: eine beim ersten Mal, **null** nach dem Neuladen.
+Gemessen in `scratchpad/reiseprobe.js` gegen einen echten Proxy, 12
+Prüfungen an drei Schiffen: `NOMSS>DEHAM` (Nachfrage beim Proxy), `BRAKE`
+(die Falle) und `DECUX-DEHGL-DECUX` (Bindestrich und ein Land dreimal).
+**Der Code im Test darf nicht im Rückfall stehen** — sonst löst der Client
+ihn selbst auf, es geht keine Abfrage raus, und die Probe ist grün, ohne den
+Proxyweg berührt zu haben. Deshalb zählt sie die `/v1/ort`-Anfragen mit: eine
+beim ersten Mal, **null** nach dem Neuladen.
 
 ### Das Drahtformat muss auf beiden Seiten dasselbe sein
 
