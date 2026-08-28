@@ -1731,15 +1731,72 @@ das CDN trägt also, solange es CORS schickt. `?cesium=` ist der Haken für die
 Probe: In der Sandbox kommt Chromium per HTTPS nirgends hin, dort liegt ein
 ausgepacktes Cesium unter demselben Ursprung.
 
-### Kein Cesium ion, keine zweite Anmeldung
+### Der Untergrund: vier Stufen, ein Token
 
-Der Viewer wird ohne ion gebaut: `baseLayer` ist ein
-`UrlTemplateImageryProvider` auf OSM-Rasterkacheln, `baseLayerPicker` und
-`geocoder` sind aus — **beide brauchen ion**. Sonst liefe die Seite in eine
-Tokenwarnung, obwohl niemand ion benutzt.
+Der Viewer wird **ohne** ion-Widgets gebaut: `baseLayerPicker` und `geocoder`
+sind aus — **beide brauchen ion** und liefen sonst in eine Tokenwarnung. Die
+Basisebene wird selbst gesetzt.
 
-Mit Google-Schlüssel kommt `createGooglePhotorealistic3DTileset()` dazu und
-`globe.show = false` — sonst sticht der Globus durch die Gebäude.
+| Stufe | Woher | Braucht |
+|---|---|---|
+| `osm` | OSM-Rasterkacheln, flach | nichts |
+| `luftbild` | `createWorldImageryAsync()` + `createWorldTerrainAsync()` | ion |
+| `gebaeude` | wie oben + `createOsmBuildingsAsync()` | ion |
+| `foto` | `createGooglePhotorealistic3DTileset()` | ion **oder** Google |
+
+**Der Fund, auf dem das steht** — im ausgelieferten Cesium 1.123.1 selbst
+nachgelesen, nicht erinnert:
+
+```js
+async function NSt(e, t) {        // createGooglePhotorealistic3DTileset
+  e = y(e, sS.defaultApiKey);     // Schlüssel ?? GoogleMaps.defaultApiKey
+  if (!l(e)) return kSt(t);       // KEIN Schlüssel -> ion-Asset 2275207
+  ...
+}
+```
+
+**Ohne Google-Schlüssel nimmt dieselbe Funktion von selbst das ion-Asset
+2275207.** Für einen ion-Token braucht es also keine zweite Kette, nur
+`Ion.defaultAccessToken` — und den Google-Schlüssel *nicht* zu setzen. Die
+weiteren Assets sind ebenso im Bundle nachgezählt: Luftbild **2**, Gelände
+**1**, OSM-Gebäude **96188**.
+
+In der Stufe `foto` steht `globe.show = false` — der Globus stäche sonst durch
+die Gebäude. `untergrundAbraeumen()` nimmt das zurück, entfernt die Tilesets
+aus `scene.primitives` und setzt Gelände und Bildebene zurück; **sonst wüchse
+der Speicher mit jedem Umschalten** (die Probe zählt Primitive und Bildebenen
+vor und nach zwei Wechseln).
+
+#### Der Rückfall muss die Ursache mitnehmen
+
+```
+foto --(kein Zugriff)--> gebaeude --> luftbild --> osm
+```
+
+Erste Fassung ließ jede Stufe ihren eigenen Text schreiben. Am Ende stand
+schlicht **„OSM-Karte"**, und warum das photorealistische Bild fehlte, sah
+niemand mehr — gemessen in der Probe, nicht vermutet. `untergrundSetzen()`
+trägt den Grund deshalb als dritten Parameter durch die ganze Kette, und eine
+**erzwungene** Rückstufung wird nicht als neue Vorgabe gemerkt.
+
+#### Cesium reicht nur den Statuscode durch
+
+Die ion-Schnittstelle unterscheidet ihre Fehler sauber (an `api.cesium.com`
+gemessen: ohne Token `InvalidCredentials`, mit falschem `INVALID_TOKEN`) —
+**aber davon kommt im Client nichts an.** Cesium wirft
+„Request has failed. Status Code: 401", der Klartext steckt im Rumpf. `ursache()`
+entscheidet deshalb am Code, und der Unterschied zwischen „kein Token" und
+„Token ungültig" ist genau die Frage, ob ein Feld ausgefüllt ist:
+
+| Code | Text |
+|---|---|
+| 401, Feld leer | kein ion-Token |
+| 401, Feld gefüllt | ion-Token ungültig |
+| 403 | ion kennt den Token, aber nicht für dieses Asset |
+| 404 | Asset nicht gefunden |
+
+**Beide Zugänge stehen im Browser, nicht im Quelltext** (`aisstream_ion_token`,
+`aisstream_google_key`) — anders als das Proxy-Token, das nichts kostet.
 
 ### Die dritte Dimension muss etwas bedeuten
 
@@ -1764,7 +1821,7 @@ beim Richtungspfeil und beim Tallinn-Foto: **ansehen, nicht ableiten.**
 | **Die Kopfzeile** hatte einen Verlauf nach Dunkel — über einer hellen Luftaufnahme war die Unterzeile unlesbar. Jetzt ein Kasten, der auf jedem Grund trägt |
 | **Die Kamera** stand genau von Norden: Die Wand war von der Kante gesehen ein Strich, und die dritte Dimension zeigte sich gar nicht. Jetzt −35° Kurs, −28° Neigung |
 
-### Gemessen in `scratchpad/drei.js` (30 Prüfungen)
+### Gemessen in `scratchpad/drei.js` (37 Prüfungen)
 
 Gegen einen **echten** aisproxy, dessen Datenbank vorher mit **seiner eigenen
 `Speicher`-Klasse** gefüllt wird — ein nachgebauter Endpunkt hätte genau die
@@ -1794,10 +1851,14 @@ der Datenbank allein genügt ihm nicht, es braucht einen echten Strom.
 
 ### Was hier NICHT geprüft werden kann
 
-- **Die photorealistischen Kacheln.** Sie brauchen einen Google-Schlüssel;
-  ohne ihn läuft die Seite auf OSM-Rasterkacheln weiter und sagt sichtbar,
-  warum. Gemessen: `tile.googleapis.com` antwortet ohne Schlüssel **403**,
-  mit ungültigem **400**.
+- **Der Erfolgsfall der photorealistischen Kacheln.** Er braucht ein echtes
+  ion-Token oder einen Google-Schlüssel. Gemessen ist, dass beide Wege einen
+  brauchen: `tile.googleapis.com` antwortet ohne Schlüssel **403**, mit
+  ungültigem **400**; `api.cesium.com` ohne Token **401 InvalidCredentials**,
+  mit falschem **401 INVALID_TOKEN**.
+- **Der FEHLERweg dagegen ist hier vollständig gemessen:** Mit einem
+  absichtlich falschen ion-Token sagt die Seite „ion-Token ungültig →
+  OSM-Karte", fällt sichtbar zurück, und das Bild steht weiter (945 Farben).
 - **Die Leistung auf echtem Gerät.** Chromium rendert hier per Software
   (SwiftShader); jede Bildrate von hier wäre eine Zahl über die Sandbox. Die
   Anzeige dafür ist eingebaut (Bilder/s, Kacheln, Heap) — `performance.memory`

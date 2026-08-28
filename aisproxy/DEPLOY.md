@@ -327,15 +327,26 @@ und das ist richtig so.
 über einem Hafen (CesiumJS). **Der Proxy ist daran nur mit `/v1/track` und
 `/v1/ship` beteiligt** — beides gibt es längst, es gibt nichts einzurichten.
 
-Ohne Schlüssel läuft sie auf OSM-Rasterkacheln. Photorealistische Gebäude
-brauchen einen Google-Maps-Schlüssel, und **der kostet Geld**:
+Der Untergrund hat vier Stufen, wählbar unter ⚙:
 
-1. Schlüssel im Cloud Console anlegen, **Referrer-Beschränkung** auf
-   `https://srautip.github.io/*` — die einzige Sperre, die bei einem
-   Schlüssel in einer öffentlichen Seite wirklich trägt.
-2. **Kontingentdeckel setzen, bevor er das erste Mal läuft.**
-3. Auf der Seite unter ⚙ eintragen. Er liegt danach im Browser
-   (`aisstream_google_key`), **nicht** im Quelltext.
+| Stufe | Braucht |
+|---|---|
+| OSM-Karte | nichts |
+| Luftbild + Gelände | ion-Token |
+| Luftbild + Gelände + Gebäude | ion-Token |
+| Photorealistisch | ion-Token **oder** Google-Schlüssel |
+
+**Ein Cesium-ion-Token genügt für alle vier.** Die photorealistischen Kacheln
+laufen dann über das ion-Asset 2275207 — Cesium schaltet ohne
+Google-Schlüssel von selbst dorthin. Trägt das Konto dieses Asset nicht,
+fällt die Seite **sichtbar** eine Stufe tiefer, mit Angabe des Grundes.
+
+1. Token bzw. Schlüssel unter ⚙ eintragen. Er liegt danach im Browser
+   (`aisstream_ion_token` / `aisstream_google_key`), **nicht** im Quelltext —
+   beide rechnen nach Nutzung ab.
+2. Bei Google zusätzlich **Referrer-Beschränkung** auf
+   `https://srautip.github.io/*` und einen **Kontingentdeckel**, bevor er das
+   erste Mal läuft.
 
 **Der Proxy darf diese Kacheln nicht zwischenspeichern.** Aus Googles
 Richtlinie: *„you must not pre-fetch, index, store, or cache any Content."*
