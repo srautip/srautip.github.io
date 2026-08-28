@@ -99,15 +99,25 @@
     <option value="flach">flach auf dem Wasser</option>
   </select>
 
-  <h2 style="margin-top:.9rem">Photorealistische Kacheln</h2>
-  <div id="keyZustand" class="zustand warn">kein Schlüssel</div>
-  <label for="googleKey">Google-Maps-Schlüssel</label>
+  <h2 style="margin-top:.9rem">Untergrund</h2>
+  <select id="untergrund">
+    <option value="osm">OSM-Karte — ohne Schlüssel</option>
+    <option value="luftbild">Luftbild + Gelände — ion</option>
+    <option value="gebaeude">Luftbild + Gelände + Gebäude — ion</option>
+    <option value="foto">Photorealistisch — ion oder Google</option>
+  </select>
+  <div id="keyZustand" class="zustand warn" style="margin-top:.45rem">kein Token</div>
+
+  <label for="ionToken">Cesium-ion-Token</label>
+  <input id="ionToken" type="password" autocomplete="off" spellcheck="false"
+         placeholder="eyJhbGciOi…">
+  <label for="googleKey">Google-Maps-Schlüssel (falls vorhanden)</label>
   <input id="googleKey" type="password" autocomplete="off" spellcheck="false"
          placeholder="AIza…">
   <button class="knopf" id="keyUebernehmen" style="margin-top:.5rem">Übernehmen</button>
-  <p>Kostet Geld. Vorher im Cloud Console eine <b>Referrer-Beschränkung</b> auf
-     diese Seite setzen und einen <b>Kontingentdeckel</b> — der Schlüssel steht
-     danach im Browser, nicht im Quelltext.</p>
+  <p>Beides kostet nach Nutzung Geld und steht deshalb <b>im Browser, nicht im
+     Quelltext</b>. Ein Google-Schlüssel hat Vorrang; ohne ihn läuft der
+     photorealistische Weg über ion (Asset 2275207).</p>
 
   <div id="werte"></div>
 </div>
@@ -167,6 +177,8 @@
     tafelKnopf: document.getElementById("tafelKnopf"),
     hoehenModus: document.getElementById("hoehenModus"),
     googleKey: document.getElementById("googleKey"),
+    ionToken: document.getElementById("ionToken"),
+    untergrund: document.getElementById("untergrund"),
     keyUebernehmen: document.getElementById("keyUebernehmen"),
     keyZustand: document.getElementById("keyZustand"),
     werte: document.getElementById("werte"),
@@ -276,7 +288,7 @@
   // --- Aufbau -----------------------------------------------------------
   var viewer = null, Cesium = null, spurPunkte = [], schiff = null;
   var bandEntity = null, wandEntity = null, bodenEntity = null, schiffEntity = null;
-  var googleTileset = null;
+  var googleTileset = null, bauTileset = null;
 
   function farbeFuerTyp(typ) {
     // Dieselben Kategoriefarben wie die Karte im Hauptclient - ein Schiff
@@ -296,14 +308,8 @@
     // Kein Cesium ion: Das waere ein ZWEITER Schluessel neben dem von Google.
     // Ohne eigene baseLayer griffe der Viewer auf ion-Bilder zu und liefe in
     // eine Tokenwarnung.
-    var osm = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
-      url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      maximumLevel: 19,
-      credit: new Cesium.Credit('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende', true)
-    }));
-
     viewer = new Cesium.Viewer("cesium", {
-      baseLayer: osm,
+      baseLayer: osmEbene(),
       baseLayerPicker: false,   // braucht ion
       geocoder: false,          // braucht ion
       homeButton: false,
@@ -461,29 +467,154 @@
     el.keyZustand.textContent = text;
   }
 
-  function googleAn(key) {
-    if (!key) { keyZustand("warn", "kein Schlüssel"); return Promise.resolve(false); }
+  // Der Weg zum Untergrund. Vier Stufen, und der Rueckfall ist SICHTBAR:
+  // Eine stille Rueckstufung saehe aus wie ein kaputtes Asset.
+  //
+  //   foto --(kein Zugriff)--> gebaeude --> luftbild --> osm
+  //
+  // Der Fund, der das hier traegt: createGooglePhotorealistic3DTileset()
+  // nimmt ohne Google-Schluessel von selbst das ion-Asset 2275207 (im
+  // ausgelieferten Cesium 1.123.1 nachgelesen: `if (!l(e)) return kSt(t)`).
+  // Es braucht also KEINE zweite Kette fuer ion, nur Ion.defaultAccessToken.
+  var STUFEN = ["foto", "gebaeude", "luftbild", "osm"];
+
+  // Alles, was eine Stufe angelegt hat, muss sie auch wieder hergeben -
+  // sonst wuechse der Speicher mit jedem Umschalten.
+  function untergrundAbraeumen() {
+    if (googleTileset) {
+      try { viewer.scene.primitives.remove(googleTileset); } catch (e) {}
+      googleTileset = null;
+    }
+    if (bauTileset) {
+      try { viewer.scene.primitives.remove(bauTileset); } catch (e) {}
+      bauTileset = null;
+    }
+    viewer.scene.globe.show = true;
+    viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+    viewer.imageryLayers.removeAll();
+    viewer.imageryLayers.add(osmEbene());
+  }
+
+  function osmEbene() {
+    return new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
+      url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      maximumLevel: 19,
+      credit: new Cesium.Credit('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende', true)
+    }));
+  }
+
+  // Gegen den Speicher auf dem iPad. createGooglePhotorealistic3DTileset
+  // setzt intern 1 536 MB Vorrat und 1 024 MB Ueberlauf - auf einem aelteren
+  // Geraet der sichere Weg zum weggeraeumten Tab.
+  function kachelRiegel() {
+    return { maximumScreenSpaceError: 24,
+             cacheBytes: 256 * 1024 * 1024,
+             maximumCacheOverflowBytes: 128 * 1024 * 1024 };
+  }
+
+  // Aus einem Cesium-Fehler die Ursache in Klartext. Die ion-Schnittstelle
+  // unterscheidet sauber, und genau das gehoert dem Nutzer gesagt:
+  // "Token ungueltig" ist etwas anderes als "kennt dich, aber nicht dieses
+  // Asset" - und beides etwas anderes als "kein Token".
+  function ursache(e) {
+    var t = String((e && (e.message || e.toString())) || "");
+    // Cesium reicht bei einem Kachelfehler NUR den Statuscode durch
+    // ("Request has failed. Status Code: 401") - der Klartext von ion
+    // ("INVALID_TOKEN") steht im Rumpf, den man hier nicht mehr sieht.
+    // Gemessen an api.cesium.com: 401 ohne oder mit falschem Token, und der
+    // Unterschied dazwischen ist genau die Frage, ob einer eingetragen ist.
+    var code = (e && e.statusCode) || Number((t.match(/Status Code:\s*(\d+)/) || [])[1]) || 0;
+    var hatIon = !!(el.ionToken.value || "").trim();
+    if (code === 401) return hatIon ? "ion-Token ungültig" : "kein ion-Token";
+    if (code === 403) return "ion kennt den Token, aber nicht für dieses Asset";
+    if (code === 404) return "Asset nicht gefunden";
+    if (/INVALID_TOKEN|Invalid access token/i.test(t)) return "ion-Token ungültig";
+    if (/InvalidCredentials|No authorization token/i.test(t)) return "kein ion-Token";
+    return (code ? "HTTP " + code + ": " : "") + t.slice(0, 70) || "unbekannter Fehler";
+  }
+
+  function stufeName(stufe) {
+    var o = el.untergrund.querySelector('option[value="' + stufe + '"]');
+    return o ? o.textContent.split(" —")[0] : stufe;
+  }
+
+  function stufeBauen(stufe) {
+    if (stufe === "osm") {
+      untergrundAbraeumen();
+      return Promise.resolve();
+    }
+    if (stufe === "foto") {
+      untergrundAbraeumen();
+      // Mit Google-Schluessel geht es direkt zu Google, ohne ueber ion.
+      var gk = (el.googleKey.value || "").trim();
+      Cesium.GoogleMaps.defaultApiKey = gk || undefined;
+      return Cesium.createGooglePhotorealistic3DTileset(undefined, kachelRiegel())
+        .then(function (ts) {
+          googleTileset = viewer.scene.primitives.add(ts);
+          // Der Globus stäche sonst durch die Gebäude.
+          viewer.scene.globe.show = false;
+        });
+    }
+    // luftbild und gebaeude teilen sich Bild und Gelaende.
+    untergrundAbraeumen();
+    return Promise.all([
+      Cesium.createWorldImageryAsync(),
+      Cesium.createWorldTerrainAsync()
+    ]).then(function (beides) {
+      viewer.imageryLayers.removeAll();
+      viewer.imageryLayers.add(new Cesium.ImageryLayer(beides[0]));
+      viewer.terrainProvider = beides[1];
+      if (stufe !== "gebaeude") return;
+      return Cesium.createOsmBuildingsAsync(kachelRiegel()).then(function (ts) {
+        bauTileset = viewer.scene.primitives.add(ts);
+      });
+    });
+  }
+
+  // Baut die gewuenschte Stufe und faellt sichtbar zurueck, wenn sie nicht
+  // traegt. `tiefer` verhindert, dass ein Fehler in osm eine Schleife dreht,
+  // `grundVorher` traegt die URSACHE durch die ganze Kette.
+  //
+  // Ohne diesen dritten Parameter ueberschrieb die zuletzt gelungene Stufe
+  // die Begruendung: Am Ende stand "OSM-Karte", und warum das photorealistische
+  // Bild fehlte, sah niemand mehr - gemessen in der Probe, nicht vermutet.
+  function untergrundSetzen(stufe, tiefer, grundVorher) {
+    if (!viewer) return Promise.resolve(false);
+    var ion = (el.ionToken.value || "").trim();
+    var google = (el.googleKey.value || "").trim();
+    Cesium.Ion.defaultAccessToken = ion || "";
+
+    if (stufe !== "osm" && !ion && !google) {
+      keyZustand("warn", "kein Token — OSM-Karte");
+      return stufeBauen("osm").then(function () {
+        el.untergrund.value = "osm";
+        viewer.scene.requestRender();
+        return false;
+      });
+    }
     keyZustand("warn", "wird geprüft…");
-    Cesium.GoogleMaps.defaultApiKey = key;
-    return Cesium.createGooglePhotorealistic3DTileset({
-      // Gegen den Speicher auf dem iPad: groebere Kacheln, kleinerer Vorrat.
-      maximumScreenSpaceError: 24,
-      cacheBytes: 256 * 1024 * 1024,
-      maximumCacheOverflowBytes: 128 * 1024 * 1024
-    }).then(function (ts) {
-      googleTileset = viewer.scene.primitives.add(ts);
-      // Der Globus wuerde sonst durch die Gebaeude stechen.
-      viewer.scene.globe.show = false;
-      keyZustand("gut", "trägt");
-      setze("aisstream_google_key", key);
+    return stufeBauen(stufe).then(function () {
+      el.untergrund.value = stufe;
+      if (grundVorher) {
+        // Angekommen, aber tiefer als gewollt: Der Grund bleibt stehen.
+        keyZustand("warn", grundVorher + " → " + stufeName(stufe));
+      } else {
+        keyZustand("gut", stufe === "osm" ? "OSM-Karte" : "trägt: " + stufeName(stufe));
+      }
+      // Gemerkt wird nur eine Stufe, die der Nutzer auch gewaehlt hat - eine
+      // erzwungene Rueckstufung soll nicht zur neuen Vorgabe werden.
+      if (!grundVorher) setze("aisstream_3d_untergrund", stufe);
       viewer.scene.requestRender();
       return true;
     }).catch(function (e) {
-      keyZustand("schlecht", "abgelehnt");
-      el.werte.insertAdjacentHTML("beforeend",
-        '<div style="margin-top:.4rem;color:#ff9d9d">Google: ' +
-        String(e && e.message || e).slice(0, 160) + "</div>");
-      return false;
+      var naechste = STUFEN[STUFEN.indexOf(stufe) + 1];
+      var grund = grundVorher || ursache(e);
+      if (!naechste || tiefer > 3) {
+        keyZustand("schlecht", grund);
+        return false;
+      }
+      keyZustand("schlecht", grund + " → " + stufeName(naechste));
+      return untergrundSetzen(naechste, (tiefer || 0) + 1, grund);
     });
   }
 
@@ -548,9 +679,14 @@
     kameraAufSpur();
     meldungWeg();
 
-    var key = hole("aisstream_google_key") || "";
-    if (key) { el.googleKey.value = key; googleAn(key); }
-    else keyZustand("warn", "kein Schlüssel");
+    el.ionToken.value = hole("aisstream_ion_token") || "";
+    el.googleKey.value = hole("aisstream_google_key") || "";
+    var hatToken = !!(el.ionToken.value || el.googleKey.value);
+    // Vorgabe: das Beste, was der vorhandene Token hergeben kann.
+    var stufe = hole("aisstream_3d_untergrund") || (hatToken ? "foto" : "osm");
+    el.untergrund.value = stufe;
+    if (hatToken || stufe !== "osm") untergrundSetzen(stufe, 0);
+    else keyZustand("warn", "kein Token — OSM-Karte");
   }).catch(function (e) {
     meldung("Das ging schief", String(e && e.message || e));
   });
@@ -559,14 +695,13 @@
     zeichneSpur();
     if (viewer) viewer.scene.requestRender();
   });
+  el.untergrund.addEventListener("change", function () {
+    untergrundSetzen(el.untergrund.value, 0);
+  });
   el.keyUebernehmen.addEventListener("click", function () {
-    var k = el.googleKey.value.trim();
-    if (!k) {
-      setze("aisstream_google_key", "");
-      keyZustand("warn", "kein Schlüssel");
-      return;
-    }
-    googleAn(k);
+    setze("aisstream_ion_token", el.ionToken.value.trim());
+    setze("aisstream_google_key", el.googleKey.value.trim());
+    untergrundSetzen(el.untergrund.value, 0);
   });
 })();
 </script>
