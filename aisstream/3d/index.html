@@ -711,9 +711,12 @@
       var ort = schiffEntity.position.getValue(uhr.currentTime);
       if (ort) {
         kursSchritt(eigenKurs, spurPunkte, ort, tms, wandDt);
-        // EINE Hoehenabfrage je Bild, an der eigenen Position - die Nachbarn
-        // liegen hoechstens UMGEBUNG_RADIUS entfernt auf demselben Wasser.
-        // Je Schiff einzeln zu fragen waere hundertmal dieselbe Zahl.
+        // EINE Hoehenabfrage je Bild, an der eigenen Position, fuer ALLE
+        // Ruempfe. Je Schiff einzeln zu fragen waere vierhundertmal fast
+        // dieselbe Zahl - das Geoid aendert sich in der Deutschen Bucht um
+        // rund einen Meter je zehn Kilometer. Am Rand des Bereichs (bis
+        // 30 km) sind das wenige Meter, und ein Schiff, das 30 km entfernt
+        // ist, misst am Horizont ohnehin Bruchteile eines Grades.
         try {
           flaecheJetzt = flaecheHoehe(Cesium.Cartographic.fromCartesian(ort));
         } catch (e) {}
@@ -786,18 +789,38 @@
 
   // --- Die Umgebung: die anderen Schiffe, ohne Spurlinien ---------------
   //
-  // Aus der Bruecke heraus ist ein leerer Hafen falsch. Gezeigt werden die
-  // Schiffe, die dem eigenen waehrend des Zeitfensters wirklich nahe kommen -
-  // jedes als Rumpf in seinen eigenen Massen, mit seinem eigenen Kurs ueber
-  // Grund. KEINE Spurlinien: 130 Linien uebereinander waeren ein Knaeuel,
-  // und die eine Spur, um die es geht, ginge darin unter.
-  var UMGEBUNG_RAND = 3000;      // Meter Rand um die eigene Spur fuer die Abfrage
-  var UMGEBUNG_RADIUS = 5000;    // Meter: so nah muss ein Schiff einmal kommen
-  var UMGEBUNG_MAX = 150;        // Riegel, kein Regelfall - siehe unten
+  // Aus der Bruecke heraus ist ein leerer Hafen falsch. Gezeigt wird, was im
+  // SICHTBAREN BEREICH liegt - jedes Schiff als Rumpf in seinen eigenen
+  // Massen, mit seinem eigenen Kurs ueber Grund. KEINE Spurlinien: hunderte
+  // Linien uebereinander waeren ein Knaeuel, und die eine Spur, um die es
+  // geht, ginge darin unter.
+  //
+  // Hier stand einmal ein Korridorfilter: nur Schiffe, die dem eigenen
+  // einmal naeher als 5 km kommen. Gemeldet als "es wird zu viel
+  // weggefiltert", und zu Recht. Nachgemessen an einer echten Spur
+  // (Bremerhaven, 6 h, 1280x800): Die Kamera zeigt beim Oeffnen 24,7 x
+  // 23,4 km, abgefragt wurden aber nur 9 x 8 km - 171 Spuren liegen im Bild,
+  // 133 im Kasten, 121 blieben nach dem Filter uebrig. Der GROSSE Verlust war
+  // also der Abfragekasten, nicht der Radius.
+  //
+  // Die 5 km waren fuer die MITFAHRT gerechnet (ein 100-m-Schiff misst auf
+  // 5 km noch 1,1 Grad) und ungeprueft auf die UEBERSICHT uebertragen, wo
+  // ohnehin alles im Bild ist. Beides zusammen ist ersetzt: Der Bereich kommt
+  // aus der Kamera und wird beim Bewegen nachgezogen.
+  var UMGEBUNG_RAND = 3;         // KILOMETER Rand um die Spur - nur noch Rueckfall
+  var UMGEBUNG_MAX = 400;        // Riegel, sichtbar statt still
+  var UMGEBUNG_MAX_KM = 60;      // Kantenlaenge des Abfragekastens, hoechstens
+  var UMGEBUNG_DEHNUNG = 0.25;   // 25 % Rand, damit ein kleiner Schwenk nichts kostet
+  var UMGEBUNG_PAUSE = 3000;     // ms zwischen zwei Abfragen
   var UMGEBUNG_SCHRITT = 60;     // Sekunden, dasselbe Raster wie der Speicher
-  var UMGEBUNG_STAMM_GLEICH = 8; // gleichzeitige /v1/ship-Abrufe
+  var UMGEBUNG_STAMM_GLEICH = 12; // gleichzeitige /v1/ship-Abrufe
 
   var umgebung = [], umgebungAn = true, umgebungGeholt = false;
+  var umgebungKennt = {};        // MMSI -> true, auch fuer noch nicht gebaute
+  var umgebungBox = null;        // Vereinigung des schon Geholten
+  var umgebungLaeuft = false, umgebungZuletzt = 0, umgebungGefunden = 0;
+  var umgebungBereich = "", umgebungOhneMasse = 0, umgebungZahl = 0;
+  var umgebungGekappt = false;
   var umgebungStand = "", flaecheJetzt = 0;
   var hilfsN = null;
 
@@ -824,9 +847,76 @@
     return Cesium.Cartesian3.add(p, hilfsN, r);
   }
 
-  // Der Kasten um die eigene Spur, mit Rand. Die Abfrage kann nur ein
-  // Rechteck; der Korridor entsteht danach ueber die Annaeherung.
-  function spurBbox(rand) {
+  // --- Rahmen: rechnen, deckeln, vergleichen ---------------------------
+  // Grad je KILOMETER - der Name sagt die Einheit, und das ist hier kein
+  // Schmuck: Die erste Fassung teilte zusaetzlich durch 1000, die Tafel
+  // meldete daraufhin "0 × 0 km" und der Rueckfallkasten waere 27 Grad breit
+  // geworden. Von der Anzeige gefunden, nicht vom Lesen.
+  function gradProKm(la) {
+    return { la: 1 / 111.32,
+             lo: 1 / (111.32 * Math.max(0.2, Math.cos(la * Math.PI / 180))) };
+  }
+  function rahmenKm(k) {
+    var g = gradProKm((k.laMin + k.laMax) / 2);
+    return { y: (k.laMax - k.laMin) / g.la, x: (k.loMax - k.loMin) / g.lo };
+  }
+  function rahmenText(k) {
+    var m = rahmenKm(k);
+    return Math.round(m.x) + " × " + Math.round(m.y) + " km";
+  }
+  function rahmenAlsBbox(k) {
+    return [k.laMin, k.loMin, k.laMax, k.loMax]
+      .map(function (x) { return x.toFixed(5); }).join(",");
+  }
+  function rahmenEnthaelt(gross, klein) {
+    return !!gross && klein.laMin >= gross.laMin - 1e-9 && klein.laMax <= gross.laMax + 1e-9 &&
+           klein.loMin >= gross.loMin - 1e-9 && klein.loMax <= gross.loMax + 1e-9;
+  }
+  function rahmenVereinige(a, b) {
+    if (!a) return { laMin: b.laMin, loMin: b.loMin, laMax: b.laMax, loMax: b.loMax };
+    return { laMin: Math.min(a.laMin, b.laMin), loMin: Math.min(a.loMin, b.loMin),
+             laMax: Math.max(a.laMax, b.laMax), loMax: Math.max(a.loMax, b.loMax) };
+  }
+  function rahmenDehnen(k, anteil) {
+    var dy = (k.laMax - k.laMin) * anteil / 2, dx = (k.loMax - k.loMin) * anteil / 2;
+    return { laMin: k.laMin - dy, loMin: k.loMin - dx,
+             laMax: k.laMax + dy, loMax: k.loMax + dx };
+  }
+  // Auf UMGEBUNG_MAX_KM Kantenlaenge begrenzen. Wo der Deckel sitzt, ist die
+  // eigentliche Frage: Liegt die eigene Spur im Bild, wird um SIE zentriert -
+  // beschneiden muss man, sobald mehr als 60 km sichtbar sind, aber nicht
+  // ausgerechnet die Umgebung des Schiffs, um das es geht. Gemessen: Mit dem
+  // Rahmenmittelpunkt (Kamera blickt schraeg, die Mitte liegt weit voraus)
+  // fiel ein Nachbar 7 km neben der Spur heraus, waehrend einer 22 km weiter
+  // vorn hereinkam. Ist die Spur nicht im Bild - man hat weggeschwenkt -,
+  // gilt wieder der Rahmenmittelpunkt: Wer nach Hamburg schaut, will die
+  // Schiffe dort.
+  function rahmenDeckeln(k) {
+    var mLa = (k.laMin + k.laMax) / 2, mLo = (k.loMin + k.loMax) / 2;
+    var sm = spurMitte();
+    if (sm && sm.lat >= k.laMin && sm.lat <= k.laMax &&
+        sm.lon >= k.loMin && sm.lon <= k.loMax) {
+      mLa = sm.lat; mLo = sm.lon;
+    }
+    var g = gradProKm(mLa);
+    var hy = UMGEBUNG_MAX_KM * g.la / 2, hx = UMGEBUNG_MAX_KM * g.lo / 2;
+    var aus = { laMin: Math.max(k.laMin, mLa - hy), laMax: Math.min(k.laMax, mLa + hy),
+                loMin: Math.max(k.loMin, mLo - hx), loMax: Math.min(k.loMax, mLo + hx) };
+    // Merken, ob wirklich beschnitten wurde - die Tafel soll es sagen duerfen.
+    aus.beschnitten = aus.laMin > k.laMin + 1e-9 || aus.laMax < k.laMax - 1e-9 ||
+                      aus.loMin > k.loMin + 1e-9 || aus.loMax < k.loMax - 1e-9;
+    return aus;
+  }
+
+  function spurMitte() {
+    if (!spurPunkte.length) return null;
+    var r = spurRahmen(0);
+    return { lat: (r.laMin + r.laMax) / 2, lon: (r.loMin + r.loMax) / 2 };
+  }
+
+  // Der Kasten um die eigene Spur, mit Rand in KILOMETERN - nur noch der
+  // Rueckfall, wenn die Kamera kein Rechteck liefert.
+  function spurRahmen(randKm) {
     var laMin = 90, laMax = -90, loMin = 180, loMax = -180;
     for (var i = 0; i < spurPunkte.length; i++) {
       var p = spurPunkte[i];
@@ -835,17 +925,36 @@
       if (p.lon < loMin) loMin = p.lon;
       if (p.lon > loMax) loMax = p.lon;
     }
-    var mitte = (laMin + laMax) / 2;
-    var dLa = rand / 111320;
-    var dLo = rand / (111320 * Math.max(0.2, Math.cos(mitte * Math.PI / 180)));
-    return [laMin - dLa, loMin - dLo, laMax + dLa, loMax + dLo]
-      .map(function (x) { return x.toFixed(5); }).join(",");
+    var g = gradProKm((laMin + laMax) / 2);
+    return { laMin: laMin - randKm * g.la, loMin: loMin - randKm * g.lo,
+             laMax: laMax + randKm * g.la, loMax: loMax + randKm * g.lo };
   }
 
-  // Wie nah kommt ein Schiff der eigenen Spur - ZUR SELBEN ZEIT? Ein Schiff,
-  // das vier Stunden spaeter durch dieselbe Stelle faehrt, war nie in Sicht.
-  // Deshalb wird die eigene Position zum Zeitpunkt des fremden Stuetzpunkts
-  // interpoliert und nicht bloss der Abstand zweier Linien gemessen.
+  // Was die Kamera GERADE ZEIGT, gedeckelt. Der Deckel ist Pflicht, nicht
+  // Vorsicht: Gemessen liefert dieselbe Ansicht auf dem iPhone hochkant
+  // 197 x 422 km, weil der Horizont im Bild liegt (60 Grad Blickwinkel auf
+  // der langen Kante). In der Mitfahrt aus 50 m reicht der Blick ohnehin bis
+  // zum Horizont. Ohne Deckel fragte ein einziges Bild die halbe Nordsee ab.
+  function sichtRahmen() {
+    var r = null;
+    try { r = viewer && viewer.camera.computeViewRectangle(); } catch (e) {}
+    var gr = 180 / Math.PI;
+    var k = null;
+    if (r && isFinite(r.south) && isFinite(r.north)) {
+      k = { laMin: r.south * gr, loMin: r.west * gr,
+            laMax: r.north * gr, loMax: r.east * gr };
+      // Ueber den Datumswechsel liefert Cesium west > east. Hier waere jeder
+      // gerechnete Kasten Unsinn - dann lieber die Spur.
+      if (k.loMax <= k.loMin || k.laMax <= k.laMin) k = null;
+    }
+    if (!k) k = spurRahmen(UMGEBUNG_RAND);
+    return rahmenDeckeln(rahmenDehnen(k, UMGEBUNG_DEHNUNG));
+  }
+
+  // Wie nah kommt ein Schiff der eigenen Spur - ZUR SELBEN ZEIT? Das war
+  // einmal ein Filter und ist jetzt nur noch der SORTIERSCHLUESSEL: Greift
+  // der Riegel, sollen die nahen Schiffe uebrigbleiben. Wer im Bereich liegt,
+  // wird gezeigt, egal wie weit weg.
   function naechsteAnnaeherung(punkte) {
     var n = spurPunkte.length;
     if (n < 2) return Infinity;
@@ -867,7 +976,13 @@
   // heissen Zustand verlassen, seit er hier durchgefahren ist (gemessen 107
   // von 163). Ohne die Einzelabrufe bekaeme ein Drittel der Umgebung eine
   // erfundene Groesse - und in einem Hafen IST die Groesse das Bild.
-  function stammHolen(mmsis, bbox) {
+  // Gebaut wird RUNDE FUER RUNDE, nicht erst am Ende: Bei 400 Nachbarn
+  // braucht rund ein Drittel einen eigenen Abruf, und die letzte Runde
+  // duerfte nicht die erste aufhalten. Die alte Regel bleibt trotzdem -
+  // KEIN Kasten waechst nachtraeglich. Ein Schiff erscheint erst mit seinen
+  // echten Massen; es erscheint nur SPAETER, statt von 40 auf 300 m zu
+  // springen.
+  function stammHolenUndBauen(kand, bbox) {
     var karte = {};
     return fetch(mitToken(proxyBasis() + "/snapshot?bbox=" + bbox))
       .then(function (r) { return r.ok ? r.json() : null; })
@@ -875,18 +990,23 @@
       .then(function (sn) {
         var da = (sn && sn.schiffe) || [];
         for (var i = 0; i < da.length; i++) karte[da[i].mmsi] = da[i];
-        var fehlt = mmsis.filter(function (m) { return !karte[m]; });
+        var sofort = [], fehlt = [];
+        for (var j = 0; j < kand.length; j++) {
+          if (karte[kand[j].mmsi]) { kand[j].stamm = karte[kand[j].mmsi]; sofort.push(kand[j]); }
+          else fehlt.push(kand[j]);
+        }
+        if (sofort.length) bauUmgebung(sofort);
         var k = 0;
         function runde() {
-          if (k >= fehlt.length) return karte;
+          if (k >= fehlt.length) return;
           var teil = fehlt.slice(k, k + UMGEBUNG_STAMM_GLEICH);
           k += UMGEBUNG_STAMM_GLEICH;
-          return Promise.all(teil.map(function (m) {
-            return fetch(mitToken(proxyBasis() + "/ship/" + m))
+          return Promise.all(teil.map(function (n) {
+            return fetch(mitToken(proxyBasis() + "/ship/" + n.mmsi))
               .then(function (r) { return r.ok ? r.json() : null; })
-              .then(function (d) { if (d) karte[m] = d; })
-              .catch(function () {});
-          })).then(runde);
+              .then(function (d) { n.stamm = d || null; })
+              .catch(function () { n.stamm = null; });
+          })).then(function () { bauUmgebung(teil); }).then(runde);
         }
         return runde();
       });
@@ -949,17 +1069,41 @@
       });
       umgebung.push(n);
     }
-    umgebungStand = "<b>" + umgebung.length + "</b> Schiffe" +
-      (ohneMasse ? " (" + ohneMasse + " ohne Maße)" : "");
+    umgebungOhneMasse += ohneMasse;
+    standSchreiben();
     if (viewer) viewer.scene.requestRender();
   }
 
-  function holeUmgebung() {
+  // Eine Stelle fuer die Tafelzeile. Der Riegel wird AUSDRUECKLICH genannt -
+  // eine Zahl, die nicht erklaert, warum sie kleiner ist als erwartet, war
+  // genau das gemeldete Problem.
+  //
+  // "Noch im Aufbau" und "abgeriegelt" muessen dabei auseinandergehalten
+  // werden: Beim ersten Messen stand "119 von 271 im Bereich", obwohl der
+  // Riegel bei 400 gar nicht greifen konnte - es war schlicht der
+  // Ladefortschritt, und die Zeile behauptete einen Filter, den es nicht gab.
+  function standSchreiben() {
+    var t = "<b>" + umgebung.length + "</b>";
+    if (umgebungGekappt) t += " von " + umgebungGefunden + " im Bereich";
+    else if (umgebungZahl > umgebung.length) t += " von " + umgebungZahl + ", Maße werden geholt…";
+    else t += " Schiffe";
+    if (umgebungBereich) t += " · " + umgebungBereich;
+    if (umgebungOhneMasse) t += " (" + umgebungOhneMasse + " ohne Maße)";
+    umgebungStand = t;
+  }
+
+  // Holt EINEN Rahmen und arbeitet ihn ADDITIV ein. Wer schon da ist, bleibt
+  // stehen; wer aus dem Bild faehrt, wird NICHT entfernt - das waere wieder
+  // das Wegfiltern, um das es hier geht.
+  function holeUmgebung(rahmen) {
     if (!spurPunkte.length) return Promise.resolve();
-    var bbox = spurBbox(UMGEBUNG_RAND);
+    var bbox = rahmenAlsBbox(rahmen);
     var von = Math.floor(spurPunkte[0].t / 1000);
     var bis = Math.ceil(spurPunkte[spurPunkte.length - 1].t / 1000);
-    umgebungStand = "wird geholt…";
+    umgebungLaeuft = true;
+    umgebungZuletzt = Date.now();
+    umgebungBereich = rahmenText(rahmen) + (rahmen.beschnitten ? " (begrenzt)" : "");
+    if (!umgebung.length) umgebungStand = "wird geholt…";
     return fetch(mitToken(proxyBasis() + "/replay?bbox=" + bbox +
       "&von=" + von + "&bis=" + bis + "&schritt=" + UMGEBUNG_SCHRITT))
       .then(function (r) {
@@ -967,54 +1111,85 @@
         return r.json();
       })
       .then(function (d) {
+        // Erst hier merken: Ein gescheiterter Abruf darf nicht als abgedeckt
+        // gelten - derselbe Fehler, den snapshotBox im 2D-Client vermeidet.
+        umgebungBox = rahmenVereinige(umgebungBox, rahmen);
         var spuren = (d && d.spuren) || [];
         var kand = [];
         for (var i = 0; i < spuren.length; i++) {
-          if (String(spuren[i].mmsi) === MMSI) continue;
+          var m = spuren[i].mmsi;
+          if (String(m) === MMSI || umgebungKennt[m]) continue;
           var pts = punkteLesen(spuren[i]);
           if (pts.length < 2) continue;
-          var nah = naechsteAnnaeherung(pts);
-          if (!(nah <= UMGEBUNG_RADIUS)) continue;
-          kand.push({ mmsi: spuren[i].mmsi, punkte: pts, nah: nah });
+          kand.push({ mmsi: m, punkte: pts, nah: naechsteAnnaeherung(pts) });
         }
+        umgebungGefunden += kand.length;
+        // Naechste zuerst: Greift der Riegel, bleiben die nahen Schiffe.
         kand.sort(function (a, b) { return a.nah - b.nah; });
-        // Der Radius macht die Arbeit; die Obergrenze ist nur ein Riegel
-        // gegen eine Reede, auf der vierhundert Schiffe liegen. Zweimal in
-        // Bremerhaven gemessen: 122 und 130 Schiffe, beide darunter.
-        if (kand.length > UMGEBUNG_MAX) kand = kand.slice(0, UMGEBUNG_MAX);
-        if (!kand.length) { umgebungStand = "keine anderen Schiffe"; return; }
-        umgebungStand = kand.length + " Schiffe, Maße werden geholt…";
-        return stammHolen(kand.map(function (k) { return k.mmsi; }), bbox)
-          .then(function (karte) {
-            // Erst bauen, wenn die Masse da sind: Sonst waechst ein Kasten
-            // ein paar Sekunden nach dem Erscheinen von 40 auf 300 m, und
-            // das sieht aus wie ein Fehler.
-            for (var i = 0; i < kand.length; i++) {
-              kand[i].stamm = karte[kand[i].mmsi] || null;
-            }
-            bauUmgebung(kand);
-          });
+        // Gegen `umgebungZahl` deckeln, nicht gegen umgebung.length: Die
+        // Ruempfe entstehen runde fuer runde, die Laenge haengt also
+        // hinterher, und der Riegel liesse zu viele durch.
+        var platz = Math.max(0, UMGEBUNG_MAX - umgebungZahl);
+        if (kand.length > platz) { kand = kand.slice(0, platz); umgebungGekappt = true; }
+        for (var j = 0; j < kand.length; j++) {
+          umgebungKennt[kand[j].mmsi] = true;
+          umgebungZahl++;
+        }
+        standSchreiben();
+        if (!kand.length) {
+          if (!umgebung.length) umgebungStand = "keine anderen Schiffe · " + umgebungBereich;
+          return;
+        }
+        return stammHolenUndBauen(kand, bbox);
       })
       .catch(function (e) {
-        umgebungStand = "nicht geladen (" + (e && e.message || e) + ")";
-      });
+        if (!umgebung.length) {
+          umgebungStand = "nicht geladen (" + (e && e.message || e) + ")";
+        }
+      })
+      .then(function () { umgebungLaeuft = false; });
+  }
+
+  // Beim Bewegen der Kamera nachziehen. Dieselben Wachen wie beim Snapshot
+  // des 2D-Clients - und aus denselben Gruenden.
+  function umgebungNachziehen() {
+    if (!umgebungAn || !viewer || !spurPunkte.length) return;
+    // Eine laufende Abfrage nicht abschiessen. Genau dieser Fehler steckt im
+    // 2D-Client hinter der snapshotCtrl-Sperre.
+    if (umgebungLaeuft) return;
+    // In der Mitfahrt bewegt sich die Kamera JE BILD; der Bereich um die Spur
+    // ist beim Start ohnehin geladen.
+    if (fpvLaeuft) return;
+    if (Date.now() - umgebungZuletzt < UMGEBUNG_PAUSE) return;
+    if (umgebungZahl >= UMGEBUNG_MAX) return;
+    var r = sichtRahmen();
+    if (rahmenEnthaelt(umgebungBox, r)) return;
+    umgebungGeholt = true;
+    holeUmgebung(r);
   }
 
   function umgebungZeigen(an) {
     umgebungAn = an;
     for (var i = 0; i < umgebung.length; i++) umgebung[i].entity.show = an;
     if (viewer) viewer.scene.requestRender();
-    if (an && !umgebungGeholt) { umgebungGeholt = true; holeUmgebung(); }
+    if (an && !umgebungGeholt) umgebungNachziehen();
   }
 
-  function kameraAufSpur() {
-    if (!spurPunkte.length) return;
+  function kameraAufSpur(fertig) {
+    if (!spurPunkte.length) { if (fertig) fertig(); return; }
     var kart = spurPunkte.map(function (p) {
       return Cesium.Cartesian3.fromDegrees(p.lon, p.lat, 0);
     });
     var kugel = Cesium.BoundingSphere.fromPoints(kart);
     viewer.camera.flyToBoundingSphere(kugel, {
       duration: 1.5,
+      // Erst wenn der Flug steht, ist der Bereich, den die Kamera zeigt,
+      // ueberhaupt bestimmt. Mit moveEnd allein traf es MITTEN IM FLUG zu -
+      // gemessen: Der erste Abruf holte einen 60x60-km-Kasten um eine
+      // Zwischenposition, dabei fiel ein Schiff am Rand heraus und ein
+      // weiter entferntes hinein. Ein Bereich, der vom Zufall des
+      // Flugverlaufs abhaengt, ist kein Bereich.
+      complete: fertig,
       // Nicht genau von Norden: Von der Kante gesehen waere die Wand ein
       // Strich, und die dritte Dimension zeigte sich gar nicht.
       offset: new Cesium.HeadingPitchRange(
@@ -1297,17 +1472,20 @@
     }
     zeichneSpur();
     bauSchiff();
-    kameraAufSpur();
+    // Der erste Abruf haengt am ENDE des Einflugs, danach an jeder Bewegung.
+    kameraAufSpur(function () {
+      viewer.camera.moveEnd.addEventListener(umgebungNachziehen);
+      umgebungNachziehen();
+    });
     // Der Kurs wird bei JEDEM Takt fortgeschrieben, auch ohne Mitfahrt:
     // Sonst stuende der Rumpf auf einem alten Wert, sobald der Schalter aus ist.
     viewer.clock.onTick.addEventListener(kursTakt);
     viewer.clock.onTick.addEventListener(fpvTakt);
     meldungWeg();
 
-    // Nach der eigenen Spur, nicht davor: Die Ansicht soll stehen, bevor der
-    // Verkehr geholt wird - und die Umgebung braucht die eigene Spur ohnehin
-    // fuer Kasten und Annaeherung.
-    if (el.umgebung.checked) { umgebungGeholt = true; holeUmgebung(); }
+    // Die Umgebung haengt jetzt an der KAMERA, nicht an einem festen Kasten
+    // um die Spur - geholt wird, was im Bild liegt, und beim Bewegen wird
+    // nachgezogen.
 
     el.ionToken.value = hole("aisstream_ion_token") || "";
     el.googleKey.value = hole("aisstream_google_key") || "";

@@ -1955,57 +1955,127 @@ Zauberwert: Cesiums HPR-Rahmen kommt aus `eastNorthUpToFixedFrame`, dessen
 Gewünscht: *„Zeige auch die Bewegungen der umliegenden Schiffe in der 3d
 Ansicht, allerdings ohne Tracklinien."* Aus 50 m Augenhöhe ist ein leerer
 Hafen falsch — und die Ausnahme („ohne Tracklinien") ist der Kern, nicht die
-Fußnote: 120 Spuren übereinander wären ein Knäuel, und die **eine** Spur, um
-die es geht, ginge darin unter. Die Probe zählt deshalb ausdrücklich
+Fußnote: hunderte Spuren übereinander wären ein Knäuel, und die **eine** Spur,
+um die es geht, ginge darin unter. Die Probe zählt deshalb ausdrücklich
 **genau eine** Polylinie, auch mit voller Umgebung.
 
 **Zwei Endpunkte, beide schon live** — es braucht keinen neuen:
 `GET /v1/replay?bbox=…&von=&bis=&schritt=60` für die Spuren,
 `GET /v1/snapshot?bbox=…` für die Maße, und für den Rest `/v1/ship/{mmsi}`.
 
-##### Wer dazugehört: der Korridor, nicht der Kasten
+##### Wer dazugehört: was im Bild ist — der Korridorfilter war ein Fehler
 
-Die Abfrage kann nur ein Rechteck (eigene Spur + 3 km). Ausgewählt wird
-danach über die **nächste Annäherung zur selben Zeit**: Die eigene Position
-wird auf den Zeitstempel des fremden Stützpunkts interpoliert, und nur wer
-einmal unter **5 km** kommt, wird gebaut.
+Hier stand einmal ein **Korridorfilter**: Abgefragt wurde die Spur-Bbox + 3 km,
+gebaut wurde nur, wer dem eigenen Schiff einmal näher als **5 km** kam.
+Gemeldet als *„es werden zu viele Schiffe weggefiltert. Belasse alle Schiffe
+die im gezeigten Sichtbereich zum Zeitpunkt da sind."* — und zutreffend.
 
-Die 5 km sind nicht gegriffen: Aus 50 m Augenhöhe reicht der Horizont 25 km
-weit, ein 100-m-Schiff misst auf 5 km aber nur noch 1,1° — dahinter tragen
-weitere Rümpfe nichts zum Bild bei und kosten trotzdem.
+**Nachgemessen an einer echten Spur** (Bremerhaven, 6 h, 1280 × 800):
 
-**Der Radius macht die Arbeit, nicht die Obergrenze.** An zwei echten Spuren
-in Bremerhaven gemessen:
+| | |
+|---|---|
+| Was die Kamera beim Öffnen zeigt (`camera.computeViewRectangle()`) | **24,7 × 23,4 km** |
+| Was abgefragt wurde (Spur + 3 km) | **9 × 8 km** |
+| Spuren im Abfragekasten | 133 |
+| davon nach dem 5-km-Filter gebaut | **121** |
+| Spuren im **sichtbaren** Bereich | **171** |
 
-| eigene Spur | im Kasten | davon unter 5 km |
+**Der große Verlust war der Abfragekasten, nicht der Radius** — 38 Schiffe
+standen im Bild und wurden nie geholt, der Filter warf nur 12 weg. Und die
+Begründung für die 5 km („aus 50 m Augenhöhe misst ein 100-m-Schiff auf 5 km
+nur noch 1,1°") galt für die **Mitfahrt** und war ungeprüft auf die
+**Übersicht** übertragen, wo ohnehin alles im Bild ist.
+
+**Die Lehre gehört festgehalten:** Eine Begründung, die für einen Blickwinkel
+gilt, trägt nicht automatisch für den anderen. Beide Ansichten leben in
+derselben Datei und wurden deshalb wie eine behandelt.
+
+**Jetzt kommt der Bereich aus der Kamera** (`sichtRahmen()`), um 25 % gedehnt
+und auf **60 km Kantenlänge** gedeckelt, und beim Bewegen wird nachgezogen.
+Der einzige harte Ausschluss, der bleibt, ist die **Zeit**: Die Abfrage läuft
+mit `von`/`bis` der eigenen Spur, und jede Entity trägt ihr
+`availability`-Intervall.
+
+Am laufenden Betrieb gemessen: **271 statt 119 Schiffe** in einem Bereich von
+29 × 31 km — 2,3-mal so viele.
+
+##### Der Deckel, und wo er sitzt
+
+`UMGEBUNG_MAX_KM = 60` ist Pflicht, nicht Vorsicht: Gemessen liefert dieselbe
+Ansicht **auf dem iPhone hochkant 197 × 422 km**, weil der Horizont im Bild
+liegt (60° Blickwinkel auf der langen Kante). In der Mitfahrt aus 50 m reicht
+der Blick ohnehin bis zum Horizont. Ohne Deckel fragte ein einziges Bild die
+halbe Nordsee ab. Die 60 km sind an der Kurve abgelesen:
+
+| Kasten | Spuren | auf der Leitung |
 |---|---|---|
-| 2,5 km (im Hafen) | 134 | **122** |
-| 23 km (bis vor die Weser) | 384 | **130** |
+| 25 × 23 km | 171 | 200 KB gzip |
+| 50 × 46 km | 414 | ~420 KB gzip |
+| 60 × 55 km | 433 | **433 KB gzip** |
+| 100 × 90 km | 633 | 658 KB gzip |
 
-Beide landen bei ~125, obwohl der Kasten um den Faktor sechs auseinanderliegt.
-`UMGEBUNG_MAX` = 150 ist deshalb ein **Riegel** gegen eine Reede mit
-vierhundert Schiffen, kein Regelfall.
+**Wo der Deckel sitzt, war die eigentliche Frage.** Zuerst um die Mitte des
+Sichtrahmens — und weil die Kamera schräg blickt, liegt die weit voraus:
+Gemessen fiel ein Nachbar **7 km neben der Spur** heraus, während einer
+**22 km weiter vorn** hereinkam. Jetzt wird um die **Spurmitte** zentriert,
+solange die Spur im Bild ist; ist sie es nicht (man hat weggeschwenkt), gilt
+wieder der Rahmenmittelpunkt — wer nach Hamburg schaut, will die Schiffe dort.
 
-**Zur selben Zeit ist der zweite Teil, und der ist leicht zu übersehen.** Ein
-Schiff, das vier Stunden später durch dieselbe Stelle fährt, war nie in
-Sicht — als *Linie* liegt es genau auf der eigenen Spur. Die Probe hat dafür
-einen eigenen Nachbarn (`SPAETER`), der die eigene Spur Punkt für Punkt
-nachfährt, nur drei Stunden versetzt: Abstand Linie zu Linie **null**,
-Abstand zur selben Zeit **7,1 km**. Er muss draußen bleiben.
+##### Nachladen beim Bewegen
+
+`camera.moveEnd` → `umgebungNachziehen()`, mit denselben Wachen wie der
+Snapshot des 2D-Clients: Schalter aus, laufende Abfrage (**eine Abfrage darf
+die andere nicht abschießen** — genau dafür gibt es dort `snapshotCtrl`),
+Bereich schon abgedeckt, jünger als 3 s, Riegel erreicht, **und: nicht während
+der Mitfahrt** — dort bewegt sich die Kamera je Bild.
+
+**Der erste Abruf hängt am ENDE des Kameraflugs**, nicht am ersten `moveEnd`.
+Gemessen: Mit `moveEnd` allein traf er **mitten im Flug** zu, holte einen
+60 × 60-km-Kasten um eine Zwischenposition, und dabei fiel ein Schiff am Rand
+heraus, während ein weiter entferntes hereinkam. Ein Bereich, der vom Zufall
+des Flugverlaufs abhängt, ist kein Bereich. `flyToBoundingSphere` hat dafür
+`complete`.
+
+**Geladen wird additiv.** `umgebungBox` wächst zur Vereinigung; wer aus dem
+Bild fährt, wird **nicht** entfernt — das wäre wieder das Wegfiltern, um das
+es geht.
+
+##### Der Proxy antwortet zellenweise, nicht kastengenau
+
+`Speicher.spuren()` sucht über `zelle IN (…)` auf einem **0,25°-Gitter**
+(`aisproxy/src/ais.js`, `GITTER`) — rund 28 km in der Breite. Ein
+Abfragekasten wird also auf ganze Zellen aufgerundet, und der Proxy liefert
+regelmäßig **mehr**, als der Kasten verlangt.
+
+Das wird **bewusst behalten**: Es sind mehr Schiffe, nicht weniger, und
+nachträglich auf den Kasten zu beschneiden wäre genau der Filter, um den es
+hier ging. Wer aber prüfen will, dass etwas *außerhalb* liegt, muss eine
+Zelle weiter gehen — drei Anläufe in der Probe (15, 22, 36 km) lagen jedes
+Mal von Anfang an drin und maßen nichts.
 
 ##### Die Maße kommen aus dem Register, nicht aus einer Annahme
 
 In einem Hafen **ist** die Größe das Bild — ein 366-m-Containerschiff als
 40-m-Kasten wäre kein Nachbar, sondern eine Behauptung. Der Schnappschuss
 deckt das meiste in **einem** Abruf ab; wer den heißen Zustand inzwischen
-verlassen hat, wird einzeln nachgeholt, acht gleichzeitig. Am laufenden
-Betrieb gemessen: von 120 Nachbarn blieben **2 ohne Maße** (31 Abrufe
-insgesamt). Die stehen als Ersatzkasten da, und die Tafel sagt es.
+verlassen hat, wird einzeln nachgeholt, **zwölf gleichzeitig**. Am laufenden
+Betrieb gemessen: von 271 Nachbarn blieben **5 ohne Maße**. Die stehen als
+Ersatzkasten da, und die Tafel sagt es.
 
-**Gebaut wird erst, wenn die Maße da sind.** Ein Kasten, der Sekunden nach
-dem Erscheinen von 40 auf 300 m wächst, sieht aus wie ein Fehler. Die
-Umgebung steht dadurch gemessen nach **10 bis 11 s** — die eigene Spur und
-die Ansicht sind längst da, der Verkehr kommt nach.
+**Gebaut wird runde für runde, nicht erst am Ende.** Bei 271 Nachbarn dürfte
+die letzte Runde die erste nicht aufhalten; die ersten Rümpfe stehen nach
+**5 bis 7 s**, der Rest kommt nach.
+
+Die Regel von damals bleibt trotzdem: **kein Kasten wächst nachträglich.** Ein
+Schiff erscheint erst mit seinen echten Maßen — es erscheint nur *später*,
+statt von 40 auf 300 m zu springen.
+
+**„Noch im Aufbau" und „abgeriegelt" sind zwei verschiedene Dinge**, und die
+Tafel muss sie auseinanderhalten. Beim ersten Messen stand dort „119 von 271
+im Bereich", obwohl der Riegel bei 400 gar nicht greifen konnte — es war der
+Ladefortschritt, und die Zeile behauptete einen Filter, den es nicht gab.
+Jetzt: „119 von 271, Maße werden geholt…" beim Laden, „271 Schiffe" danach,
+und „400 von 512 im Bereich" nur, wenn der Riegel wirklich greift.
 
 ##### Kurs und Höhe: dieselbe Regel, aber je Schiff ein eigener Zustand
 
@@ -2026,16 +2096,18 @@ Unterschied zur exakten Lösung liegt im Zehntelmeter.
 
 | | gemessen |
 |---|---|
-| JS je Bild für 120 Nachbarn (Ort + Ausrichtung) | **0,32–0,34 ms** |
-| Bildzeit mit gegen ohne (SwiftShader, ~700 ms je Bild) | Faktor 1,01–1,18 — **Rauschen** |
-| Daten | 762 KB entpackt, auf der Leitung gzip (der Umleiter im Test packt aus, der Browser bekäme weniger) |
+| JS je Bild für **271** Nachbarn (Ort + Ausrichtung) | **0,41 ms** |
+| dasselbe für 120 (vorher) | 0,32–0,34 ms |
+| Bildzeit mit gegen ohne (SwiftShader, ~600 ms je Bild) | Faktor 1,5 — **nicht übertragbar** |
+| Daten | 1,3 MB entpackt, auf der Leitung gzip (der Umleiter im Test packt aus, der Browser bekäme weniger) |
 
 **Die Bildzeit aus dieser Sandbox trägt nicht.** Hier rastert Software mit
-700 ms je Bild; darin verschwindet alles. Die 0,32 ms sind dagegen
-übertragbar — sie sagen, dass die **Rechenseite** der Umgebung nichts kostet.
-Was 120 zusätzliche Zeichenaufrufe auf einem echten Telefon kosten, ist von
-hier aus nicht messbar; **deshalb der Schalter** („Verkehr — die anderen
-Schiffe zeigen", gemerkt in `aisstream_3d_umgebung`).
+600 ms je Bild; darin verschwindet alles. Die 0,41 ms sind dagegen
+übertragbar — sie sagen, dass die **Rechenseite** der Umgebung auch bei 271
+Rümpfen nichts kostet. Was 271 zusätzliche Zeichenaufrufe auf einem echten
+Telefon kosten, ist von hier aus nicht messbar; **deshalb der Schalter**
+(„Verkehr — die anderen Schiffe zeigen", gemerkt in `aisstream_3d_umgebung`)
+und **deshalb der Riegel** `UMGEBUNG_MAX = 400`.
 
 ##### Bewusst nicht enthalten
 
@@ -2048,6 +2120,9 @@ Schiffe zeigen", gemerkt in `aisstream_3d_umgebung`).
 - **Liegende Schiffe bleiben drin.** Gefragt waren die Bewegungen; ein Hafen
   ohne die Schiffe an den Kaien wäre trotzdem falsch. Gemessen liegen 46 von
   163 Spuren unter 200 m Gesamtweg — sie stehen einfach da, wie in echt.
+- **Kein Entfernen beim Hinausfahren.** Was einmal geladen ist, bleibt.
+- **Kein Nachladen während der Mitfahrt.** Dort bewegt sich die Kamera je
+  Bild; der Bereich um die Spur ist beim Start geladen.
 
 #### Der 3D-Aufruf steht oben, neben dem Tagebuchknopf
 
@@ -2278,7 +2353,7 @@ beim Richtungspfeil und beim Tallinn-Foto: **ansehen, nicht ableiten.**
 | **Die Kopfzeile** hatte einen Verlauf nach Dunkel — über einer hellen Luftaufnahme war die Unterzeile unlesbar. Jetzt ein Kasten, der auf jedem Grund trägt |
 | **Die Kamera** stand genau von Norden: Die Wand war von der Kante gesehen ein Strich, und die dritte Dimension zeigte sich gar nicht. Jetzt −35° Kurs, −28° Neigung |
 
-### Gemessen in `scratchpad/drei.js` (187 Prüfungen)
+### Gemessen in `scratchpad/drei.js` (195 Prüfungen)
 
 Gegen einen **echten** aisproxy, dessen Datenbank vorher mit **seiner eigenen
 `Speicher`-Klasse** gefüllt wird — ein nachgebauter Endpunkt hätte genau die
@@ -2317,14 +2392,22 @@ Formatfragen offengelassen, auf die es ankommt.
 - **Der Multiplikator gehört ins `clockViewModel`.** `clock.multiplier`
   allein blieb wirkungslos: Das Animationswidget schreibt seinen eigenen Wert
   bei jedem Bild zurück, gemessen lief die Uhr rund 500-fach statt 60-fach.
-- **Die Umgebung wird an zwei Nachbarn gemessen, die durchfallen müssen.**
-  Vier liegen im Abfragekasten: `NAH` (410 m, fährt 270° und meldet 45°) und
-  `OHNE` (586 m, ohne Stammdatensatz) müssen erscheinen, `FERN` (7,2 km) und
-  `SPAETER` (dieselbe Linie, drei Stunden später, 7,1 km) nicht. Ohne die
-  beiden letzten prüfte der Abschnitt nur, dass überhaupt etwas erscheint.
-  **Die eigene Probenspur musste dafür von 4 auf 20 km wachsen** — bei einer
-  kurzen Spur liegt jeder Punkt des Kastens näher als 5 km, und der
-  Radiusfilter hätte nichts zu tun gehabt.
+- **Die Umgebung wird an sechs Nachbarn gemessen, zwei davon müssen
+  draußen bleiben.** `NAH` (410 m, fährt 270° und meldet 45°), `OHNE` (586 m,
+  ohne Stammdatensatz), **`FERN` (7,2 km)** und **`SPAETER`** (dieselbe Linie,
+  drei Stunden später) gehören **hinein** — die letzten beiden hat der alte
+  Korridor weggeworfen, und genau das war der gemeldete Fehler. Draußen
+  bleiben `FRUEHER` (mitten im Bereich, aber **zwölf Stunden vor** dem
+  Fenster — der einzige harte Ausschluss, der bleibt) und anfangs `WEIT`.
+- **`WEIT` prüft das Nachladen** und musste dafür dreimal weiter weg: 15, 22
+  und 36 km lagen jedes Mal von Anfang an drin. Erst bei **49 km** liegt es in
+  einer anderen Speicherzelle des Proxys (0,25°-Gitter, siehe oben).
+  Herangeholt wird es, wenn die Kamera **dorthin schwenkt** — Herauszoomen
+  allein reicht nicht, und das ist richtig: Der Deckel bleibt um die Spur,
+  solange sie im Bild ist.
+- **Additiv, nicht austauschend:** Nach dem Schwenk sind die vorher geladenen
+  Schiffe **alle noch da**, keine MMSI doppelt, und Zurückschwenken kostet
+  **null** weitere `/v1/replay`-Abfragen.
 - **Und dann noch: genau EINE Polylinie**, mit 120 Nachbarn wie mit zweien.
   Das ist die eigentliche Anforderung, und sie wird an derselben Zahl
   gemessen wie vorher.
