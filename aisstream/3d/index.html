@@ -19,16 +19,55 @@
     --text: #e7edf4; --gedimmt: #8fa0b4; --akzent: #4aa3ff; --warn: #e2b53c;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+  /* 100dvh, nicht 100% - und die 100% davor als Rueckfall fuer alte Browser.
+     Auf iOS ist der LAYOUT-Bereich hoeher als der SICHTBARE, sobald Safari
+     seine Adress- und Werkzeugleiste einblendet. Der Seitenboden - dort sitzen
+     Cesiums Abspielknoepfe und die Zeitleiste - liegt dann unter dem Bild, und
+     wegen overflow:hidden kommt man nicht hin. Gemeldet als "manchmal ist die
+     Animationsleiste nicht sichtbar"; dieselbe Falle stand fuer die
+     Detailleiste des 2D-Clients schon in CLAUDE.md. */
+  html, body { margin: 0; height: 100%; height: 100dvh; background: var(--bg);
+    color: var(--text);
     font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     -webkit-text-size-adjust: 100%; overflow: hidden; }
   #cesium { position: absolute; inset: 0; }
-  /* Cesium malt sonst einen hellen Rahmen um das Kreditfeld. */
-  .cesium-widget-credits { font-size: 11px; }
+  /* Die Seite laeuft mit viewport-fit=cover unter Notch und Home-Indikator -
+     die KACHELN sollen das auch. Cesiums Bedienleisten nicht: Sie sitzen ab
+     Werk auf bottom:0 / left:0 und liegen im Querformat unter der Aussparung.
+     Deshalb genau sie um den Sicherheitsabstand anheben, den Rest randlos
+     lassen.
 
+     !important ist hier PFLICHT, kein Zufall: Cesiums Stilblatt wird zur
+     Laufzeit nachgeladen (ladeCesium) und steht damit HINTER diesem - bei
+     gleicher Spezifitaet gewinnt sonst Cesium. Genau daran ist die Zeile
+     "Kreditfeld auf 11 px" jahrelang wirkungslos gewesen; sie hat jetzt
+     ebenfalls ein !important.
+
+     Die 169 px und 29 px sind Cesiums eigene Werte (Widgets/widgets.css,
+     nachgelesen): Breite des Abspielrads, Platz fuer den Vollbildknopf. Sie
+     werden UEBERNOMMEN und nur um den Einzug erweitert - wer sie hier auf 0
+     setzt, verschiebt die Zeitleiste auf jedem Geraet. */
+  .cesium-viewer-animationContainer {
+    bottom: env(safe-area-inset-bottom) !important;
+    left: env(safe-area-inset-left) !important; }
+  .cesium-viewer-timelineContainer {
+    bottom: env(safe-area-inset-bottom) !important;
+    left: calc(169px + env(safe-area-inset-left)) !important;
+    right: calc(29px + env(safe-area-inset-right)) !important; }
+  .cesium-widget-credits {
+    font-size: 11px !important;
+    bottom: env(safe-area-inset-bottom) !important;
+    left: env(safe-area-inset-left) !important; }
+
+  /* Links und rechts brauchen denselben Sicherheitsabstand wie oben: Im
+     Querformat liegt der Zahnradknopf sonst in der 59-px-Aussparung eines
+     iPhones und ist halb oder ganz verdeckt. Oben war das abgefangen, an den
+     Seiten nicht - und der Fehler faellt genau deshalb nur "manchmal" auf. */
   header { position: absolute; top: 0; left: 0; right: 0; z-index: 10;
     display: flex; gap: .6rem; align-items: center; padding: .5rem .75rem;
     padding-top: max(.5rem, env(safe-area-inset-top));
+    padding-left: calc(.75rem + env(safe-area-inset-left));
+    padding-right: calc(.75rem + env(safe-area-inset-right));
     pointer-events: none; }
   header > * { pointer-events: auto; }
   /* Kein Verlauf: Der Untergrund ist hier eine Luftaufnahme und oft HELL -
@@ -48,16 +87,22 @@
   @media (pointer: coarse) { a.knopf, button.knopf { min-height: 44px; } }
   a.knopf:hover, button.knopf:hover { border-color: var(--akzent); }
 
-  #tafel { position: absolute; z-index: 10; right: .75rem; width: 280px; max-width: calc(100vw - 1.5rem);
+  #tafel { position: absolute; z-index: 10; width: 280px;
+    right: calc(.75rem + env(safe-area-inset-right));
+    max-width: calc(100vw - 1.5rem - env(safe-area-inset-left) - env(safe-area-inset-right));
     top: 52px; top: calc(52px + env(safe-area-inset-top));
     background: rgba(23,32,43,.95); border: 1px solid var(--rand); border-radius: 10px;
-    padding: .7rem .75rem; display: none; max-height: 70vh; overflow: auto;
+    padding: .7rem .75rem; display: none;
+    max-height: 70vh; max-height: 70dvh; overflow: auto;
     overscroll-behavior: contain; }
   #tafel.auf { display: block; }
   #tafel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
     color: var(--gedimmt); margin: .2rem 0 .45rem; font-weight: 600; }
   #tafel label { display: block; margin: .5rem 0 .2rem; color: var(--gedimmt); font-size: 12px; }
-  #tafel input[type=text], #tafel input[type=password], #tafel select {
+  /* type=number MUSS mit in diese Regel: Ohne die 16 px zoomt iOS beim
+     Antippen in das Feld hinein und die Seite bleibt verschoben. */
+  #tafel input[type=text], #tafel input[type=password],
+  #tafel input[type=number], #tafel select {
     width: 100%; font-size: 16px; padding: .4rem .5rem; border-radius: 7px;
     background: #101822; color: var(--text); border: 1px solid var(--rand); }
   #tafel p { margin: .5rem 0 0; color: var(--gedimmt); font-size: 12px; }
@@ -99,6 +144,23 @@
   </label>
   <p style="margin-top:.3rem">Gilt beim Abspielen. In der Pause ist die Kamera
      frei zum Umsehen.</p>
+  <label style="display:flex;align-items:center;gap:.5rem;margin:.45rem 0 0">
+    <input type="checkbox" id="rumpf" style="width:auto">
+    <span>Den eigenen Rumpf zeigen</span>
+  </label>
+
+  <label for="augenhoehe">Augenhöhe über der Fläche (m)</label>
+  <input id="augenhoehe" type="number" inputmode="numeric" step="5" min="2" max="200">
+  <label for="versatz">Versatz in Achsrichtung (m, + nach vorn)</label>
+  <input id="versatz" type="number" inputmode="numeric" step="10" min="-200" max="200">
+  <label for="neigung">Neigung (Grad, negativ = nach unten)</label>
+  <input id="neigung" type="number" inputmode="numeric" step="1" min="-60" max="20">
+  <p id="kameraHilfe" style="margin-top:.4rem">Der Versatz verschiebt die Kamera
+     entlang der Fahrtrichtung, gemessen ab der Mitte des Rumpfes. Eine steile
+     Neigung blickt nach unten, eine flache weiter voraus.
+     <b>Um den eigenen Bug zu sehen, sitzt man achtern</b> — also negativer
+     Versatz, Rumpf eingeschaltet. Ein positiver Versatz setzt die Kamera vor
+     das Schiff; von dort liegt der Rumpf hinter einem.</p>
 
   <h2 style="margin-top:.9rem">Verkehr</h2>
   <label style="display:flex;align-items:center;gap:.5rem;margin:.1rem 0 0">
@@ -158,11 +220,41 @@
   // Die Spur liegt auf dem Wasser. Ein aufsteigendes Band (Hoehe = Zeit oder
   // Geschwindigkeit) stand hier einmal und ist auf Wunsch wieder raus: Im
   // Betrieb stand es im Weg. Die dritte Dimension traegt jetzt die FAHRT.
-  var AUGENHOEHE = 50;          // Meter UEBER DER FLAECHE, Blick von der Bruecke
-  var FPV_NEIGUNG = -8;         // Grad, leicht nach unten - sonst sieht man nur Himmel
+  // Die drei Werte der Mitfahrkamera sind EINSTELLBAR, nicht fest: Wo die
+  // Bruecke sitzt, haengt am Schiff - auf einem Containerschiff weit achtern,
+  // auf einem Massengutfrachter vorn. Die Augenhoehe ist schon zweimal per
+  // Rueckmeldung nachjustiert worden (20, dann 50 m); genau das war der Grund.
+  // Hier stehen nur noch die VORGABEN und die Grenzen.
+  var AUGENHOEHE_VOR = 50,  AUGENHOEHE_MIN = 2,   AUGENHOEHE_MAX = 200;
+  var VERSATZ_VOR = 0,      VERSATZ_MIN = -200,   VERSATZ_MAX = 200;
+  var NEIGUNG_VOR = -8,     NEIGUNG_MIN = -60,    NEIGUNG_MAX = 20;
+  var augenhoehe = AUGENHOEHE_VOR, versatz = VERSATZ_VOR, neigung = NEIGUNG_VOR;
 
   function hole(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function setze(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+  // EINE Klammer je Wert, nach dem Muster von trackGrenzeAus() im 2D-Client.
+  // Leer heisst VORGABE, nicht 0: Number("") waere 0, und eine Augenhoehe von
+  // 0 m ist keine Kamera. Der geklammerte Wert wird ins Feld zurueck-
+  // geschrieben, denn dort soll stehen, was wirklich gilt.
+  //
+  // Gelesen wird NUR das Feld, nicht ersatzweise der Speicher: Die Felder
+  // werden beim Start aus dem Speicher gefuellt, ein leeres Feld heisst also
+  // "der Nutzer hat es geleert" und muss auf die Vorgabe fallen. Mit dem
+  // Speicher als Rueckfall kam dort der zuletzt gemerkte Wert zurueck, und
+  // ein geleertes Feld liess sich nicht zuruecksetzen - von der Probe
+  // gefunden, nicht vom Lesen.
+  function zahlAus(feld, schluessel, vorgabe, min, max) {
+    // Bei <input type=number> liefert der Browser fuer "abc" den LEEREN
+    // String - Unsinn und leer sind hier dasselbe, und beide gehen auf die
+    // Vorgabe.
+    var n = !feld || feld.value === "" ? NaN : Number(feld.value);
+    if (!isFinite(n)) n = vorgabe;
+    n = Math.max(min, Math.min(max, n));
+    if (feld) feld.value = String(n);
+    setze(schluessel, String(n));
+    return n;
+  }
 
   function proxyBasis() {
     var u = (hole("aisstream_proxy_url") || "").trim().replace(/\/+$/, "");
@@ -184,6 +276,11 @@
     tafel: document.getElementById("tafel"),
     tafelKnopf: document.getElementById("tafelKnopf"),
     fpv: document.getElementById("fpv"),
+    rumpf: document.getElementById("rumpf"),
+    augenhoehe: document.getElementById("augenhoehe"),
+    versatz: document.getElementById("versatz"),
+    neigung: document.getElementById("neigung"),
+    kameraHilfe: document.getElementById("kameraHilfe"),
     umgebung: document.getElementById("umgebung"),
     googleKey: document.getElementById("googleKey"),
     ionToken: document.getElementById("ionToken"),
@@ -609,13 +706,32 @@
       // Sonst zeichnet die Seite nur alle maximumRenderTimeChange Sekunden
       // Simulationszeit ein Bild - die Fahrt ruckelte.
       viewer.scene.requestRenderMode = false;
-      // Der Kasten wird ausgeblendet: Die Kamera sitzt 20 m ueber SEINER
-      // Mitte, ein 180-m-Rumpf reicht bis 8 m hoch - auf dem Schirmfoto
-      // fuellte er die halbe Sicht und verdeckte die Spur voraus. In der
-      // Mitfahrt IST man das Schiff.
-      schiffEntity.show = false;
     }
-    var c = Cesium.Cartographic.fromCartesian(ort);
+    // Der Kasten ist ab Werk ausgeblendet: Ohne Versatz sitzt die Kamera ueber
+    // SEINER MITTE, und ein 180-m-Rumpf fuellte auf dem Schirmfoto die halbe
+    // Sicht. Mit Versatz nach vorn oder achtern will man ihn dagegen sehen -
+    // deshalb ein Schalter statt einer Regel, die man erraten muesste. Bei
+    // JEDEM Takt gesetzt, damit der Schalter waehrend der Fahrt wirkt.
+    schiffEntity.show = el.rumpf.checked;
+    var kurs = eigenKurs.glatt == null ? 0 : eigenKurs.glatt;
+    // Der Versatz laeuft entlang des GEGLAETTETEN Kurses - derselben Zahl, in
+    // die die Kamera blickt. Mit dem gemeldeten cog saesse sie seitlich
+    // versetzt zu ihrer eigenen Blickrichtung.
+    var stelle = ort;
+    if (versatz) {
+      var gr = Math.PI / 180;
+      var rahmen = Cesium.Transforms.eastNorthUpToFixedFrame(ort, Cesium.Ellipsoid.WGS84,
+        fpvRahmen || (fpvRahmen = new Cesium.Matrix4()));
+      stelle = Cesium.Matrix4.multiplyByPoint(rahmen,
+        new Cesium.Cartesian3(Math.sin(kurs * gr) * versatz,
+                              Math.cos(kurs * gr) * versatz, 0),
+        fpvStelle || (fpvStelle = new Cesium.Cartesian3()));
+    }
+    // Die Flaeche wird an der VERSETZTEN Stelle abgefragt, nicht an der des
+    // Schiffs: Am steilen Ufer laege die Kamera sonst um den Uferversatz
+    // daneben - derselbe Fehler wie "die Kamera steht auf dem Kopf", nur um
+    // hundert Meter verschoben.
+    var c = Cesium.Cartographic.fromCartesian(stelle);
     // Absicherung, keine bekannte Ursache: Steht ein Bezugsrahmen an der
     // Kamera, laese setView Kurs, Neigung und Rollen in DIESEM Rahmen statt
     // im oertlichen. flyToBoundingSphere raeumt ihn zwar selbst weg (im
@@ -624,14 +740,15 @@
     viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
     viewer.camera.setView({
       destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude,
-        flaecheHoehe(c) + AUGENHOEHE),
+        flaecheHoehe(c) + augenhoehe),
       orientation: {
-        heading: Cesium.Math.toRadians(eigenKurs.glatt == null ? 0 : eigenKurs.glatt),
-        pitch: Cesium.Math.toRadians(FPV_NEIGUNG),
+        heading: Cesium.Math.toRadians(kurs),
+        pitch: Cesium.Math.toRadians(neigung),
         roll: 0
       }
     });
   }
+  var fpvRahmen = null, fpvStelle = null;
 
   function fpvAus() {
     if (!fpvLaeuft) return;
@@ -1086,7 +1203,10 @@
         var kc = Cesium.Cartographic.fromCartesian(viewer.camera.positionWC);
         var fl = flaecheHoehe(kc);
         zeilen.push("Kamera: <b>" + Math.round(kc.height - fl) + " m</b> über der Fläche" +
-          (Math.abs(fl) > 1 ? " (Fläche " + Math.round(fl) + " m)" : ""));
+          (Math.abs(fl) > 1 ? " (Fläche " + Math.round(fl) + " m)" : "") +
+          (versatz ? " · <b>" + Math.abs(versatz) + " m</b> " +
+            (versatz > 0 ? "vor" : "hinter") + " Mitte" : "") +
+          " · <b>" + neigung + "°</b>");
       } catch (e) {}
       // Der Unterschied, um den es geht, direkt ablesbar.
       if (eigenKurs.glatt != null) {
@@ -1127,6 +1247,11 @@
     // den Untergrund, bevor sie weiss, welcher Zugang gilt.
     vomProxy = beides[2] || { ion: null, google: null };
     if (schiff && schiff.name) el.titel.textContent = schiff.name;
+    // Ohne Bezug ist "+70 m" eine Zahl ohne Massstab.
+    if (schiff && schiff.laenge) {
+      el.kameraHilfe.innerHTML += " Dieser Rumpf misst <b>" + schiff.laenge +
+        " m</b>, an Bord liegt also ±" + Math.round(schiff.laenge / 2) + " m.";
+    }
     el.unter.textContent = "MMSI " + MMSI +
       (schiff && schiff.imo ? " · IMO " + schiff.imo : "") +
       " · " + spurPunkte.length + " Punkte / " + STUNDEN + " h";
@@ -1172,6 +1297,45 @@
     setze("aisstream_3d_fpv", el.fpv.checked ? "1" : "0");
     if (!el.fpv.checked) fpvAus();
   });
+  // Die Felder erst aus dem Speicher fuellen, dann klammern: zahlAus() liest
+  // das Feld zuerst, und ein leeres Feld soll den gemerkten Wert holen, nicht
+  // die Vorgabe.
+  el.augenhoehe.value = hole("aisstream_3d_augenhoehe") || "";
+  el.versatz.value = hole("aisstream_3d_versatz") || "";
+  el.neigung.value = hole("aisstream_3d_neigung") || "";
+  function kameraWerte() {
+    augenhoehe = zahlAus(el.augenhoehe, "aisstream_3d_augenhoehe",
+      AUGENHOEHE_VOR, AUGENHOEHE_MIN, AUGENHOEHE_MAX);
+    versatz = zahlAus(el.versatz, "aisstream_3d_versatz",
+      VERSATZ_VOR, VERSATZ_MIN, VERSATZ_MAX);
+    neigung = zahlAus(el.neigung, "aisstream_3d_neigung",
+      NEIGUNG_VOR, NEIGUNG_MIN, NEIGUNG_MAX);
+    // Sofort wirken, auch in der Pause: Sonst muesste man zum Nachjustieren
+    // erst abspielen, und die Zahl waere nicht nachvollziehbar.
+    if (viewer) viewer.scene.requestRender();
+  }
+  kameraWerte();
+  ["change", "input"].forEach(function (was) {
+    [el.augenhoehe, el.versatz, el.neigung].forEach(function (f) {
+      // "input" wirkt beim Tippen, "change" klammert und schreibt zurueck -
+      // waehrend des Tippens waere ein Zurueckschreiben ein Sprung im Feld.
+      f.addEventListener(was, was === "input" ? function () {
+        var n = Number(f.value);
+        if (!isFinite(n) || f.value === "") return;
+        if (f === el.augenhoehe) augenhoehe = Math.max(AUGENHOEHE_MIN, Math.min(AUGENHOEHE_MAX, n));
+        if (f === el.versatz) versatz = Math.max(VERSATZ_MIN, Math.min(VERSATZ_MAX, n));
+        if (f === el.neigung) neigung = Math.max(NEIGUNG_MIN, Math.min(NEIGUNG_MAX, n));
+        if (viewer) viewer.scene.requestRender();
+      } : kameraWerte);
+    });
+  });
+  el.rumpf.checked = hole("aisstream_3d_rumpf") === "1";
+  el.rumpf.addEventListener("change", function () {
+    setze("aisstream_3d_rumpf", el.rumpf.checked ? "1" : "0");
+    if (schiffEntity && fpvLaeuft) schiffEntity.show = el.rumpf.checked;
+    if (viewer) viewer.scene.requestRender();
+  });
+
   el.umgebung.checked = hole("aisstream_3d_umgebung") !== "0";
   el.umgebung.addEventListener("change", function () {
     setze("aisstream_3d_umgebung", el.umgebung.checked ? "1" : "0");

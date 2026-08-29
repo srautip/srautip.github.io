@@ -1844,8 +1844,9 @@ Die dritte Dimension trägt jetzt die **Fahrt**.
 
 #### Mitfahren: Blick von der Brücke
 
-Beim Abspielen sitzt die Kamera **50 m über der Fläche** (`AUGENHOEHE`) und
-blickt in Fahrtrichtung, 8° nach unten geneigt.
+Beim Abspielen sitzt die Kamera in Fahrtrichtung über dem Schiff. **Alle drei
+Werte sind einstellbar** — Augenhöhe, Versatz in Achsrichtung und Neigung
+(siehe „Die Kamera einstellen" unten); die Vorgaben sind 50 m, 0 m und −8°.
 
 - **Der Verkehr fährt mit.** Die Nachbarn sind nicht an die Mitfahrt
   gebunden — sie bewegen sich auch in der Übersicht, und in der Mitfahrt
@@ -1864,10 +1865,12 @@ blickt in Fahrtrichtung, 8° nach unten geneigt.
   Seite nur alle `maximumRenderTimeChange` Sekunden Simulationszeit ein Bild
   und die Fahrt ruckelt. Beim Pausieren wird es wieder eingeschaltet — ein
   liegengelassener Tab soll nicht dauerhaft rendern.
-- **Der eigene Rumpf wird ausgeblendet.** Die Kamera sitzt 20 m über der
-  *Mitte* des Kastens; bei 180 m Länge und 8 m Höhe füllte er auf dem
-  Schirmfoto die halbe Sicht und verdeckte die Spur voraus. In der Mitfahrt
-  **ist** man das Schiff. Wieder eingeblendet wird er beim Pausieren.
+- **Der eigene Rumpf ist ab Werk ausgeblendet, aber schaltbar.** Ohne Versatz
+  sitzt die Kamera über der *Mitte* des Kastens; bei 180 m Länge füllte er auf
+  dem Schirmfoto die halbe Sicht und verdeckte die Spur voraus. Mit Versatz
+  nach achtern will man ihn dagegen sehen — deshalb ein Schalter statt einer
+  Regel, die man erraten müsste. Wieder eingeblendet wird er ohnehin beim
+  Pausieren.
 - **Vorgabe des Untergrunds ist `gebaeude`** (Luftbild + Gelände + Gebäude,
   alles aus ion) — im Betrieb die beste Stufe. `foto` bleibt wählbar.
 
@@ -2045,6 +2048,129 @@ Schiffe zeigen", gemerkt in `aisstream_3d_umgebung`).
   ohne die Schiffe an den Kaien wäre trotzdem falsch. Gemessen liegen 46 von
   163 Spuren unter 200 m Gesamtweg — sie stehen einfach da, wie in echt.
 
+#### Die Kamera einstellen: Augenhöhe, Versatz, Neigung
+
+Gewünscht: *„Ergänze im Client eine Konfigurationsmöglichkeit im 3D Fenster
+für die FPV Kamera: Augenhöhe in m, Position in Achsrichtung des Schiffes
+relativ zum Mittelpunkt des Schiffs in m, Neigung in Grad."*
+
+**Der Grund steht in der eigenen Vorgeschichte:** Die Augenhöhe ist schon
+zweimal per Rückmeldung nachjustiert worden — erst 20 m, dann 50 m. Wo die
+Brücke sitzt, hängt am Schiff: auf einem Containerschiff weit achtern, auf
+einem Massengutfrachter vorn. Ein Wert im Quelltext kann für beide nicht
+stimmen.
+
+| Feld | Vorgabe | Grenzen | Speicher |
+|---|---|---|---|
+| Augenhöhe über der Fläche | 50 m | 2 … 200 | `aisstream_3d_augenhoehe` |
+| Versatz in Achsrichtung (+ vorn) | 0 m | −200 … +200 | `aisstream_3d_versatz` |
+| Neigung | −8° | −60 … +20 | `aisstream_3d_neigung` |
+| Eigenen Rumpf zeigen | aus | — | `aisstream_3d_rumpf` |
+
+- **Der Versatz läuft am geglätteten Kurs entlang, nicht nach Norden.**
+  Genommen wird dieselbe Zahl, in die die Kamera *blickt* — mit dem gemeldeten
+  `cog` säße sie seitlich versetzt zu ihrer eigenen Blickrichtung. Gerechnet
+  im örtlichen ENU-Rahmen (`Transforms.eastNorthUpToFixedFrame`).
+- **Die Fläche wird an der VERSETZTEN Stelle abgefragt**, nicht an der des
+  Schiffs. Am steilen Ufer läge die Kamera sonst um den Uferversatz daneben —
+  derselbe Fehler wie „die Kamera steht auf dem Kopf", nur um hundert Meter
+  verschoben.
+- **Um den eigenen Bug zu sehen, sitzt man achtern.** Das steht so im
+  Hilfetext, und zwar weil das erste Schirmfoto es gezeigt hat: Mit +90 m saß
+  die Kamera **vor** dem Schiff, und der eingeschaltete Rumpf war
+  folgerichtig nicht im Bild. Kein Fehler, aber ein Vorzeichen, das man
+  erklären muss. Der Hilfetext nennt außerdem die **Länge des eigenen
+  Schiffs** („Dieser Rumpf misst 180 m, an Bord liegt also ±90 m") — ohne
+  Bezug ist „−80 m" eine Zahl ohne Maßstab.
+- **Eine Klammer je Wert**, nach dem Muster von `trackGrenzeAus()` im
+  2D-Client: leer → **Vorgabe, nicht 0** (`Number("")` wäre 0, und eine
+  Augenhöhe von 0 m ist keine Kamera), außerhalb → auf die Grenze gezogen,
+  und der geklammerte Wert wird ins Feld zurückgeschrieben.
+  **Gelesen wird nur das Feld, nicht ersatzweise der Speicher** — die Felder
+  werden beim Start aus dem Speicher gefüllt, ein leeres Feld heißt also „der
+  Nutzer hat es geleert". Mit dem Speicher als Rückfall kam dort der zuletzt
+  gemerkte Wert zurück und ein geleertes Feld ließ sich nicht zurücksetzen;
+  **von der Probe gefunden, nicht vom Lesen.**
+  Nebenbefund: Bei `<input type="number">` liefert der Browser für „abc" den
+  **leeren String** — Unsinn und leer sind derselbe Weg, und beide fallen auf
+  die Vorgabe.
+- **`input[type=number]` musste in die CSS-Regel der Tafel.** Sonst tragen die
+  Felder nicht die 16 px, und iOS zoomt beim Antippen hinein und lässt die
+  Seite verschoben stehen — die Falle steht in dieser Datei schon für den
+  2D-Client.
+
+#### „Manchmal sind die Buttons oder die Animationsleiste nicht sichtbar"
+
+Gemeldet, und im Quelltext ablesbar — **drei** Ursachen, jede für sich nur
+manchmal wirksam:
+
+**1. Die Höhe hing an `height: 100%`.** Auf iOS ist der Layoutbereich höher
+als der **sichtbare**, sobald Safari seine Leisten einblendet. Der
+Seitenboden — dort sitzen Cesiums Abspielknöpfe und die Zeitleiste — liegt
+dann unter dem Bild, und `overflow: hidden` lässt niemanden hin. Jetzt
+`height: 100dvh` mit `100%` davor als Rückfall; `#tafel`s `max-height` ebenso
+auf `dvh`.
+
+**Das war kein neuer Befund.** Für die Detailleiste des 2D-Clients steht seit
+Langem in dieser Datei: *„`top`/`bottom` statt `height: 100%` bindet die Höhe
+an den wirklich sichtbaren Bereich; auf iOS passt `height: 100%` nicht, sobald
+Safari seine Leisten ein- oder ausblendet."* Die Lehre war da, die Seite hat
+sie nur nie angewandt.
+
+**2. Kein waagerechter Sicherheitsabstand.** Die Seite fordert
+`viewport-fit=cover`, die Leinwand reicht also unter Notch und
+Home-Indikator — bei den **Kacheln** ist das gewollt, bei der Bedienung
+nicht. Oben war es abgefangen, links, rechts und unten nicht:
+
+| Element | vorher | im Querformat |
+|---|---|---|
+| `header` (Zurück, Zahnrad) | Polster `.75rem` | Knopf in der 59-px-Aussparung |
+| `#tafel` | `right: .75rem` | dasselbe an der rechten Kante |
+| Cesiums Abspielrad, Zeitleiste, Kreditfeld | `bottom: 0; left: 0` | unter Home-Indikator und abgerundeter Ecke |
+
+Das erklärt, warum **Zahnrad und Abspielleiste zusammen** ausfallen können,
+obwohl sie an gegenüberliegenden Rändern sitzen: Im Querformat sind alle vier
+Ränder beschnitten.
+
+**`!important` ist bei den Cesium-Regeln Pflicht, kein Zufall.** Cesiums
+Stilblatt wird zur Laufzeit nachgeladen (`ladeCesium`) und steht damit
+**hinter** dem eigenen — bei gleicher Spezifität gewinnt sonst Cesium. Genau
+daran ist die Zeile „Kreditfeld auf 11 px" die ganze Zeit wirkungslos
+gewesen (Cesium setzt 10 px); sie hat jetzt ebenfalls ein `!important`. Und
+die 169 px / 29 px in der Zeitleistenregel sind **Cesiums eigene Werte**
+(`Widgets/widgets.css`, nachgelesen) — sie werden übernommen und nur um den
+Einzug erweitert; wer sie auf 0 setzt, verschiebt die Zeitleiste auf jedem
+Gerät.
+
+**3. Cesiums Fehlerfenster.** Wirft Cesium beim Zeichnen, legt sich
+`.cesium-widget-errorPanel` über die Szene **und schluckt jeden Klick**. Genau
+das ist beim Umbau auf den Kurszustand je Schiff passiert. Die Probe prüft
+das jetzt je Geräteprofil.
+
+##### Warum die Probe das nicht gefunden hat
+
+Sie maß `meldungWeg`, `quer <= 0` und `knopfHoehe >= 44`. Alle drei können
+grün sein, während der Knopf **außerhalb des Bildes oder hinter etwas
+anderem** liegt: Gemessen wurde die Größe des Kastens, nicht seine Lage. Und
+die zwei Profile waren iPhone 15 **hoch** und iPad Pro 11 quer — der
+problematische Fall, ein iPhone im **Querformat**, kam gar nicht vor.
+
+Jetzt prüft `randPruefen()` für Zahnrad, Zurückknopf, Abspielrad und
+Zeitleiste über **drei** Profile: Liegt das Rechteck vollständig im Bild, und
+liefert `elementFromPoint` auf seiner Mitte das Element selbst? Dieselbe
+Technik, mit der `mobiletest.js` des 2D-Clients das verdeckte Schließkreuz
+gefunden hat. Eine Gegenprobe legt einen Kasten über das Zahnrad und verlangt
+ein rotes Ergebnis — sonst wäre „erreichbar" eine Zeile, die immer grün sagt.
+
+**Und was hier NICHT messbar ist, gehört dazugesagt:** `env(safe-area-inset-*)`
+löst in Chromium immer zu **0** auf, Playwright bildet Notch und
+Home-Indikator nicht nach — Ursache 2 ist in dieser Umgebung nicht prüfbar.
+Ebenso wenig Ursache 1: `setViewportSize` verkleinert den **Layout**bereich
+mit, `100%` folgt also brav, und der Unterschied zu `100dvh` entsteht gar
+nicht. Beide Änderungen stehen auf dem Muster, das der 2D-Client seit Langem
+trägt, nicht auf einer Messung. Die neue Prüfung hält dafür fest, dass die
+Bedienung bei jeder Fenstergröße im Bild und anfassbar bleibt.
+
 #### Warum die Probe das durchgehen ließ
 
 Sie maß `heading` und `pitch` — **nicht `roll` und nicht die Blickrichtung
@@ -2067,7 +2193,7 @@ beim Richtungspfeil und beim Tallinn-Foto: **ansehen, nicht ableiten.**
 | **Die Kopfzeile** hatte einen Verlauf nach Dunkel — über einer hellen Luftaufnahme war die Unterzeile unlesbar. Jetzt ein Kasten, der auf jedem Grund trägt |
 | **Die Kamera** stand genau von Norden: Die Wand war von der Kante gesehen ein Strich, und die dritte Dimension zeigte sich gar nicht. Jetzt −35° Kurs, −28° Neigung |
 
-### Gemessen in `scratchpad/drei.js` (83 Prüfungen)
+### Gemessen in `scratchpad/drei.js` (160 Prüfungen)
 
 Gegen einen **echten** aisproxy, dessen Datenbank vorher mit **seiner eigenen
 `Speicher`-Klasse** gefüllt wird — ein nachgebauter Endpunkt hätte genau die
@@ -2122,6 +2248,24 @@ Formatfragen offengelassen, auf die es ankommt.
   nächste Klick einen Zeitablauf, und die Ursache steht nirgends — beim
   Umbau auf den Zustand je Schiff genau so passiert: Fünf Stellen lasen noch
   `kursGlatt`, und die Fehlermeldung stand nur in diesem Fenster.
+- **Die Kameraeinstellungen werden an der KAMERA gemessen, nicht an den
+  Feldern.** Ein Feld, das 120 anzeigt, während die Kamera auf 50 steht, wäre
+  ja der eigentliche Fehler. Gemessen: Augenhöhe 120 → **120,0 m** über der
+  Fläche; Neigung −35 → **−35,0°**.
+- **Der Versatz wird ZERLEGT, nicht als Abstand gemessen.** (Kamera − Schiff)
+  in den örtlichen ENU-Rahmen gedreht und auf Kurs und Querrichtung
+  projiziert: +150 → längs **150,0**, quer **0,0**; **−150 → längs −150,0**.
+  Der bloße Abstand hätte das Vorzeichen verschluckt, und ein Versatz nach
+  achtern sähe aus wie einer nach vorn. Dieselbe Messung bei Kurs 20° **und**
+  110° — ein Versatz, der stur nach Norden ginge, fiele nur an dieser Stelle
+  auf.
+- **Die Aufrecht-Prüfung ist jetzt neigungsabhängig.** „oben·Normale > 0,9"
+  war geraten und von der Probe kassiert: Bei −35° **ist** der Wert 0,819,
+  nämlich cos(35°). Verglichen wird jetzt mit genau diesem Kosinus — das
+  fängt eine gekippte Kamera bei **jeder** Neigung statt nur bei flachen.
+- **Die Klammer wird an vier Eingaben gemessen**: leer → 50, `0` → 2, `9999`
+  → 200, `abc` → 50; dazu Versatz und Neigung an ihren Grenzen, und die
+  Kamera muss dem **geklammerten** Wert folgen, nicht dem eingetippten.
 - **Die Vorgabe wird an den angefragten ion-Assets gemessen**, nicht am Wert
   des Wählers: Mit ungültigem Token fällt der ohnehin auf `osm` zurück. Die
   Seite fragt **2 und 1** (Luftbild, Gelände) und **nicht** 2275207.
