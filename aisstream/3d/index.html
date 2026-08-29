@@ -205,6 +205,18 @@
   var MMSI = (P.get("mmsi") || "").replace(/\D/g, "");
   var STUNDEN = Math.min(24, Math.max(1, Number(P.get("stunden")) ||
     Number(hole("aisstream_track_stunden")) || 6));
+  // `bis` und `stunden` ergeben zusammen den Zeitraum [bis - stunden, bis].
+  // Ohne `bis` endet das Fenster wie bisher jetzt - dann ist der Aufruf live,
+  // und die Kopfzeile nennt keine Uhrzeit, die niemand gewaehlt hat.
+  //
+  // Menschenlesbar als ISO 8601 in UTC (2026-08-29T14:20:33Z), nicht als
+  // Unix-Zeitstempel. Date.parse liest das ohne eigenen Parser; ein
+  // unlesbarer Wert faellt auf jetzt zurueck, statt ein leeres Fenster zu
+  // erzeugen - dieselbe Klammer-Regel wie bei den Kamerawerten.
+  var BIS_ROH = P.get("bis");
+  var BIS_MS = BIS_ROH ? Date.parse(BIS_ROH) : NaN;
+  var BIS_GESETZT = isFinite(BIS_MS);
+  if (!BIS_GESETZT) BIS_MS = Date.now();
 
   // Derselbe Ursprung wie der Hauptclient, also derselbe localStorage -
   // Proxyadresse und Token stehen schon da, ein zweites Feld waere doppelt.
@@ -328,12 +340,26 @@
 
   // --- Die Spur aus dem Proxy ------------------------------------------
   function holeSpur() {
-    var von = Math.floor(Date.now() / 1000) - STUNDEN * 3600;
+    var bis = Math.floor(BIS_MS / 1000);
+    var von = bis - STUNDEN * 3600;
+    // `bis` MUSS mit: Ohne es setzt der Proxy von sich aus "jetzt", und ein
+    // zurueckverlegtes Fenster waere still auf die Gegenwart gedehnt.
     return fetch(mitToken(proxyBasis() + "/track?mmsi=" + encodeURIComponent(MMSI) +
-      "&von=" + von)).then(function (r) {
+      "&von=" + von + "&bis=" + bis)).then(function (r) {
         if (!r.ok) throw new Error("Spur: HTTP " + r.status);
         return r.json();
       });
+  }
+
+  // Fuer die Anzeige, nicht fuer die URL: dort steht ISO, hier die Form, die
+  // ein Mensch im Kopf hat. UTC bleibt UTC - Cesiums Zeitleiste darunter
+  // beschriftet genauso, und zwei Zeitzonen in einem Bild waeren eine Falle.
+  function zeitText(ms) {
+    var d = new Date(ms);
+    var z = function (n) { return (n < 10 ? "0" : "") + n; };
+    return z(d.getUTCDate()) + "." + z(d.getUTCMonth() + 1) + "." +
+      d.getUTCFullYear() + " " + z(d.getUTCHours()) + ":" +
+      z(d.getUTCMinutes()) + " UTC";
   }
   // Was auf dem Proxy hinterlegt ist, damit der Token nicht in jedem Browser
   // einzeln eingetragen werden muss. Ein hier eingetragener hat Vorrang -
@@ -1254,11 +1280,19 @@
     }
     el.unter.textContent = "MMSI " + MMSI +
       (schiff && schiff.imo ? " · IMO " + schiff.imo : "") +
-      " · " + spurPunkte.length + " Punkte / " + STUNDEN + " h";
+      " · " + spurPunkte.length + " Punkte / " + STUNDEN + " h" +
+      // Nur bei einem gesetzten Ende: Sonst stuende bei jedem gewoehnlichen
+      // Aufruf eine Uhrzeit da, die niemand gewaehlt hat. Und ohne sie saehe
+      // ein Zeitraum in der Vergangenheit wie ein Fehler aus.
+      (BIS_GESETZT ? " bis " + zeitText(BIS_MS) : "");
 
     if (!spurPunkte.length) {
-      meldung("Keine Spur", "Der Proxy hat für dieses Schiff in den letzten " +
-        STUNDEN + " Stunden keine Positionen.");
+      meldung("Keine Spur", BIS_GESETZT
+        ? "Der Proxy hat für dieses Schiff zwischen " +
+          zeitText(BIS_MS - STUNDEN * 3600000) + " und " + zeitText(BIS_MS) +
+          " keine Positionen."
+        : "Der Proxy hat für dieses Schiff in den letzten " +
+          STUNDEN + " Stunden keine Positionen.");
       return;
     }
     zeichneSpur();

@@ -1697,7 +1697,8 @@ nicht. 56, 57 und 59 hatten überhaupt kein Label und standen als „Typ 56" da.
 ## Die 3D-Ansicht: eine eigene Seite, mit Absicht
 
 `aisstream/3d/index.html`, aufgerufen aus der Detailansicht — **oben im
-klebenden Kopf, direkt neben dem Tagebuchknopf** — mit `?mmsi=…&stunden=…`. Zeigt die Spur **eines** Schiffs über
+klebenden Kopf, direkt neben dem Tagebuchknopf** — mit
+`?mmsi=…&stunden=…&bis=…`. Zeigt die Spur **eines** Schiffs über
 einem Hafen, mit Cesiums eingebauter Uhr zum Abspielen.
 
 **Warum eine eigene Seite und nicht ein Umschalter im Client:** CesiumJS wiegt
@@ -2088,6 +2089,50 @@ eigene Seite.
   Knopf verlassen, und dass nichts passiert, ist richtig — sonst öffnete
   jedes Wischen einen Tab.
 
+#### Der Zeitraum steht im Aufruf: `bis` + `stunden`
+
+Gewünscht: *„Beim Aufruf des 3d Fensters aus der Detailseite soll in der URL
+zusätzlich zum Stunden Parameter auch die aktuelle Uhrzeit als timestamp
+übergeben werden. So dass man gezielt mit timestamp und stunden einen Zeitraum
+für die 3d Animation definieren kann."*
+
+Vorher rechnete die 3D-Seite ihr Fenster **selbst aus der Uhr des Geräts**
+(`von = Date.now()/1000 − STUNDEN·3600`, ohne `bis`). Es endete damit immer
+„jetzt": nicht festzuhalten, nicht zu verschieben, und ein verschickter Link
+zeigte beim nächsten Öffnen etwas anderes.
+
+```
+3d/?mmsi=211595610&stunden=6&bis=2026-08-29T13:25:33Z
+```
+
+- **Der Zeitstempel markiert das ENDE**, der Zeitraum ist
+  `[bis − stunden, bis]`. `stunden` bleibt damit überall in der App ein
+  Rückblick — dieselbe Bedeutung wie beim Zeitregler und beim Spurenfenster.
+- **Mitgegeben wird die im 2D gerade gezeigte Zeit**, über das vorhandene
+  `bezugsZeit(entry)`: Steht der Zeitregler auf live, ist das die Uhrzeit
+  jetzt; steht er zurück, trägt der Link genau den Moment mit, den die Karte
+  zeigt. Nichts Neues erfunden — dieselbe Funktion tragen schon Marker,
+  Spurende und Verblassung.
+- **ISO 8601 in UTC, kein Unix-Zeitstempel** (ausdrücklich so gewünscht). Es
+  ist die einzige verbreitete Schreibweise, die in einem Link **eindeutig**
+  ist: „29.08.2026 13:25" ließe offen, ob Tag oder Monat vorn steht und welche
+  Zeitzone gilt. UTC passt außerdem zum Rest — Cesiums Zeitleiste beschriftet
+  in UTC, und die Detailansicht führt „Zeitstempel (UTC)".
+- **Nicht durch `encodeURIComponent()`.** Der Doppelpunkt ist im Abfrageteil
+  erlaubt (RFC 3986); kodiert stünde dort `2026-08-29T13%3A25%3A33Z` — genau
+  die Lesbarkeit weg, um die es geht. `mmsi` und `stunden` bleiben kodiert.
+- **Unlesbares fällt auf jetzt zurück**, statt ein leeres Fenster zu erzeugen
+  — dieselbe Klammer-Regel wie bei den Kamerawerten.
+- **Die Kopfzeile nennt das Ende**, aber **nur wenn eines gesetzt ist**:
+  „72 Punkte / 6 h bis 29.08.2026 13:25 UTC". Ohne die Zeile sähe ein Zeitraum
+  in der Vergangenheit wie ein Fehler aus; bei einem gewöhnlichen Aufruf stünde
+  dort sonst eine Uhrzeit, die niemand gewählt hat. Die Meldung „Keine Spur"
+  nennt aus demselben Grund den abgefragten Zeitraum statt „in den letzten
+  N Stunden".
+- **Am Proxy war nichts zu ändern:** `/v1/track` nimmt `bis` längst entgegen.
+  Und die Umgebung zieht von selbst mit — `holeUmgebung()` leitet ihr Fenster
+  aus dem ersten und letzten Spurpunkt ab.
+
 #### Die Kamera einstellen: Augenhöhe, Versatz, Neigung
 
 Gewünscht: *„Ergänze im Client eine Konfigurationsmöglichkeit im 3D Fenster
@@ -2233,7 +2278,7 @@ beim Richtungspfeil und beim Tallinn-Foto: **ansehen, nicht ableiten.**
 | **Die Kopfzeile** hatte einen Verlauf nach Dunkel — über einer hellen Luftaufnahme war die Unterzeile unlesbar. Jetzt ein Kasten, der auf jedem Grund trägt |
 | **Die Kamera** stand genau von Norden: Die Wand war von der Kante gesehen ein Strich, und die dritte Dimension zeigte sich gar nicht. Jetzt −35° Kurs, −28° Neigung |
 
-### Gemessen in `scratchpad/drei.js` (171 Prüfungen)
+### Gemessen in `scratchpad/drei.js` (187 Prüfungen)
 
 Gegen einen **echten** aisproxy, dessen Datenbank vorher mit **seiner eigenen
 `Speicher`-Klasse** gefüllt wird — ein nachgebauter Endpunkt hätte genau die
@@ -2318,6 +2363,32 @@ Formatfragen offengelassen, auf die es ankommt.
   verschoben, nicht verdoppelt. Dazu am Finger: 44 px hoch, per
   `elementFromPoint` nicht verdeckt, und nach 0, 12 und 20 px Wischweg geht
   **genau ein** Tab auf; bei 40 px keiner.
+- **Der Zeitstempel im Link wird an beiden Reglerstellungen gemessen.** Live
+  liegt `bis` innerhalb einer Sekunde bei `Date.now()`; mit **ganz
+  zurückgezogenem** Zeitregler exakt **2,00 h** zurück bei 2 h Fenster.
+  **Ohne den zweiten Fall prüfte der erste nichts** — „ungefähr jetzt" wäre
+  auch bei einem festverdrahteten `Date.now()` grün. Dazu die Form:
+  `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$` und **kein `%`** im Wert.
+- **Die Probe hat dabei ihre eigene Veraltung gemeldet.** „Das Ziel bleibt
+  unverändert, während Meldungen laufen" war richtig, solange das `href` nur
+  MMSI und Stunden trug — mit dem mitlaufenden Zeitstempel ist es falsch.
+  Jetzt getrennt: **MMSI und Fenster stehen still**, `bis` **läuft mit der
+  Uhr mit**, und der Knoten bleibt derselbe.
+- **Der Zeitraum wird am ERGEBNIS gemessen, nicht an der Anfrage.** Mit
+  `bis` drei Stunden zurück fragt die Seite `/v1/track` mit genau diesem
+  `bis` und einem `von` exakt 21 600 s davor — aber entscheidend ist, dass
+  **Cesiums Uhr** dort endet (185 min zurück statt bei jetzt) und die vollen
+  6 h umspannt. Eine richtige Anfrage mit falscher Auswertung sähe an der
+  Anfrage allein noch grün aus.
+- Dafür reicht die **Probenspur vier Stunden weiter zurück** als das Fenster —
+  nur in die Datenbank, nicht in die Stützpunktliste der Nachbarn. Ohne den
+  Vorlauf läge jedes verschobene Fenster teilweise vor dem Beginn der Spur,
+  und die Uhr wäre halbleer gemessen worden.
+- **Die Umgebung zieht mit** (`/v1/replay` mit demselben Zeitraum) — sonst
+  stünden die Nachbarn von heute neben einer Spur von vorgestern.
+- **`bis=abc` fällt auf jetzt zurück**, zeigt eine Spur statt einer leeren
+  Meldung, und die Kopfzeile nennt **keine** Uhrzeit — ebenso wenig beim
+  Aufruf ganz ohne `bis`.
 
 **Fünf Fehler der Probe, alle vom Lauf gefunden:** der Regler wurde
 angesprochen, ohne die Tafel zu öffnen („element is not visible"); die
