@@ -1842,6 +1842,14 @@
   function bezugsZeit(entry) {
     return replayGilt(entry) ? replayZeit() : Date.now();
   }
+  // ISO 8601 in UTC, ohne die Millisekunden. Die einzige verbreitete
+  // Schreibweise, die in einem Link EINDEUTIG ist: "29.08.2026 14:20" liesse
+  // offen, ob Tag oder Monat vorn steht und welche Zeitzone gilt. UTC passt
+  // ausserdem zum Rest - Cesiums Zeitleiste beschriftet in UTC, und die
+  // Detailansicht fuehrt "Zeitstempel (UTC)".
+  function isoZeit(ms) {
+    return new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
+  }
 
   // Wo ein Schiff zu einem Zeitpunkt war. null heisst "damals nicht bekannt" -
   // dann gehoert es nicht auf die Karte, statt an einer erfundenen Stelle zu
@@ -6836,8 +6844,18 @@
     // Genau darauf kommt es an - ein ersetzter Knoten verschluckt einen Tipp,
     // der zwischen Beruehren und Loslassen laeuft.
     if (detail3dTop) {
+      // bis + stunden ergeben zusammen den Zeitraum [bis - stunden, bis].
+      // bezugsZeit() gibt es schon und beantwortet genau die Frage, aus
+      // welchem Moment heraus dieses Schiff gerade gezeichnet wird: die
+      // Reglerzeit, wenn der Zeitregler fuer es gilt, sonst jetzt. Damit
+      // traegt der Link den Augenblick mit, den die Karte gerade zeigt.
+      //
+      // Der Zeitstempel wird BEWUSST NICHT kodiert: Der Doppelpunkt ist im
+      // Abfrageteil erlaubt (RFC 3986), und "2026-08-29T14%3A20%3A33Z" waere
+      // genau die Lesbarkeit weg, um die es hier geht.
       detail3dTop.href = "3d/?mmsi=" + encodeURIComponent(entry.mmsi) +
-        "&stunden=" + encodeURIComponent(trackStundenAus());
+        "&stunden=" + encodeURIComponent(trackStundenAus()) +
+        "&bis=" + isoZeit(bezugsZeit(entry));
     }
     var osmLink = detailLinks.querySelector(".l-osm");
     if (entry.lat != null) {
