@@ -1696,8 +1696,8 @@ nicht. 56, 57 und 59 hatten überhaupt kein Label und standen als „Typ 56" da.
 
 ## Die 3D-Ansicht: eine eigene Seite, mit Absicht
 
-`aisstream/3d/index.html`, aufgerufen aus der Detailansicht („3D" neben
-MarineTraffic) mit `?mmsi=…&stunden=…`. Zeigt die Spur **eines** Schiffs über
+`aisstream/3d/index.html`, aufgerufen aus der Detailansicht — **oben im
+klebenden Kopf, direkt neben dem Tagebuchknopf** — mit `?mmsi=…&stunden=…`. Zeigt die Spur **eines** Schiffs über
 einem Hafen, mit Cesiums eingebauter Uhr zum Abspielen.
 
 **Warum eine eigene Seite und nicht ein Umschalter im Client:** CesiumJS wiegt
@@ -2048,6 +2048,46 @@ Schiffe zeigen", gemerkt in `aisstream_3d_umgebung`).
   ohne die Schiffe an den Kaien wäre trotzdem falsch. Gemessen liegen 46 von
   163 Spuren unter 200 m Gesamtweg — sie stehen einfach da, wie in echt.
 
+#### Der 3D-Aufruf steht oben, neben dem Tagebuchknopf
+
+Gewünscht: *„Der 3D Aufruf Button im Schiffsdetail Fenster soll direkt neben
+dem Tagebuchbutton oben sein."* Vorher stand er unten in `#detailLinks`
+hinter MarineTraffic, VesselFinder und der Bildersuche — also erst nach dem
+Scrollen erreichbar. Er ist **verschoben, nicht verdoppelt**: Die untere
+Leiste führt jetzt nur noch fremde Dienste, und die 3D-Ansicht ist die
+eigene Seite.
+
+- **Ein `<a>`, kein `<button>`.** „In neuem Tab öffnen" und „Link kopieren"
+  bleiben damit erhalten; das Aussehen kommt aus einer eigenen Regel, die
+  `#detailDiaryTop` nachbildet.
+- **Das `href` wird bei jedem Durchlauf nachgezogen**, wie das von
+  OpenStreetMap — das Zeitfenster (`trackStundenAus()`) kann sich bei offener
+  Leiste ändern. Ein Attribut zu schreiben tauscht den Knoten **nicht** aus,
+  und genau darauf kommt es an: Ein ersetzter Knoten verschluckt einen Tipp,
+  der zwischen Berühren und Loslassen läuft (in dieser Datei schon zweimal
+  passiert).
+- **`tippfestLink()` ist kein Zierrat — gemessen.** Der Link sitzt jetzt in
+  derselben klebenden Leiste, an der der Tagebuchknopf schon einmal
+  gescheitert ist: Ein Tipp unmittelbar nach einer Wischbewegung gilt dem
+  Browser als Scrollen, er verwirft den Klick. Gegenprobe mit ausgebautem
+  Zusatz (`scratchpad/tipp3d.js`):
+
+  | Wischweg | mit `tippfestLink` | **ohne** |
+  |---|---|---|
+  | 0 px | 1 Tab | 1 Tab |
+  | 12 px | 1 Tab | 1 Tab |
+  | **20 px** | **1 Tab** | **0** |
+  | 40 px | 0 (Finger hat den Knopf verlassen) | 0 |
+
+  Dieselbe 20-px-Schwelle wie beim Tagebuchknopf. **Nur der Touchweg**, nicht
+  wie `tippfest()` auch der Klick: Die Navigation macht der Browser beim
+  Klick schon selbst, sonst gingen zwei Tabs auf. Dass bei 0 px genau **ein**
+  Tab aufgeht, ist der Beleg, dass `preventDefault()` den nachgereichten
+  Klick wirklich unterdrückt.
+- **40 px sind die Gegenprobe**, nicht ein Mangel: Dort hat der Finger den
+  Knopf verlassen, und dass nichts passiert, ist richtig — sonst öffnete
+  jedes Wischen einen Tab.
+
 #### Die Kamera einstellen: Augenhöhe, Versatz, Neigung
 
 Gewünscht: *„Ergänze im Client eine Konfigurationsmöglichkeit im 3D Fenster
@@ -2193,7 +2233,7 @@ beim Richtungspfeil und beim Tallinn-Foto: **ansehen, nicht ableiten.**
 | **Die Kopfzeile** hatte einen Verlauf nach Dunkel — über einer hellen Luftaufnahme war die Unterzeile unlesbar. Jetzt ein Kasten, der auf jedem Grund trägt |
 | **Die Kamera** stand genau von Norden: Die Wand war von der Kante gesehen ein Strich, und die dritte Dimension zeigte sich gar nicht. Jetzt −35° Kurs, −28° Neigung |
 
-### Gemessen in `scratchpad/drei.js` (160 Prüfungen)
+### Gemessen in `scratchpad/drei.js` (171 Prüfungen)
 
 Gegen einen **echten** aisproxy, dessen Datenbank vorher mit **seiner eigenen
 `Speicher`-Klasse** gefüllt wird — ein nachgebauter Endpunkt hätte genau die
@@ -2272,8 +2312,12 @@ Formatfragen offengelassen, auf die es ankommt.
 - `window.__viewer` ist der Griff dafür: An einer 3D-Szene lässt sich über
   das DOM nichts messen, eine Polylinie hat keinen Knoten.
 - iPhone 15 und iPad Pro 11 quer: kommt hoch, keine Überbreite, 44-px-Ziele.
-- Der Link aus der Detailansicht trägt MMSI und Zeitfenster und **bleibt
-  derselbe Knoten**, während Meldungen laufen.
+- Der Link aus der Detailansicht trägt MMSI und Zeitfenster, **bleibt
+  derselbe Knoten**, während Meldungen laufen, steht **im klebenden Kopf
+  neben dem Tagebuchknopf** und **nicht mehr unten** bei den Fremdlinks —
+  verschoben, nicht verdoppelt. Dazu am Finger: 44 px hoch, per
+  `elementFromPoint` nicht verdeckt, und nach 0, 12 und 20 px Wischweg geht
+  **genau ein** Tab auf; bei 40 px keiner.
 
 **Fünf Fehler der Probe, alle vom Lauf gefunden:** der Regler wurde
 angesprochen, ohne die Tafel zu öffnen („element is not visible"); die

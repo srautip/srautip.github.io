@@ -436,12 +436,29 @@
     white-space: nowrap;
   }
   #detailDiaryTop.done { border-color: var(--ok); color: var(--ok); }
+  /* Sieht aus wie seine Nachbarn und traegt dieselbe Trefferflaeche - es ist
+     nur technisch ein Link. */
+  #detail3dTop {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--text);
+    text-decoration: none;
+    line-height: 1.1;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
   /* Am Finger ist ein 28-px-Ziel in der Ecke zu klein. Die Datei setzt fuer
      Kartenmarker schon 24 px als Untergrenze; ein Schliessknopf verdient die
      ueblichen 44. */
   @media (pointer: coarse) {
     #detailClose { width: 44px; min-height: 44px; font-size: 1.2rem; }
     #detailDiaryTop { min-height: 44px; padding: 0.15rem 0.6rem; }
+    #detail3dTop { min-height: 44px; padding: 0.15rem 0.6rem; }
     /* Nicht nur bequemer: Ausgeloest wird, wenn der Finger auf dem Knopf
        loslaesst. Ein 34-px-Knopf ist bei 20 px Fingerdrift schon verlassen,
        ein 44er nicht. */
@@ -457,7 +474,7 @@
      `none` nimmt die Flaeche aus dem Scrollen heraus: Von einem Knopf aus
      laesst sich die Leiste nicht mehr scrollen - bei Bedienelementen ist das
      richtig so, gescrollt wird ueberall sonst. */
-  .detail-head button, .detail-actions button { touch-action: none; }
+  .detail-head button, .detail-head a, .detail-actions button { touch-action: none; }
   #detail h4 {
     font-size: 0.72rem;
     text-transform: uppercase;
@@ -1484,6 +1501,13 @@
          gewertet und verworfen. -->
     <button type="button" id="detailDiaryTop" title="Ins Tagebuch eintragen"
             aria-label="Ins Tagebuch eintragen">📖<span aria-hidden="true">+</span></button>
+    <!-- Neben dem Tagebuchknopf, nicht mehr unten bei den Fremdlinks: Dort
+         unten steht er hinter MarineTraffic und VesselFinder, ist also erst
+         nach dem Scrollen erreichbar - und die 3D-Ansicht ist die EIGENE
+         Seite, kein fremder Dienst. Ein <a> und kein <button>, damit "in
+         neuem Tab oeffnen" und "Link kopieren" erhalten bleiben. -->
+    <a id="detail3dTop" class="l-3d" href="3d/" target="_blank" rel="noopener"
+       title="Spur in 3D über dem Hafen ansehen">3D</a>
     <button type="button" id="detailClose" title="Schließen">&times;</button>
   </div>
   <div class="detail-sub" id="detailSub"></div>
@@ -2021,6 +2045,7 @@
   var diaryCountEl = document.getElementById("diaryCount");
   var detailRaw = document.getElementById("detailRaw");
   var detailLinks = document.getElementById("detailLinks");
+  var detail3dTop = document.getElementById("detail3dTop");
   var detailSuche = document.getElementById("detailSuche");
 
   var storedKey = localStorage.getItem("aisstream_api_key");
@@ -6802,13 +6827,17 @@
           '" target="_blank" rel="noopener">VesselFinder</a>' +
         '<a class="l-bild" href="' + esc(bildersucheUrl(entry.mmsi)) +
           '" target="_blank" rel="noopener">Bildersuche</a>' +
-        // Die 3D-Ansicht ist eine eigene Seite, und das ist Absicht: CesiumJS
-        // wiegt 1 408 KB auf der Leitung. Als Link kostet sie nur, wer sie
-        // öffnet — eingebaut zahlte jeder Seitenaufruf dafür.
-        '<a class="l-3d" href="3d/?mmsi=' + mmsiQuery + '&stunden=' +
-          encodeURIComponent(trackStundenAus()) +
-          '" target="_blank" rel="noopener">3D</a>' +
         '<a class="l-osm" target="_blank" rel="noopener" hidden>OpenStreetMap</a>';
+    }
+    // Die 3D-Ansicht steht jetzt oben im klebenden Kopf. Ihr href wird - wie
+    // der von OpenStreetMap - bei JEDEM Durchlauf nachgezogen statt einmal je
+    // Schiff: Das Zeitfenster (trackStundenAus) kann sich bei offener Leiste
+    // aendern, und ein Attribut zu schreiben tauscht den Knoten nicht aus.
+    // Genau darauf kommt es an - ein ersetzter Knoten verschluckt einen Tipp,
+    // der zwischen Beruehren und Loslassen laeuft.
+    if (detail3dTop) {
+      detail3dTop.href = "3d/?mmsi=" + encodeURIComponent(entry.mmsi) +
+        "&stunden=" + encodeURIComponent(trackStundenAus());
     }
     var osmLink = detailLinks.querySelector(".l-osm");
     if (entry.lat != null) {
@@ -8126,6 +8155,32 @@
     });
   }
 
+  // Wie tippfest(), aber fuer einen LINK: Die Navigation macht der Browser
+  // beim Klick schon selbst, deshalb hier NUR der Touchweg - sonst oeffneten
+  // sich zwei Tabs. Gebraucht wird er aus demselben Grund wie bei den
+  // Knoepfen daneben: Ein Tipp unmittelbar nach einer Wischbewegung wird vom
+  // Browser als Scrollen gewertet und der Klick verworfen (gemessen ab 20 px
+  // Zugweg, scratchpad/touchslop.js).
+  function tippfestLink(a) {
+    if (!a) return;
+    var aufMir = false;
+    a.addEventListener("touchstart", function () { aufMir = true; }, { passive: true });
+    a.addEventListener("touchcancel", function () { aufMir = false; }, { passive: true });
+    a.addEventListener("touchend", function (e) {
+      if (!aufMir) return;
+      aufMir = false;
+      var t = e.changedTouches && e.changedTouches[0];
+      if (!t) return;
+      var r = a.getBoundingClientRect();
+      if (t.clientX < r.left || t.clientX > r.right ||
+          t.clientY < r.top || t.clientY > r.bottom) return;
+      // Unterdrueckt den nachgereichten Klick - sonst oeffnete der Browser
+      // den Link ein zweites Mal.
+      e.preventDefault();
+      window.open(a.href, "_blank", "noopener");
+    });
+  }
+
   // Ohne sichtbare Bestaetigung sehen "Tipp verworfen" und "Tipp angekommen"
   // identisch aus - der Knopf beschriftet sich vorher wie nachher gleich, und
   // der Zaehler in der Kopfzeile liegt bei offener Leiste dahinter. Genau
@@ -8154,6 +8209,7 @@
 
   tippfest(document.getElementById("detailDiary"), sichtungEintragen);
   tippfest(document.getElementById("detailDiaryTop"), sichtungEintragen);
+  tippfestLink(detail3dTop);
 
   document.getElementById("diaryExport").addEventListener("click", exportDiary);
   document.getElementById("diaryImport").addEventListener("click", function () {
