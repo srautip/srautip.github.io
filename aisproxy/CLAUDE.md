@@ -585,6 +585,106 @@ mal bis zu fünf Abrufen mal einer Sekunde — Stunden. Was nicht drankam,
 bleibt fällig und steht als `fotoOffen` im Bericht. **Eine stille Kappung
 liest sich wie „alles abgearbeitet".**
 
+## Schleifen erkennen: drei Kennzahlen, die es nicht können, und eine, die es kann
+
+Gemeldet: „MMSI 311003300 ist die letzten 10 h Schleifen gefahren. Oder
+Lotsenschiffe fahren ständig Schleifen — wie kann ich solche Schleifen
+erkennen?" Nachgemessen am 30. Aug. 2026 an **3 437 echten Spuren**
+(553 457 Punkte, 8 h, ganze Region).
+
+**Die drei naheliegenden Kennzahlen versagen, jede auf ihre Art:**
+
+| Kennzahl | Woran sie scheitert |
+|---|---|
+| **kumulierte Kursänderung** | Die Elbfähren sammeln in 8 h mehr davon als jedes Lotsenboot — sie wenden ja an jedem Ende. BRESLAU stand mit 7 932° vor PILOTT.WANGEROOG; nach dieser Zahl ist die Fähre auffälliger als der Lotse. |
+| **Umweg = Weg / Luftlinie** | Wer dort endet, wo er anfing, hat Luftlinie 0 und Umweg unendlich. Gemessen kamen Werte bis **101 606** heraus. Eine Kennzahl, die so ausschlägt, sagt nichts mehr. |
+| **Länglichkeit** (Hauptachsen) | Trennt Fähre und Lotse nicht: BRESLAU **5,92** gegen PILOTVESSEL HANSE **5,44**. Zwei Prozent Abstand ist keine Grenze, das ist ein Zufall. |
+
+**Was trennt, ist die Schleife selbst, nicht eine Note über die ganze Spur.**
+`src/anomalie.js` sucht die geschlossene Runde: Die Spur kommt bis auf 400 m
+an einen früheren Punkt zurück, hat dabei mindestens 800 m Weg gemacht,
+bleibt unter 6 km Durchmesser — und **umschließt Fläche**. Eine Pendelfahrt
+kommt auch zurück, umschließt aber fast nichts; sie ist ein Strich.
+
+Der Nebengewinn ist der eigentliche: Eine Schleife hat damit einen **Ort** und
+eine **Zeit**, keine Note. Genau das braucht die Karte.
+
+Die Bilder haben das entschieden, nicht die Tabellen. Als die Spuren einmal
+gezeichnet dalagen, war auf einen Blick zu sehen, dass BRESLAU, OPPELN und
+KLEINENSIEL Fähren im Pendelverkehr sind und die hohen Kursänderungswerte
+nichts über „besondere Manöver" sagen.
+
+### Die Rundheitsschranke schließt den Strich aus, nicht die Fähre
+
+`A / (L²/4π)` — 1,0 wäre ein exakter Kreis, 0 ein Strich. Gemessen:
+
+| | |
+|---|---|
+| GENTLE LEADER (der gemeldete Fall) | 0,58 |
+| KAYLEE, PILOTT.WANGEROOG | 0,56 · 0,46 |
+| WESER PILOT | 0,33 |
+| Fähre KLEINENSIEL | 0,22 |
+| Fähre OPPELN | 0,001 |
+
+Die Schranke steht bei **0,06** und damit bewusst tief. Sie soll den entarteten
+Strich draußen halten; **Fähre und Lotse kann sie nicht trennen** — WESER PILOT
+0,33 gegen BRESLAU 0,31 wäre wieder eine Zufallsgrenze. Die Trennung fällt
+deshalb später und über den **Schiffstyp**: Lotsenboot, Schlepper, Fähre,
+Fischer und Bagger sind *Berufsschleifer* (`stufe: "gewohnt"`), alle anderen
+sind auffällig. Ein Autotransporter, der kreist, ist eine Meldung wert; ein
+Lotsenboot nicht. Beide bleiben auf der Karte, nur nicht gleich laut.
+
+An `pendel()` in `test/anomalie.test.js` nachgemessen: bis 5 m Versatz null
+Funde, ab 10 m greift die Erkennung.
+
+### Der Sprungfilter ist keine Vorsicht, sondern eine Messung
+
+GRIETJE (Autotransporter) kam mit **drei** Positionssprüngen auf **443 km Weg
+in 8 h** — 30 kn Dauerfahrt für ein Schiff, das vor Anker lag. Nach dem Filter
+(alles über 40 kn zwischen zwei Punkten fliegt raus) sind es 2,7 km, und die
+Spur ist unauffällig. Ohne ihn stand sie auf Platz eins jeder Rangliste.
+
+### Gerechnet wird in Kacheln, weil 4,6 s am Stück nicht gehen
+
+Ein Lauf über die ganze Region kostet gemessen **3,3–4,6 s** reine Rechenzeit.
+So lange darf im Proxy nichts blockieren: Er nimmt in dieser Zeit rund 150
+AIS-Meldungen entgegen, und die lägen alle im Rückstau. `Anomalie.lauf()`
+arbeitet deshalb 21 Kacheln zu je 1° ab und gibt zwischen ihnen mit
+`setImmediate` die Ereignisschleife frei.
+
+Die Kacheln **überlappen um 0,15°** (rund 9,8 km in der Länge bei 56° Nord,
+mehr als der größte zugelassene Schleifendurchmesser): Ohne den Rand fiele
+eine Schleife genau auf einer Kachelgrenze in keiner der beiden auf, weil ihre
+Spur dort zerschnitten wäre. Die dadurch doppelt gefundenen Schleifen fängt
+der Schlüssel `mmsi:startzeit` ab — beide Werte stehen fest, egal aus welcher
+Kachel die Spur kam.
+
+### Erkannt wird im Takt, verdichtet bei jeder Anfrage
+
+Der Lauf legt **Einzelschleifen** ab (gemessen 1 359–1 395 in der Region, von
+442 Schiffen), alle fünf Minuten neu. Die Verdichtung zu Gebieten passiert
+erst in `hole()` — sie kostet **23 ms** und erlaubt dafür ein freies
+Zeitfenster (`?stunden=`), ohne neu erkennen zu müssen. Mehr als vorgehalten
+wird, gibt es nicht; das benutzte Fenster steht deshalb **in der Antwort**.
+
+Verdichtet wird um den jeweils **größten noch freien Keim**, damit ein Gebiet
+um seinen Kern wächst und nicht von einem zufälligen Rand aus. Gemessen bleibt
+es dabei handlich: Radius median **1,6 km**, 90 % unter 3,7 km, größtes 6,2 km
+— auch dort, wo 63 Schiffe in einem Gebiet liegen (Hamburger Hafen).
+
+Was der Client bekommt: **39 KB für die ganze Region**, 6,5 KB für die
+Deutsche Bucht.
+
+### Was daran noch offen ist
+
+- **„Anomaliedetektor" ist weiter als Schleifen.** Stillstand außerhalb von
+  Ankerplätzen, AIS-Lücken und Geschwindigkeitssprünge liegen im selben
+  Rahmen, sind aber bewusst nicht gebaut — der erste Schritt sollte eine
+  Sache ganz können.
+- **Es gibt keinen Normalzustand.** Der Detektor weiß nicht, dass an einer
+  Lotsenstation seit Jahren gekreist wird. Die Typtabelle ist ein Ersatz
+  dafür, kein Ersatz für gelerntes Verhalten je Ort.
+
 ## Sichern heißt `VACUUM INTO`, nicht `cp`
 
 Die Datenbank läuft im WAL-Modus. Ein `cp ais.db` nimmt genau das nicht mit,

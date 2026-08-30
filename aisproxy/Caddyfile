@@ -23,7 +23,7 @@
 	# unaufgeloest hin. Auffallen konnte das nur bei Haefen ausserhalb seiner
 	# eigenen Rueckfalltabelle, hier Abidjan. test/caddy.test.js vergleicht die
 	# Liste deshalb mit den Routen in server.js.
-	@schnittstelle path /v1/live* /v1/snapshot* /v1/replay* /v1/track* /v1/ship/* /v1/foto/* /v1/ort* /v1/einstellungen*
+	@schnittstelle path /v1/live* /v1/snapshot* /v1/replay* /v1/track* /v1/ship/* /v1/foto/* /v1/ort* /v1/einstellungen* /v1/anomalien*
 	handle @schnittstelle {
 		reverse_proxy proxy:8080
 	}
