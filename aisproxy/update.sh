@@ -426,6 +426,24 @@ if docker compose ps --status running --services 2>/dev/null | grep -qx caddy; t
     echo "    Die alte Konfiguration laeuft weiter. Pruefen mit:"
     echo "    docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile"
   fi
+
+  # Und jetzt nachsehen, ob das Neuladen auch GEWIRKT hat. "reload" meldet
+  # Erfolg, wenn der Befehl abgesetzt werden konnte - nicht, dass die neue
+  # Fassung greift. Am 30. Aug. 2026 lief ein Update sauber durch, der Proxy
+  # rechnete nachweislich (1 505 Schleifen von 471 Schiffen), und
+  # /v1/anomalien antwortete dem Browser trotzdem mit 401: Caddy hielt seine
+  # alte Konfiguration. Von aussen sah das aus wie "die Funktion gibt es
+  # nicht". Dasselbe schon bei /v1/ort und /v1/einstellungen - dreimal
+  # derselbe Fehler, und jedes Mal hat ihn ein Mensch gefunden, nicht dieses
+  # Skript.
+  #
+  # --heilen: Bei Abweichung wird der Container neu gestartet UND danach
+  # nachgesehen. Das ist die einzige Stelle, an der hier ohne Rueckfrage
+  # etwas angefasst wird; sie kostet eine Sekunde Aussetzer waehrend eines
+  # Updates, bei dem der Proxy ohnehin gerade neu gebaut wurde.
+  if [[ -x "$ZIEL/caddy-pruefen.sh" ]]; then
+    AIS_ZIEL="$ZIEL" bash "$ZIEL/caddy-pruefen.sh" --heilen || true
+  fi
 fi
 
 echo "==> 5/6 Warten, bis der Dienst wieder Schiffe meldet"

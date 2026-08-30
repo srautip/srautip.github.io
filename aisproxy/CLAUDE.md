@@ -261,6 +261,55 @@ Drei Dinge sind daraufhin geaendert worden, und alle drei braucht es:
   Ortsname, der roh stehenblieb. Jetzt steht die Ursache im Protokoll —
   einmal, nicht bei jeder Zielangabe.
 
+### Und dann ein drittes Mal — deshalb prüft jetzt ein Skript die ANLAGE
+
+`/v1/ort` (27. Aug.), `/v1/einstellungen` (30. Aug. vormittags), `/v1/anomalien`
+(30. Aug. nachmittags): dreimal derselbe Fehler. Beim dritten Mal war es
+besonders deutlich, weil alles andere nachweislich lief —
+`/v1/status` meldete **1 505 Schleifen von 471 Schiffen**, mit Basic-Auth
+lieferte `/v1/anomalien` 30 Gebiete, und die Karte im Browser blieb trotzdem
+leer. Von allen acht Schnittstellenpfaden war genau der neue betroffen:
+
+| Pfad, ohne Token | wer antwortet |
+|---|---|
+| `/v1/live`, `/v1/snapshot`, `/v1/replay`, `/v1/track`, `/v1/ship/…`, `/v1/ort`, `/v1/einstellungen` | Proxy (401 als JSON) |
+| `/v1/anomalien` | **Caddy** (401 mit `www-authenticate: Basic`) |
+
+**Diese Unterscheidung ist das ganze Werkzeug:** Caddys 401 trägt den Kopf
+`www-authenticate: Basic`, der 401 des Proxys nicht. Damit lässt sich von
+außen feststellen, wer abweist — **ohne Token auf einer Befehlszeile**.
+
+`caddy-pruefen.sh` vergleicht die `@schnittstelle`-Zeile mit der **laufenden**
+Konfiguration (Caddys Admin-Schnittstelle im Container auf `localhost:2019`,
+sonst der Abruf von außen). `update.sh` ruft es nach dem Reload mit `--heilen`
+auf: Bei Abweichung wird der Container neu gestartet **und danach nachgesehen**
+— ein Neustart, dessen Wirkung niemand prüft, ist genau der Schritt, der hier
+schon zweimal Erfolg gemeldet hat, ohne einen zu haben. Von Hand geht es auch:
+
+```
+/opt/aisproxy/caddy-pruefen.sh            # nur nachsehen
+/opt/aisproxy/caddy-pruefen.sh --heilen   # und bei Abweichung neu starten
+```
+
+Rückgabe **0** alles da · **1** es fehlt etwas · **2** nicht feststellbar. Die
+2 ist Absicht und schlägt keinen Alarm: Ein falscher Alarm, der jemanden eine
+laufende Anlage zurückbauen lässt, wäre schlimmer als die Lücke.
+
+**Geprüft ist, dass es „nein" sagen kann** (`test/caddy-pruefen.probe.sh`, 13
+Prüfungen mit gestelltem `docker` auf dem PATH): vollständige Konfiguration →
+0; fehlendes `/v1/anomalien*` → 1, **und der fehlende Pfad wird benannt**;
+`--heilen` startet wirklich neu und sieht danach nach; ein vergeblicher
+Neustart bleibt bei 1 und sagt es; ohne Admin-Schnittstelle und ohne erreichbare
+Domain → 2 **ohne ACHTUNG**. Eine Prüfung, die nie „nein" gesagt hat, ist nur
+eine Zeile, die immer grün leuchtet.
+
+**Was ich dabei falsch gemacht habe, gehört dazu:** Nach dem zweiten Vorfall
+war genau dieses Skript geplant und freigegeben. Ich habe es dann **nicht
+gebaut**, weil die 401 beim Nachmessen von selbst verschwunden waren und ich
+daraus schloss, der Reload-Schritt erledige das und ein Wächter schlüge nur
+Fehlalarm. Zwei Stunden später stand derselbe Fehler wieder da. Aus „ich habe
+es nicht mehr reproduzieren können" folgt nicht „es passiert nicht".
+
 Dazu eine vierte Aenderung, dieselbe Familie: Der Client merkte sich
 **Fehlanzeigen dauerhaft**. Ein „kenne ich nicht" aus einem Moment, in dem das
 Ortsregister noch leer war, waere damit fuer immer stehengeblieben. Gemerkt

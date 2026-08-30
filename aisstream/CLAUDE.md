@@ -3611,6 +3611,44 @@ roter Kreise beim ersten Öffnen erklärt sich nicht selbst. Antwortet der Proxy
 mit **503**, ist der Detektor dort abgeschaltet — das steht als Auskunft im
 Protokoll, einmal, nicht bei jeder Kartenbewegung.
 
+### Eine eingeschaltete Ebene, die nichts zeigt, muss sagen warum
+
+Gemeldet nach dem ersten Ausliefern: „in der Karte sind keine Schleifen
+markiert." Die Ursache lag am Proxy (Caddy gab dem Browser 401 für
+`/v1/anomalien`), und der Client wusste das auch — er hatte es **ins Protokoll
+geschrieben**, das niemand offen hatte. Für den, der auf die Karte sieht, war
+„die Ebene ist an und leer" nicht von „hier gab es keine Schleifen" zu
+unterscheiden.
+
+Deshalb steht unter dem Schalter eine Standzeile, und sie unterscheidet fünf
+Lagen:
+
+| Lage | Text |
+|---|---|
+| Proxy ausgeschaltet | „Ohne Proxy gibt es diese Ebene nicht" (rot) |
+| Proxy gerade nicht erreichbar | „…füllt sich, sobald er wieder liefert" (**nicht** rot) |
+| läuft | „wird geladen…" |
+| Erfolg | „13 Gebiete in den letzten 8 h, davon 10 auffällig" |
+| leer | „In diesem Ausschnitt wurde in den letzten 8 h keine Schleife gefahren." |
+
+Und aus dem HTTP-Code wird eine Auskunft, die zur nächsten Handlung führt:
+**401** nennt beide möglichen Ursachen (Token falsch *oder* `/v1/anomalien`
+fehlt im Caddy-Matcher — genau der eingetretene Fall), **404** heißt „dieser
+Proxy braucht ein Update", **503** „der Erkenner ist dort abgeschaltet".
+„HTTP 401" allein hat hier zwei ganz verschiedene Ursachen, und die falsche zu
+vermuten kostet eine Stunde.
+
+**Zwei Fehler beim Bauen, beide vom Schirm gefunden:** Der erste Anlauf schrieb
+auch dann „ohne Proxy", wenn der Proxy nur noch **nicht verbunden** war — beim
+Umlegen des Schalters ist das der Normalfall, und die Ebene füllte sich
+Sekunden später trotzdem. Ein Fehlertext, der gleich darauf falsch ist, ist
+schlimmer als keiner. Und die Probe wartete auf den *ersten* Textwechsel statt
+auf ein Ergebnis, maß also den Weg statt das Ziel und wurde falsch rot.
+
+Ins Protokoll geht der Fehler weiterhin nur **einmal**; die Standzeile wird bei
+jedem Versuch neu gesetzt. Ein Protokoll, das bei jeder Kartenbewegung dieselbe
+Zeile schreibt, wäre zugemauert.
+
 ### Gemessen in `scratchpad/schleifen_client.js` (8 Prüfungen)
 
 Gegen einen **echten** Proxy mit den echten 8-h-Spuren der Region: Schalter
@@ -3623,6 +3661,12 @@ Die Kette davor steht in `scratchpad/anomalie_echt.js` (11 Prüfungen, echter
 Speicher, echter Server): Das gemeldete Schiff **311003300** steht in zwei
 Gebieten und ist dort **auffällig**, die Lotsenstation Weser ist **gewohnt**
 (2 Berufsschleifer, 0 andere).
+
+Und die Standzeile in beiden Lagen, `scratchpad/schleifen_stand.js`
+(7 Prüfungen): gegen einen echten Proxy „13 Gebiete in den letzten 8 h, davon
+10 auffällig", 12 Kreise, keine Fehlfarbe — gegen einen Stellvertreter, der
+`/v1/anomalien` wie Caddy mit **401 und `www-authenticate`** abweist, null
+Kreise und der Satz, der den Caddy-Matcher benennt, in Fehlfarbe.
 
 ## Was in `localStorage` liegt
 
