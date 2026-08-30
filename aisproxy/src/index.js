@@ -7,6 +7,7 @@ const { Netz } = require("./netz");
 const { Speicher } = require("./speicher");
 const { Register } = require("./register");
 const { Server } = require("./server");
+const { Anomalie } = require("./anomalie");
 
 function log(msg) {
   console.log("[" + new Date().toISOString() + "] " + msg);
@@ -55,8 +56,13 @@ async function start() {
 
   speicher.startSchreiben();
 
+  // Der Schleifenerkenner. Er liest nur aus dem Speicher und schreibt nichts
+  // zurueck - faellt er aus, fehlt eine Kartenebene und sonst nichts.
+  const anomalie = konfig.ANOMALIE_AN
+    ? new Anomalie({ konfig, speicher, zustand, log }) : null;
+
   const server = new Server({
-    konfig, zustand, speicher, log,
+    konfig, zustand, speicher, anomalie, log,
     status: () => ({
       zeit: new Date().toISOString(),
       region: konfig.REGION,
@@ -68,6 +74,7 @@ async function start() {
       netz: netz.bericht(),
       speicher: speicher.bericht(),
       register: register.bericht(),
+      anomalie: anomalie ? anomalie.bericht() : null,
       clients: server.bericht(),
       speicherMB: Number((process.memoryUsage().heapUsed / 1e6).toFixed(1))
     })
@@ -132,6 +139,15 @@ async function start() {
     if (weg.length) { server.meldeEntfernt(weg); log(weg.length + " Schiff(e) ohne Meldung entfernt"); }
     speicher.pflege();
   }, konfig.PFLEGE_MS);
+
+  // Der erste Schleifenlauf erst nach einer Minute: Direkt beim Start faellt
+  // er mit dem Kaltstart und dem ersten Netzabruf zusammen, und dann warten
+  // drei schwere Dinge aufeinander. Danach im Takt.
+  if (anomalie) {
+    setTimeout(() => anomalie.lauf().catch(e => log("Anomalie: " + e.message)), 60000);
+    setInterval(() => anomalie.lauf().catch(e => log("Anomalie: " + e.message)),
+      konfig.ANOMALIE_TAKT_MS);
+  }
 
   // Register vorwaermen: erst kurz warten, damit der Bestand steht - sonst
   // waermt man 40 Schiffe vor und den Rest beim naechsten Lauf.

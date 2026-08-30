@@ -58,6 +58,9 @@ class Server {
     this.konfig = opt.konfig;
     this.zustand = opt.zustand;
     this.speicher = opt.speicher;
+    // Darf fehlen: Ohne Detektor antwortet /v1/anomalien mit 503, alles
+    // andere laeuft unveraendert weiter.
+    this.anomalie = opt.anomalie || null;
     this.log = opt.log || console.log;
     this.status = opt.status || (() => ({}));
     this.clients = new Set();
@@ -107,6 +110,7 @@ class Server {
       if (url.pathname === "/v1/replay") return this.replay(url, res);
       if (url.pathname === "/v1/track") return this.track(url, res);
       if (url.pathname === "/v1/ort") return this.ort(url, res);
+      if (url.pathname === "/v1/anomalien") return this.anomalien(url, res);
       if (url.pathname === "/v1/einstellungen") return this.einstellungen(res);
       if (url.pathname.startsWith("/v1/ship/")) return this.ship(url, res);
       if (url.pathname.startsWith("/v1/foto/")) {
@@ -118,7 +122,8 @@ class Server {
           dienst: "aisproxy", region: this.konfig.REGION,
           endpunkte: ["/v1/snapshot", "/v1/live (WebSocket)", "/v1/replay",
                       "/v1/track", "/v1/ship/{mmsi}", "/v1/foto/{datei}",
-                      "/v1/ort?codes=", "/v1/einstellungen", "/v1/status"]
+                      "/v1/ort?codes=", "/v1/anomalien?bbox=", "/v1/einstellungen",
+                      "/v1/status"]
         });
       }
       return jsonAus(res, 404, { fehler: "unbekannter Pfad" });
@@ -157,6 +162,32 @@ class Server {
       // Abtastung zu festen Zeiten - der Client interpoliert dazwischen.
       form: ["t", "lat_1e6", "lon_1e6", "sog_01", "cog_01"],
       spuren
+    });
+  }
+
+  // Wo in den letzten Stunden Schleifen gefahren wurden. Geliefert wird aus
+  // dem Zwischenstand des Detektors, nicht frisch gerechnet: Ein voller Lauf
+  // dauert Sekunden, eine Kartenbewegung darf das nicht ausloesen.
+  anomalien(url, res) {
+    if (!this.anomalie) return jsonAus(res, 503, { fehler: "Anomaliedetektor ist aus" });
+    const box = bboxAus(url.searchParams.get("bbox"), this.konfig.REGION);
+    if (!box) return jsonAus(res, 400, { fehler: "bbox unlesbar" });
+    const vorrat = this.konfig.ANOMALIE_STUNDEN;
+    let stunden = Number(url.searchParams.get("stunden"));
+    if (!Number.isFinite(stunden) || stunden <= 0) stunden = vorrat;
+    // Mehr als vorgehalten wird, kann nicht geliefert werden - und still
+    // weniger zu liefern, als in der Antwort steht, waere die schlechtere
+    // Auskunft. Deshalb steht das benutzte Fenster mit in der Antwort.
+    stunden = Math.min(stunden, vorrat);
+    const gebiete = this.anomalie.hole(box, stunden);
+    return jsonAus(res, 200, {
+      stunden,
+      gerechnet: this.anomalie.gerechnet || null,
+      anzahl: gebiete.length,
+      // radius in Metern, lat/lon der Mittelpunkt. "stufe" ist "auffaellig",
+      // sobald mindestens ein Schiff dabei ist, das nicht von Berufs wegen
+      // kreist - Lotse, Schlepper, Faehre, Fischer und Bagger tun das staendig.
+      gebiete
     });
   }
 

@@ -1269,12 +1269,21 @@
     <div class="checkboxes">
       <label><input type="checkbox" id="showLabels" checked /> Schiffsnamen auf der Karte</label>
       <label><input type="checkbox" id="ownPos" checked /> Eigenen Standort als ✕ anzeigen</label>
+      <label><input type="checkbox" id="schleifenAn" /> Schleifen der letzten 8 Stunden als rote Kreise</label>
     </div>
     <p class="hint" style="margin-top:0.35rem">
       Namen werden ab Zoomstufe 12 eingeblendet und aktualisieren sich, sobald
       der Name aus einer weiteren Quelle bekannt wird. Der eigene Standort
       kommt vom Browser und wird nirgendwohin gesendet; beim ersten Mal fragt
       der Browser um Erlaubnis.
+    </p>
+    <p class="hint" style="margin-top:0.35rem">
+      Der Proxy sucht in den Spuren nach <b>geschlossenen Runden</b> — die Spur
+      kommt dorthin zurück, wo sie war, und umschließt dabei Fläche. Ein
+      kräftiger Kreis heißt: mindestens ein Schiff dabei, das <b>nicht</b> von
+      Berufs wegen kreist. Ein dünner gestrichelter Kreis sind Lotsenboote,
+      Schlepper, Fähren, Fischer oder Bagger — für die ist das der Alltag.
+      Braucht einen Proxy; ohne ihn bleibt die Ebene leer.
     </p>
     <label class="zahlzeile" for="trackLimit">
       Spuren zeichnen bis
@@ -2013,6 +2022,7 @@
   var filterCountEl = document.getElementById("filterCount");
   var filterResetEl = document.getElementById("filterReset");
   var showLabelsInput = document.getElementById("showLabels");
+  var schleifenAnInput = document.getElementById("schleifenAn");
   var trackLimitInput = document.getElementById("trackLimit");
   var trackStundenInput = document.getElementById("trackStunden");
   var replayInput = document.getElementById("replay");
@@ -2080,6 +2090,7 @@
 
   if (localStorage.getItem("aisstream_auto_enrich") === "0") autoEnrichInput.checked = false;
   if (localStorage.getItem("aisstream_show_labels") === "0") showLabelsInput.checked = false;
+  if (localStorage.getItem("aisstream_schleifen") === "1") schleifenAnInput.checked = true;
   if (localStorage.getItem("aisstream_own_pos") === "0") ownPosInput.checked = false;
   if (localStorage.getItem("aisstream_auto_snapshot") === "0") autoSnapshotInput.checked = false;
   if (localStorage.getItem("aisstream_auto_refresh") === "0") autoRefreshInput.checked = false;
@@ -2149,6 +2160,8 @@
         // Und die Spuren fuer den neuen Ausschnitt: Der Verlauf haengt an der
         // bbox, nicht am Schiff.
         verlaufHolen(false);
+        // Dasselbe fuer die Schleifen - auch sie haengen an der bbox.
+        schleifenHolen(false);
         // Wer die Karte zoomt oder schwenkt, arbeitet an der KARTE, nicht an
         // der Tabelle - und deren Inhalt aendert sich dabei zwangslaeufig.
         // Eine Ordnung festzuhalten, die fuer einen anderen Ausschnitt
@@ -7427,6 +7440,9 @@
       // und die Historie wird nur denen zugeordnet, die es gibt. Die Wache in
       // verlaufHolen() macht den Aufruf im Sekundentakt kostenlos.
       verlaufHolen(false);
+      // Und die Schleifen. Auch sie brauchen den Bestand: Ohne ihn stuenden
+      // im Kreishinweis lauter MMSIs statt Schiffsnamen. Dieselbe Wache.
+      schleifenHolen(false);
     };
 
     ws.onerror = function () { log("Proxy: Verbindungsfehler."); };
@@ -7616,6 +7632,119 @@
         log("Verlauf konnte nicht geladen werden: " + (e && e.message ? e.message : e));
       })
       .finally(function () { verlaufLaeuft = false; });
+  }
+
+  // --- Schleifen: wo in den letzten Stunden Runden gefahren wurden ---------
+  //
+  // Die Erkennung liegt im Proxy (aisproxy/src/anomalie.js) und NICHT hier:
+  // Sie braucht die Spuren aller Schiffe der ganzen Region ueber acht
+  // Stunden - gemessen 553 457 Punkte - und rechnet daran rund 3,7 s. Der
+  // Client bekommt davon 39 KB fertige Gebiete.
+  //
+  // Warum ueberhaupt: Gemeldet war "MMSI 311003300 faehrt seit zehn Stunden
+  // Schleifen" - und dass Lotsenboote das staendig tun. Beides steht jetzt
+  // auf der Karte, aber nicht gleich laut.
+  var SCHLEIFEN_STUNDEN = 8;
+  // Zwei Minuten. Der Proxy rechnet alle fuenf neu, oefter zu fragen brachte
+  // dieselbe Antwort - aber ein Schwenk in ein neues Gebiet soll nicht auf
+  // den naechsten Lauf warten muessen.
+  var SCHLEIFEN_FRISCH_MS = 2 * 60 * 1000;
+  var SCHLEIFEN_RAND = 0.25;
+  var schleifenKreise = [];
+  var schleifenBox = null;
+  var schleifenAt = 0;
+  var schleifenLaeuft = false;
+  var schleifenFehlerLog = false;
+
+  function schleifenWeg() {
+    if (mapAvailable) schleifenKreise.forEach(function (k) { map.removeLayer(k); });
+    schleifenKreise = [];
+    schleifenBox = null;
+    schleifenAt = 0;
+  }
+
+  function schleifenName(mmsi) {
+    var e = ships.get(String(mmsi));
+    return (e && e.name) ? e.name : String(mmsi);
+  }
+
+  function schleifenZeichnen(gebiete) {
+    schleifenKreise.forEach(function (k) { map.removeLayer(k); });
+    schleifenKreise = [];
+    // Die gewohnten zuerst, damit die auffaelligen im DOM darueber liegen -
+    // dieselbe Ueberlegung wie bei den Sichtlinien. An einer Ueberschneidung
+    // soll der kraeftige Kreis nicht vom blassen uebermalt werden.
+    gebiete.slice()
+      .sort(function (a, b) { return (a.stufe === "auffaellig" ? 1 : 0) - (b.stufe === "auffaellig" ? 1 : 0); })
+      .forEach(function (g) {
+        var laut = g.stufe === "auffaellig";
+        // fill:false statt fillOpacity:0 - Leaflet zeichnet dann gar kein
+        // Fuellelement. Und es haelt die Kreise klickdurchlaessig: Nur der
+        // Ring selbst faengt Klicks, nicht die Scheibe darunter. Eine gefuellte
+        // 6-km-Scheibe ueber der Karte waere die groesste Klickfalle hier.
+        var k = L.circle([g.lat, g.lon], {
+          radius: g.radius,
+          color: "#d92b2b",
+          weight: laut ? 2 : 1,
+          opacity: laut ? 0.9 : 0.4,
+          dashArray: laut ? null : "4 6",
+          fill: false
+        }).addTo(map);
+        var namen = g.schiffe.slice(0, 6).map(schleifenName);
+        if (g.schiffe.length > 6) namen.push("+" + (g.schiffe.length - 6) + " weitere");
+        k.bindTooltip(
+          (laut ? "Schleifen" : "Schleifen (Berufsverkehr)") + " · " +
+          g.schleifen + " Runde" + (g.schleifen === 1 ? "" : "n") + " von " +
+          g.schiffe.length + " Schiff" + (g.schiffe.length === 1 ? "" : "en") +
+          " · Radius " + (g.radius / 1000).toFixed(1) + " km<br>" + namen.join(", "),
+          { sticky: true });
+        schleifenKreise.push(k);
+      });
+  }
+
+  function schleifenHolen(erzwingen) {
+    if (!schleifenAnInput.checked) return;
+    if (!proxyLiefert() || !mapAvailable || schleifenLaeuft) return;
+    var b = map.getBounds();
+    var sicht = { latMin: b.getSouth(), lonMin: b.getWest(),
+                  latMax: b.getNorth(), lonMax: b.getEast() };
+    if (!erzwingen && boxCovers(schleifenBox, sicht) &&
+        Date.now() - schleifenAt < SCHLEIFEN_FRISCH_MS) return;
+
+    var dLat = (sicht.latMax - sicht.latMin) * SCHLEIFEN_RAND;
+    var dLon = (sicht.lonMax - sicht.lonMin) * SCHLEIFEN_RAND;
+    var abruf = { latMin: sicht.latMin - dLat, lonMin: sicht.lonMin - dLon,
+                  latMax: sicht.latMax + dLat, lonMax: sicht.lonMax + dLon };
+    var box = [abruf.latMin, abruf.lonMin, abruf.latMax, abruf.lonMax]
+      .map(function (x) { return x.toFixed(4); }).join(",");
+
+    schleifenLaeuft = true;
+    fetch(proxyMitToken(proxyBasis() + "/anomalien?bbox=" + encodeURIComponent(box) +
+        "&stunden=" + SCHLEIFEN_STUNDEN))
+      .then(function (res) {
+        // 503 heisst: Der Detektor ist auf diesem Proxy abgeschaltet. Das ist
+        // eine Auskunft, kein Fehler - und sie gehoert einmal ins Protokoll,
+        // sonst sucht jemand nach einer Ebene, die es dort nicht gibt.
+        if (res.status === 503) throw new Error("Der Proxy hat den Schleifenerkenner nicht eingeschaltet");
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (d) {
+        if (!d || !d.gebiete || !schleifenAnInput.checked) return;
+        schleifenZeichnen(d.gebiete);
+        schleifenBox = abruf;
+        schleifenAt = Date.now();
+        schleifenFehlerLog = false;
+        var laut = d.gebiete.filter(function (g) { return g.stufe === "auffaellig"; }).length;
+        log("Schleifen aus dem Proxy: " + d.gebiete.length + " Gebiete in den letzten " +
+          d.stunden + " h, davon " + laut + " mit Schiffen ausserhalb des Berufsverkehrs.");
+      })
+      .catch(function (e) {
+        if (schleifenFehlerLog) return;
+        schleifenFehlerLog = true;
+        log("Schleifen konnten nicht geladen werden: " + (e && e.message ? e.message : e));
+      })
+      .finally(function () { schleifenLaeuft = false; });
   }
 
   // Stammdaten und Register in einem Zug: Der Proxy hat den ganzen Bestand
@@ -8363,6 +8492,18 @@
   showLabelsInput.addEventListener("change", function () {
     localStorage.setItem("aisstream_show_labels", showLabelsInput.checked ? "1" : "0");
     refreshAllLabels();
+  });
+
+  schleifenAnInput.addEventListener("change", function () {
+    localStorage.setItem("aisstream_schleifen", schleifenAnInput.checked ? "1" : "0");
+    if (schleifenAnInput.checked) {
+      // erzwingen: Wer den Schalter umlegt, will das Ergebnis jetzt sehen und
+      // nicht erst nach der naechsten Kartenbewegung.
+      schleifenFehlerLog = false;
+      schleifenHolen(true);
+    } else {
+      schleifenWeg();
+    }
   });
 
   trackLimitInput.addEventListener("change", function () {

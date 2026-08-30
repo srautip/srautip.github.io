@@ -54,6 +54,9 @@ GET  /v1/replay?bbox=…&von=&bis=&schritt=  Stützpunktfolgen für die Animatio
 GET  /v1/track?mmsi=&von=&bis=             eine Spur in voller Auflösung
 GET  /v1/ship/{mmsi}                       Stammdaten, Register, Foto
 GET  /v1/foto/{datei}                      das Bild selbst
+GET  /v1/ort?codes=DEHAM,BEANR             UN/LOCODE → Ortsname
+GET  /v1/anomalien?bbox=…&stunden=8        Gebiete, in denen Schleifen gefahren wurden
+GET  /v1/einstellungen                     hinterlegte Zugänge für die 3D-Ansicht
 GET  /v1/status                            Ratenwächter und Zähler
 ```
 

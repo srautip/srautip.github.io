@@ -3575,13 +3575,62 @@ Position und Höhe der Karte, ob die Technik ausgelagert ist, ob die Tabelle
 als Karten läuft, `scrollWidth` gegen `clientWidth` und die Schriftgröße im
 Eingabefeld. Bedienung per `page.tap()`, nicht `click()`.
 
+## Schleifen als rote Kreise — die Erkennung liegt im Proxy, nicht hier
+
+Gewünscht: „besondere Manöver erkennen … Gebiete, in denen es die letzten 8 h
+Schleifen gab, mit roten Kreisen ohne Füllung markieren."
+
+**Die Erkennung gehört nicht in den Browser**, und das ist keine Bequemlichkeit:
+Sie braucht die Spuren *aller* Schiffe der ganzen Region über acht Stunden —
+gemessen 553 457 Punkte, 20 MB — und rechnet daran 3,3 s. Der Client bekäme
+das nie über die Leitung. Der Proxy hat die Daten ohnehin lokal, rechnet alle
+fünf Minuten und liefert **39 KB fertige Gebiete** für die ganze Region, 6,5 KB
+für die Deutsche Bucht. Warum die Erkennung so und nicht anders arbeitet,
+steht in `aisproxy/CLAUDE.md`.
+
+Hier bleiben drei Dinge:
+
+- **`fill: false`, nicht `fillOpacity: 0`.** Leaflet zeichnet dann gar kein
+  Füllelement statt eines unsichtbaren — dieselbe Regel wie bei den
+  Sichtlinien. Das ist hier nicht nur Kosmetik: Nur so fängt allein der Ring
+  Klicks ab. Eine gefüllte 6-km-Scheibe über der Karte wäre die größte
+  Klickfalle der Anwendung.
+- **Die gewohnten Kreise werden zuerst gezeichnet.** Dann liegen die
+  auffälligen im DOM darüber und werden an einer Überschneidung nicht vom
+  blassen Ring übermalt — dieselbe Überlegung wie beim größten Sichtring
+  zuerst.
+- **Zwei Stufen, beide rot.** Kräftig durchgezogen (`weight 2`, `opacity 0.9`),
+  sobald mindestens ein Schiff dabei ist, das nicht von Berufs wegen kreist;
+  dünn gestrichelt (`weight 1`, `opacity 0.4`) für Lotsenboote, Schlepper,
+  Fähren, Fischer und Bagger. **Die Einstufung fällt im Proxy**, weil sie am
+  Schiffstyp hängt und der Client den für ein Schiff außerhalb seines
+  Ausschnitts nicht kennt.
+
+Vorgabe ist **aus**: Die Ebene braucht einen Proxy, und eine Karte voller
+roter Kreise beim ersten Öffnen erklärt sich nicht selbst. Antwortet der Proxy
+mit **503**, ist der Detektor dort abgeschaltet — das steht als Auskunft im
+Protokoll, einmal, nicht bei jeder Kartenbewegung.
+
+### Gemessen in `scratchpad/schleifen_client.js` (8 Prüfungen)
+
+Gegen einen **echten** Proxy mit den echten 8-h-Spuren der Region: Schalter
+an → 11 Kreise, alle `#d92b2b`, alle `fill: none`, 9 kräftig und 2 blass, nur
+die blassen gestrichelt, das Protokoll nennt Gebiete und Fenster, Schalter aus
+→ null Kreise. Schirmfoto angesehen: kräftige Ringe an der Weser-Anfahrt, ein
+blasser gestrichelter über der Lotsenstation.
+
+Die Kette davor steht in `scratchpad/anomalie_echt.js` (11 Prüfungen, echter
+Speicher, echter Server): Das gemeldete Schiff **311003300** steht in zwei
+Gebieten und ist dort **auffällig**, die Lotsenstation Weser ist **gewohnt**
+(2 Berufsschleifer, 0 andere).
+
 ## Was in `localStorage` liegt
 
 Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
 
 | Schlüssel | Inhalt | TTL |
 |---|---|---|
-| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_own_pos`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_auto_refresh`, `aisstream_filters` | Einstellungen & Filterauswahl | unbegrenzt |
+| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_own_pos`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_auto_refresh`, `aisstream_filters`, `aisstream_schleifen` | Einstellungen & Filterauswahl | unbegrenzt |
 | `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss / **10 min unvollständig** (ohne IMO gelaufen), max. `ENRICH_MAX` = 400 |
 | `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d, max. 2000 |
 | `aisstream_ais` | **eine** JSON-Map MMSI → Position, Fahrtdaten, Personen an Bord, Binnenangaben | **30 min**, max. 1500 |

@@ -90,6 +90,31 @@ const konfig = {
   // Puffer verliert bei einem Absturz zu viel.
   SCHREIB_MS: zahl("AIS_SCHREIB_MS", 2000),
 
+  // --- Anomalien (Schleifen) ---
+  ANOMALIE_AN: text("AIS_ANOMALIE_AN", "1") !== "0",
+  // Das Fenster, das der Detektor vorhaelt. Die Karte darf ein kuerzeres
+  // waehlen (?stunden=), ein laengeres nicht - dafuer muesste neu erkannt
+  // werden, und das dauert Sekunden.
+  ANOMALIE_STUNDEN: zahl("AIS_ANOMALIE_STUNDEN", 8),
+  // Alle fuenf Minuten neu. Gemessen dauert ein voller Lauf ueber die Region
+  // rund 4,6 s reine Rechenzeit (in Kacheln verteilt), das sind 1,5 % der
+  // Zeit - und eine Schleife, die eben zu Ende gefahren wurde, steht damit
+  // spaetestens nach fuenf Minuten auf der Karte.
+  ANOMALIE_TAKT_MS: zahl("AIS_ANOMALIE_TAKT_MS", 5 * 60 * 1000),
+  // Rasterabstand der Spuren fuer die Erkennung. 60 s ist derselbe Wert, mit
+  // dem gemessen wurde; feiner bringt nichts, weil eine Schleife Minuten
+  // dauert, kostet aber mehr Punkte.
+  ANOMALIE_SCHRITT_S: zahl("AIS_ANOMALIE_SCHRITT_S", 60),
+  // Kachelgroesse fuer den Lauf. 1 Grad ergibt in der Region 21 Kacheln,
+  // zwischen denen die Ereignisschleife freigegeben wird.
+  ANOMALIE_KACHEL_GRAD: zahl("AIS_ANOMALIE_KACHEL_GRAD", 1),
+  // Ueberlappung der Kacheln. 0,15 Grad sind bei 54 Grad Nord rund 9,8 km in
+  // der Laenge - mehr als der groesste zugelassene Schleifendurchmesser (6 km),
+  // also kann keine Schleife auf einer Kachelgrenze verlorengehen.
+  ANOMALIE_KACHEL_RAND_GRAD: zahl("AIS_ANOMALIE_KACHEL_RAND_GRAD", 0.15),
+  // Was naeher beieinander liegt, wird ein Gebiet. Siehe anomalie.js.
+  ANOMALIE_ZUSAMMEN_M: zahl("AIS_ANOMALIE_ZUSAMMEN_M", 3000),
+
   // --- Register ---
   WIKIDATA_URL: text("AIS_WIKIDATA_URL", "https://query.wikidata.org/sparql"),
   DIGITRAFFIC_URL: text("AIS_DIGITRAFFIC_URL", "https://meri.digitraffic.fi/api/ais/v1/vessels"),
