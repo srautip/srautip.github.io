@@ -144,15 +144,16 @@ async function start() {
   // er mit dem Kaltstart und dem ersten Netzabruf zusammen, und dann warten
   // drei schwere Dinge aufeinander. Danach im Takt.
   //
-  // Zwei Takte, nicht einer: Der Ruhedurchgang liest ein dreimal so langes
-  // Fenster und trieb den Lauf gemessen von 9,3 s auf 56,3 s. Eine Ruhephase
-  // dauert mindestens sechs Stunden - alle 15 Minuten reicht dafuer, und der
-  // gewoehnliche Lauf bleibt kurz.
+  // Zwei Takte, nicht einer: Der Ruhedurchgang liest ein 24-h-Fenster ueber
+  // ALLE Spuren der Region und trieb den Lauf gemessen von 9,3 s auf 56,3 s.
+  // Eine Ruhephase dauert mindestens sechs Stunden - alle 15 Minuten reicht
+  // dafuer. Der Lotsendurchgang daneben fragt nur die Lotsenboote einzeln ab
+  // und kostet fast nichts.
   if (anomalie) {
-    setTimeout(() => anomalie.lauf(true).catch(e => log("Anomalie: " + e.message)), 60000);
-    setInterval(() => anomalie.lauf(false).catch(e => log("Anomalie: " + e.message)),
+    setTimeout(() => anomalie.lauf(true).catch(e => log("Lotsen/Anomalie: " + e.message)), 60000);
+    setInterval(() => anomalie.lauf(false).catch(e => log("Lotsen/Anomalie: " + e.message)),
       konfig.ANOMALIE_TAKT_MS);
-    setInterval(() => anomalie.lauf(true).catch(e => log("Anomalie: " + e.message)),
+    setInterval(() => anomalie.lauf(true).catch(e => log("Lotsen/Anomalie: " + e.message)),
       konfig.ANOMALIE_STILL_TAKT_MS);
   }
 

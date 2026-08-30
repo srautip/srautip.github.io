@@ -502,6 +502,29 @@ class Speicher {
     return this.db.prepare("SELECT * FROM schiff WHERE mmsi = ?").get(Number(mmsi)) || null;
   }
 
+  // Die Lotsenboote der Region. AIS-Typ 50 ODER der Name traegt PILOT/LOTSE.
+  //
+  // Die Namensregel ist keine Bequemlichkeit: Gemessen am Regionsbestand
+  // (2801 Schiffe) fuehren 49 Boote den Typ 50, aber 6 weitere Lotsenboote
+  // melden einen falschen (HAMBURG PILOT 3 und LOTSE 4 als 99, HAMBURG
+  // PILOT 4 und DANPILOT ALDEBARAN als 90, MEES (PILOTS) als 53). Ohne die
+  // Namensregel fehlt die ZWEITSTAERKSTE Station der Region ganz - Elbe bei
+  // Hamburg, 95 Runden in 24 h, ausschliesslich von solchen Booten.
+  //
+  // Ein Fehltreffer bliebe sichtbar: Der Tooltip auf der Karte nennt die
+  // Bootsnamen des Gebiets.
+  lotsenMmsis() {
+    try {
+      return this.db.prepare(
+        "SELECT mmsi FROM schiff WHERE typ = 50" +
+        " OR upper(name) LIKE '%PILOT%' OR upper(name) LIKE '%LOTSE%'"
+      ).all().map(r => Number(r.mmsi));
+    } catch (e) {
+      this.log("Lotsenliste fehlgeschlagen: " + e.message);
+      return [];
+    }
+  }
+
   stammSetze(mmsi, felder) {
     const vorhanden = this.stammHole(mmsi);
     // Vor dem Ueberschreiben: Ein gewechseltes Ziel gehoert in den Verlauf.

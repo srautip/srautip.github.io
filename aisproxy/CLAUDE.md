@@ -634,130 +634,149 @@ mal bis zu fünf Abrufen mal einer Sekunde — Stunden. Was nicht drankam,
 bleibt fällig und steht als `fotoOffen` im Bericht. **Eine stille Kappung
 liest sich wie „alles abgearbeitet".**
 
-## Schleifen erkennen: drei Kennzahlen, die es nicht können, und eine, die es kann
+## Lotsenbereiche: die Schleife war der Weg, nicht das Ziel
 
-Gemeldet: „MMSI 311003300 ist die letzten 10 h Schleifen gefahren. Oder
-Lotsenschiffe fahren ständig Schleifen — wie kann ich solche Schleifen
-erkennen?" Nachgemessen am 30. Aug. 2026 an **3 437 echten Spuren**
-(553 457 Punkte, 8 h, ganze Region).
+Gemeldet war ursprünglich: „MMSI 311003300 ist die letzten 10 h Schleifen
+gefahren. Oder Lotsenschiffe fahren ständig Schleifen — wie kann ich solche
+Schleifen erkennen?" Am Ende stand der zweite Halbsatz: Gezeigt werden
+**Lotsenbereiche**, also die Reviere, in denen Lotsenboote ihre Runden drehen.
+Der Weg dahin ging über drei Zwischenstufen, und die Zahlen daraus sind die
+eigentliche Auskunft (jeweils Gebiete in der ganzen Region):
 
-**Die drei naheliegenden Kennzahlen versagen, jede auf ihre Art:**
+| Stand | Regel | Gebiete |
+|---|---|---|
+| 30. Aug., früh | alle Schleifen, Einstufung „gewohnt/auffällig" | **277** |
+| 30. Aug., mittags | zusätzlich Landabstand ≥ 2 km | **100** |
+| 30. Aug., abends | statt dessen Typfilter (36, 60–69) | **225** |
+| **heute** | **nur Lotsenboote, ab 3 Runden je Gebiet** | **31** |
+
+Die Schleifenerkennung selbst ist **unverändert** — sie ist weiterhin das
+Werkzeug, nur wird sie jetzt auf 54 Boote statt auf 3 600 Spuren angewandt.
+Warum sie so und nicht anders arbeitet, steht darum weiter hier.
+
+### Die drei naheliegenden Kennzahlen versagen, jede auf ihre Art
+
+Nachgemessen am 30. Aug. 2026 an **3 437 echten Spuren** (553 457 Punkte, 8 h):
 
 | Kennzahl | Woran sie scheitert |
 |---|---|
-| **kumulierte Kursänderung** | Die Elbfähren sammeln in 8 h mehr davon als jedes Lotsenboot — sie wenden ja an jedem Ende. BRESLAU stand mit 7 932° vor PILOTT.WANGEROOG; nach dieser Zahl ist die Fähre auffälliger als der Lotse. |
-| **Umweg = Weg / Luftlinie** | Wer dort endet, wo er anfing, hat Luftlinie 0 und Umweg unendlich. Gemessen kamen Werte bis **101 606** heraus. Eine Kennzahl, die so ausschlägt, sagt nichts mehr. |
+| **kumulierte Kursänderung** | Die Elbfähren sammeln in 8 h mehr davon als jedes Lotsenboot — sie wenden ja an jedem Ende. BRESLAU stand mit 7 932° vor PILOTT.WANGEROOG. |
+| **Umweg = Weg / Luftlinie** | Wer dort endet, wo er anfing, hat Luftlinie 0 und Umweg unendlich. Gemessen kamen Werte bis **101 606** heraus. |
 | **Länglichkeit** (Hauptachsen) | Trennt Fähre und Lotse nicht: BRESLAU **5,92** gegen PILOTVESSEL HANSE **5,44**. Zwei Prozent Abstand ist keine Grenze, das ist ein Zufall. |
 
-**Was trennt, ist die Schleife selbst, nicht eine Note über die ganze Spur.**
+**Was trägt, ist die Schleife selbst, nicht eine Note über die ganze Spur.**
 `src/anomalie.js` sucht die geschlossene Runde: Die Spur kommt bis auf 400 m
 an einen früheren Punkt zurück, hat dabei mindestens 800 m Weg gemacht,
 bleibt unter 6 km Durchmesser — und **umschließt Fläche**. Eine Pendelfahrt
-kommt auch zurück, umschließt aber fast nichts; sie ist ein Strich.
-
-Der Nebengewinn ist der eigentliche: Eine Schleife hat damit einen **Ort** und
+kommt auch zurück, umschließt aber fast nichts; sie ist ein Strich. Der
+Nebengewinn ist der eigentliche: Eine Schleife hat damit einen **Ort** und
 eine **Zeit**, keine Note. Genau das braucht die Karte.
 
-Die Bilder haben das entschieden, nicht die Tabellen. Als die Spuren einmal
-gezeichnet dalagen, war auf einen Blick zu sehen, dass BRESLAU, OPPELN und
-KLEINENSIEL Fähren im Pendelverkehr sind und die hohen Kursänderungswerte
-nichts über „besondere Manöver" sagen.
-
-### Die Rundheitsschranke schließt den Strich aus, nicht die Fähre
-
-`A / (L²/4π)` — 1,0 wäre ein exakter Kreis, 0 ein Strich. Gemessen:
-
-| | |
-|---|---|
-| GENTLE LEADER (der gemeldete Fall) | 0,58 |
-| KAYLEE, PILOTT.WANGEROOG | 0,56 · 0,46 |
-| WESER PILOT | 0,33 |
-| Fähre KLEINENSIEL | 0,22 |
-| Fähre OPPELN | 0,001 |
-
-Die Schranke steht bei **0,06** und damit bewusst tief. Sie soll den entarteten
-Strich draußen halten; **Fähre und Lotse kann sie nicht trennen** — WESER PILOT
-0,33 gegen BRESLAU 0,31 wäre wieder eine Zufallsgrenze. Die Trennung fällt
-deshalb später und über den **Schiffstyp**: Lotsenboot, Schlepper, Fähre,
-Fischer und Bagger sind *Berufsschleifer* (`stufe: "gewohnt"`), alle anderen
-sind auffällig. Ein Autotransporter, der kreist, ist eine Meldung wert; ein
-Lotsenboot nicht. Beide bleiben auf der Karte, nur nicht gleich laut.
-
-An `pendel()` in `test/anomalie.test.js` nachgemessen: bis 5 m Versatz null
-Funde, ab 10 m greift die Erkennung.
+`A / (L²/4π)` — 1,0 wäre ein exakter Kreis, 0 ein Strich. Gemessen: GENTLE
+LEADER 0,58 · PILOTT.WANGEROOG 0,46 · WESER PILOT 0,33 gegen die Fähren
+KLEINENSIEL 0,22 und OPPELN 0,001. Die Schranke steht bei **0,06** und damit
+bewusst tief: Sie soll den entarteten Strich ausschließen, nicht die Fähre.
+**Fähre und Lotse kann Geometrie nicht trennen** — WESER PILOT 0,33 gegen
+BRESLAU 0,31 wäre wieder eine Zufallsgrenze. Deshalb trennt heute die
+Bootsliste, nicht die Form.
 
 ### Der Sprungfilter ist keine Vorsicht, sondern eine Messung
 
 GRIETJE (Autotransporter) kam mit **drei** Positionssprüngen auf **443 km Weg
 in 8 h** — 30 kn Dauerfahrt für ein Schiff, das vor Anker lag. Nach dem Filter
-(alles über 40 kn zwischen zwei Punkten fliegt raus) sind es 2,7 km, und die
-Spur ist unauffällig. Ohne ihn stand sie auf Platz eins jeder Rangliste.
+(alles über 40 kn zwischen zwei Punkten fliegt raus) sind es 2,7 km. Ohne ihn
+stand die Spur auf Platz eins jeder Rangliste.
 
-### Gerechnet wird in Kacheln, weil 4,6 s am Stück nicht gehen
+### Wer als Lotsenboot gilt: Typ 50 ODER der Name
 
-Ein Lauf über die ganze Region kostet gemessen **3,3–4,6 s** reine Rechenzeit.
-So lange darf im Proxy nichts blockieren: Er nimmt in dieser Zeit rund 150
-AIS-Meldungen entgegen, und die lägen alle im Rückstau. `Anomalie.lauf()`
-arbeitet deshalb 21 Kacheln zu je 1° ab und gibt zwischen ihnen mit
-`setImmediate` die Ereignisschleife frei.
+Gemessen am Regionsbestand (2 730 Schiffe): **49** Boote führen AIS-Typ 50,
+**45** tragen PILOT oder LOTSE im Namen — und **sechs Lotsenboote melden einen
+falschen Typ**: HAMBURG PILOT 3 und LOTSE 4 als 99, HAMBURG PILOT 4 und
+DANPILOT ALDEBARAN als 90, MEES (PILOTS) als 53.
 
-Die Kacheln **überlappen um 0,15°** (rund 9,8 km in der Länge bei 56° Nord,
-mehr als der größte zugelassene Schleifendurchmesser): Ohne den Rand fiele
-eine Schleife genau auf einer Kachelgrenze in keiner der beiden auf, weil ihre
-Spur dort zerschnitten wäre. Die dadurch doppelt gefundenen Schleifen fängt
-der Schlüssel `mmsi:startzeit` ab — beide Werte stehen fest, egal aus welcher
-Kachel die Spur kam.
+**Ohne die Namensregel fehlt die zweitstärkste Station der Region** — Elbe bei
+Hamburg, 94 Runden in 24 h, ausschließlich von Booten mit falschem Typ. Ein
+Fehltreffer bliebe dafür sichtbar: Der Tooltip auf der Karte nennt die
+Bootsnamen des Gebiets. Die Regel steht zweimal — als SQL in
+`speicher.lotsenMmsis()` und als `istLotse()` in `anomalie.js`, für den heißen
+Zustand. Wer eine ändert, muss die andere mitziehen.
 
-### Erkannt wird im Takt, verdichtet bei jeder Anfrage
+### Der Durchgang liest 54 Spuren, nicht 3 600
 
-Der Lauf legt **Einzelschleifen** ab (gemessen 1 359–1 395 in der Region, von
-442 Schiffen), alle fünf Minuten neu. Die Verdichtung zu Gebieten passiert
-erst in `hole()` — sie kostet **23 ms** und erlaubt dafür ein freies
-Zeitfenster (`?stunden=`), ohne neu erkennen zu müssen. Mehr als vorgehalten
-wird, gibt es nicht; das benutzte Fenster steht deshalb **in der Antwort**.
+Das ist der eigentliche Rückbau. Vorher las er **alle** Spuren der Region in
+21 Kacheln und siebte hinterher; jetzt fragt er die Lotsenboote einzeln über
+`speicher.spur(mmsi, …)` — ein Indexzugriff auf `(mmsi, t)` je Boot. Gemessen
+an echten Daten:
 
-Verdichtet wird um den jeweils **größten noch freien Keim**, damit ein Gebiet
-um seinen Kern wächst und nicht von einem zufälligen Rand aus. Gemessen bleibt
-es dabei handlich: Radius median **1,6 km**, 90 % unter 3,7 km, größtes 6,2 km
-— auch dort, wo 63 Schiffe in einem Gebiet liegen (Hamburger Hafen).
+| | |
+|---|---|
+| Lotsendurchgang (54 Spuren, 24 h, volle Auflösung) | **267 ms** |
+| Ruhedurchgang (21 Kacheln, alle Schiffe, 24 h) | **1 969 ms** |
+| Antwort von `/v1/lotsen` für die ganze Region | **12 ms, 4 KB** |
 
-Was der Client bekommt: **39 KB für die ganze Region**, 6,5 KB für die
-Deutsche Bucht.
+Kacheln, `setImmediate` je Kachel und der Dopplungsschlüssel
+`mmsi:startzeit` entfallen dort ersatzlos — eine Spur kommt genau einmal. Der
+**Ruhedurchgang behält sie**, denn seine Grundlinie braucht alle liegenden
+Schiffe. Beide haben ihren eigenen Takt (5 min gegen 15 min) und ihren
+**eigenen Zeitstempel im Bericht**: Eine gemeinsame Zahl ließe den älteren
+aktueller aussehen, als er ist.
 
-### Fähren gehen über den Schiffstyp weg — nach einem Umweg über den Landabstand
+Nebenbei fällt die 60-s-Rasterung weg: Bei 54 Spuren ist die volle Auflösung
+geschenkt, und sie findet gemessen **mehr** Schleifen (194 statt 147 in
+denselben acht Stunden).
 
-Gemeldet: die Fähren stören. Erst waren Passagierschiffe (60–69) zum Ausschluss
-vorgesehen, dann wurde stattdessen ein **Landabstand** gewünscht: alles unter
-2 km fällt weg. Das war gebaut und gemessen — und wieder zurückgebaut, weil das
-Ergebnis nicht taugte. Beide Zahlen an denselben 2 468 echten Schleifen
-(600 Schiffe, 8 h, ganze Region):
+### 24 Stunden, und ab drei Runden
 
-| Regel | Schleifen bleiben | Gebiete |
+**Das Fenster ist 24 h**, nicht 8: Gemessen ergeben 8 h 38 Gebiete aus 194
+Runden, 24 h dagegen 57 aus 574 — und erst dabei sind alle bekannten Reviere
+vertreten. Eine Station, an der gerade Ruhe war, fehlte im kurzen Fenster ganz.
+Gedeckt ist das durch `verdichte()`: Sie löscht nach `ROH_STUNDEN` nur die
+**liegenden** Punkte und dünnt die fahrenden auf 60 s aus. Eine Schleife ist
+Fahrt, sie überlebt also bis `HISTORIE_TAGE`.
+
+**Ein Gebiet braucht drei Runden.** Gemessen beruhen **19 von 57** Gebieten auf
+einer einzigen Runde — ein Boot auf dem Weg, keine Station. Ab drei bleiben
+**31**, und die bekannten Reviere liegen mit 15 bis 85 Runden weit darüber:
+
+| Ort | Runden in 24 h | Boote |
 |---|---|---|
-| kein Filter | 2 468 | 277 |
-| Landabstand 2 km | 297 | **100** |
-| **Typ 36 + 60–69 (heute)** | 1 399 | **225** |
+| 54,245 / 9,614 — Nord-Ostsee-Kanal | 85 | RUESTERBERGEN, BREIHOLZ |
+| 53,885 / 9,138 — Elbe bei Glückstadt | 56 | PILOT STEINBURG, PILOT DITHMARSCHEN |
+| 53,540 / 9,875 — Elbe bei Hamburg | 54 | HAMBURG PILOT 3/4, LOTSE 4 |
+| 53,868 / 7,869 — Jade/Weser-Ansteuerung | 38 | PILOTT.WANGEROOG, WESER PILOT |
+| 54,001 / 8,242 — Elbe-Ansteuerung Cuxhaven | 34 | PILOTTENDER DOESE, PILOTVESSEL HANSE |
+| 53,335 / 7,175 — Ems | 32 | IZURDIA |
+| 54,491 / 10,289 · 54,368 / 10,159 — Kieler Förde | 22 · 18 | PILOT TRAVEMUENDE, PILOT BUELK, PILOT LABOE |
+| 54,188 / 12,089 — Warnemünde | 15 | PILOT MUTTLAND |
 
-Der Landabstand nahm zwar 97 % der Fährenschleifen mit (454 von 466, ohne dass
-irgendwo „Fähre" steht), aber eben auch alles andere, was dicht unter Land
-arbeitet: Schlepper, Lotsenboote, Fischer, Bagger, Hafenboote. Helgoland-Reede,
-Kieler Förde und die ganze Unterelbe waren stumm. Der Typfilter ist gröber und
-trifft weniger genau — er lässt die Arbeitsschiffe aber stehen, und das ist die
-Ebene, um die es geht.
+Erkannt wird im Takt, **verdichtet bei jeder Anfrage** — das erlaubt ein freies
+Zeitfenster (`?stunden=`), ohne neu erkennen zu müssen. Mehr als vorgehalten
+wird, gibt es nicht; das benutzte Fenster steht deshalb **in der Antwort**,
+ebenso die Zahl der bekannten Boote: Ohne sie wäre „0 Gebiete" nicht von
+„keine Lotsenliste" zu unterscheiden.
 
-**Der Preis in der anderen Richtung gehört dazugesagt:** In einem typischen
-Ausschnitt (53,3–54,3 °N / 7–9 °O) stehen jetzt **50 Gebiete statt rund 12**,
-38 davon kräftig gezeichnet. Bei Arbeitszoom (Stufe 10) ist das gut lesbar, in
-der Regionsübersicht (Stufe 8, 193 Gebiete) wird es dicht.
+### Zwei Endpunkte, weil es zwei Fragen sind
 
-**Sportboote (37) bleiben ausdrücklich drin** — gefragt waren Segelschiffe.
+`/v1/lotsen` sagt, wo gelotst wird; `/v1/anomalien` sagt, wer außerhalb der
+gewohnten Liegeplätze stillliegt. Bis dahin lieferte **ein** Endpunkt beides,
+und das war richtig, solange beide Ebenen dieselbe Frage beantworteten. Ein
+Endpunkt namens „Lotsen", der Stillstand mitliefert, wäre der schlechtere
+Handel gewesen. Der Client holt jetzt zwei statt einer Antwort — parallel, je
+gemessen im Millisekundenbereich.
 
-#### Was die Küstenmessung gekostet hat, und was davon bleibt
+**`/v1/lotsen*` musste in den Caddy-Matcher.** `test/caddy.test.js` erzwingt
+das, und `update.sh` prüft nach dem Reload mit `caddy-pruefen.sh --heilen` die
+**laufende** Konfiguration. Genau dieser Schritt ist hier dreimal schiefgegangen.
 
-Der Landfilter ist gelöscht (`src/kueste.js`, `karten/kueste.json`,
-`werkzeug/kueste-bauen.js`); die Git-Historie hält ihn fest. Die Quellenprüfung
-war zu teuer, um sie zu verlieren — wer je wieder eine Küstenlinie braucht,
-fängt hier an:
+### Was der Landfilter gekostet hat, und was davon bleibt
+
+Zwischendurch fielen Fähren über den **Landabstand** weg statt über den Typ:
+alles unter 2 km. Das traf sie genauer (454 von 466 Fährenschleifen, ohne dass
+irgendwo „Fähre" steht), nahm aber alles andere mit, was dicht unter Land
+arbeitet — Schlepper, Lotsenboote, Fischer, Bagger. Gelöscht ist er wieder
+(`src/kueste.js`, `karten/kueste.json`, `werkzeug/kueste-bauen.js`); die
+Git-Historie hält ihn fest. Die Quellenprüfung war zu teuer, um sie zu
+verlieren — wer je wieder eine Küstenlinie braucht, fängt hier an:
 
 | Quelle | Befund |
 |---|---|
@@ -775,6 +794,14 @@ Strahlentest über den beschnittenen Segmentsatz erklärte die offene Nordsee zu
 Land; geprüft werden muss je vollständigem Ring. **Douglas-Peucker auf einem
 geschlossenen Ring** hat Anfang und Ende am selben Punkt und ließ 535 Ringe
 entarten, davon 37 größer als 200 m und der größte 1 373 m — echte Inseln.
+
+**Die Lehre aus vier Anläufen an einer Ebene:** Die Frage war nie „welche
+Schiffe filtere ich weg", sondern „welche Auskunft soll die Karte geben". Drei
+Filterrunden lang stand die erste Frage vorn, und jede Antwort darauf war
+nachweisbar schlechter als die nächste. Erst „zeig mir die Lotsenreviere" hat
+die Ebene brauchbar gemacht — und dabei nebenbei den Durchgang von 3 600 auf
+54 Spuren gebracht.
+
 ## Stillstand: 77 % liegen still, die Auskunft steckt im „außerhalb"
 
 **2 346 von 3 021 Schiffen liegen still.** „Stillstand" allein ist deshalb
@@ -864,10 +891,14 @@ Kaputt war nichts — 21 Kacheln mit `setImmediate` dazwischen, rund 1,3 s je
 Abschnitt, der AIS-Strom staut sich darin um etwa 43 Nachrichten. Aber 56 s
 alle fünf Minuten sind 19 % Dauerlast. Eine Ruhephase dauert mindestens sechs
 Stunden, also hat der Durchgang jetzt einen **eigenen Takt**
-(`ANOMALIE_STILL_TAKT_MS`, 15 min): `lauf(false)` für die Schleifen,
+(`ANOMALIE_STILL_TAKT_MS`, 15 min): `lauf(false)` nur für die Lotsenbereiche,
 `lauf(true)` für beides. Der letzte Ruhestand bleibt dabei stehen — ihn zu
 leeren hieße, die Ebene zwischen zwei Ruheläufen stumm abzuschalten — und
 `ruheGerechnet` sagt im Status, wie alt er ist.
+
+Seit der Lotsendurchgang nur noch 54 Spuren je MMSI liest (**267 ms** gegen
+1 969 ms für die Kacheln), ist er ohnehin der billigere von beiden — die
+Trennung der Takte bleibt trotzdem richtig, denn die Last kam nie von ihm.
 
 ### In dünn abgedeckten Gewässern meldet das Verfahren mehr
 
@@ -892,12 +923,14 @@ zeitweise über 0,5 kn) weiter. `ANOMALIE_STILL_STUNDEN` ist deshalb auf
 
 - **AIS-Lücken und Geschwindigkeitssprünge** liegen im selben Rahmen, sind
   aber nicht gebaut.
-- **Es gibt keinen gelernten Normalzustand für Schleifen.** Der Detektor
-  weiß nicht, dass an einer Lotsenstation seit Jahren gekreist wird — die
-  Typtabelle ist ein Ersatz dafür. Beim Stillstand ist dieser Schritt getan
-  (die Grundlinie), bei den Schleifen nicht.
+- **Es gibt keine gelernte Lotsenstation über Tage.** Das Fenster sind 24 h;
+  wo seit Jahren gelotst wird, weiß der Proxy nicht. Eine dauerhaft
+  mitgeschriebene Stationstabelle wäre der nächste Schritt — beim Stillstand
+  ist er getan (die Grundlinie), bei den Lotsenbereichen nicht.
 - **Eine Grundlinie über mehrere Tage** bräuchte eine eigene, dauerhaft
-  mitgeschriebene Tabelle, weil die Verdichtung die Liegenden wegwirft.
+  mitgeschriebene Tabelle, weil die Verdichtung die Liegenden wegwirft. Für
+  die Lotsenbereiche gilt das nicht — Schleifen sind Fahrt und überleben bis
+  `HISTORIE_TAGE`; dort wäre ein längeres Fenster nur eine Zahl.
 
 ## Sichern heißt `VACUUM INTO`, nicht `cp`
 
