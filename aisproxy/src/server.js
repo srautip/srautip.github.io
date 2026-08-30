@@ -180,10 +180,23 @@ class Server {
     // Auskunft. Deshalb steht das benutzte Fenster mit in der Antwort.
     stunden = Math.min(stunden, vorrat);
     const gebiete = this.anomalie.hole(box, stunden);
+    // Der Stillstand hat sein EIGENES Fenster - es haengt an ROH_STUNDEN, weil
+    // die Verdichtung die Liegenden danach loescht. Beide Zahlen stehen in der
+    // Antwort, sonst raet der Client.
+    const stillStunden = Math.min(
+      Number(url.searchParams.get("stillstunden")) || this.konfig.ANOMALIE_STILL_STUNDEN,
+      this.konfig.ANOMALIE_STILL_STUNDEN);
+    const stillstand = this.anomalie.stillstand(box, stillStunden);
     return jsonAus(res, 200, {
       stunden,
+      stillStunden,
       gerechnet: this.anomalie.gerechnet || null,
       anzahl: gebiete.length,
+      stillAnzahl: stillstand.length,
+      // Ein Schiff, das laenger als ANOMALIE_STILL_MIN_S stillliegt, ohne dass
+      // in der Naehe andere liegen. lat/lon ist der Liegeort, dauer in
+      // Sekunden, nachbarn die Zahl der anderen Liegenden im Umkreis.
+      stillstand,
       // radius in Metern, lat/lon der Mittelpunkt. "stufe" ist "auffaellig",
       // sobald mindestens ein Schiff dabei ist, das nicht von Berufs wegen
       // kreist - Lotse, Schlepper, Faehre, Fischer und Bagger tun das staendig.

@@ -14,9 +14,15 @@ const MITTE = { lat: 54.0, lon: 8.0 };
 const KY = 111320, KX = 111320 * Math.cos(54 * Math.PI / 180);
 
 // Punkte im Format des Speichers: [t, lat*1e6, lon*1e6, sog*10, cog*10]
+//
+// Kein "sogKn || 5": Das machte aus der 0 eine 5, und jede Ruheprobe fand
+// nichts, weil ihre stillliegenden Schiffe mit fuenf Knoten unterwegs waren.
+// Derselbe Falsy-Fehler wie in pendel() weiter unten - beim zweiten Mal
+// gehoert er benannt.
 function pkt(t, dxM, dyM, sogKn) {
   return [t, Math.round((MITTE.lat + dyM / KY) * 1e6),
-          Math.round((MITTE.lon + dxM / KX) * 1e6), Math.round((sogKn || 5) * 10), 0];
+          Math.round((MITTE.lon + dxM / KX) * 1e6),
+          Math.round((sogKn == null ? 5 : sogKn) * 10), 0];
 }
 
 // Ein Kreis mit r Metern Radius, in n Schritten, ab Zeitpunkt t0 alle dt s.
@@ -259,4 +265,210 @@ test("die Kacheln decken die Region ab und ueberlappen", () => {
   const randM = KONFIG.ANOMALIE_KACHEL_RAND_GRAD * 111320 * Math.cos(56 * Math.PI / 180);
   assert.ok(randM > A.MAX_DURCHMESSER_M,
     "Rand " + Math.round(randM) + " m muss ueber " + A.MAX_DURCHMESSER_M + " m liegen");
+});
+
+// --- Stillstand ------------------------------------------------------------
+
+// Eine Ruhephase: n Punkte am selben Ort, alle dt Sekunden.
+function liegt(t0, stunden, dt, x0, y0, streu) {
+  const aus = [];
+  const n = Math.round(stunden * 3600 / dt);
+  for (let i = 0; i <= n; i++) {
+    // Ein bisschen Zappeln wie ein schwojendes Schiff, aber innerhalb streu.
+    const w = 2 * Math.PI * i / 7;
+    aus.push(pkt(t0 + i * dt, (x0 || 0) + Math.cos(w) * (streu || 30),
+                 (y0 || 0) + Math.sin(w) * (streu || 30), 0));
+  }
+  return aus;
+}
+
+test("wer sieben Stunden auf der Stelle liegt, hat eine Ruhephase", () => {
+  const g = A.ruhephasen(liegt(1000, 7, 300), 6 * 3600);
+  assert.strictEqual(g.length, 1, "gefunden: " + g.length);
+  assert.ok(g[0].dauer >= 6 * 3600);
+  assert.ok(g[0].radius <= A.STILL_M, "Radius " + g[0].radius);
+});
+
+test("fuenf Stunden reichen nicht, sieben schon", () => {
+  assert.deepStrictEqual(A.ruhephasen(liegt(1000, 5, 300), 6 * 3600), []);
+  assert.strictEqual(A.ruhephasen(liegt(1000, 7, 300), 6 * 3600).length, 1);
+});
+
+test("wer sich um 500 m bewegt, liegt nicht still", () => {
+  // Dieselbe Dauer, aber ueber STILL_M verteilt: keine Ruhephase.
+  assert.deepStrictEqual(A.ruhephasen(liegt(1000, 7, 300, 0, 0, 500), 6 * 3600), []);
+  // Gegenprobe mit 100 m - sonst pruefte der Test nur die Dauer.
+  assert.strictEqual(A.ruhephasen(liegt(1000, 7, 300, 0, 0, 100), 6 * 3600).length, 1);
+});
+
+test("Fahrt dazwischen zerteilt die Ruhe in zwei Phasen", () => {
+  const p = liegt(1000, 7, 300)
+    .concat([pkt(1000 + 7 * 3600 + 300, 3000, 0, 8)])   // faehrt weg
+    .concat(liegt(1000 + 7 * 3600 + 600, 7, 300, 3000, 0));
+  const g = A.ruhephasen(p, 6 * 3600);
+  assert.strictEqual(g.length, 2, "gefunden: " + g.length);
+});
+
+test("die Nachbarschaft zaehlt Schiffe, nicht Phasen", () => {
+  const ph = [
+    { mmsi: 1, lat: 54.0, lon: 8.0 },
+    { mmsi: 2, lat: 54.002, lon: 8.002 },      // rund 250 m
+    { mmsi: 2, lat: 54.003, lon: 8.003 },      // dasselbe Schiff nochmal
+    { mmsi: 9, lat: 54.9, lon: 8.9 }           // weit weg
+  ];
+  A.nachbarnZaehlen(ph, 3000);
+  assert.strictEqual(ph[0].nachbarn, 1, "Schiff 2 zaehlt einmal, nicht zweimal");
+  assert.strictEqual(ph[3].nachbarn, 0);
+});
+
+// --- Der Kern: was ist ein Ankerplatz --------------------------------------
+
+const STILL_KONFIG = Object.assign({}, KONFIG, {
+  ANOMALIE_STILL_STUNDEN: 24, ANOMALIE_STILL_SCHRITT_S: 300,
+  ANOMALIE_STILL_MIN_S: 6 * 3600, ANOMALIE_STILL_GRUND_S: 2 * 3600,
+  ANOMALIE_STILL_UMKREIS_M: 3000, ANOMALIE_STILL_MIN: 2,
+  ANOMALIE_LAND_M: 0
+});
+const WEITBOX = { latMin: 40, lonMin: 0, latMax: 60, lonMax: 20 };
+
+function ruheProxy(spuren, typen) {
+  let i = 0;
+  const speicher = {
+    spuren() { return i++ === 0 ? [] : spuren; },   // 1. Durchgang Schleifen, 2. Ruhe
+    stammHole(m) { return { typ: (typen || {})[m] }; }
+  };
+  return new A.Anomalie({ konfig: STILL_KONFIG, speicher, zustand: null });
+}
+
+test("allein liegen wird gemeldet, zu dritt liegen nicht", async () => {
+  const jetzt = Math.floor(Date.now() / 1000);
+  const t0 = jetzt - 10 * 3600;
+  const allein = ruheProxy([{ mmsi: 70, punkte: liegt(t0, 7, 300) }]);
+  await allein.lauf();
+  assert.strictEqual(allein.stillstand(WEITBOX, 24).length, 1, "einer allein: Meldung");
+
+  // Dieselbe Lage, aber zwei Nachbarn in 500 m: ein Ankerplatz.
+  const zuDritt = ruheProxy([
+    { mmsi: 70, punkte: liegt(t0, 7, 300) },
+    { mmsi: 71, punkte: liegt(t0, 7, 300, 400, 0) },
+    { mmsi: 72, punkte: liegt(t0, 7, 300, 0, 400) }
+  ]);
+  await zuDritt.lauf();
+  assert.strictEqual(zuDritt.stillstand(WEITBOX, 24).length, 0,
+    "zu dritt ist ein Ankerplatz, keine Meldung");
+});
+
+test("die Grundlinie zaehlt auch Schiffe, die selbst nie gemeldet wuerden", async () => {
+  // Genau der Fehler, der beim Messen unterlaufen ist: Wer Grundlinie und
+  // Meldung mit demselben Sieb filtert, laesst die Nachbarn verschwinden -
+  // und dann wirken MEHR Schiffe einsam statt weniger.
+  const jetzt = Math.floor(Date.now() / 1000);
+  const t0 = jetzt - 10 * 3600;
+  const a = ruheProxy([
+    { mmsi: 70, punkte: liegt(t0, 7, 300) },                    // Frachter
+    { mmsi: 36, punkte: liegt(t0, 3, 300, 400, 0) },            // Segler, ausgenommen
+    { mmsi: 37, punkte: liegt(t0, 3, 300, 0, 400) }             // noch einer
+  ], { 70: 70, 36: 36, 37: 36 });
+  await a.lauf();
+  assert.strictEqual(a.stillstand(WEITBOX, 24).length, 0,
+    "die beiden Segler machen den Ort zum Liegeplatz, auch wenn sie selbst " +
+    "nie gemeldet wuerden");
+});
+
+test("wer das ganze Fenster ueber liegt, ist Moebel", async () => {
+  const jetzt = Math.floor(Date.now() / 1000);
+  // Von Fensteranfang bis Fensterende - Kai, Plattform, Hubinsel.
+  const a = ruheProxy([{ mmsi: 70, punkte: liegt(jetzt - 24 * 3600, 24, 300) }]);
+  await a.lauf();
+  assert.strictEqual(a.stillstand(WEITBOX, 24).length, 0);
+  assert.ok(a.ruhe.length > 0, "die Phase ist erkannt, nur nicht gemeldet");
+  assert.ok(a.ruhe[0].dauerlieger, "und ausdruecklich als Dauerlieger vermerkt");
+});
+
+test("ein ausgenommener Typ wird nicht gemeldet, ein anderer schon", async () => {
+  const jetzt = Math.floor(Date.now() / 1000);
+  const t0 = jetzt - 10 * 3600;
+  const segler = ruheProxy([{ mmsi: 36, punkte: liegt(t0, 7, 300) }], { 36: 36 });
+  await segler.lauf();
+  assert.strictEqual(segler.stillstand(WEITBOX, 24).length, 0, "Segel ist ausgenommen");
+  const frachter = ruheProxy([{ mmsi: 70, punkte: liegt(t0, 7, 300) }], { 70: 70 });
+  await frachter.lauf();
+  assert.strictEqual(frachter.stillstand(WEITBOX, 24).length, 1, "ein Frachter nicht");
+});
+
+// --- Der Landfilter --------------------------------------------------------
+
+test("Schleifen in Landnaehe fallen weg, die draussen bleiben", async () => {
+  const { Kueste } = require("../src/kueste");
+  const kueste = new Kueste({ region: KONFIG.REGION, log: () => {} });
+  assert.ok(kueste.da, "ohne Kuestendatei prueft dieser Test nichts: " + kueste.grund);
+
+  const jetzt = Math.floor(Date.now() / 1000);
+  // Zwei gleiche Schleifen an verschiedenen Orten. Der Kreis wird um MITTE
+  // gebaut; fuer den zweiten Ort wird die Spur verschoben.
+  function kreisBei(la, lo) {
+    return kreis(600, 40, jetzt - 3000, 60).map(p => [
+      p[0], Math.round((la + (p[1] / 1e6 - MITTE.lat)) * 1e6),
+      Math.round((lo + (p[2] / 1e6 - MITTE.lon)) * 1e6), p[3], p[4]]);
+  }
+  const spuren = [
+    { mmsi: 70, punkte: kreisBei(54.5, 6.5) },      // offene Nordsee
+    { mmsi: 71, punkte: kreisBei(53.8919, 9.1438) } // Elbe bei Glueckstadt
+  ];
+  const konfig = Object.assign({}, KONFIG, { ANOMALIE_LAND_M: 2000 });
+  const mkProxy = (k) => {
+    const speicher = { spuren: () => spuren, stammHole: () => ({ typ: 70 }) };
+    return new A.Anomalie({ konfig, speicher, zustand: null, kueste: k });
+  };
+  const mit = mkProxy(kueste);
+  await mit.lauf();
+  const g = mit.hole({ latMin: 50, lonMin: 0, latMax: 60, lonMax: 15 }, 8);
+  const mmsis = g.flatMap(x => x.schiffe).sort();
+  assert.deepStrictEqual(mmsis, [70], "nur die Schleife auf offener See bleibt");
+
+  // Gegenprobe OHNE Kuestendatei: dann faellt nichts weg. Ein stiller
+  // Totalausfall waere schlimmer als gar kein Filter.
+  const ohne = mkProxy(null);
+  await ohne.lauf();
+  const g2 = ohne.hole({ latMin: 50, lonMin: 0, latMax: 60, lonMax: 15 }, 8);
+  assert.deepStrictEqual(g2.flatMap(x => x.schiffe).sort((a, b) => a - b), [70, 71],
+    "ohne Kueste bleiben beide");
+});
+
+test("der Dauerlieger-Vermerk haengt an den Daten, nicht am Wunschfenster", async () => {
+  const jetzt = Math.floor(Date.now() / 1000);
+  // Ein Frachter liegt 7 h, waehrend daneben 20 h lang Verkehr laeuft. Die
+  // Beobachtung ist damit lang genug fuer ein Urteil - und der Frachter lag
+  // NICHT die ganze Zeit da.
+  const fahrend = [];
+  for (let i = 0; i <= 240; i++) fahrend.push(pkt(jetzt - 20 * 3600 + i * 300, i * 200, 5000, 8));
+  const a = ruheProxy([
+    { mmsi: 70, punkte: liegt(jetzt - 10 * 3600, 7, 300) },
+    { mmsi: 99, punkte: fahrend }
+  ]);
+  await a.lauf();
+  assert.strictEqual(a.stillstand(WEITBOX, 24).length, 1, "wird gemeldet");
+  assert.ok(a.ruhe.some(f => !f.dauerlieger));
+
+  // Derselbe Frachter, aber er liegt ueber die GANZE beobachtete Zeit.
+  const b = ruheProxy([
+    { mmsi: 70, punkte: liegt(jetzt - 20 * 3600, 20, 300) },
+    { mmsi: 99, punkte: fahrend }
+  ]);
+  await b.lauf();
+  assert.strictEqual(b.stillstand(WEITBOX, 24).length, 0, "Moebel, keine Meldung");
+});
+
+test("bei zu kurzer Beobachtung gilt niemand als Moebel", async () => {
+  // Ein frisch gestarteter Proxy hat nur Stunden Historie. Nach dem
+  // nominellen 24-h-Fenster waere dann NIEMAND Dauerlieger und jedes
+  // festgemachte Schiff im Hafen bekaeme eine Meldung; nach der Datenspanne
+  // waere umgekehrt JEDER Moebel. Beides ist falsch - deshalb urteilt der
+  // Vermerk erst ab dem Doppelten der Meldeschwelle.
+  const jetzt = Math.floor(Date.now() / 1000);
+  const a = ruheProxy([{ mmsi: 70, punkte: liegt(jetzt - 7 * 3600, 7, 300) }]);
+  await a.lauf();
+  assert.ok(a.ruhe.length > 0);
+  assert.ok(a.ruhe.every(f => !f.dauerlieger), "kein Urteil bei 7 h Beobachtung");
+  assert.strictEqual(a.stillstand(WEITBOX, 24).length, 1, "im Zweifel melden");
 });

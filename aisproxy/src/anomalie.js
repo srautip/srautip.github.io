@@ -76,6 +76,95 @@ function berufsschleifer(typ) {
   return typ != null && BERUF.has(Number(typ));
 }
 
+// Ganz draussen, nicht nur leiser. Segelschiffe waren die ausdrueckliche
+// Vorgabe; Faehren erledigt der Landfilter (gemessen 454 von 466
+// Passagierschleifen), sie stehen deshalb NICHT hier.
+const AUSGENOMMEN = new Set([36]);
+function ausgenommen(typ) {
+  return typ != null && AUSGENOMMEN.has(Number(typ));
+}
+
+// --- Stillstand ------------------------------------------------------------
+//
+// 77 % aller Schiffe liegen still (gemessen 2 346 von 3 021). "Stillstand"
+// allein ist deshalb keine Auskunft - alles haengt am AUSSERHALB.
+//
+// Und dafuer braucht es keine Ankerplatzliste: "Ankerplatz" heisst "hier
+// liegen viele Schiffe still", und das ist in denselben Daten messbar. Die
+// Grundlinie deckt so Reeden UND Kais ab, was eine Ankerplatzliste nicht
+// taete.
+
+// Ab hier gilt ein Schiff als liegend. Derselbe Wert wie FAHRT_KN, mit dem
+// die Verdichtung arbeitet - zwei verschiedene Grenzen fuer dieselbe Frage
+// waeren eine Falle.
+const STILL_KN = 0.5;
+// So eng muss die Spur bleiben. Ein Schiff vor Anker schwojt; 300 m fasst
+// das, ohne eine langsame Fahrt durchzulassen.
+const STILL_M = 300;
+
+// Zusammenhaengende Abschnitte, in denen ein Schiff steht.
+function ruhephasen(punkte, mindestS) {
+  const P = saeubere(punkte);
+  if (P.length < 3) return [];
+  const aus = [];
+  let lauf = [];
+  const schliesse = () => {
+    if (lauf.length < 3) return;
+    const dauer = lauf[lauf.length - 1].t - lauf[0].t;
+    if (dauer < mindestS) return;
+    let cx = 0, cy = 0;
+    for (const q of lauf) { cx += q.x; cy += q.y; }
+    cx /= lauf.length; cy /= lauf.length;
+    let r = 0;
+    for (const q of lauf) r = Math.max(r, Math.hypot(q.x - cx, q.y - cy));
+    if (r > STILL_M) return;
+    let la = 0, lo = 0;
+    for (const q of lauf) { la += q.lat; lo += q.lon; }
+    aus.push({
+      von: lauf[0].t, bis: lauf[lauf.length - 1].t, dauer,
+      lat: la / lauf.length, lon: lo / lauf.length, radius: Math.round(r)
+    });
+  };
+  for (const q of P) {
+    if (q.sog < STILL_KN) lauf.push(q);
+    else { schliesse(); lauf = []; }
+  }
+  schliesse();
+  return aus;
+}
+
+// Wie viele ANDERE Schiffe lagen in Reichweite still? Gitterbasiert, nicht
+// paarweise: Bei rund 4 000 Phasen waeren das 16 Mio. Vergleiche je Anfrage.
+function nachbarnZaehlen(phasen, umkreisM) {
+  const G = umkreisM / 111320;          // Zellenkante = Umkreis, dann reichen 3x3
+  const eimer = new Map();
+  for (const f of phasen) {
+    const k = Math.floor(f.lon / G) + ":" + Math.floor(f.lat / G);
+    let v = eimer.get(k);
+    if (!v) eimer.set(k, v = []);
+    v.push(f);
+  }
+  for (const f of phasen) {
+    const { kx, ky } = massstab(f.lat);
+    const gx = Math.floor(f.lon / G), gy = Math.floor(f.lat / G);
+    const andere = new Set();
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const v = eimer.get((gx + dx) + ":" + (gy + dy));
+        if (!v) continue;
+        for (const g of v) {
+          if (g.mmsi === f.mmsi) continue;
+          if (Math.hypot((g.lon - f.lon) * kx, (g.lat - f.lat) * ky) <= umkreisM) {
+            andere.add(g.mmsi);
+          }
+        }
+      }
+    }
+    f.nachbarn = andere.size;
+  }
+  return phasen;
+}
+
 // --- Geometrie -------------------------------------------------------------
 
 // Meter je Grad. In der Region (53-56 Grad Nord) ist die ebene Naeherung auf
@@ -208,12 +297,16 @@ class Anomalie {
   // brauchte 4,6 s am Stueck. So lange darf hier nichts blockieren - der
   // Proxy nimmt in dieser Zeit rund 150 AIS-Meldungen entgegen, und die
   // laegen dann alle im Rueckstau.
-  constructor({ konfig, speicher, zustand, log }) {
+  constructor(opt) {
+    const { konfig, speicher, zustand, log } = opt;
     this.konfig = konfig;
     this.speicher = speicher;
     this.zustand = zustand;
     this.log = log || (() => {});
+    this.kueste = opt.kueste || null;
     this.ereignisse = [];
+    this.ruhe = [];                  // alle Ruhephasen, auch die gewoehnlichen
+    this.ruheFenster = null;         // { von, bis } des letzten Laufs
     this.gerechnet = 0;
     this.dauerMs = 0;
     this.laeuft = false;
@@ -249,8 +342,11 @@ class Anomalie {
     const t0 = Date.now();
     const bisS = Math.floor(Date.now() / 1000);
     const vonS = bisS - this.konfig.ANOMALIE_STUNDEN * 3600;
-    const gesehen = new Set();
-    const aus = [];
+    const stillBis = bisS;
+    const stillVon = stillBis - this.konfig.ANOMALIE_STILL_STUNDEN * 3600;
+    const gesehen = new Set(), gesehenRuhe = new Set();
+    const aus = [], ruhe = [];
+    let datenVon = Infinity, datenBis = -Infinity;
     try {
       for (const kachel of this.kacheln()) {
         // Zwischen den Kacheln die Schleife freigeben. setImmediate und nicht
@@ -273,13 +369,76 @@ class Anomalie {
             aus.push(e);
           }
         }
+
+        // Zweiter Durchgang derselben Kachel: der Stillstand. Eigenes Fenster
+        // (24 h statt 8) und eigenes Raster (300 s statt 60), weil eine
+        // Ruhephase Stunden dauert - ein Minutenraster kostete dafuer die
+        // fuenffache Punktzahl und braechte nichts.
+        if (this.konfig.ANOMALIE_STILL_STUNDEN > 0) {
+          await new Promise(f => setImmediate(f));
+          let liegend;
+          try {
+            liegend = this.speicher.spuren(kachel, stillVon, stillBis,
+              this.konfig.ANOMALIE_STILL_SCHRITT_S);
+          } catch (e) { this.log("Anomalie, Ruhekachel uebersprungen: " + e.message); continue; }
+          for (const s2 of liegend) {
+            // Die beobachtete Spanne kommt aus ALLEN Spuren, nicht nur aus den
+            // ruhenden: Sonst waere bei einem einzigen liegenden Schiff dessen
+            // eigene Phase die ganze "Beobachtung", und es gaelte immer als
+            // Moebel.
+            for (const p of s2.punkte) {
+              if (p[0] < datenVon) datenVon = p[0];
+              if (p[0] > datenBis) datenBis = p[0];
+            }
+            for (const f of ruhephasen(s2.punkte, this.konfig.ANOMALIE_STILL_GRUND_S)) {
+              const k = s2.mmsi + ":" + f.von;
+              if (gesehenRuhe.has(k)) continue;
+              gesehenRuhe.add(k);
+              f.mmsi = s2.mmsi;
+              ruhe.push(f);
+            }
+          }
+        }
       }
+      // Die Nachbarschaft ueber ALLE Phasen, nicht nur die meldenswerten.
+      // Gerade die Festgemachten und die Dauerlieger definieren, wo Liegen
+      // normal ist; sie mit demselben Sieb wegzufiltern liess gemessen MEHR
+      // Schiffe einsam wirken (136 statt 67 Meldungen).
+      nachbarnZaehlen(ruhe, this.konfig.ANOMALIE_STILL_UMKREIS_M);
+
+      // Wer das ganze Fenster ueber lag, ist Moebel - Kai, Plattform,
+      // Hubinsel. Gemessen halbiert dieser Vermerk die Kandidaten (501 -> 309)
+      // und entfernt genau HOEGH ESPERANZA am LNG-Terminal, FINO 1 und
+      // SEAFOX 4.
+      //
+      // Bezug ist der Rand der WIRKLICH VORHANDENEN Daten, nicht das
+      // angefragte Fenster. Der Unterschied ist keine Feinheit: Ein Proxy, der
+      // erst seit drei Stunden laeuft, haette nach dem nominellen Fenster
+      // keinen einzigen Dauerlieger - und meldete dann jedes festgemachte
+      // Schiff im Hafen. Aufgefallen ist es an einer Probe mit zwei Stunden
+      // alten Daten: Aus 39 Meldungen wurden 107, und die laengsten hiessen
+      // alle "22,0 h".
+      // Und der Vermerk gilt nur, wenn die Beobachtung lang genug ist, um
+      // ueberhaupt etwas auszusagen. "Lag die ganze Zeit da" heisst bei drei
+      // Stunden Beobachtung nichts; verlangt wird das Doppelte der
+      // Meldeschwelle. Darunter ist niemand Moebel - im Zweifel lieber melden
+      // als still verschweigen.
+      const spanne = datenBis - datenVon;
+      const urteilsfaehig = spanne >= 2 * this.konfig.ANOMALIE_STILL_MIN_S;
+      for (const f of ruhe) {
+        f.dauerlieger = urteilsfaehig &&
+          f.von <= datenVon + 900 && f.bis >= datenBis - 900;
+      }
+      this.ruhe = ruhe;
+      this.ruheFenster = { von: stillVon, bis: stillBis, datenVon, datenBis };
       this.ereignisse = aus;
       this.gerechnet = Date.now();
       this.dauerMs = this.gerechnet - t0;
       this.laeufe++;
       this.log("Anomalie: " + aus.length + " Schleifen von " +
-        new Set(aus.map(e => e.mmsi)).size + " Schiffen in " + this.dauerMs + " ms");
+        new Set(aus.map(e => e.mmsi)).size + " Schiffen, " + ruhe.length +
+        " Ruhephasen von " + new Set(ruhe.map(f => f.mmsi)).size +
+        " Schiffen in " + this.dauerMs + " ms");
     } finally {
       this.laeuft = false;
     }
@@ -288,21 +447,29 @@ class Anomalie {
   // Die Auskunft fuer die Karte. Verdichtet wird bei JEDER Anfrage neu, nicht
   // im Lauf: Das kostet gemessen 23 ms fuer die ganze Region und erlaubt
   // dafuer ein freies Zeitfenster, ohne alles neu zu erkennen.
+  // Der Typ eines Schiffs - aus dem heissen Zustand, sonst aus dem Speicher.
+  typVon(mmsi) {
+    const s = this.zustand && this.zustand.schiffe.get(mmsi);
+    if (s && s.typ != null) return s.typ;
+    return (this.speicher.stammHole(mmsi) || {}).typ;
+  }
+
   hole(box, stunden) {
     const grenze = Math.floor(Date.now() / 1000) - stunden * 3600;
     const drin = this.ereignisse.filter(e =>
       e.bis >= grenze &&
       e.lat >= box.latMin && e.lat <= box.latMax &&
-      e.lon >= box.lonMin && e.lon <= box.lonMax);
+      e.lon >= box.lonMin && e.lon <= box.lonMax &&
+      !ausgenommen(this.typVon(e.mmsi)) &&
+      // Der Landfilter. Er sitzt HIER und nicht im Lauf: Die Ereignisse
+      // bleiben vollstaendig, damit eine geaenderte Schwelle keinen neuen
+      // Lauf braucht. Ohne Kuestendatei liefert landabstand() den Deckel,
+      // also faellt nichts weg - lieber ungefiltert als still leer.
+      this.landOk(e.lat, e.lon));
     const gb = gebiete(drin, this.konfig.ANOMALIE_ZUSAMMEN_M);
     for (const g of gb) {
       let beruf = 0;
-      for (const m of g.schiffe) {
-        const s = this.zustand && this.zustand.schiffe.get(m);
-        const typ = s && s.typ != null ? s.typ
-          : (this.speicher.stammHole(m) || {}).typ;
-        if (berufsschleifer(typ)) beruf++;
-      }
+      for (const m of g.schiffe) if (berufsschleifer(this.typVon(m))) beruf++;
       g.beruf = beruf;
       g.andere = g.schiffe.length - beruf;
       // Die Einstufung faellt HIER und nicht im Client: Sie haengt an den
@@ -313,6 +480,43 @@ class Anomalie {
     return gb;
   }
 
+  // Liegt der Ort weit genug von Land? Ohne Kuestendatei immer ja.
+  landOk(lat, lon) {
+    if (!this.kueste || !this.kueste.da) return true;
+    const s = this.konfig.ANOMALIE_LAND_M;
+    if (!(s > 0)) return true;
+    return this.kueste.landabstand(lat, lon, s * 2) >= s;
+  }
+
+  // Stillstand ausserhalb der gewohnten Liegeplaetze.
+  //
+  // Gemeldet wird eine Ruhephase, wenn sie lang genug ist, das Schiff nicht
+  // ausgenommen ist, sie nicht das ganze Fenster fuellt - und wenn im
+  // Umkreis WENIGER als ANOMALIE_STILL_MIN andere Schiffe lagen. Die
+  // Nachbarzahl stammt aus dem Lauf und zaehlt ALLE Liegenden.
+  stillstand(box, stunden) {
+    if (!this.ruhe.length) return [];
+    const grenze = Math.floor(Date.now() / 1000) - stunden * 3600;
+    const aus = [];
+    for (const f of this.ruhe) {
+      if (f.bis < grenze) continue;
+      if (f.dauer < this.konfig.ANOMALIE_STILL_MIN_S) continue;
+      if (f.dauerlieger) continue;
+      if (f.nachbarn >= this.konfig.ANOMALIE_STILL_MIN) continue;
+      if (f.lat < box.latMin || f.lat > box.latMax ||
+          f.lon < box.lonMin || f.lon > box.lonMax) continue;
+      if (ausgenommen(this.typVon(f.mmsi))) continue;
+      aus.push({
+        mmsi: f.mmsi,
+        lat: Number(f.lat.toFixed(5)), lon: Number(f.lon.toFixed(5)),
+        von: f.von, bis: f.bis, dauer: f.dauer,
+        radius: f.radius, nachbarn: f.nachbarn
+      });
+    }
+    aus.sort((a, b) => b.dauer - a.dauer);
+    return aus;
+  }
+
   bericht() {
     return {
       laeufe: this.laeufe,
@@ -320,13 +524,18 @@ class Anomalie {
       schiffe: new Set(this.ereignisse.map(e => e.mmsi)).size,
       gerechnet: this.gerechnet ? new Date(this.gerechnet).toISOString() : null,
       dauerMs: this.dauerMs,
-      stunden: this.konfig.ANOMALIE_STUNDEN
+      stunden: this.konfig.ANOMALIE_STUNDEN,
+      ruhephasen: this.ruhe.length,
+      ruheSchiffe: new Set(this.ruhe.map(f => f.mmsi)).size,
+      stillStunden: this.konfig.ANOMALIE_STILL_STUNDEN,
+      kueste: this.kueste ? this.kueste.bericht() : null
     };
   }
 }
 
 module.exports = {
   Anomalie, schleifen, gebiete, saeubere, berufsschleifer,
+  ausgenommen, ruhephasen, nachbarnZaehlen, STILL_KN, STILL_M,
   RUECKKEHR_M, MIN_WEG_M, MAX_DURCHMESSER_M, MIN_RUNDHEIT, MAX_RUNDE_S,
   SPRUNG_MS, ZUSAMMEN_M
 };

@@ -3575,6 +3575,33 @@ Position und Höhe der Karte, ob die Technik ausgelagert ist, ob die Tabelle
 als Karten läuft, `scrollWidth` gegen `clientWidth` und die Schriftgröße im
 Eingabefeld. Bedienung per `page.tap()`, nicht `click()`.
 
+## Zwei Anomalie-Ebenen: rote Kreise und rote Quadrate
+
+Zwei Schalter, **ein** Abruf: Der Proxy liefert Schleifen und Stillstand in
+derselben Antwort, und zwei Anfragen dafür wären Verschwendung. Gezeichnet
+wird jede Ebene nur mit ihrem eigenen Kästchen, und die Standzeile nennt nur,
+was auch gezeichnet wird — sonst stünde dort eine Zahl zu einer Ebene, die
+gar nicht an ist.
+
+**Stillstand ist ein Ort, keine Fläche.** Ein `L.rectangle` über die 300 m des
+Stillstands wäre beim Herauszoomen unsichtbar; es ist deshalb ein `L.marker`
+mit `divIcon` und **festen 14 px**. Gleiche Farbe wie die Schleifenkreise
+(`#d92b2b`), andere Form — und wie dort ohne Füllung: `pointer-events` liegt
+nur auf dem Rahmen, damit ein Zeichen mitten auf der Karte keine Klickfalle
+wird.
+
+**Fähren fallen über den Landabstand weg, nicht über den Schiffstyp** — das
+entscheidet der Proxy (2 km, gemessen 97 % der Fährschleifen). Der Client
+zeichnet nur, was ankommt.
+
+### Gemessen in `scratchpad/beide_ebenen.js` (8 Prüfungen)
+
+Gegen einen echten Proxy mit echten Daten: nur Stillstand → 2 Quadrate und
+**null** Kreise; beide an → 11 Schleifengebiete und 2 Quadrate; das Quadrat ist
+`rgb(217,43,43)`, 2 px, ohne Füllung, genau 14 px; **Schleifen aus lässt die
+Quadrate stehen**; beides aus räumt alles weg. Schirmfoto angesehen: Kreise nur
+noch draußen, keiner mehr über den Inselhäfen.
+
 ## Schleifen als rote Kreise — die Erkennung liegt im Proxy, nicht hier
 
 Gewünscht: „besondere Manöver erkennen … Gebiete, in denen es die letzten 8 h
@@ -3674,7 +3701,7 @@ Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
 
 | Schlüssel | Inhalt | TTL |
 |---|---|---|
-| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_own_pos`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_auto_refresh`, `aisstream_filters`, `aisstream_schleifen` | Einstellungen & Filterauswahl | unbegrenzt |
+| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_own_pos`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_auto_refresh`, `aisstream_filters`, `aisstream_schleifen`, `aisstream_stillstand` | Einstellungen & Filterauswahl | unbegrenzt |
 | `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss / **10 min unvollständig** (ohne IMO gelaufen), max. `ENRICH_MAX` = 400 |
 | `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d, max. 2000 |
 | `aisstream_ais` | **eine** JSON-Map MMSI → Position, Fahrtdaten, Personen an Bord, Binnenangaben | **30 min**, max. 1500 |
