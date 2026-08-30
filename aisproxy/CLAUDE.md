@@ -814,19 +814,75 @@ IEVOLI COBALT, ORION, SEA INSTALLER, JETTE THERESA.
 nicht der von damals. Ein Filter auf der falschen Zeitscheibe ist es für sechs
 Zeilen nicht wert.
 
-### Der Dauerlieger-Vermerk hängt an den Daten, nicht am Wunschfenster
+### Der Möbel-Vermerk: drei Anläufe, jeder von einer Messung korrigiert
 
-Zuerst verglich er gegen das *angefragte* Fenster (24 h). An einer Probe mit
-zwei Stunden alten Daten wurden daraus **107 statt 39 Meldungen**, und die
-längsten hießen alle „22,0 h": Kein einziges Schiff reichte bis an den
-Fensterrand, also galt keines als Möbel.
+Die Frage dahinter ist immer dieselbe — **haben wir das Schiff ankommen
+sehen?** Wer schon dalag, als die Beobachtung begann, hat nirgends angehalten.
+Der Weg zur richtigen Formulierung ging über zwei falsche:
 
-Bezug ist deshalb der Rand der **wirklich vorhandenen** Daten — gemessen über
-*alle* Spuren des Durchgangs, nicht nur die ruhenden, sonst wäre bei einem
-einzigen Lieger dessen eigene Phase die ganze „Beobachtung". Und der Vermerk
-urteilt erst ab dem **Doppelten der Meldeschwelle**: „lag die ganze Zeit da"
-heißt bei drei Stunden Beobachtung nichts. Darunter ist niemand Möbel — im
-Zweifel lieber melden als still verschweigen.
+**Erster Anlauf: gegen das angefragte Fenster.** An einer Probe mit zwei
+Stunden alten Daten wurden daraus **107 statt 39 Meldungen**, und die längsten
+hießen alle „22,0 h": Kein Schiff reichte bis an den Fensterrand, also galt
+keines als Möbel. Bezug ist seitdem der Rand der **wirklich vorhandenen**
+Daten — gemessen über *alle* Spuren des Durchgangs, nicht nur die ruhenden,
+sonst wäre bei einem einzigen Lieger dessen eigene Phase die ganze
+„Beobachtung".
+
+**Zweiter Anlauf: Anfang UND Ende.** An der laufenden Anlage scheiterte die
+Endbedingung in **24 von 92 Fällen** an Meldelücken — ein festgemachtes
+Kleinfahrzeug sendet unregelmäßig, sein letzter Punkt lag 24 Minuten vor dem
+jüngsten Punkt der Region, und schon galt es nicht mehr als Möbel. Ob es
+inzwischen weg ist, ändert an der Frage aber nichts. Also nur der Anfang, mit
+**1 h Toleranz** für Meldelücken.
+
+**Dritter Anlauf, und erst der taugt: die Historie fragen.** Die reine
+Randregel nahm **HMM ALGECIRAS** mit heraus — 400 m, 16,4 h vor Anker, Beginn
+**18 Sekunden** nach dem Datenrand. Wer länger ankert als das Fenster, wird
+sonst ununterscheidbar von einem Kai, und das trifft ausgerechnet die
+interessantesten Fälle.
+
+Die Antwort liegt in den eigenen Daten: **Die Verdichtung löscht nach
+`ROH_STUNDEN` die liegenden Punkte, behält aber die fahrenden.** Wer
+angekommen ist, hat davor eine Anfahrt; ein Kai, eine Plattform, eine Hubinsel
+haben keine. Für jede Phase am Datenrand wird deshalb einmal je Schiff gefragt,
+ob es im Vorlauf (24 h) in Fahrt war — `pos_*` trägt einen Index auf
+`(mmsi, t)`, das sind ein paar Dutzend Indexzugriffe je Lauf.
+
+Gemessen an echten Daten: **90 Meldungen** (nur Rand, mit Endbedingung) →
+**69** (nur Rand, ohne Endbedingung, HMM ALGECIRAS weg) → **76** (mit der
+Historienfrage, HMM ALGECIRAS wieder da).
+
+Und der Vermerk urteilt erst ab dem **Doppelten der Meldeschwelle**: „lag die
+ganze Zeit da" heißt bei drei Stunden Beobachtung nichts. Darunter ist niemand
+Möbel — im Zweifel lieber melden als still verschweigen.
+
+### Zwei Takte, weil `schritt` die falsche Schraube ist
+
+Der Ruhedurchgang trieb einen Lauf an der laufenden Anlage von **9,3 s auf
+56,3 s** — sechsmal so viel, nicht doppelt, wie ich vorher geschätzt hatte.
+Der Grund ist nicht der Rasterabstand: **`speicher.spuren()` liest alle Zeilen
+des Zeitraums und dünnt erst danach in JS aus**, `ANOMALIE_STILL_SCHRITT_S`
+spart also nichts am Lesen. Der Durchgang liest schlicht ein dreimal so langes
+Fenster.
+
+Kaputt war nichts — 21 Kacheln mit `setImmediate` dazwischen, rund 1,3 s je
+Abschnitt, der AIS-Strom staut sich darin um etwa 43 Nachrichten. Aber 56 s
+alle fünf Minuten sind 19 % Dauerlast. Eine Ruhephase dauert mindestens sechs
+Stunden, also hat der Durchgang jetzt einen **eigenen Takt**
+(`ANOMALIE_STILL_TAKT_MS`, 15 min): `lauf(false)` für die Schleifen,
+`lauf(true)` für beides. Der letzte Ruhestand bleibt dabei stehen — ihn zu
+leeren hieße, die Ebene zwischen zwei Ruheläufen stumm abzuschalten — und
+`ruheGerechnet` sagt im Status, wie alt er ist.
+
+### In dünn abgedeckten Gewässern meldet das Verfahren mehr
+
+Von 92 Meldungen lagen **46 in der Ostsee**, überwiegend Kleinfahrzeuge
+(9–12 m). Das ist kein Fehler, sondern eine Eigenschaft: Wo wenige Schiffe
+liegen, hat jeder wenige Nachbarn, und die gelernte Grundlinie findet keinen
+Liegeplatz. In der Deutschen Bucht stehen dagegen Arbeitsschiffe und
+Ankerlieger oben. Wer die Zahl drücken will, dreht an `ANOMALIE_STILL_MIN`
+oder am Umkreis — **nicht** an einer Mindestlänge: „Unbekannte mitnehmen" war
+die ausdrückliche Entscheidung.
 
 ### Die harte Grenze sind 24 Stunden
 

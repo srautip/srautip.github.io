@@ -149,10 +149,17 @@ async function start() {
   // Der erste Schleifenlauf erst nach einer Minute: Direkt beim Start faellt
   // er mit dem Kaltstart und dem ersten Netzabruf zusammen, und dann warten
   // drei schwere Dinge aufeinander. Danach im Takt.
+  //
+  // Zwei Takte, nicht einer: Der Ruhedurchgang liest ein dreimal so langes
+  // Fenster und trieb den Lauf gemessen von 9,3 s auf 56,3 s. Eine Ruhephase
+  // dauert mindestens sechs Stunden - alle 15 Minuten reicht dafuer, und der
+  // gewoehnliche Lauf bleibt kurz.
   if (anomalie) {
-    setTimeout(() => anomalie.lauf().catch(e => log("Anomalie: " + e.message)), 60000);
-    setInterval(() => anomalie.lauf().catch(e => log("Anomalie: " + e.message)),
+    setTimeout(() => anomalie.lauf(true).catch(e => log("Anomalie: " + e.message)), 60000);
+    setInterval(() => anomalie.lauf(false).catch(e => log("Anomalie: " + e.message)),
       konfig.ANOMALIE_TAKT_MS);
+    setInterval(() => anomalie.lauf(true).catch(e => log("Anomalie: " + e.message)),
+      konfig.ANOMALIE_STILL_TAKT_MS);
   }
 
   // Register vorwaermen: erst kurz warten, damit der Bestand steht - sonst
