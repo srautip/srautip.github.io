@@ -3575,86 +3575,91 @@ Position und Höhe der Karte, ob die Technik ausgelagert ist, ob die Tabelle
 als Karten läuft, `scrollWidth` gegen `clientWidth` und die Schriftgröße im
 Eingabefeld. Bedienung per `page.tap()`, nicht `click()`.
 
-## Zwei Anomalie-Ebenen: rote Kreise und rote Quadrate
+## Zwei Ebenen: violette Kreise für die Lotsenbereiche, rote Quadrate für den Stillstand
 
-Zwei Schalter, **ein** Abruf: Der Proxy liefert Schleifen und Stillstand in
-derselben Antwort, und zwei Anfragen dafür wären Verschwendung. Gezeichnet
-wird jede Ebene nur mit ihrem eigenen Kästchen, und die Standzeile nennt nur,
-was auch gezeichnet wird — sonst stünde dort eine Zahl zu einer Ebene, die
-gar nicht an ist.
+Zwei Schalter, **zwei** Abrufe — und das ist eine Änderung. Bis dahin lieferte
+`/v1/anomalien` beide Ebenen in einer Antwort, ausdrücklich um eine zweite
+Anfrage zu sparen. Das war richtig, solange beide dieselbe Frage beantworteten.
+Jetzt sind es zwei: `/v1/lotsen` sagt, **wo gelotst wird**, `/v1/anomalien`,
+**wer außerhalb der gewohnten Liegeplätze stillliegt**. Ein Endpunkt namens
+„Lotsen", der Stillstand mitliefert, wäre der schlechtere Handel. Beide laufen
+parallel, und geholt wird nur, was auch gezeichnet wird.
+
+Gezeichnet wird jede Ebene nur mit ihrem eigenen Kästchen, und die Standzeile
+nennt nur, was auch gezeichnet wird — sonst stünde dort eine Zahl zu einer
+Ebene, die gar nicht an ist.
+
+**Die Kreisfarbe ist die der Lotsenschiffe**, `#8c2c95`: `typeCategory()`
+steckt Typ 50 in `working`, und das ist dieselbe Farbe, die ihre Marker auf der
+Karte tragen. Sie wird deshalb aus `TYPE_COLOR_MAP.working` geholt und **nicht
+danebengeschrieben** — wer die Palette ändert, ändert die Kreise mit. Die
+Stillstandsquadrate bleiben rot (`#d92b2b`); die beiden Ebenen sind damit an
+Farbe **und** Form zu unterscheiden.
+
+**Eine Kreisdarstellung, keine zwei Stufen mehr.** Das frühere Kräftig/Blass
+trennte „auffällig" von „gewohnt" — wenn nur noch Lotsen gezeigt werden, ist
+diese Unterscheidung gegenstandslos.
 
 **Stillstand ist ein Ort, keine Fläche.** Ein `L.rectangle` über die 300 m des
 Stillstands wäre beim Herauszoomen unsichtbar; es ist deshalb ein `L.marker`
-mit `divIcon` und **festen 14 px**. Gleiche Farbe wie die Schleifenkreise
-(`#d92b2b`), andere Form — und wie dort ohne Füllung: `pointer-events` liegt
-nur auf dem Rahmen, damit ein Zeichen mitten auf der Karte keine Klickfalle
-wird.
+mit `divIcon` und **festen 14 px**. Wie bei den Kreisen ohne Füllung:
+`pointer-events` liegt nur auf dem Rahmen, damit ein Zeichen mitten auf der
+Karte keine Klickfalle wird.
 
-**Fähren fallen über den Schiffstyp weg** (Passagier 60–69 und Segel 36) — das
-entscheidet der Proxy, der Client zeichnet nur, was ankommt. Zwischendurch tat
-das ein Landabstand von 2 km; er traf die Fähren genauer, nahm aber alle
-Arbeitsschiffe unter Land mit (100 statt 225 Gebiete), und ist wieder draußen.
-Der Erklärtext unter dem Schalter nennt deshalb den Typ, nicht die 2 km — eine
-Oberfläche, die eine abgeschaffte Regel erklärt, ist schlimmer als eine ohne
-Erklärung.
+**Der Erklärtext unter dem Schalter nennt die Lotsenregel**, nicht mehr den
+Landabstand und nicht mehr den Typfilter. Eine Oberfläche, die eine
+abgeschaffte Regel erklärt, ist schlimmer als eine ohne Erklärung — das ist
+hier innerhalb eines Tages zweimal nachgezogen worden.
 
-### Gemessen in `scratchpad/beide_ebenen.js` (8 Prüfungen)
+**Der Speicherschlüssel heißt jetzt `aisstream_lotsen`.** Der Schalter steht
+nach dem Update also einmal auf aus: Es ist eine andere Ebene als die, die
+gemerkt war.
 
-Gegen einen echten Proxy mit echten Daten: nur Stillstand → 2 Quadrate und
-**null** Kreise; beide an → 22 Schleifengebiete und 2 Quadrate; das Quadrat ist
-`rgb(217,43,43)`, 2 px, ohne Füllung, genau 14 px; **Schleifen aus lässt die
-Quadrate stehen**; beides aus räumt alles weg.
+### Gemessen in `scratchpad/beide_ebenen.js` (10 Prüfungen)
 
-**Und das Schirmfoto angesehen, denn die Frage hat sich verschoben:** Sie
-lautet nicht mehr „ist etwas da", sondern „ist es noch lesbar". Bei Arbeitszoom
-(Stufe 10, Deutsche Bucht) stehen 59 Gebiete gut getrennt auf der Karte; in der
-Regionsübersicht (Stufe 8, 193 Gebiete) wird es dicht, die Ringe bleiben aber
-als Ringe erkennbar.
+Gegen einen echten Proxy mit echten Daten: nur Stillstand → 4 Quadrate und
+**null** Kreise; beide an → 2 Lotsenbereiche und 4 Quadrate; die Kreise sind
+`rgb(140, 44, 149)` und ohne Füllung, das Quadrat `rgb(217, 43, 43)`, 2 px,
+ohne Füllung, genau 14 px; **Lotsenebene aus lässt die Quadrate stehen**;
+beides aus räumt alles weg.
 
-## Schleifen als rote Kreise — die Erkennung liegt im Proxy, nicht hier
+**Und die Schirmfotos angesehen**, denn genau daran ist die vorige Fassung
+gescheitert: Bei Arbeitszoom (Stufe 10, Deutsche Bucht) stehen **12** Ringe
+klar getrennt auf der Karte — Elbansteuerung, Jade, Weser, Cuxhaven, jeder für
+sich lesbar. Vorher waren es dort 59 rote Kreise. In der Regionsübersicht
+(Stufe 8, 26 Ringe) bleiben sie erkennbar, konkurrieren aber mit den
+Arbeitsschiff-Markern **derselben Farbe** — das ist der Preis dafür, die Farbe
+der Lotsenschiffe zu nehmen, und er ist gewollt.
 
-Gewünscht: „besondere Manöver erkennen … Gebiete, in denen es die letzten 8 h
-Schleifen gab, mit roten Kreisen ohne Füllung markieren."
+### Warum die Erkennung nicht im Browser liegt
 
-**Die Erkennung gehört nicht in den Browser**, und das ist keine Bequemlichkeit:
-Sie braucht die Spuren *aller* Schiffe der ganzen Region über acht Stunden —
-gemessen 553 457 Punkte, 20 MB — und rechnet daran 3,3 s. Der Client bekäme
-das nie über die Leitung. Der Proxy hat die Daten ohnehin lokal, rechnet alle
-fünf Minuten und liefert **39 KB fertige Gebiete** für die ganze Region, 6,5 KB
-für die Deutsche Bucht. Warum die Erkennung so und nicht anders arbeitet,
-steht in `aisproxy/CLAUDE.md`.
+Sie braucht die Spuren der Lotsenboote über 24 Stunden aus der Datenbank des
+Proxys — der Client bekäme das nie über die Leitung, und er weiß auch nicht,
+welche MMSI ein Lotsenboot führt. Der Proxy hat beides ohnehin lokal, rechnet
+alle fünf Minuten (**gemessen 267 ms** für 54 Spuren) und liefert **4 KB
+fertige Gebiete** für die ganze Region. Warum die Erkennung so und nicht anders
+arbeitet, steht in `aisproxy/CLAUDE.md`.
 
-Hier bleiben drei Dinge:
+Drei Dinge bleiben hier:
 
 - **`fill: false`, nicht `fillOpacity: 0`.** Leaflet zeichnet dann gar kein
   Füllelement statt eines unsichtbaren — dieselbe Regel wie bei den
-  Sichtlinien. Das ist hier nicht nur Kosmetik: Nur so fängt allein der Ring
-  Klicks ab. Eine gefüllte 6-km-Scheibe über der Karte wäre die größte
-  Klickfalle der Anwendung.
-- **Die gewohnten Kreise werden zuerst gezeichnet.** Dann liegen die
-  auffälligen im DOM darüber und werden an einer Überschneidung nicht vom
-  blassen Ring übermalt — dieselbe Überlegung wie beim größten Sichtring
-  zuerst.
-- **Zwei Stufen, beide rot.** Kräftig durchgezogen (`weight 2`, `opacity 0.9`),
-  sobald mindestens ein Schiff dabei ist, das nicht von Berufs wegen kreist;
-  dünn gestrichelt (`weight 1`, `opacity 0.4`) für Lotsenboote, Schlepper,
-  Fähren, Fischer und Bagger. **Die Einstufung fällt im Proxy**, weil sie am
-  Schiffstyp hängt und der Client den für ein Schiff außerhalb seines
-  Ausschnitts nicht kennt.
-
-Vorgabe ist **aus**: Die Ebene braucht einen Proxy, und eine Karte voller
-roter Kreise beim ersten Öffnen erklärt sich nicht selbst. Antwortet der Proxy
-mit **503**, ist der Detektor dort abgeschaltet — das steht als Auskunft im
-Protokoll, einmal, nicht bei jeder Kartenbewegung.
+  Sichtlinien. Das ist nicht nur Kosmetik: Nur so fängt allein der Ring Klicks
+  ab. Eine gefüllte 6-km-Scheibe über der Karte wäre die größte Klickfalle der
+  Anwendung.
+- **Die schwächeren Bereiche werden zuerst gezeichnet.** Dann liegen die
+  starken Reviere im DOM darüber — dieselbe Überlegung wie beim größten
+  Sichtring zuerst.
+- Vorgabe ist **aus**: Die Ebene braucht einen Proxy, und eine Karte voller
+  Kreise beim ersten Öffnen erklärt sich nicht selbst.
 
 ### Eine eingeschaltete Ebene, die nichts zeigt, muss sagen warum
 
 Gemeldet nach dem ersten Ausliefern: „in der Karte sind keine Schleifen
-markiert." Die Ursache lag am Proxy (Caddy gab dem Browser 401 für
-`/v1/anomalien`), und der Client wusste das auch — er hatte es **ins Protokoll
-geschrieben**, das niemand offen hatte. Für den, der auf die Karte sieht, war
-„die Ebene ist an und leer" nicht von „hier gab es keine Schleifen" zu
-unterscheiden.
+markiert." Die Ursache lag am Proxy (Caddy gab dem Browser 401), und der Client
+wusste das auch — er hatte es **ins Protokoll geschrieben**, das niemand offen
+hatte. Für den, der auf die Karte sieht, war „die Ebene ist an und leer" nicht
+von „hier gibt es nichts" zu unterscheiden.
 
 Deshalb steht unter dem Schalter eine Standzeile, und sie unterscheidet fünf
 Lagen:
@@ -3664,15 +3669,14 @@ Lagen:
 | Proxy ausgeschaltet | „Ohne Proxy gibt es diese Ebene nicht" (rot) |
 | Proxy gerade nicht erreichbar | „…füllt sich, sobald er wieder liefert" (**nicht** rot) |
 | läuft | „wird geladen…" |
-| Erfolg | „13 Gebiete in den letzten 8 h, davon 10 auffällig" |
-| leer | „In diesem Ausschnitt wurde in den letzten 8 h keine Schleife gefahren." |
+| Erfolg | „31 Lotsenbereiche (24 h) · 6 mal Stillstand (24 h)" |
+| leer | „kein Lotsenbereich in diesem Ausschnitt (24 h)" |
 
-Und aus dem HTTP-Code wird eine Auskunft, die zur nächsten Handlung führt:
-**401** nennt beide möglichen Ursachen (Token falsch *oder* `/v1/anomalien`
-fehlt im Caddy-Matcher — genau der eingetretene Fall), **404** heißt „dieser
-Proxy braucht ein Update", **503** „der Erkenner ist dort abgeschaltet".
-„HTTP 401" allein hat hier zwei ganz verschiedene Ursachen, und die falsche zu
-vermuten kostet eine Stunde.
+Und aus dem HTTP-Code wird eine Auskunft, die zur nächsten Handlung führt —
+**mit dem Pfad darin**, denn seit es zwei sind, ist „welcher" die erste Frage:
+**401** nennt beide möglichen Ursachen (Token falsch *oder* der Pfad fehlt im
+Caddy-Matcher — genau der eingetretene Fall), **404** heißt „dieser Proxy
+braucht ein Update", **503** „die Erkennung ist dort abgeschaltet".
 
 **Zwei Fehler beim Bauen, beide vom Schirm gefunden:** Der erste Anlauf schrieb
 auch dann „ohne Proxy", wenn der Proxy nur noch **nicht verbunden** war — beim
@@ -3685,32 +3689,13 @@ Ins Protokoll geht der Fehler weiterhin nur **einmal**; die Standzeile wird bei
 jedem Versuch neu gesetzt. Ein Protokoll, das bei jeder Kartenbewegung dieselbe
 Zeile schreibt, wäre zugemauert.
 
-### Gemessen in `scratchpad/schleifen_client.js` (8 Prüfungen)
-
-Gegen einen **echten** Proxy mit den echten 8-h-Spuren der Region: Schalter
-an → 11 Kreise, alle `#d92b2b`, alle `fill: none`, 9 kräftig und 2 blass, nur
-die blassen gestrichelt, das Protokoll nennt Gebiete und Fenster, Schalter aus
-→ null Kreise. Schirmfoto angesehen: kräftige Ringe an der Weser-Anfahrt, ein
-blasser gestrichelter über der Lotsenstation.
-
-Die Kette davor steht in `scratchpad/anomalie_echt.js` (11 Prüfungen, echter
-Speicher, echter Server): Das gemeldete Schiff **311003300** steht in zwei
-Gebieten und ist dort **auffällig**, die Lotsenstation Weser ist **gewohnt**
-(2 Berufsschleifer, 0 andere).
-
-Und die Standzeile in beiden Lagen, `scratchpad/schleifen_stand.js`
-(7 Prüfungen): gegen einen echten Proxy „13 Gebiete in den letzten 8 h, davon
-10 auffällig", 12 Kreise, keine Fehlfarbe — gegen einen Stellvertreter, der
-`/v1/anomalien` wie Caddy mit **401 und `www-authenticate`** abweist, null
-Kreise und der Satz, der den Caddy-Matcher benennt, in Fehlfarbe.
-
 ## Was in `localStorage` liegt
 
 Vier Dinge, mit sehr unterschiedlicher Lebensdauer:
 
 | Schlüssel | Inhalt | TTL |
 |---|---|---|
-| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_own_pos`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_auto_refresh`, `aisstream_filters`, `aisstream_schleifen`, `aisstream_stillstand` | Einstellungen & Filterauswahl | unbegrenzt |
+| `aisstream_api_key`, `aisstream_server_url`, `aisstream_mmsi_filter`, `aisstream_auto_enrich`, `aisstream_legend_open`, `aisstream_legend_open_sm`, `aisstream_show_labels`, `aisstream_own_pos`, `aisstream_auto_snapshot`, `aisstream_auto_connect`, `aisstream_auto_refresh`, `aisstream_filters`, `aisstream_lotsen`, `aisstream_stillstand` | Einstellungen & Filterauswahl | unbegrenzt |
 | `aisstream_enrich_<mmsi>` | Registerdaten je Schiff, **auch Fehlschläge** | 30 d Treffer / 3 d Miss / **10 min unvollständig** (ohne IMO gelaufen), max. `ENRICH_MAX` = 400 |
 | `aisstream_static` | **eine** JSON-Map MMSI → Schiffsstatik | 60 d, max. 2000 |
 | `aisstream_ais` | **eine** JSON-Map MMSI → Position, Fahrtdaten, Personen an Bord, Binnenangaben | **30 min**, max. 1500 |

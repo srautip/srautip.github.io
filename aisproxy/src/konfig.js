@@ -90,27 +90,33 @@ const konfig = {
   // Puffer verliert bei einem Absturz zu viel.
   SCHREIB_MS: zahl("AIS_SCHREIB_MS", 2000),
 
-  // --- Anomalien (Schleifen) ---
+  // --- Lotsenbereiche ---
   ANOMALIE_AN: text("AIS_ANOMALIE_AN", "1") !== "0",
   // Das Fenster, das der Detektor vorhaelt. Die Karte darf ein kuerzeres
-  // waehlen (?stunden=), ein laengeres nicht - dafuer muesste neu erkannt
-  // werden, und das dauert Sekunden.
-  ANOMALIE_STUNDEN: zahl("AIS_ANOMALIE_STUNDEN", 8),
-  // Alle fuenf Minuten neu. Gemessen dauert ein voller Lauf ueber die Region
-  // rund 4,6 s reine Rechenzeit (in Kacheln verteilt), das sind 1,5 % der
-  // Zeit - und eine Schleife, die eben zu Ende gefahren wurde, steht damit
-  // spaetestens nach fuenf Minuten auf der Karte.
+  // waehlen (?stunden=), ein laengeres nicht.
+  //
+  // 24 h, nicht 8: Gemessen an den echten Lotsenbooten der Region ergeben
+  // 8 h 38 Gebiete aus 194 Runden, 24 h dagegen 58 aus 571 - und erst dabei
+  // sind alle bekannten Reviere vertreten. Eine Station, an der gerade
+  // Ruhe war, fehlte im kurzen Fenster ganz.
+  //
+  // Das Fenster ist gedeckt: verdichte() loescht nach ROH_STUNDEN nur die
+  // LIEGENDEN Punkte und duennt die fahrenden auf VERDICHTUNG_S (60 s). Eine
+  // Schleife ist Fahrt, sie ueberlebt also bis HISTORIE_TAGE.
+  ANOMALIE_LOTSE_STUNDEN: zahl("AIS_ANOMALIE_LOTSE_STUNDEN", 24),
+  // Wie viele Runden ein Gebiet mindestens braucht. Ein Boot, das auf dem
+  // Weg einmal kreist, ist keine Station: Gemessen beruhen 18 von 58
+  // Gebieten auf genau einer Runde. Ab drei bleiben 31, und die bekannten
+  // Reviere liegen mit neun Runden und mehr weit darueber.
+  ANOMALIE_LOTSE_MIN: zahl("AIS_ANOMALIE_LOTSE_MIN", 3),
+  // Alle fuenf Minuten neu. Der Durchgang fragt nur die Lotsenboote einzeln
+  // ab (rund 55 Indexzugriffe), kostet also fast nichts.
   ANOMALIE_TAKT_MS: zahl("AIS_ANOMALIE_TAKT_MS", 5 * 60 * 1000),
-  // Rasterabstand der Spuren fuer die Erkennung. 60 s ist derselbe Wert, mit
-  // dem gemessen wurde; feiner bringt nichts, weil eine Schleife Minuten
-  // dauert, kostet aber mehr Punkte.
-  ANOMALIE_SCHRITT_S: zahl("AIS_ANOMALIE_SCHRITT_S", 60),
-  // Kachelgroesse fuer den Lauf. 1 Grad ergibt in der Region 21 Kacheln,
-  // zwischen denen die Ereignisschleife freigegeben wird.
+  // Kachelgroesse fuer den RUHEdurchgang. 1 Grad ergibt in der Region 21
+  // Kacheln, zwischen denen die Ereignisschleife freigegeben wird. Der
+  // Lotsendurchgang braucht keine Kacheln mehr - er liest je Boot.
   ANOMALIE_KACHEL_GRAD: zahl("AIS_ANOMALIE_KACHEL_GRAD", 1),
-  // Ueberlappung der Kacheln. 0,15 Grad sind bei 54 Grad Nord rund 9,8 km in
-  // der Laenge - mehr als der groesste zugelassene Schleifendurchmesser (6 km),
-  // also kann keine Schleife auf einer Kachelgrenze verlorengehen.
+  // Ueberlappung der Kacheln.
   ANOMALIE_KACHEL_RAND_GRAD: zahl("AIS_ANOMALIE_KACHEL_RAND_GRAD", 0.15),
   // Was naeher beieinander liegt, wird ein Gebiet. Siehe anomalie.js.
   ANOMALIE_ZUSAMMEN_M: zahl("AIS_ANOMALIE_ZUSAMMEN_M", 3000),

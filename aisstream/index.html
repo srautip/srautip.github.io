@@ -1279,7 +1279,7 @@
     <div class="checkboxes">
       <label><input type="checkbox" id="showLabels" checked /> Schiffsnamen auf der Karte</label>
       <label><input type="checkbox" id="ownPos" checked /> Eigenen Standort als ✕ anzeigen</label>
-      <label><input type="checkbox" id="schleifenAn" /> Schleifen der letzten 8 Stunden als rote Kreise</label>
+      <label><input type="checkbox" id="schleifenAn" /> Lotsenbereiche der letzten 24 Stunden als violette Kreise</label>
       <label><input type="checkbox" id="stillstandAn" /> Stillstand außerhalb von Ankerplätzen als rote Quadrate</label>
     </div>
     <p class="hint" style="margin-top:0.35rem">
@@ -1289,14 +1289,11 @@
       der Browser um Erlaubnis.
     </p>
     <p class="hint" style="margin-top:0.35rem">
-      Der Proxy sucht in den Spuren nach <b>geschlossenen Runden</b> — die Spur
-      kommt dorthin zurück, wo sie war, und umschließt dabei Fläche. Ein
-      kräftiger Kreis heißt: mindestens ein Schiff dabei, das <b>nicht</b> von
-      Berufs wegen kreist. Ein dünner gestrichelter Kreis sind Lotsenboote,
-      Schlepper, Fischer, Bagger oder Behördenschiffe — für die ist das der
-      Alltag. <b>Passagierschiffe und Segelschiffe</b> bleiben ganz draußen;
-      damit fallen Fähren heraus, ohne dass die vielen Arbeitsschiffe dicht
-      unter Land mit verschwinden.
+      Der Proxy sucht in den Spuren der <b>Lotsenboote</b> nach
+      <b>geschlossenen Runden</b> — die Spur kommt dorthin zurück, wo sie war,
+      und umschließt dabei Fläche. Wo sich mindestens drei solcher Runden
+      sammeln, steht ein Kreis in der Farbe der Lotsenschiffe. Ein Boot, das
+      auf dem Weg einmal kreist, ergibt also noch keinen Bereich.
       <b>Stillstand</b> meldet, wer stundenlang stillliegt, <b>ohne dass in
       3 km andere Schiffe liegen</b> — was ein Ankerplatz oder Liegeplatz ist,
       lernt der Proxy aus den Schiffen selbst, nicht aus einer Liste.
@@ -2110,7 +2107,7 @@
 
   if (localStorage.getItem("aisstream_auto_enrich") === "0") autoEnrichInput.checked = false;
   if (localStorage.getItem("aisstream_show_labels") === "0") showLabelsInput.checked = false;
-  if (localStorage.getItem("aisstream_schleifen") === "1") schleifenAnInput.checked = true;
+  if (localStorage.getItem("aisstream_lotsen") === "1") schleifenAnInput.checked = true;
   if (localStorage.getItem("aisstream_stillstand") === "1") stillstandAnInput.checked = true;
   if (localStorage.getItem("aisstream_own_pos") === "0") ownPosInput.checked = false;
   if (localStorage.getItem("aisstream_auto_snapshot") === "0") autoSnapshotInput.checked = false;
@@ -7658,19 +7655,25 @@
   // --- Schleifen: wo in den letzten Stunden Runden gefahren wurden ---------
   //
   // Die Erkennung liegt im Proxy (aisproxy/src/anomalie.js) und NICHT hier:
-  // Sie braucht die Spuren aller Schiffe der ganzen Region ueber acht
-  // Stunden - gemessen 553 457 Punkte - und rechnet daran rund 3,7 s. Der
-  // Client bekommt davon 39 KB fertige Gebiete.
+  // Sie braucht die Spuren der Lotsenboote ueber 24 Stunden aus der eigenen
+  // Datenbank. Der Client bekommt davon fertige Gebiete.
   //
-  // Warum ueberhaupt: Gemeldet war "MMSI 311003300 faehrt seit zehn Stunden
-  // Schleifen" - und dass Lotsenboote das staendig tun. Beides steht jetzt
-  // auf der Karte, aber nicht gleich laut.
-  var SCHLEIFEN_STUNDEN = 8;
+  // Der Weg dahin ging ueber drei Zwischenstufen: erst ALLE Schleifen mit
+  // einer Einstufung "gewohnt/auffaellig" (277 Gebiete), dann ein Filter
+  // nach Landabstand (100), dann einer nach Schiffstyp (225). Gewuenscht
+  // war am Ende die Auskunft, um die es die ganze Zeit ging: WO WIRD
+  // GELOTST. Das sind 31 Gebiete, und sie sind die bekannten Reviere.
+  var LOTSEN_STUNDEN = 24;
   // Zwei Minuten. Der Proxy rechnet alle fuenf neu, oefter zu fragen brachte
   // dieselbe Antwort - aber ein Schwenk in ein neues Gebiet soll nicht auf
   // den naechsten Lauf warten muessen.
   var SCHLEIFEN_FRISCH_MS = 2 * 60 * 1000;
   var SCHLEIFEN_RAND = 0.25;
+  // Die Farbe der Lotsenschiffe selbst: typeCategory() steckt Typ 50 in
+  // "working", und das ist TYPE_COLORS[working] - dieselbe Farbe, die ihre
+  // Marker auf der Karte tragen. Nicht doppelt hingeschrieben, sondern von
+  // dort geholt: Wer die Palette aendert, aendert die Kreise mit.
+  var LOTSEN_FARBE = TYPE_COLOR_MAP.working;
   var schleifenKreise = [];
   var stillMarken = [];
   var schleifenBox = null;
@@ -7690,15 +7693,15 @@
   // Aus einem HTTP-Code eine Auskunft machen, die zur naechsten Handlung
   // fuehrt. "HTTP 401" allein hat hier zwei ganz verschiedene Ursachen, und
   // die falsche zu vermuten kostet eine Stunde.
-  function schleifenFehlertext(status) {
+  function schleifenFehlertext(status, pfad) {
     if (status === 401) {
       return "Der Proxy weist die Anfrage ab (401). Entweder stimmt das " +
-        "Zugangstoken nicht — oder /v1/anomalien steht dort nicht im " +
+        "Zugangstoken nicht — oder " + pfad + " steht dort nicht im " +
         "Caddy-Matcher, dann antwortet Caddy, bevor der Proxy gefragt wird.";
     }
-    if (status === 404) return "Dieser Proxy kennt /v1/anomalien noch nicht — er braucht ein Update.";
-    if (status === 503) return "Der Schleifenerkenner ist auf diesem Proxy abgeschaltet.";
-    return "Der Proxy antwortet mit HTTP " + status + ".";
+    if (status === 404) return "Dieser Proxy kennt " + pfad + " noch nicht — er braucht ein Update.";
+    if (status === 503) return "Die Erkennung ist auf diesem Proxy abgeschaltet.";
+    return "Der Proxy antwortet mit HTTP " + status + " auf " + pfad + ".";
   }
 
   function schleifenWeg() {
@@ -7760,34 +7763,30 @@
     return (e && e.name) ? e.name : String(mmsi);
   }
 
-  function schleifenZeichnen(gebiete) {
-    schleifenKreise.forEach(function (k) { map.removeLayer(k); });
-    schleifenKreise = [];
-    // Die gewohnten zuerst, damit die auffaelligen im DOM darueber liegen -
-    // dieselbe Ueberlegung wie bei den Sichtlinien. An einer Ueberschneidung
-    // soll der kraeftige Kreis nicht vom blassen uebermalt werden.
+  function lotsenZeichnen(gebiete) {
+    schleifenKreiseWeg();
+    // Die schwaecheren zuerst, damit die starken Reviere im DOM darueber
+    // liegen - dieselbe Ueberlegung wie bei den Sichtlinien. An einer
+    // Ueberschneidung soll der Kern nicht vom Rand uebermalt werden.
     gebiete.slice()
-      .sort(function (a, b) { return (a.stufe === "auffaellig" ? 1 : 0) - (b.stufe === "auffaellig" ? 1 : 0); })
+      .sort(function (a, b) { return (a.schleifen || 0) - (b.schleifen || 0); })
       .forEach(function (g) {
-        var laut = g.stufe === "auffaellig";
         // fill:false statt fillOpacity:0 - Leaflet zeichnet dann gar kein
         // Fuellelement. Und es haelt die Kreise klickdurchlaessig: Nur der
         // Ring selbst faengt Klicks, nicht die Scheibe darunter. Eine gefuellte
         // 6-km-Scheibe ueber der Karte waere die groesste Klickfalle hier.
         var k = L.circle([g.lat, g.lon], {
           radius: g.radius,
-          color: "#d92b2b",
-          weight: laut ? 2 : 1,
-          opacity: laut ? 0.9 : 0.4,
-          dashArray: laut ? null : "4 6",
+          color: LOTSEN_FARBE,
+          weight: 2,
+          opacity: 0.85,
           fill: false
         }).addTo(map);
         var namen = g.schiffe.slice(0, 6).map(schleifenName);
         if (g.schiffe.length > 6) namen.push("+" + (g.schiffe.length - 6) + " weitere");
         k.bindTooltip(
-          (laut ? "Schleifen" : "Schleifen (Berufsverkehr)") + " · " +
-          g.schleifen + " Runde" + (g.schleifen === 1 ? "" : "n") + " von " +
-          g.schiffe.length + " Schiff" + (g.schiffe.length === 1 ? "" : "en") +
+          "Lotsenbereich · " + g.schleifen + " Runde" + (g.schleifen === 1 ? "" : "n") +
+          " von " + g.schiffe.length + " Boot" + (g.schiffe.length === 1 ? "" : "en") +
           " · Radius " + (g.radius / 1000).toFixed(1) + " km<br>" + namen.join(", "),
           { sticky: true });
         schleifenKreise.push(k);
@@ -7795,8 +7794,12 @@
   }
 
   function schleifenHolen(erzwingen) {
-    // Ein Abruf fuer beide Ebenen: Der Proxy liefert Schleifen und Stillstand
-    // in derselben Antwort, und zwei Anfragen dafuer waeren Verschwendung.
+    // ZWEI Abrufe, nicht mehr einer. Bis gestern lieferte /v1/anomalien beide
+    // Ebenen zusammen, und das war die richtige Entscheidung, solange sie
+    // dieselbe Frage beantworteten. Jetzt sind es zwei: /v1/lotsen sagt, wo
+    // gelotst wird, /v1/anomalien, wer ausserhalb der Liegeplaetze stillliegt.
+    // Ein Endpunkt namens "Lotsen", der Stillstand mitliefert, waere der
+    // schlechtere Handel. Beide laufen parallel.
     if (!schleifenAnInput.checked && !stillstandAnInput.checked) return;
     // Drei verschiedene Lagen, und sie duerfen nicht denselben Satz bekommen.
     // Der erste Anlauf sagte auch dann "ohne Proxy", wenn der Proxy nur noch
@@ -7825,40 +7828,48 @@
     var box = [abruf.latMin, abruf.lonMin, abruf.latMax, abruf.lonMax]
       .map(function (x) { return x.toFixed(4); }).join(",");
 
+    // Geholt wird nur, was auch gezeichnet wird. Ein Abruf fuer eine
+    // abgeschaltete Ebene waere Verkehr fuer nichts.
+    function hole(pfad, an) {
+      if (!an) return Promise.resolve(null);
+      return fetch(proxyMitToken(proxyBasis() + pfad))
+        .then(function (res) {
+          if (!res.ok) throw new Error(schleifenFehlertext(res.status, pfad.split("?")[0]));
+          return res.json();
+        });
+    }
+
     schleifenLaeuft = true;
     schleifenStand("wird geladen…");
-    fetch(proxyMitToken(proxyBasis() + "/anomalien?bbox=" + encodeURIComponent(box) +
-        "&stunden=" + SCHLEIFEN_STUNDEN))
-      .then(function (res) {
-        if (!res.ok) throw new Error(schleifenFehlertext(res.status));
-        return res.json();
-      })
-      .then(function (d) {
-        if (!d || !d.gebiete) return;
-        var still = d.stillstand || [];
-        if (schleifenAnInput.checked) schleifenZeichnen(d.gebiete); else schleifenKreiseWeg();
-        if (stillstandAnInput.checked) stillZeichnen(still); else stillMarkenWeg();
+    Promise.all([
+      hole("/lotsen?bbox=" + encodeURIComponent(box) + "&stunden=" + LOTSEN_STUNDEN,
+        schleifenAnInput.checked),
+      hole("/anomalien?bbox=" + encodeURIComponent(box), stillstandAnInput.checked)
+    ])
+      .then(function (beide) {
+        var l = beide[0], a = beide[1];
+        if (l && l.gebiete) lotsenZeichnen(l.gebiete); else schleifenKreiseWeg();
+        var still = (a && a.stillstand) || [];
+        if (a) stillZeichnen(still); else stillMarkenWeg();
         schleifenBox = abruf;
         schleifenAt = Date.now();
         schleifenFehlerLog = false;
-        var laut = d.gebiete.filter(function (g) { return g.stufe === "auffaellig"; }).length;
         // Die Standzeile nennt nur, was auch gezeichnet wird - sonst stuende
         // dort eine Zahl zu einer Ebene, die gar nicht an ist.
         var teile = [];
-        if (schleifenAnInput.checked) {
-          teile.push(d.gebiete.length
-            ? d.gebiete.length + " Schleifengebiete (" + d.stunden + " h), davon " +
-              laut + " auffällig"
-            : "keine Schleife in diesem Ausschnitt (" + d.stunden + " h)");
+        if (l) {
+          teile.push(l.gebiete.length
+            ? l.gebiete.length + " Lotsenbereiche (" + l.stunden + " h)"
+            : "kein Lotsenbereich in diesem Ausschnitt (" + l.stunden + " h)");
         }
-        if (stillstandAnInput.checked) {
+        if (a) {
           teile.push(still.length
-            ? still.length + " mal Stillstand (" + (d.stillStunden || 24) + " h)"
-            : "kein auffälliger Stillstand (" + (d.stillStunden || 24) + " h)");
+            ? still.length + " mal Stillstand (" + (a.stillStunden || 24) + " h)"
+            : "kein auffälliger Stillstand (" + (a.stillStunden || 24) + " h)");
         }
         schleifenStand(teile.join(" · "));
-        log("Anomalien aus dem Proxy: " + d.gebiete.length + " Schleifengebiete (" +
-          laut + " auffaellig) und " + still.length + " Stillstandsmeldungen.");
+        log("Aus dem Proxy: " + (l ? l.gebiete.length + " Lotsenbereiche" : "keine Lotsenebene") +
+          ", " + (a ? still.length + " Stillstandsmeldungen" : "keine Stillstandsebene") + ".");
       })
       .catch(function (e) {
         var text = (e && e.message) ? e.message : String(e);
@@ -7869,7 +7880,7 @@
         schleifenStand(text, true);
         if (schleifenFehlerLog) return;
         schleifenFehlerLog = true;
-        log("Schleifen konnten nicht geladen werden: " + text);
+        log("Lotsenbereiche/Stillstand konnten nicht geladen werden: " + text);
       })
       .finally(function () { schleifenLaeuft = false; });
   }
@@ -8637,7 +8648,7 @@
       }
     });
   }
-  anomalieSchalter(schleifenAnInput, "aisstream_schleifen", schleifenKreiseWeg);
+  anomalieSchalter(schleifenAnInput, "aisstream_lotsen", schleifenKreiseWeg);
   anomalieSchalter(stillstandAnInput, "aisstream_stillstand", stillMarkenWeg);
 
   trackLimitInput.addEventListener("change", function () {

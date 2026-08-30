@@ -83,15 +83,14 @@ test("Fahrt auf derselben Linie hin und zurueck ist keine Schleife", () => {
     "die Gegenprobe muss anschlagen, sonst prueft der Test nichts");
 });
 
-test("eine Faehre mit echtem Versatz WIRD gefunden - und erst am Typ aussortiert", () => {
-  // Bewusst so und nicht anders. Ein Kursaenderungs-Zaehler meldete fuer die
-  // Elbfaehre BRESLAU 19 Runden und schob sie vor jedes Lotsenboot; die
-  // Geometrie kann Faehre und Lotse aber nicht trennen (gemessen:
-  // Laenglichkeit BRESLAU 5,92 gegen PILOTVESSEL HANSE 5,44). Die Trennung
-  // faellt deshalb ueber den SCHIFFSTYP in hole(), nicht hier.
+test("eine Faehre mit echtem Versatz WAERE eine Schleife - sie wird nur nie gelesen", () => {
+  // Die Geometrie kann Faehre und Lotse nicht trennen (gemessen:
+  // Laenglichkeit BRESLAU 5,92 gegen PILOTVESSEL HANSE 5,44), und genau
+  // deshalb versucht sie es gar nicht mehr: Der Lauf fragt nur noch die
+  // Lotsenboote ab, eine Faehre kommt nie in den Detektor.
   const g = A.schleifen(pendel(2000, 6, 1000, 60, 60));
-  assert.ok(g.length > 0, "die Faehrenrunden werden erkannt");
-  assert.ok(A.ausgenommen(69), "und ihr Typ nimmt sie beim Abholen heraus");
+  assert.ok(g.length > 0, "erkennbar waeren die Faehrenrunden");
+  assert.ok(!A.istLotse(69, "BRESLAU"), "aber die Faehre steht nicht auf der Lotsenliste");
 });
 
 test("eine zu kleine Runde ist Manoevrieren, keine Schleife", () => {
@@ -171,29 +170,32 @@ test("dasselbe Schiff zweimal im selben Gebiet zaehlt einmal", () => {
   assert.strictEqual(g[0].schleifen, 2, "die Schleifen zaehlen aber beide");
 });
 
-// --- Wer von Berufs wegen kreist -------------------------------------------
+// --- Wer als Lotsenboot gilt ------------------------------------------------
 
-test("Berufsschleifer sind benannt, nicht geraten", () => {
-  for (const t of [30, 31, 32, 33, 50, 51, 52, 53, 54, 55]) {
-    assert.ok(A.berufsschleifer(t), "typ " + t + " gehoert dazu");
+test("ein Lotsenboot erkennt man am Typ 50 - oder am Namen", () => {
+  assert.ok(A.istLotse(50), "Typ 50 ist die Angabe des Bootes selbst");
+  assert.ok(A.istLotse(50, "IRGENDWAS"), "der Typ genuegt, der Name muss nicht passen");
+
+  // Der Grund fuer die Namensregel: Gemessen fahren sechs Lotsenboote der
+  // Region unter falschem Typ, und die zweitstaerkste Station (Elbe bei
+  // Hamburg, 95 Runden in 24 h) besteht AUSSCHLIESSLICH aus solchen.
+  assert.ok(A.istLotse(99, "HAMBURG PILOT 3"), "Typ 99, aber ein Lotsenboot");
+  assert.ok(A.istLotse(90, "HAMBURG PILOT 4"));
+  assert.ok(A.istLotse(99, "LOTSE 4"));
+  assert.ok(A.istLotse(53, "MEES (PILOTS)"));
+  assert.ok(A.istLotse(null, "pilot steinburg"), "Gross- und Kleinschreibung egal");
+
+  // Und die Gegenprobe, sonst prueft der Test nur, dass true true ist.
+  for (const [t, n] of [[70, "MSC DAKAR X"], [31, "FAIRPLAY-57"], [30, "FRIEDRICH WESSELS"],
+                        [69, "BRESLAU"], [36, "SEGLER"], [null, null]]) {
+    assert.ok(!A.istLotse(t, n), (n || "ohne Namen") + " ist kein Lotsenboot");
   }
-  for (const t of [70, 79, 80, 89, 36, 37, 40, 90, 99]) {
-    assert.ok(!A.berufsschleifer(t), "typ " + t + " gehoert NICHT dazu");
-  }
-  // Passagierschiffe standen hier einmal - sie sind jetzt ganz ausgenommen
-  // und waeren als Berufsschleifer ein toter Eintrag.
-  for (const t of [60, 65, 69]) {
-    assert.ok(!A.berufsschleifer(t), "typ " + t + " ist ausgenommen, nicht leise");
-  }
-  // Der gemeldete Fall: MMSI 311003300 ist ein Autotransporter, typ 70.
-  assert.ok(!A.berufsschleifer(70), "ein Frachter, der kreist, ist auffaellig");
-  assert.ok(!A.berufsschleifer(null), "ohne Typ gilt niemand als Berufsschleifer");
-  assert.ok(!A.berufsschleifer(undefined));
+  assert.ok(!A.istLotse(undefined, undefined));
 });
 
-test("ausgenommen sind Segler und Passagierschiffe, sonst niemand", () => {
+test("ausgenommen gilt nur noch fuer den Stillstand", () => {
   for (const t of [36, 60, 61, 64, 69]) {
-    assert.ok(A.ausgenommen(t), "typ " + t + " ist ausgenommen");
+    assert.ok(A.ausgenommen(t), "typ " + t + " liegt still, ohne gemeldet zu werden");
   }
   // Sportboote (37) waren NICHT gefragt - gefragt waren Segelschiffe.
   for (const t of [37, 30, 50, 70, 80, 90]) {
@@ -205,63 +207,131 @@ test("ausgenommen sind Segler und Passagierschiffe, sonst niemand", () => {
 
 // --- Der Laufbetrieb -------------------------------------------------------
 
-function stellVertreter(spurenJeKachel) {
-  let i = 0;
+// Der Lotsendurchgang liest je MMSI, nicht mehr in Kacheln. Der Vertreter
+// bildet das ab: lotsenMmsis() nennt die Boote, spur() liefert ihre Spur.
+// spuren() bleibt fuer den Ruhedurchgang, der weiter in Kacheln liest.
+function stellVertreter(spuren) {
+  const nachMmsi = new Map(spuren.map(s => [s.mmsi, s.punkte]));
   return {
-    spuren() { return spurenJeKachel[i++] || []; },
-    stammHole(mmsi) { return { typ: mmsi === 70 ? 70 : 50 }; }
+    lotsenMmsis() { return [...nachMmsi.keys()]; },
+    spur(mmsi) { return nachMmsi.get(Number(mmsi)) || []; },
+    spuren() { return []; },
+    stammHole(mmsi) { return { typ: 50 }; }
   };
 }
 
 const KONFIG = {
   REGION: { latMin: 54, lonMin: 8, latMax: 55, lonMax: 9 },
-  ANOMALIE_STUNDEN: 8, ANOMALIE_SCHRITT_S: 60,
+  ANOMALIE_LOTSE_STUNDEN: 24, ANOMALIE_LOTSE_MIN: 1,
   ANOMALIE_KACHEL_GRAD: 1, ANOMALIE_KACHEL_RAND_GRAD: 0.15,
   ANOMALIE_ZUSAMMEN_M: 3000
 };
 
-test("der Lauf sammelt Schleifen und meldet den Stand", async () => {
+test("der Lauf sammelt die Runden der Lotsenboote und meldet den Stand", async () => {
   const jetzt = Math.floor(Date.now() / 1000);
-  const speicher = stellVertreter([[{ mmsi: 70, punkte: kreis(600, 40, jetzt - 3000, 60) }]]);
+  const speicher = stellVertreter([{ mmsi: 50, punkte: kreis(600, 40, jetzt - 3000, 60) }]);
   const a = new A.Anomalie({ konfig: KONFIG, speicher, zustand: null });
-  await a.lauf();
+  await a.lauf(false);
   assert.strictEqual(a.ereignisse.length, 1);
-  assert.strictEqual(a.ereignisse[0].mmsi, 70, "die MMSI haengt am Ereignis");
+  assert.strictEqual(a.ereignisse[0].mmsi, 50, "die MMSI haengt am Ereignis");
   assert.strictEqual(a.bericht().schleifen, 1);
-  assert.ok(a.bericht().gerechnet, "der Stand traegt eine Zeit");
+  assert.strictEqual(a.bericht().lotsen, 1, "der Bericht nennt die Zahl der bekannten Boote");
+  assert.ok(a.bericht().lotsenGerechnet, "der Stand traegt eine Zeit");
 });
 
-test("dieselbe Schleife aus zwei ueberlappenden Kacheln zaehlt einmal", async () => {
+test("wer kein Lotsenboot ist, wird gar nicht erst gelesen", async () => {
+  // Der Kern des Rueckbaus: Frueher las der Lauf ALLE Spuren der Region und
+  // siebte hinterher. Jetzt fragt er nur die Lotsenboote - ein Schlepper,
+  // der Runden dreht, kommt nicht einmal in die Naehe des Detektors.
   const jetzt = Math.floor(Date.now() / 1000);
-  const spur = { mmsi: 70, punkte: kreis(600, 40, jetzt - 3000, 60) };
-  // Beide Kacheln liefern dieselbe Spur - genau das passiert im Ueberlappungsrand.
-  const speicher = stellVertreter([[spur], [spur]]);
+  const gelesen = [];
+  const speicher = {
+    lotsenMmsis() { return [50]; },
+    spur(mmsi) {
+      gelesen.push(Number(mmsi));
+      return kreis(600, 40, jetzt - 3000, 60);
+    },
+    spuren() { return []; },
+    stammHole() { return { typ: 50 }; }
+  };
   const a = new A.Anomalie({ konfig: KONFIG, speicher, zustand: null });
-  await a.lauf();
-  assert.strictEqual(a.ereignisse.length, 1, "gefunden: " + a.ereignisse.length);
+  await a.lauf(false);
+  assert.deepStrictEqual(gelesen, [50], "genau eine Spur gelesen, die des Lotsen");
+  assert.strictEqual(a.ereignisse.length, 1);
 });
 
-test("hole() stuft nach Schiffstyp ein und begrenzt das Fenster", async () => {
+test("der heisse Zustand ergaenzt die Lotsenliste aus dem Speicher", async () => {
+  // Ein eben aufgetauchtes Boot hat seinen Stammsatz noch nicht - es steht
+  // aber schon im heissen Zustand, und dort auch mit seinem Namen.
   const jetzt = Math.floor(Date.now() / 1000);
-  const speicher = stellVertreter([[
-    { mmsi: 70, punkte: kreis(600, 40, jetzt - 3000, 60) },     // Frachter
-    { mmsi: 50, punkte: kreis(600, 40, jetzt - 3000, 60, 20000, 0) }  // Lotse, 20 km weiter
-  ]]);
-  const a = new A.Anomalie({ konfig: KONFIG, speicher, zustand: null });
-  await a.lauf();
+  const speicher = {
+    lotsenMmsis() { return [50]; },
+    spur() { return kreis(600, 40, jetzt - 3000, 60); },
+    spuren() { return []; },
+    stammHole() { return { typ: 50 }; }
+  };
+  const zustand = { schiffe: new Map([
+    [99, { typ: 99, name: "HAMBURG PILOT 3" }],     // falscher Typ, richtiger Name
+    [70, { typ: 70, name: "MSC DAKAR X" }]          // Frachter, gehoert nicht dazu
+  ]) };
+  const a = new A.Anomalie({ konfig: KONFIG, speicher, zustand });
+  assert.deepStrictEqual(a.lotsenListe().sort((x, y) => x - y), [50, 99]);
+});
+
+test("lotsenGebiete() begrenzt Fenster, Ausschnitt und Mindestzahl", async () => {
+  const jetzt = Math.floor(Date.now() / 1000);
+  const speicher = stellVertreter([
+    { mmsi: 50, punkte: kreis(600, 40, jetzt - 3000, 60) },
+    { mmsi: 51, punkte: kreis(600, 40, jetzt - 3000, 60, 20000, 0) }   // 20 km weiter
+  ]);
+  const konfig = Object.assign({}, KONFIG, { ANOMALIE_LOTSE_MIN: 1 });
+  const a = new A.Anomalie({ konfig, speicher, zustand: null });
+  await a.lauf(false);
   const box = { latMin: 53, lonMin: 7, latMax: 56, lonMax: 10 };
-  const g = a.hole(box, 8);
+  const g = a.lotsenGebiete(box, 24);
   assert.strictEqual(g.length, 2, "zwei getrennte Gebiete");
-  assert.strictEqual(g[0].stufe, "auffaellig", "das Auffaellige steht vorn");
-  assert.strictEqual(g[0].schiffe[0], 70);
-  assert.strictEqual(g[1].stufe, "gewohnt", "der Lotse gilt als gewohnt");
-  assert.strictEqual(g[1].beruf, 1);
-  assert.strictEqual(g[1].andere, 0);
+  assert.ok(g.every(x => x.stufe === undefined), "keine Einstufung mehr - alle sind Lotsen");
 
-  // Ein kurzes Fenster laesst die aeltere Schleife draussen.
-  assert.strictEqual(a.hole(box, 0.1).length, 0, "vor 50 Minuten ist ausserhalb 6 Minuten");
-  // Und eine bbox neben den Schleifen liefert nichts.
-  assert.strictEqual(a.hole({ latMin: 40, lonMin: 0, latMax: 41, lonMax: 1 }, 8).length, 0);
+  // Ein kurzes Fenster laesst die aeltere Runde draussen.
+  assert.strictEqual(a.lotsenGebiete(box, 0.1).length, 0,
+    "vor 50 Minuten ist ausserhalb von 6 Minuten");
+  // Und eine bbox neben den Runden liefert nichts.
+  assert.strictEqual(a.lotsenGebiete({ latMin: 40, lonMin: 0, latMax: 41, lonMax: 1 }, 24).length, 0);
+});
+
+test("die Mindestzahl wirft Einzelrunden weg und laesst Stationen stehen", async () => {
+  // Gemessen beruhen 18 von 58 Gebieten auf genau EINER Runde - ein Boot auf
+  // dem Weg, keine Station. Zwei Runden nebeneinander sind eine Station.
+  const jetzt = Math.floor(Date.now() / 1000);
+  // Ein Boot dreht drei Runden am selben Ort, ein zweites eine einzige,
+  // 20 km entfernt.
+  const drei = [];
+  for (let k = 0; k < 3; k++) drei.push(...kreis(600, 40, jetzt - 9000 + k * 2700, 60));
+  const speicher = stellVertreter([
+    { mmsi: 50, punkte: drei },
+    { mmsi: 51, punkte: kreis(600, 40, jetzt - 3000, 60, 20000, 0) }
+  ]);
+  const box = { latMin: 53, lonMin: 7, latMax: 56, lonMax: 10 };
+
+  const alle = new A.Anomalie({
+    konfig: Object.assign({}, KONFIG, { ANOMALIE_LOTSE_MIN: 1 }), speicher, zustand: null });
+  await alle.lauf(false);
+  const g1 = alle.lotsenGebiete(box, 24);
+  assert.strictEqual(g1.length, 2, "ohne Schwelle sind es zwei Gebiete");
+  assert.ok(g1.some(g => g.schleifen >= 3), "eines hat drei Runden");
+  assert.ok(g1.some(g => g.schleifen === 1), "das andere genau eine");
+
+  const ab3 = new A.Anomalie({
+    konfig: Object.assign({}, KONFIG, { ANOMALIE_LOTSE_MIN: 3 }), speicher, zustand: null });
+  await ab3.lauf(false);
+  const g2 = ab3.lotsenGebiete(box, 24);
+  assert.strictEqual(g2.length, 1, "mit Schwelle bleibt nur die Station");
+  assert.ok(g2[0].schleifen >= 3);
+  // Die Gegenprobe zur Schwelle selbst: Bei 4 faellt auch die Station weg.
+  const ab4 = new A.Anomalie({
+    konfig: Object.assign({}, KONFIG, { ANOMALIE_LOTSE_MIN: 99 }), speicher, zustand: null });
+  await ab4.lauf(false);
+  assert.strictEqual(ab4.lotsenGebiete(box, 24).length, 0, "die Schwelle wirkt wirklich");
 });
 
 test("die Kacheln decken die Region ab und ueberlappen", () => {
@@ -352,9 +422,13 @@ const WEITBOX = { latMin: 40, lonMin: 0, latMax: 60, lonMax: 20 };
 // der Detektor die Ankunft in der Historie findet. Ohne Eintrag gilt ein
 // Schiff als "nie in Fahrt gesehen", also als Moebel.
 function ruheProxy(spuren, typen, vorfahrt) {
-  let i = 0;
   const speicher = {
-    spuren() { return i++ === 0 ? [] : spuren; },   // 1. Durchgang Schleifen, 2. Ruhe
+    // Der Ruhedurchgang liest weiter in Kacheln - er BRAUCHT alle liegenden
+    // Schiffe, denn die Grundlinie entsteht erst aus ihnen.
+    spuren() { return spuren; },
+    // Der Lotsendurchgang liest je MMSI. Hier ist kein Lotsenboot dabei, er
+    // findet also nichts - das ist der Punkt dieser Proben.
+    lotsenMmsis() { return []; },
     spur(mmsi) { return (vorfahrt || {})[mmsi] || []; },
     stammHole(m) { return { typ: (typen || {})[m] }; }
   };
@@ -417,51 +491,6 @@ test("ein ausgenommener Typ wird nicht gemeldet, ein anderer schon", async () =>
   assert.strictEqual(frachter.stillstand(WEITBOX, 24).length, 1, "ein Frachter nicht");
 });
 
-// --- Der Typfilter ---------------------------------------------------------
-
-// Drei gleiche Schleifen, drei Schiffstypen. Vorher stand hier der Filter
-// nach Landabstand; er nahm mit den Faehren auch alles andere kuestennahe
-// weg (gemessen 100 statt 227 Gebieten) und ist deshalb wieder draussen.
-test("Passagierschiffe und Segler fallen weg, ein Lotsenboot bleibt leise drin",
-  async () => {
-    const jetzt = Math.floor(Date.now() / 1000);
-    // Weit auseinander, damit gebiete() sie nicht zusammenlegt und jeder
-    // Fund einzeln nachweisbar bleibt.
-    function kreisBei(la, lo) {
-      return kreis(600, 40, jetzt - 3000, 60).map(p => [
-        p[0], Math.round((la + (p[1] / 1e6 - MITTE.lat)) * 1e6),
-        Math.round((lo + (p[2] / 1e6 - MITTE.lon)) * 1e6), p[3], p[4]]);
-    }
-    const spuren = [
-      { mmsi: 70, punkte: kreisBei(54.5, 6.5) },   // Frachter
-      { mmsi: 60, punkte: kreisBei(54.0, 7.0) },   // Faehre / Passagier
-      { mmsi: 36, punkte: kreisBei(53.5, 7.5) },   // Segelschiff
-      { mmsi: 50, punkte: kreisBei(53.0, 8.0) }    // Lotsenboot
-    ];
-    // Der Typ ist hier gleich der MMSI - das haelt die Probe lesbar.
-    const speicher = {
-      spuren: () => spuren,
-      stammHole: (m) => ({ typ: m })
-    };
-    const a = new A.Anomalie({ konfig: KONFIG, speicher, zustand: null });
-    await a.lauf();
-    assert.strictEqual(new Set(a.ereignisse.map(e => e.mmsi)).size, 4,
-      "erkannt werden alle vier - gefiltert wird erst beim Abholen");
-
-    const box = { latMin: 50, lonMin: 0, latMax: 60, lonMax: 15 };
-    const gb = a.hole(box, 8);
-    const mmsis = gb.flatMap(x => x.schiffe).sort((x, y) => x - y);
-    assert.deepStrictEqual(mmsis, [50, 70],
-      "Passagier (60) und Segel (36) sind draussen, Frachter und Lotse drin");
-
-    // Die Gegenprobe, die den Unterschied zwischen "weg" und "leise" haelt:
-    // Das Lotsenboot kommt durch, bekommt aber nur die Stufe "gewohnt".
-    const lotse = gb.find(g => g.schiffe.includes(50));
-    const frachter = gb.find(g => g.schiffe.includes(70));
-    assert.strictEqual(lotse.stufe, "gewohnt", "ein Lotsenboot kreist von Berufs wegen");
-    assert.strictEqual(frachter.stufe, "auffaellig", "ein Frachter nicht");
-  });
-
 test("der Dauerlieger-Vermerk haengt an den Daten, nicht am Wunschfenster", async () => {
   const jetzt = Math.floor(Date.now() / 1000);
   // Ein Frachter liegt 7 h, waehrend daneben 20 h lang Verkehr laeuft. Die
@@ -508,9 +537,10 @@ test("lauf(false) laesst den letzten Ruhestand stehen, statt ihn zu leeren", asy
   // Ruhelaeufen stumm - und niemand saehe, warum.
   const jetzt = Math.floor(Date.now() / 1000);
   const spuren = [{ mmsi: 70, punkte: liegt(jetzt - 10 * 3600, 7, 300) }];
-  let i = 0;
+  let ruheGelesen = 0;
   const speicher = {
-    spuren() { return i++ % 2 === 0 ? [] : spuren; },   // gerade: Schleifen, ungerade: Ruhe
+    spuren() { ruheGelesen++; return spuren; },
+    lotsenMmsis() { return []; },
     spur() { return []; },
     stammHole() { return { typ: 70 }; }
   };
@@ -519,14 +549,18 @@ test("lauf(false) laesst den letzten Ruhestand stehen, statt ihn zu leeren", asy
   const vorher = a.stillstand(WEITBOX, 24).length;
   assert.strictEqual(vorher, 1, "erst einmal mit Ruhedurchgang");
   const stand = a.ruheGerechnet;
+  const gelesen = ruheGelesen;
+  assert.ok(gelesen > 0, "der Ruhedurchgang hat wirklich gelesen");
 
-  i = 0;                                    // derselbe Speicher, neuer Lauf
   await a.lauf(false);
+  assert.strictEqual(ruheGelesen, gelesen,
+    "und lauf(false) liest die Kacheln gar nicht erst");
   assert.strictEqual(a.stillstand(WEITBOX, 24).length, vorher,
     "nach einem Lauf ohne Ruhedurchgang steht der Stillstand noch");
   assert.strictEqual(a.ruheGerechnet, stand,
     "und sein Zeitstempel wandert nicht mit - sonst saehe er aktueller aus, als er ist");
-  assert.ok(a.gerechnet > 0, "der Schleifenstand ist dagegen frisch");
+  assert.ok(a.lotsenGerechnet > stand || a.lotsenGerechnet > 0,
+    "der Lotsenstand ist dagegen frisch");
 });
 
 // --- Moebel: nur der Anfang zaehlt -----------------------------------------
