@@ -3590,17 +3590,26 @@ mit `divIcon` und **festen 14 px**. Gleiche Farbe wie die Schleifenkreise
 nur auf dem Rahmen, damit ein Zeichen mitten auf der Karte keine Klickfalle
 wird.
 
-**Fähren fallen über den Landabstand weg, nicht über den Schiffstyp** — das
-entscheidet der Proxy (2 km, gemessen 97 % der Fährschleifen). Der Client
-zeichnet nur, was ankommt.
+**Fähren fallen über den Schiffstyp weg** (Passagier 60–69 und Segel 36) — das
+entscheidet der Proxy, der Client zeichnet nur, was ankommt. Zwischendurch tat
+das ein Landabstand von 2 km; er traf die Fähren genauer, nahm aber alle
+Arbeitsschiffe unter Land mit (100 statt 225 Gebiete), und ist wieder draußen.
+Der Erklärtext unter dem Schalter nennt deshalb den Typ, nicht die 2 km — eine
+Oberfläche, die eine abgeschaffte Regel erklärt, ist schlimmer als eine ohne
+Erklärung.
 
 ### Gemessen in `scratchpad/beide_ebenen.js` (8 Prüfungen)
 
 Gegen einen echten Proxy mit echten Daten: nur Stillstand → 2 Quadrate und
-**null** Kreise; beide an → 11 Schleifengebiete und 2 Quadrate; das Quadrat ist
+**null** Kreise; beide an → 22 Schleifengebiete und 2 Quadrate; das Quadrat ist
 `rgb(217,43,43)`, 2 px, ohne Füllung, genau 14 px; **Schleifen aus lässt die
-Quadrate stehen**; beides aus räumt alles weg. Schirmfoto angesehen: Kreise nur
-noch draußen, keiner mehr über den Inselhäfen.
+Quadrate stehen**; beides aus räumt alles weg.
+
+**Und das Schirmfoto angesehen, denn die Frage hat sich verschoben:** Sie
+lautet nicht mehr „ist etwas da", sondern „ist es noch lesbar". Bei Arbeitszoom
+(Stufe 10, Deutsche Bucht) stehen 59 Gebiete gut getrennt auf der Karte; in der
+Regionsübersicht (Stufe 8, 193 Gebiete) wird es dicht, die Ringe bleiben aber
+als Ringe erkennbar.
 
 ## Schleifen als rote Kreise — die Erkennung liegt im Proxy, nicht hier
 

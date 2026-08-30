@@ -68,18 +68,19 @@ const BERUF = new Set([
   51,             // SAR
   53,             // Hafenboot
   54,             // Umweltschutz
-  55,             // Behoerden
-  60, 61, 62, 63, 64, 65, 66, 67, 68, 69   // Passagier, hier ueberwiegend Faehren
+  55              // Behoerden
 ]);
 
 function berufsschleifer(typ) {
   return typ != null && BERUF.has(Number(typ));
 }
 
-// Ganz draussen, nicht nur leiser. Segelschiffe waren die ausdrueckliche
-// Vorgabe; Faehren erledigt der Landfilter (gemessen 454 von 466
-// Passagierschleifen), sie stehen deshalb NICHT hier.
-const AUSGENOMMEN = new Set([36]);
+// Ganz draussen, nicht nur leiser: Segelschiffe (36) und Passagierschiffe
+// samt Faehren (60-69). Beides ist ausdrueckliche Vorgabe. Frueher stand
+// hier nur die 36 und die Faehren gingen ueber den Landabstand weg - dieser
+// Filter ist wieder entfernt, weil er auch alles andere kuestennahe
+// wegnahm (gemessen 100 statt 227 Gebieten).
+const AUSGENOMMEN = new Set([36, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69]);
 function ausgenommen(typ) {
   return typ != null && AUSGENOMMEN.has(Number(typ));
 }
@@ -303,7 +304,6 @@ class Anomalie {
     this.speicher = speicher;
     this.zustand = zustand;
     this.log = log || (() => {});
-    this.kueste = opt.kueste || null;
     this.ereignisse = [];
     this.ruhe = [];                  // alle Ruhephasen, auch die gewoehnlichen
     this.ruheFenster = null;         // { von, bis } des letzten Ruhelaufs
@@ -508,12 +508,11 @@ class Anomalie {
       e.bis >= grenze &&
       e.lat >= box.latMin && e.lat <= box.latMax &&
       e.lon >= box.lonMin && e.lon <= box.lonMax &&
-      !ausgenommen(this.typVon(e.mmsi)) &&
-      // Der Landfilter. Er sitzt HIER und nicht im Lauf: Die Ereignisse
-      // bleiben vollstaendig, damit eine geaenderte Schwelle keinen neuen
-      // Lauf braucht. Ohne Kuestendatei liefert landabstand() den Deckel,
-      // also faellt nichts weg - lieber ungefiltert als still leer.
-      this.landOk(e.lat, e.lon));
+      // Der Typfilter sitzt HIER und nicht im Lauf: Die Ereignisse bleiben
+      // vollstaendig, damit eine geaenderte Liste keinen neuen Lauf braucht -
+      // und damit ein Typ, der erst spaeter aus dem Strom eintrifft, noch
+      // wirkt.
+      !ausgenommen(this.typVon(e.mmsi)));
     const gb = gebiete(drin, this.konfig.ANOMALIE_ZUSAMMEN_M);
     for (const g of gb) {
       let beruf = 0;
@@ -526,14 +525,6 @@ class Anomalie {
     }
     gb.sort((a, b) => (b.andere - a.andere) || (b.schiffe.length - a.schiffe.length));
     return gb;
-  }
-
-  // Liegt der Ort weit genug von Land? Ohne Kuestendatei immer ja.
-  landOk(lat, lon) {
-    if (!this.kueste || !this.kueste.da) return true;
-    const s = this.konfig.ANOMALIE_LAND_M;
-    if (!(s > 0)) return true;
-    return this.kueste.landabstand(lat, lon, s * 2) >= s;
   }
 
   // Stillstand ausserhalb der gewohnten Liegeplaetze.
@@ -581,8 +572,7 @@ class Anomalie {
       // einer funktionierenden Anlage einlaedt.
       ruheGerechnet: this.ruheGerechnet
         ? new Date(this.ruheGerechnet).toISOString() : null,
-      stillStunden: this.konfig.ANOMALIE_STILL_STUNDEN,
-      kueste: this.kueste ? this.kueste.bericht() : null
+      stillStunden: this.konfig.ANOMALIE_STILL_STUNDEN
     };
   }
 }

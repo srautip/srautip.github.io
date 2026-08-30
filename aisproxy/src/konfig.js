@@ -114,11 +114,6 @@ const konfig = {
   ANOMALIE_KACHEL_RAND_GRAD: zahl("AIS_ANOMALIE_KACHEL_RAND_GRAD", 0.15),
   // Was naeher beieinander liegt, wird ein Gebiet. Siehe anomalie.js.
   ANOMALIE_ZUSAMMEN_M: zahl("AIS_ANOMALIE_ZUSAMMEN_M", 3000),
-  // Schleifen naeher als das an Land fallen weg - so verschwinden die Faehren,
-  // ohne dass irgendwo "Faehre" steht. Gemessen an 1 359 echten Schleifen
-  // fallen damit 454 der 466 Passagierschleifen heraus (97 %) und es bleiben
-  // 272; bei 1 km waeren es 382, bei 3 km 227. 0 schaltet den Filter ab.
-  ANOMALIE_LAND_M: zahl("AIS_ANOMALIE_LAND_M", 2000),
 
   // --- Anomalien (Stillstand) ---
   // Das Fenster fuer den Stillstand. HART BEGRENZT durch ROH_STUNDEN: Danach

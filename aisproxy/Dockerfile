@@ -12,15 +12,6 @@ RUN npm install --omit=dev --no-audit --no-fund
 
 COPY src ./src
 
-# Die Kuestenlinie MUSS mit ins Abbild. Ohne sie laeuft der Proxy zwar, aber
-# der Landfilter der Schleifenerkennung schaltet sich ab - und dann stehen die
-# Faehren wieder auf der Karte, ohne dass irgendwo ein Fehler auftaucht.
-# Erzeugt wird sie von werkzeug/kueste-bauen.js, sie liegt im Repo.
-#
-# NICHT unter daten/: Das steht in .dockerignore (dort liegt die Datenbank),
-# und /daten wird zur Laufzeit ohnehin vom Volume ueberdeckt.
-COPY karten ./karten
-
 # Historie und Fotos liegen im Volume, nicht im Image.
 RUN mkdir -p /daten/fotos && chown -R node:node /daten
 ENV AIS_DB=/daten/ais.db AIS_FOTO_VERZEICHNIS=/daten/fotos
