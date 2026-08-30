@@ -724,15 +724,129 @@ es dabei handlich: Radius median **1,6 km**, 90 % unter 3,7 km, größtes 6,2 km
 Was der Client bekommt: **39 KB für die ganze Region**, 6,5 KB für die
 Deutsche Bucht.
 
+### Fähren gehen über den Landabstand weg, nicht über den Schiffstyp
+
+Erst war geplant, Passagierschiffe (Typ 60–69) auszuschließen. Gewünscht wurde
+stattdessen: **alles unter 2 km Landabstand fällt weg.** Das ist die bessere
+Regel, und die Messung an 1 359 echten Schleifen sagt warum:
+
+| Schwelle | Schleifen bleiben |
+|---|---|
+| 1 km | 382 von 1 359 |
+| **2 km** | **272 von 1 359** (90 Schiffe) |
+| 3 km | 227 von 1 359 |
+
+Bei 2 km fallen **454 der 466 Passagierschleifen** weg — 97 %, ohne dass
+irgendwo „Fähre" steht, und ohne Kreuzfahrer mit auszusperren. GENTLE LEADER,
+der gemeldete Ausgangsfall, hat 10,7 km Landabstand und bleibt.
+
+**Der Preis gehört dazugesagt:** Helgoland-Reede, Kieler Förde und die ganze
+Unterelbe fallen mit heraus. Wer dort schleift, wird nicht gemeldet.
+
+#### Vier Küstenquellen probiert, drei verworfen
+
+| Quelle | Befund |
+|---|---|
+| **Natural Earth 10m** (10 MB) | Löst die Elbe nicht auf: Hamburger Hafen läge „7,9 km von Land", die 63 Hafenfähren blieben stehen. |
+| **OSM simplified land polygons** (24 MB) | Noch schlechter — die Vereinfachung hat die Elbe ganz geschluckt (Hamburg „20 km"). |
+| **Overpass API** | Nicht erreichbar (Tunnelabbruch bzw. HTTP 500, auch bei kleiner Box). Als *laufende* Abhängigkeit ohnehin fragil. |
+| **Aus den AIS-Daten lernen** („Wasser ist, wo Schiffe fahren") | Nur **4 %** der Regionszellen waren je befahren; die nächste unbefahrene Zelle liegt selbst mitten in der Nordsee 280 m entfernt. Die Regel hätte alles weggeworfen. |
+| **OSM `land-polygons-split-4326`** (925 MB, volle Auflösung) | Trifft jede Probe. **Genommen.** |
+
+Daraus macht `werkzeug/kueste-bauen.js` einmalig `karten/kueste.json`:
+1 042 Ringe, 20 731 von 402 142 Punkten, **395 KB**. Zur Laufzeit wird nur
+diese Datei gelesen — ein Dienst, der beim Start 925 MB braucht, ist keiner.
+
+#### Drei Fallstricke, jeder einmal zugeschlagen
+
+- **OSM führt Flüsse oberhalb der Küstenlinie als LAND** — Elbe ab Cuxhaven,
+  Weser ab Bremerhaven, Nord-Ostsee-Kanal, die Förden. Der bloße Abstand zur
+  nächsten Kante meldete für den Hamburger Hafen „3,16 km", weil der Punkt
+  *innen* liegt und der Rand wirklich so weit weg ist. Es braucht zusätzlich
+  einen **Punkt-in-Polygon-Test**; an Land ist der Abstand 0.
+- **Die Polygone sind kachelweise zerschnitten.** Ein Strahlentest über den
+  beschnittenen Segmentsatz erklärte die offene Nordsee zu Land. Geprüft wird
+  je **vollständigem Ring**, dessen Hüllbox den Punkt enthält.
+- **Douglas-Peucker auf einem geschlossenen Ring** hat Anfang und Ende am
+  selben Punkt: Die Sehne ist null lang, übrig bleiben drei Punkte, und die
+  fielen als entartet heraus. Das kostete 535 Ringe, davon 37 größer als
+  200 m und der größte **1 373 m** — echte Inseln, neben denen ein Schiff dann
+  nicht mehr „landnah" gewesen wäre. Jetzt zwei Anker, und eine zur Linie
+  zusammengefallene Sandbank wird **behalten** statt verworfen: Sie ist kein
+  Polygon mehr, aber immer noch Land.
+
+**Fehlt die Datei oder deckt sie die Region nicht ab, wird NICHT gefiltert** —
+und das steht im Protokoll. Ein Punkt ohne Küste in Reichweite gälte sonst als
+„weit draußen", und ausgerechnet die Schleifen am Regionsrand blieben alle
+stehen: ein stiller Fehler, der wie ein Ergebnis aussieht.
+
+## Stillstand: 77 % liegen still, die Auskunft steckt im „außerhalb"
+
+**2 346 von 3 021 Schiffen liegen still.** „Stillstand" allein ist deshalb
+keine Auskunft — alles hängt am *außerhalb*.
+
+Eine Ankerplatzliste braucht es dafür nicht: **„Ankerplatz" heißt „hier liegen
+viele Schiffe still"**, und das ist in denselben Daten messbar. Die Grundlinie
+deckt so Reeden *und* Kais ab, was eine OSM-Ankerplatzliste nicht täte.
+
+Drei Messbefunde haben den Entwurf bestimmt:
+
+1. **Der Umkreis muss 3 km sein.** Das Reede-Nest bei 54,04 °N / 8,13 °O
+   besteht aus **sieben** Schiffen — bei 1 km Umkreis hat dort jedes *null*
+   Nachbarn und würde einzeln gemeldet, bei 3 km sind es im Median vier.
+   Offshore ankert man kilometerweit auseinander, am Kai liegt man
+   nebeneinander; ein enger Umkreis kann beides nicht.
+2. **Die Grundlinie zählt ALLE Liegenden**, auch Fähren, Festgemachte und
+   Dauerlieger. Mein erster Anlauf filterte Grundlinie und Meldung mit
+   demselben Sieb — dadurch fielen die Nachbarn weg und es wirkten **mehr**
+   Schiffe einsam (136 statt 67 Meldungen). Gerade die Festgemachten
+   definieren, wo Liegen normal ist.
+3. **Wer die ganze Beobachtung über lag, ist Möbel** — HOEGH ESPERANZA (294 m
+   am LNG-Terminal), FINO 1, SEAFOX 4, REIWA am Kai. Das halbiert die
+   Kandidaten (501 → 309).
+
+Ergebnis mit ≥ 6 h, 3 km, 2+ anderen: **39 Meldungen in 24 h** für die Deutsche
+Bucht — darunter **HMM ALGECIRAS** (400 m, 17 h vor Anker), LADY ALIDA,
+IEVOLI COBALT, ORION, SEA INSTALLER, JETTE THERESA.
+
+**Kein Filter auf den Navigationsstatus.** „Festgemacht" auszunehmen spart nur
+6 der 39 Meldungen — und der Status, den der Proxy kennt, ist der *heutige*,
+nicht der von damals. Ein Filter auf der falschen Zeitscheibe ist es für sechs
+Zeilen nicht wert.
+
+### Der Dauerlieger-Vermerk hängt an den Daten, nicht am Wunschfenster
+
+Zuerst verglich er gegen das *angefragte* Fenster (24 h). An einer Probe mit
+zwei Stunden alten Daten wurden daraus **107 statt 39 Meldungen**, und die
+längsten hießen alle „22,0 h": Kein einziges Schiff reichte bis an den
+Fensterrand, also galt keines als Möbel.
+
+Bezug ist deshalb der Rand der **wirklich vorhandenen** Daten — gemessen über
+*alle* Spuren des Durchgangs, nicht nur die ruhenden, sonst wäre bei einem
+einzigen Lieger dessen eigene Phase die ganze „Beobachtung". Und der Vermerk
+urteilt erst ab dem **Doppelten der Meldeschwelle**: „lag die ganze Zeit da"
+heißt bei drei Stunden Beobachtung nichts. Darunter ist niemand Möbel — im
+Zweifel lieber melden als still verschweigen.
+
+### Die harte Grenze sind 24 Stunden
+
+`speicher.verdichte()` löscht nach `ROH_STUNDEN` **alle Punkte mit
+`sog < FAHRT_KN`** — also genau die Liegenden. Eine Grundlinie über mehrere
+Tage ist damit nicht rekonstruierbar; nachgemessen reichten zwei von vier
+stillliegenden Frachtern genau 24,1 h zurück, die anderen (schwojend, also
+zeitweise über 0,5 kn) weiter. `ANOMALIE_STILL_STUNDEN` ist deshalb auf
+`ROH_STUNDEN` gedeckelt, und das benutzte Fenster steht **in der Antwort**.
+
 ### Was daran noch offen ist
 
-- **„Anomaliedetektor" ist weiter als Schleifen.** Stillstand außerhalb von
-  Ankerplätzen, AIS-Lücken und Geschwindigkeitssprünge liegen im selben
-  Rahmen, sind aber bewusst nicht gebaut — der erste Schritt sollte eine
-  Sache ganz können.
-- **Es gibt keinen Normalzustand.** Der Detektor weiß nicht, dass an einer
-  Lotsenstation seit Jahren gekreist wird. Die Typtabelle ist ein Ersatz
-  dafür, kein Ersatz für gelerntes Verhalten je Ort.
+- **AIS-Lücken und Geschwindigkeitssprünge** liegen im selben Rahmen, sind
+  aber nicht gebaut.
+- **Es gibt keinen gelernten Normalzustand für Schleifen.** Der Detektor
+  weiß nicht, dass an einer Lotsenstation seit Jahren gekreist wird — die
+  Typtabelle ist ein Ersatz dafür. Beim Stillstand ist dieser Schritt getan
+  (die Grundlinie), bei den Schleifen nicht.
+- **Eine Grundlinie über mehrere Tage** bräuchte eine eigene, dauerhaft
+  mitgeschriebene Tabelle, weil die Verdichtung die Liegenden wegwirft.
 
 ## Sichern heißt `VACUUM INTO`, nicht `cp`
 

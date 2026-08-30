@@ -1157,6 +1157,16 @@
   @media (min-width: 701px) and (max-width: 1024px) {
     .table-wrap { overflow-x: auto; }
   }
+/* Der Stillstand ist ein ORT, keine Flaeche - deshalb feste 14 px am
+   Bildschirm statt eines Rechtecks in Metern, das beim Herauszoomen
+   verschwaende. Ohne Fuellung und ohne pointer-events auf der Flaeche:
+   Nur der Rahmen faengt Klicks, wie bei den Schleifenkreisen. */
+.still-marke { background: none; border: 0; pointer-events: none; }
+.still-marke span {
+  display: block; width: 14px; height: 14px; box-sizing: border-box;
+  border: 2px solid #d92b2b; background: none; pointer-events: auto;
+}
+
 </style>
 </head>
 <body>
@@ -1270,6 +1280,7 @@
       <label><input type="checkbox" id="showLabels" checked /> Schiffsnamen auf der Karte</label>
       <label><input type="checkbox" id="ownPos" checked /> Eigenen Standort als ✕ anzeigen</label>
       <label><input type="checkbox" id="schleifenAn" /> Schleifen der letzten 8 Stunden als rote Kreise</label>
+      <label><input type="checkbox" id="stillstandAn" /> Stillstand außerhalb von Ankerplätzen als rote Quadrate</label>
     </div>
     <p class="hint" style="margin-top:0.35rem">
       Namen werden ab Zoomstufe 12 eingeblendet und aktualisieren sich, sobald
@@ -1283,7 +1294,12 @@
       kräftiger Kreis heißt: mindestens ein Schiff dabei, das <b>nicht</b> von
       Berufs wegen kreist. Ein dünner gestrichelter Kreis sind Lotsenboote,
       Schlepper, Fähren, Fischer oder Bagger — für die ist das der Alltag.
-      Braucht einen Proxy; ohne ihn bleibt die Ebene leer.
+      Schleifen <b>näher als 2 km an Land</b> zählen nicht mit; damit fallen
+      Hafen- und Flussfähren heraus, ohne dass irgendwo „Fähre" steht.
+      <b>Stillstand</b> meldet, wer stundenlang stillliegt, <b>ohne dass in
+      3 km andere Schiffe liegen</b> — was ein Ankerplatz oder Liegeplatz ist,
+      lernt der Proxy aus den Schiffen selbst, nicht aus einer Liste.
+      Beides braucht einen Proxy; ohne ihn bleiben die Ebenen leer.
       <span id="schleifenStand" style="display:block;margin-top:0.3rem"></span>
     </p>
     <label class="zahlzeile" for="trackLimit">
@@ -2024,6 +2040,7 @@
   var filterResetEl = document.getElementById("filterReset");
   var showLabelsInput = document.getElementById("showLabels");
   var schleifenAnInput = document.getElementById("schleifenAn");
+  var stillstandAnInput = document.getElementById("stillstandAn");
   var schleifenStandEl = document.getElementById("schleifenStand");
   var trackLimitInput = document.getElementById("trackLimit");
   var trackStundenInput = document.getElementById("trackStunden");
@@ -2093,6 +2110,7 @@
   if (localStorage.getItem("aisstream_auto_enrich") === "0") autoEnrichInput.checked = false;
   if (localStorage.getItem("aisstream_show_labels") === "0") showLabelsInput.checked = false;
   if (localStorage.getItem("aisstream_schleifen") === "1") schleifenAnInput.checked = true;
+  if (localStorage.getItem("aisstream_stillstand") === "1") stillstandAnInput.checked = true;
   if (localStorage.getItem("aisstream_own_pos") === "0") ownPosInput.checked = false;
   if (localStorage.getItem("aisstream_auto_snapshot") === "0") autoSnapshotInput.checked = false;
   if (localStorage.getItem("aisstream_auto_refresh") === "0") autoRefreshInput.checked = false;
@@ -7653,6 +7671,7 @@
   var SCHLEIFEN_FRISCH_MS = 2 * 60 * 1000;
   var SCHLEIFEN_RAND = 0.25;
   var schleifenKreise = [];
+  var stillMarken = [];
   var schleifenBox = null;
   var schleifenAt = 0;
   var schleifenLaeuft = false;
@@ -7682,11 +7701,57 @@
   }
 
   function schleifenWeg() {
-    if (mapAvailable) schleifenKreise.forEach(function (k) { map.removeLayer(k); });
+    if (mapAvailable) {
+      schleifenKreise.forEach(function (k) { map.removeLayer(k); });
+      stillMarken.forEach(function (k) { map.removeLayer(k); });
+    }
     schleifenKreise = [];
+    stillMarken = [];
     schleifenBox = null;
     schleifenAt = 0;
     schleifenStand("");
+  }
+
+  // Nur die Kreise weg, die Quadrate bleiben - und umgekehrt. Sonst raeumte
+  // das Ausschalten einer Ebene die andere gleich mit ab.
+  function schleifenKreiseWeg() {
+    if (mapAvailable) schleifenKreise.forEach(function (k) { map.removeLayer(k); });
+    schleifenKreise = [];
+  }
+  function stillMarkenWeg() {
+    if (mapAvailable) stillMarken.forEach(function (k) { map.removeLayer(k); });
+    stillMarken = [];
+  }
+
+  function dauerText(s) {
+    var h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+    return h + " h" + (m ? " " + m + " min" : "");
+  }
+
+  function stillZeichnen(liste) {
+    stillMarkenWeg();
+    liste.forEach(function (x) {
+      // Ein L.rectangle ueber 300 m waere beim Herauszoomen unsichtbar - der
+      // Stillstand ist ein ORT, keine Flaeche. Deshalb ein Zeichen mit fester
+      // Groesse am Bildschirm. Kein Hintergrund und kein pointer-events auf
+      // der Flaeche: Nur der Rahmen faengt Klicks, wie bei den Kreisen.
+      var m = L.marker([x.lat, x.lon], {
+        icon: L.divIcon({
+          className: "still-marke",
+          html: '<span></span>',
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
+        }),
+        keyboard: false
+      }).addTo(map);
+      m.bindTooltip("Stillstand · " + schleifenName(x.mmsi) + "<br>" +
+        dauerText(x.dauer) + " still, bis " +
+        new Date(x.bis * 1000).toLocaleString() + "<br>" +
+        (x.nachbarn ? x.nachbarn + " anderes Schiff lag in 3 km"
+                    : "kein anderes Schiff lag in 3 km"),
+        { sticky: true });
+      stillMarken.push(m);
+    });
   }
 
   function schleifenName(mmsi) {
@@ -7729,7 +7794,9 @@
   }
 
   function schleifenHolen(erzwingen) {
-    if (!schleifenAnInput.checked) return;
+    // Ein Abruf fuer beide Ebenen: Der Proxy liefert Schleifen und Stillstand
+    // in derselben Antwort, und zwei Anfragen dafuer waeren Verschwendung.
+    if (!schleifenAnInput.checked && !stillstandAnInput.checked) return;
     // Drei verschiedene Lagen, und sie duerfen nicht denselben Satz bekommen.
     // Der erste Anlauf sagte auch dann "ohne Proxy", wenn der Proxy nur noch
     // nicht verbunden war - beim Umlegen des Schalters ist das der Normalfall,
@@ -7766,18 +7833,31 @@
         return res.json();
       })
       .then(function (d) {
-        if (!d || !d.gebiete || !schleifenAnInput.checked) return;
-        schleifenZeichnen(d.gebiete);
+        if (!d || !d.gebiete) return;
+        var still = d.stillstand || [];
+        if (schleifenAnInput.checked) schleifenZeichnen(d.gebiete); else schleifenKreiseWeg();
+        if (stillstandAnInput.checked) stillZeichnen(still); else stillMarkenWeg();
         schleifenBox = abruf;
         schleifenAt = Date.now();
         schleifenFehlerLog = false;
         var laut = d.gebiete.filter(function (g) { return g.stufe === "auffaellig"; }).length;
-        schleifenStand(d.gebiete.length
-          ? d.gebiete.length + " Gebiete in den letzten " + d.stunden + " h, davon " +
-            laut + " auffällig"
-          : "In diesem Ausschnitt wurde in den letzten " + d.stunden + " h keine Schleife gefahren.");
-        log("Schleifen aus dem Proxy: " + d.gebiete.length + " Gebiete in den letzten " +
-          d.stunden + " h, davon " + laut + " mit Schiffen ausserhalb des Berufsverkehrs.");
+        // Die Standzeile nennt nur, was auch gezeichnet wird - sonst stuende
+        // dort eine Zahl zu einer Ebene, die gar nicht an ist.
+        var teile = [];
+        if (schleifenAnInput.checked) {
+          teile.push(d.gebiete.length
+            ? d.gebiete.length + " Schleifengebiete (" + d.stunden + " h), davon " +
+              laut + " auffällig"
+            : "keine Schleife in diesem Ausschnitt (" + d.stunden + " h)");
+        }
+        if (stillstandAnInput.checked) {
+          teile.push(still.length
+            ? still.length + " mal Stillstand (" + (d.stillStunden || 24) + " h)"
+            : "kein auffälliger Stillstand (" + (d.stillStunden || 24) + " h)");
+        }
+        schleifenStand(teile.join(" · "));
+        log("Anomalien aus dem Proxy: " + d.gebiete.length + " Schleifengebiete (" +
+          laut + " auffaellig) und " + still.length + " Stillstandsmeldungen.");
       })
       .catch(function (e) {
         var text = (e && e.message) ? e.message : String(e);
@@ -8540,17 +8620,24 @@
     refreshAllLabels();
   });
 
-  schleifenAnInput.addEventListener("change", function () {
-    localStorage.setItem("aisstream_schleifen", schleifenAnInput.checked ? "1" : "0");
-    if (schleifenAnInput.checked) {
-      // erzwingen: Wer den Schalter umlegt, will das Ergebnis jetzt sehen und
-      // nicht erst nach der naechsten Kartenbewegung.
-      schleifenFehlerLog = false;
-      schleifenHolen(true);
-    } else {
-      schleifenWeg();
-    }
-  });
+  function anomalieSchalter(el, schluessel, weg) {
+    el.addEventListener("change", function () {
+      localStorage.setItem(schluessel, el.checked ? "1" : "0");
+      if (el.checked) {
+        // erzwingen: Wer den Schalter umlegt, will das Ergebnis jetzt sehen
+        // und nicht erst nach der naechsten Kartenbewegung.
+        schleifenFehlerLog = false;
+        schleifenHolen(true);
+      } else {
+        weg();
+        // Die andere Ebene laeuft weiter; erst wenn beide aus sind, ist auch
+        // der Deckungsvermerk hinfaellig.
+        if (!schleifenAnInput.checked && !stillstandAnInput.checked) schleifenWeg();
+      }
+    });
+  }
+  anomalieSchalter(schleifenAnInput, "aisstream_schleifen", schleifenKreiseWeg);
+  anomalieSchalter(stillstandAnInput, "aisstream_stillstand", stillMarkenWeg);
 
   trackLimitInput.addEventListener("change", function () {
     trackGrenze = trackGrenzeAus(trackLimitInput.value);

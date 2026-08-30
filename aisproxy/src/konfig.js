@@ -114,6 +114,34 @@ const konfig = {
   ANOMALIE_KACHEL_RAND_GRAD: zahl("AIS_ANOMALIE_KACHEL_RAND_GRAD", 0.15),
   // Was naeher beieinander liegt, wird ein Gebiet. Siehe anomalie.js.
   ANOMALIE_ZUSAMMEN_M: zahl("AIS_ANOMALIE_ZUSAMMEN_M", 3000),
+  // Schleifen naeher als das an Land fallen weg - so verschwinden die Faehren,
+  // ohne dass irgendwo "Faehre" steht. Gemessen an 1 359 echten Schleifen
+  // fallen damit 454 der 466 Passagierschleifen heraus (97 %) und es bleiben
+  // 272; bei 1 km waeren es 382, bei 3 km 227. 0 schaltet den Filter ab.
+  ANOMALIE_LAND_M: zahl("AIS_ANOMALIE_LAND_M", 2000),
+
+  // --- Anomalien (Stillstand) ---
+  // Das Fenster fuer den Stillstand. HART BEGRENZT durch ROH_STUNDEN: Danach
+  // loescht verdichte() alle Punkte mit sog < FAHRT_KN, also genau die
+  // Liegenden. Ein groesseres Fenster fragte Daten ab, die es nicht mehr gibt.
+  ANOMALIE_STILL_STUNDEN: Math.min(zahl("AIS_ANOMALIE_STILL_STUNDEN", 24),
+                                   zahl("AIS_ROH_STUNDEN", 24)),
+  // Ruhephasen dauern Stunden - ein Minutenraster kostete die fuenffache
+  // Punktzahl und braechte nichts.
+  ANOMALIE_STILL_SCHRITT_S: zahl("AIS_ANOMALIE_STILL_SCHRITT_S", 300),
+  // Ab wann eine Ruhephase meldenswert ist. Gemessen ergibt das 39 Meldungen
+  // in 24 h fuer die Deutsche Bucht; 4 h waeren 77, 12 h waeren 36.
+  ANOMALIE_STILL_MIN_S: zahl("AIS_ANOMALIE_STILL_MIN_S", 6 * 3600),
+  // Ab wann eine Phase fuer die GRUNDLINIE zaehlt. Kuerzer als die Meldung:
+  // Auch wer nur zwei Stunden lag, belegt, dass hier gelegen wird.
+  ANOMALIE_STILL_GRUND_S: zahl("AIS_ANOMALIE_STILL_GRUND_S", 2 * 3600),
+  // "Ankerplatz" heisst: so viele andere Schiffe lagen im Umkreis still.
+  // 3 km ist gemessen und keine runde Zahl: Das Reede-Nest bei 54,04 N /
+  // 8,13 O hat sieben Schiffe, bei 1 km Umkreis hat dort jedes NULL Nachbarn
+  // und wuerde einzeln gemeldet; bei 3 km sind es im Median vier. Offshore
+  // ankert man kilometerweit auseinander, am Kai liegt man nebeneinander.
+  ANOMALIE_STILL_UMKREIS_M: zahl("AIS_ANOMALIE_STILL_UMKREIS_M", 3000),
+  ANOMALIE_STILL_MIN: zahl("AIS_ANOMALIE_STILL_MIN", 2),
 
   // --- Register ---
   WIKIDATA_URL: text("AIS_WIKIDATA_URL", "https://query.wikidata.org/sparql"),
