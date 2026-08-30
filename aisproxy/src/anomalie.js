@@ -306,7 +306,8 @@ class Anomalie {
     this.kueste = opt.kueste || null;
     this.ereignisse = [];
     this.ruhe = [];                  // alle Ruhephasen, auch die gewoehnlichen
-    this.ruheFenster = null;         // { von, bis } des letzten Laufs
+    this.ruheFenster = null;         // { von, bis } des letzten Ruhelaufs
+    this.ruheGerechnet = 0;
     this.gerechnet = 0;
     this.dauerMs = 0;
     this.laeuft = false;
@@ -336,7 +337,14 @@ class Anomalie {
     return aus;
   }
 
-  async lauf() {
+  // mitRuhe = false laesst den Ruhedurchgang aus. Er liest ein dreimal so
+  // langes Fenster und kostete gemessen den Loewenanteil der 56 s je Lauf
+  // (gegen 9,3 s ohne ihn); eine Ruhephase dauert aber mindestens sechs
+  // Stunden, er braucht also einen eigenen, langsameren Takt. Der letzte
+  // Ruhestand bleibt dabei stehen - ihn zu leeren hiesse, die Ebene zwischen
+  // zwei Ruhelaeufen stumm abzuschalten.
+  async lauf(mitRuhe) {
+    const ruheJetzt = mitRuhe !== false;
     if (this.laeuft) return;         // ein zweiter Lauf brauchte doppelt so lange
     this.laeuft = true;
     const t0 = Date.now();
@@ -374,7 +382,7 @@ class Anomalie {
         // (24 h statt 8) und eigenes Raster (300 s statt 60), weil eine
         // Ruhephase Stunden dauert - ein Minutenraster kostete dafuer die
         // fuenffache Punktzahl und braechte nichts.
-        if (this.konfig.ANOMALIE_STILL_STUNDEN > 0) {
+        if (ruheJetzt && this.konfig.ANOMALIE_STILL_STUNDEN > 0) {
           await new Promise(f => setImmediate(f));
           let liegend;
           try {
@@ -404,41 +412,81 @@ class Anomalie {
       // Gerade die Festgemachten und die Dauerlieger definieren, wo Liegen
       // normal ist; sie mit demselben Sieb wegzufiltern liess gemessen MEHR
       // Schiffe einsam wirken (136 statt 67 Meldungen).
-      nachbarnZaehlen(ruhe, this.konfig.ANOMALIE_STILL_UMKREIS_M);
+      if (ruheJetzt) {
+        nachbarnZaehlen(ruhe, this.konfig.ANOMALIE_STILL_UMKREIS_M);
 
-      // Wer das ganze Fenster ueber lag, ist Moebel - Kai, Plattform,
-      // Hubinsel. Gemessen halbiert dieser Vermerk die Kandidaten (501 -> 309)
-      // und entfernt genau HOEGH ESPERANZA am LNG-Terminal, FINO 1 und
-      // SEAFOX 4.
-      //
-      // Bezug ist der Rand der WIRKLICH VORHANDENEN Daten, nicht das
-      // angefragte Fenster. Der Unterschied ist keine Feinheit: Ein Proxy, der
-      // erst seit drei Stunden laeuft, haette nach dem nominellen Fenster
-      // keinen einzigen Dauerlieger - und meldete dann jedes festgemachte
-      // Schiff im Hafen. Aufgefallen ist es an einer Probe mit zwei Stunden
-      // alten Daten: Aus 39 Meldungen wurden 107, und die laengsten hiessen
-      // alle "22,0 h".
-      // Und der Vermerk gilt nur, wenn die Beobachtung lang genug ist, um
-      // ueberhaupt etwas auszusagen. "Lag die ganze Zeit da" heisst bei drei
-      // Stunden Beobachtung nichts; verlangt wird das Doppelte der
-      // Meldeschwelle. Darunter ist niemand Moebel - im Zweifel lieber melden
-      // als still verschweigen.
-      const spanne = datenBis - datenVon;
-      const urteilsfaehig = spanne >= 2 * this.konfig.ANOMALIE_STILL_MIN_S;
-      for (const f of ruhe) {
-        f.dauerlieger = urteilsfaehig &&
-          f.von <= datenVon + 900 && f.bis >= datenBis - 900;
+        // Moebel sind Kai, Plattform, Hubinsel - und die Frage dahinter ist
+        // genau eine: HABEN WIR DAS SCHIFF ANKOMMEN SEHEN? Wer schon dalag,
+        // als die Beobachtung begann, hat nirgends angehalten.
+        //
+        // Deshalb zaehlt NUR DER ANFANG. Zuerst stand hier zusaetzlich "und
+        // am Ende noch da"; an der laufenden Anlage scheiterte das in 24 von
+        // 92 Faellen an Meldeluecken - ein festgemachtes Kleinfahrzeug sendet
+        // unregelmaessig, sein letzter Punkt lag 24 Minuten vor dem juengsten
+        // Punkt der Region, und schon galt es nicht mehr als Moebel. Ob es
+        // inzwischen weg ist, aendert an der Frage aber nichts.
+        //
+        // Bezug ist der Rand der WIRKLICH VORHANDENEN Daten, nicht das
+        // angefragte Fenster. Ein Proxy, der erst seit drei Stunden laeuft,
+        // haette nach dem nominellen Fenster keinen einzigen Dauerlieger - und
+        // meldete dann jedes festgemachte Schiff im Hafen. Aufgefallen ist das
+        // an einer Probe mit zwei Stunden alten Daten: Aus 39 Meldungen wurden
+        // 107, und die laengsten hiessen alle "22,0 h".
+        //
+        // Und der Vermerk urteilt nur, wenn die Beobachtung lang genug ist:
+        // "lag die ganze Zeit da" heisst bei drei Stunden nichts. Darunter ist
+        // niemand Moebel - im Zweifel lieber melden als still verschweigen.
+        const spanne = datenBis - datenVon;
+        const urteilsfaehig = spanne >= 2 * this.konfig.ANOMALIE_STILL_MIN_S;
+        // ?? und nicht ||: Eine 0 waere eine gueltige Angabe ("keine
+        // Toleranz"), und || machte daraus stillschweigend 3600. Fehlt der
+        // Schluessel dagegen ganz, ergaebe der Vergleich NaN und der Vermerk
+        // fiele lautlos aus - beim ersten Lauf mit einer aelteren
+        // Testkonfiguration ist genau das passiert.
+        const rand = this.konfig.ANOMALIE_STILL_RAND_S ?? 3600;
+
+        // Der Rand allein reicht nicht, und das hat eine Messung gezeigt:
+        // HMM ALGECIRAS (400 m) lag 16,4 h vor Anker und begann 18 Sekunden
+        // nach dem Datenrand - nach der blossen Randregel also "Moebel",
+        // obwohl es der interessanteste Fall im ganzen Datensatz war. Wer
+        // laenger ankert als das Fenster, wird sonst ununterscheidbar von
+        // einem Kai.
+        //
+        // Die Historie kann die Frage beantworten. Die Verdichtung loescht
+        // nach ROH_STUNDEN zwar die LIEGENDEN Punkte, behaelt aber die
+        // FAHRENDEN - wer angekommen ist, hat davor eine Anfahrt, ein Kai
+        // oder eine Plattform hat keine. Gefragt wird nur fuer die Kandidaten
+        // am Rand und nur einmal je Schiff; pos_* traegt einen Index auf
+        // (mmsi, t), das sind also ein paar Dutzend Indexzugriffe.
+        const fahrt = Math.round(this.konfig.FAHRT_KN * 10);
+        const vorlauf = this.konfig.ANOMALIE_STILL_VORLAUF_S ?? 24 * 3600;
+        const angekommen = new Map();
+        for (const f of ruhe) {
+          if (!(urteilsfaehig && f.von <= datenVon + rand)) { f.dauerlieger = false; continue; }
+          if (!angekommen.has(f.mmsi)) {
+            let fuhr = false;
+            try {
+              const vorher = this.speicher.spur(f.mmsi, datenVon - vorlauf, datenVon);
+              fuhr = vorher.some(p => p[3] != null && p[3] >= fahrt);
+            } catch (e) { fuhr = false; }
+            angekommen.set(f.mmsi, fuhr);
+          }
+          f.angekommen = angekommen.get(f.mmsi);
+          f.dauerlieger = !f.angekommen;
+        }
+        this.ruhe = ruhe;
+        this.ruheFenster = { von: stillVon, bis: stillBis, datenVon, datenBis };
+        this.ruheGerechnet = Date.now();
       }
-      this.ruhe = ruhe;
-      this.ruheFenster = { von: stillVon, bis: stillBis, datenVon, datenBis };
       this.ereignisse = aus;
       this.gerechnet = Date.now();
       this.dauerMs = this.gerechnet - t0;
       this.laeufe++;
       this.log("Anomalie: " + aus.length + " Schleifen von " +
-        new Set(aus.map(e => e.mmsi)).size + " Schiffen, " + ruhe.length +
-        " Ruhephasen von " + new Set(ruhe.map(f => f.mmsi)).size +
-        " Schiffen in " + this.dauerMs + " ms");
+        new Set(aus.map(e => e.mmsi)).size + " Schiffen" +
+        (ruheJetzt ? ", " + ruhe.length + " Ruhephasen von " +
+          new Set(ruhe.map(f => f.mmsi)).size + " Schiffen" : " (ohne Ruhedurchgang)") +
+        " in " + this.dauerMs + " ms");
     } finally {
       this.laeuft = false;
     }
@@ -527,6 +575,12 @@ class Anomalie {
       stunden: this.konfig.ANOMALIE_STUNDEN,
       ruhephasen: this.ruhe.length,
       ruheSchiffe: new Set(this.ruhe.map(f => f.mmsi)).size,
+      // Eigener Zeitstempel: Der Ruhedurchgang laeuft seltener als die
+      // Schleifensuche. Ohne ihn saehe "gerechnet" aktueller aus, als der
+      // Stillstand wirklich ist - genau die Sorte Bericht, die zum Suchen an
+      // einer funktionierenden Anlage einlaedt.
+      ruheGerechnet: this.ruheGerechnet
+        ? new Date(this.ruheGerechnet).toISOString() : null,
       stillStunden: this.konfig.ANOMALIE_STILL_STUNDEN,
       kueste: this.kueste ? this.kueste.bericht() : null
     };

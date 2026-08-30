@@ -142,6 +142,24 @@ const konfig = {
   // ankert man kilometerweit auseinander, am Kai liegt man nebeneinander.
   ANOMALIE_STILL_UMKREIS_M: zahl("AIS_ANOMALIE_STILL_UMKREIS_M", 3000),
   ANOMALIE_STILL_MIN: zahl("AIS_ANOMALIE_STILL_MIN", 2),
+  // Eigener Takt fuer den Ruhedurchgang. Gemessen an der laufenden Anlage
+  // stieg ein Lauf von 9,3 s auf 56,3 s, sobald er dazukam - der Grund ist
+  // NICHT der Rasterabstand, sondern das dreimal so lange Fenster:
+  // speicher.spuren() liest alle Zeilen des Zeitraums und duennt erst danach
+  // aus, ANOMALIE_STILL_SCHRITT_S spart also nichts am Lesen. Eine Ruhephase
+  // dauert mindestens sechs Stunden; sie alle 15 Minuten neu zu suchen statt
+  // alle fuenf verliert nichts und drittelt die Last.
+  ANOMALIE_STILL_TAKT_MS: zahl("AIS_ANOMALIE_STILL_TAKT_MS", 15 * 60 * 1000),
+  // Toleranz fuer "lief schon, als die Beobachtung begann". 15 Minuten waren
+  // gemessen zu knapp: Ein festgemachtes Kleinfahrzeug meldet unregelmaessig.
+  ANOMALIE_STILL_RAND_S: zahl("AIS_ANOMALIE_STILL_RAND_S", 3600),
+  // Wie weit vor dem Datenrand nach einer ANFAHRT gesucht wird. Die
+  // Verdichtung loescht nach ROH_STUNDEN die liegenden Punkte, behaelt aber
+  // die fahrenden - wer angekommen ist, hat davor eine Spur, ein Kai oder
+  // eine Plattform hat keine. Ohne diese Frage waere HMM ALGECIRAS (400 m,
+  // 16,4 h vor Anker, Beginn 18 s nach dem Datenrand) als "Moebel"
+  // verschwunden, also ausgerechnet der interessanteste gemessene Fall.
+  ANOMALIE_STILL_VORLAUF_S: zahl("AIS_ANOMALIE_STILL_VORLAUF_S", 24 * 3600),
 
   // --- Register ---
   WIKIDATA_URL: text("AIS_WIKIDATA_URL", "https://query.wikidata.org/sparql"),

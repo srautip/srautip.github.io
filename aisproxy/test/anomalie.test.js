@@ -327,14 +327,20 @@ const STILL_KONFIG = Object.assign({}, KONFIG, {
   ANOMALIE_STILL_STUNDEN: 24, ANOMALIE_STILL_SCHRITT_S: 300,
   ANOMALIE_STILL_MIN_S: 6 * 3600, ANOMALIE_STILL_GRUND_S: 2 * 3600,
   ANOMALIE_STILL_UMKREIS_M: 3000, ANOMALIE_STILL_MIN: 2,
+  ANOMALIE_STILL_RAND_S: 3600, ANOMALIE_STILL_VORLAUF_S: 24 * 3600,
+  FAHRT_KN: 0.5,
   ANOMALIE_LAND_M: 0
 });
 const WEITBOX = { latMin: 40, lonMin: 0, latMax: 60, lonMax: 20 };
 
-function ruheProxy(spuren, typen) {
+// vorfahrt: Punkte VOR dem Datenrand je MMSI - damit laesst sich pruefen, ob
+// der Detektor die Ankunft in der Historie findet. Ohne Eintrag gilt ein
+// Schiff als "nie in Fahrt gesehen", also als Moebel.
+function ruheProxy(spuren, typen, vorfahrt) {
   let i = 0;
   const speicher = {
     spuren() { return i++ === 0 ? [] : spuren; },   // 1. Durchgang Schleifen, 2. Ruhe
+    spur(mmsi) { return (vorfahrt || {})[mmsi] || []; },
     stammHole(m) { return { typ: (typen || {})[m] }; }
   };
   return new A.Anomalie({ konfig: STILL_KONFIG, speicher, zustand: null });
@@ -471,4 +477,118 @@ test("bei zu kurzer Beobachtung gilt niemand als Moebel", async () => {
   assert.ok(a.ruhe.length > 0);
   assert.ok(a.ruhe.every(f => !f.dauerlieger), "kein Urteil bei 7 h Beobachtung");
   assert.strictEqual(a.stillstand(WEITBOX, 24).length, 1, "im Zweifel melden");
+});
+
+// --- Der eigene Takt fuer den Ruhedurchgang --------------------------------
+
+test("lauf(false) laesst den letzten Ruhestand stehen, statt ihn zu leeren", async () => {
+  // Der Ruhedurchgang laeuft seltener als die Schleifensuche. Wuerde ein
+  // gewoehnlicher Lauf this.ruhe leeren, waere die Ebene zwischen zwei
+  // Ruhelaeufen stumm - und niemand saehe, warum.
+  const jetzt = Math.floor(Date.now() / 1000);
+  const spuren = [{ mmsi: 70, punkte: liegt(jetzt - 10 * 3600, 7, 300) }];
+  let i = 0;
+  const speicher = {
+    spuren() { return i++ % 2 === 0 ? [] : spuren; },   // gerade: Schleifen, ungerade: Ruhe
+    spur() { return []; },
+    stammHole() { return { typ: 70 }; }
+  };
+  const a = new A.Anomalie({ konfig: STILL_KONFIG, speicher, zustand: null });
+  await a.lauf(true);
+  const vorher = a.stillstand(WEITBOX, 24).length;
+  assert.strictEqual(vorher, 1, "erst einmal mit Ruhedurchgang");
+  const stand = a.ruheGerechnet;
+
+  i = 0;                                    // derselbe Speicher, neuer Lauf
+  await a.lauf(false);
+  assert.strictEqual(a.stillstand(WEITBOX, 24).length, vorher,
+    "nach einem Lauf ohne Ruhedurchgang steht der Stillstand noch");
+  assert.strictEqual(a.ruheGerechnet, stand,
+    "und sein Zeitstempel wandert nicht mit - sonst saehe er aktueller aus, als er ist");
+  assert.ok(a.gerechnet > 0, "der Schleifenstand ist dagegen frisch");
+});
+
+// --- Moebel: nur der Anfang zaehlt -----------------------------------------
+
+test("Moebel ist, wer schon dalag - auch wenn er inzwischen weg ist", async () => {
+  // Zuerst verlangte der Vermerk "am Anfang da UND am Ende noch da". An der
+  // laufenden Anlage scheiterte die zweite Bedingung in 24 von 92 Faellen an
+  // Meldeluecken. Die Frage ist aber nur: Haben wir das Schiff ankommen sehen?
+  const jetzt = Math.floor(Date.now() / 1000);
+  const fahrend = [];
+  for (let k = 0; k <= 240; k++) fahrend.push(pkt(jetzt - 20 * 3600 + k * 300, k * 200, 5000, 8));
+
+  // Liegt ab Beobachtungsbeginn, hoert aber 8 h vor dem Ende auf zu melden.
+  const frueh = ruheProxy([
+    { mmsi: 70, punkte: liegt(jetzt - 20 * 3600, 12, 300) },
+    { mmsi: 99, punkte: fahrend }
+  ]);
+  await frueh.lauf();
+  assert.strictEqual(frueh.stillstand(WEITBOX, 24).length, 0,
+    "wir haben ihn nie ankommen sehen - keine Meldung");
+  assert.ok(frueh.ruhe.some(f => f.dauerlieger));
+
+  // Gegenprobe: Dasselbe Schiff, aber es kommt MITTEN in der Beobachtung an.
+  const spaet = ruheProxy([
+    { mmsi: 70, punkte: liegt(jetzt - 12 * 3600, 12, 300) },
+    { mmsi: 99, punkte: fahrend }
+  ]);
+  await spaet.lauf();
+  assert.strictEqual(spaet.stillstand(WEITBOX, 24).length, 1,
+    "hier haben wir die Ankunft gesehen - Meldung");
+});
+
+test("die Toleranz von einer Stunde greift, und nicht mehr", async () => {
+  const jetzt = Math.floor(Date.now() / 1000);
+  const fahrend = [];
+  for (let k = 0; k <= 240; k++) fahrend.push(pkt(jetzt - 20 * 3600 + k * 300, k * 200, 5000, 8));
+  const nach = async (minuten) => {
+    const a = ruheProxy([
+      { mmsi: 70, punkte: liegt(jetzt - 20 * 3600 + minuten * 60, 8, 300) },
+      { mmsi: 99, punkte: fahrend }
+    ]);
+    await a.lauf();
+    return a.ruhe.find(f => f.mmsi === 70).dauerlieger;
+  };
+  assert.strictEqual(await nach(50), true, "50 min nach Beginn gilt noch als 'lag schon da'");
+  assert.strictEqual(await nach(70), false, "70 min nach Beginn nicht mehr");
+});
+
+test("wer am Datenrand liegt, aber vorher in Fahrt war, IST angekommen", () => {
+  // Der Fall HMM ALGECIRAS: 16,4 h vor Anker, Beginn 18 Sekunden nach dem
+  // Datenrand. Nach der blossen Randregel waere das Moebel gewesen - und
+  // damit ausgerechnet der interessanteste Fall im Datensatz verschwunden.
+  // Die Historie entscheidet: Ein Kai hat keine Anfahrt, ein Ankerlieger schon.
+  return (async () => {
+    const jetzt = Math.floor(Date.now() / 1000);
+    const fahrend = [];
+    for (let k = 0; k <= 240; k++) fahrend.push(pkt(jetzt - 20 * 3600 + k * 300, k * 200, 5000, 8));
+    const amRand = [
+      { mmsi: 70, punkte: liegt(jetzt - 20 * 3600, 12, 300) },
+      { mmsi: 99, punkte: fahrend }
+    ];
+    // Ohne Anfahrt in der Historie: Moebel.
+    const ohne = ruheProxy(amRand);
+    await ohne.lauf();
+    assert.strictEqual(ohne.stillstand(WEITBOX, 24).length, 0, "keine Anfahrt -> Moebel");
+
+    // Mit Anfahrt: angekommen, also Meldung. Der einzige Unterschied ist die
+    // Historie - dieselben Ruhedaten, dasselbe Fenster.
+    const mit = ruheProxy(amRand, null, {
+      70: [[jetzt - 26 * 3600, 54000000, 8000000, 80, 0],
+           [jetzt - 25 * 3600, 54010000, 8010000, 75, 0]]
+    });
+    await mit.lauf();
+    assert.strictEqual(mit.stillstand(WEITBOX, 24).length, 1, "mit Anfahrt -> Meldung");
+    assert.ok(mit.ruhe.find(f => f.mmsi === 70).angekommen);
+
+    // Gegenprobe: Eine Historie voller LIEGENDER Punkte ist keine Anfahrt.
+    const still = ruheProxy(amRand, null, {
+      70: [[jetzt - 26 * 3600, 54000000, 8000000, 0, 0],
+           [jetzt - 25 * 3600, 54000000, 8000000, 2, 0]]
+    });
+    await still.lauf();
+    assert.strictEqual(still.stillstand(WEITBOX, 24).length, 0,
+      "nur liegende Punkte davor -> weiterhin Moebel");
+  })();
 });
