@@ -8,7 +8,6 @@ const { Speicher } = require("./speicher");
 const { Register } = require("./register");
 const { Server } = require("./server");
 const { Anomalie } = require("./anomalie");
-const { Kueste } = require("./kueste");
 
 function log(msg) {
   console.log("[" + new Date().toISOString() + "] " + msg);
@@ -59,13 +58,8 @@ async function start() {
 
   // Der Schleifenerkenner. Er liest nur aus dem Speicher und schreibt nichts
   // zurueck - faellt er aus, fehlt eine Kartenebene und sonst nichts.
-  // Die Kueste wird EINMAL geladen und dann nur noch gefragt. Fehlt die
-  // Datei oder deckt sie die Region nicht ab, sagt kueste.da nein und der
-  // Landfilter bleibt aus - lieber ungefiltert als still falsch gefiltert.
-  const kueste = konfig.ANOMALIE_AN
-    ? new Kueste({ region: konfig.REGION, log }) : null;
   const anomalie = konfig.ANOMALIE_AN
-    ? new Anomalie({ konfig, speicher, zustand, kueste, log }) : null;
+    ? new Anomalie({ konfig, speicher, zustand, log }) : null;
 
   const server = new Server({
     konfig, zustand, speicher, anomalie, log,

@@ -724,62 +724,57 @@ es dabei handlich: Radius median **1,6 km**, 90 % unter 3,7 km, größtes 6,2 km
 Was der Client bekommt: **39 KB für die ganze Region**, 6,5 KB für die
 Deutsche Bucht.
 
-### Fähren gehen über den Landabstand weg, nicht über den Schiffstyp
+### Fähren gehen über den Schiffstyp weg — nach einem Umweg über den Landabstand
 
-Erst war geplant, Passagierschiffe (Typ 60–69) auszuschließen. Gewünscht wurde
-stattdessen: **alles unter 2 km Landabstand fällt weg.** Das ist die bessere
-Regel, und die Messung an 1 359 echten Schleifen sagt warum:
+Gemeldet: die Fähren stören. Erst waren Passagierschiffe (60–69) zum Ausschluss
+vorgesehen, dann wurde stattdessen ein **Landabstand** gewünscht: alles unter
+2 km fällt weg. Das war gebaut und gemessen — und wieder zurückgebaut, weil das
+Ergebnis nicht taugte. Beide Zahlen an denselben 2 468 echten Schleifen
+(600 Schiffe, 8 h, ganze Region):
 
-| Schwelle | Schleifen bleiben |
-|---|---|
-| 1 km | 382 von 1 359 |
-| **2 km** | **272 von 1 359** (90 Schiffe) |
-| 3 km | 227 von 1 359 |
+| Regel | Schleifen bleiben | Gebiete |
+|---|---|---|
+| kein Filter | 2 468 | 277 |
+| Landabstand 2 km | 297 | **100** |
+| **Typ 36 + 60–69 (heute)** | 1 399 | **225** |
 
-Bei 2 km fallen **454 der 466 Passagierschleifen** weg — 97 %, ohne dass
-irgendwo „Fähre" steht, und ohne Kreuzfahrer mit auszusperren. GENTLE LEADER,
-der gemeldete Ausgangsfall, hat 10,7 km Landabstand und bleibt.
+Der Landabstand nahm zwar 97 % der Fährenschleifen mit (454 von 466, ohne dass
+irgendwo „Fähre" steht), aber eben auch alles andere, was dicht unter Land
+arbeitet: Schlepper, Lotsenboote, Fischer, Bagger, Hafenboote. Helgoland-Reede,
+Kieler Förde und die ganze Unterelbe waren stumm. Der Typfilter ist gröber und
+trifft weniger genau — er lässt die Arbeitsschiffe aber stehen, und das ist die
+Ebene, um die es geht.
 
-**Der Preis gehört dazugesagt:** Helgoland-Reede, Kieler Förde und die ganze
-Unterelbe fallen mit heraus. Wer dort schleift, wird nicht gemeldet.
+**Der Preis in der anderen Richtung gehört dazugesagt:** In einem typischen
+Ausschnitt (53,3–54,3 °N / 7–9 °O) stehen jetzt **50 Gebiete statt rund 12**,
+38 davon kräftig gezeichnet. Bei Arbeitszoom (Stufe 10) ist das gut lesbar, in
+der Regionsübersicht (Stufe 8, 193 Gebiete) wird es dicht.
 
-#### Vier Küstenquellen probiert, drei verworfen
+**Sportboote (37) bleiben ausdrücklich drin** — gefragt waren Segelschiffe.
+
+#### Was die Küstenmessung gekostet hat, und was davon bleibt
+
+Der Landfilter ist gelöscht (`src/kueste.js`, `karten/kueste.json`,
+`werkzeug/kueste-bauen.js`); die Git-Historie hält ihn fest. Die Quellenprüfung
+war zu teuer, um sie zu verlieren — wer je wieder eine Küstenlinie braucht,
+fängt hier an:
 
 | Quelle | Befund |
 |---|---|
-| **Natural Earth 10m** (10 MB) | Löst die Elbe nicht auf: Hamburger Hafen läge „7,9 km von Land", die 63 Hafenfähren blieben stehen. |
-| **OSM simplified land polygons** (24 MB) | Noch schlechter — die Vereinfachung hat die Elbe ganz geschluckt (Hamburg „20 km"). |
-| **Overpass API** | Nicht erreichbar (Tunnelabbruch bzw. HTTP 500, auch bei kleiner Box). Als *laufende* Abhängigkeit ohnehin fragil. |
-| **Aus den AIS-Daten lernen** („Wasser ist, wo Schiffe fahren") | Nur **4 %** der Regionszellen waren je befahren; die nächste unbefahrene Zelle liegt selbst mitten in der Nordsee 280 m entfernt. Die Regel hätte alles weggeworfen. |
-| **OSM `land-polygons-split-4326`** (925 MB, volle Auflösung) | Trifft jede Probe. **Genommen.** |
+| **Natural Earth 10m** (10 MB) | Löst die Elbe nicht auf: Hamburger Hafen läge „7,9 km von Land". |
+| **OSM simplified land polygons** (24 MB) | Noch schlechter — die Elbe ganz geschluckt (Hamburg „20 km"). |
+| **Overpass API** | Nicht erreichbar (Tunnelabbruch bzw. HTTP 500); als *laufende* Abhängigkeit ohnehin fragil. |
+| **Aus den AIS-Daten lernen** | Nur **4 %** der Regionszellen waren je befahren; die Regel hätte alles weggeworfen. |
+| **OSM `land-polygons-split-4326`** (925 MB, volle Auflösung) | Trifft jede Probe. Daraus wurden einmalig 1 042 Ringe / 395 KB. **Das war die brauchbare.** |
 
-Daraus macht `werkzeug/kueste-bauen.js` einmalig `karten/kueste.json`:
-1 042 Ringe, 20 731 von 402 142 Punkten, **395 KB**. Zur Laufzeit wird nur
-diese Datei gelesen — ein Dienst, der beim Start 925 MB braucht, ist keiner.
-
-#### Drei Fallstricke, jeder einmal zugeschlagen
-
-- **OSM führt Flüsse oberhalb der Küstenlinie als LAND** — Elbe ab Cuxhaven,
-  Weser ab Bremerhaven, Nord-Ostsee-Kanal, die Förden. Der bloße Abstand zur
-  nächsten Kante meldete für den Hamburger Hafen „3,16 km", weil der Punkt
-  *innen* liegt und der Rand wirklich so weit weg ist. Es braucht zusätzlich
-  einen **Punkt-in-Polygon-Test**; an Land ist der Abstand 0.
-- **Die Polygone sind kachelweise zerschnitten.** Ein Strahlentest über den
-  beschnittenen Segmentsatz erklärte die offene Nordsee zu Land. Geprüft wird
-  je **vollständigem Ring**, dessen Hüllbox den Punkt enthält.
-- **Douglas-Peucker auf einem geschlossenen Ring** hat Anfang und Ende am
-  selben Punkt: Die Sehne ist null lang, übrig bleiben drei Punkte, und die
-  fielen als entartet heraus. Das kostete 535 Ringe, davon 37 größer als
-  200 m und der größte **1 373 m** — echte Inseln, neben denen ein Schiff dann
-  nicht mehr „landnah" gewesen wäre. Jetzt zwei Anker, und eine zur Linie
-  zusammengefallene Sandbank wird **behalten** statt verworfen: Sie ist kein
-  Polygon mehr, aber immer noch Land.
-
-**Fehlt die Datei oder deckt sie die Region nicht ab, wird NICHT gefiltert** —
-und das steht im Protokoll. Ein Punkt ohne Küste in Reichweite gälte sonst als
-„weit draußen", und ausgerechnet die Schleifen am Regionsrand blieben alle
-stehen: ein stiller Fehler, der wie ein Ergebnis aussieht.
-
+Und drei Fallstricke, jeder einmal zugeschlagen: **OSM führt Flüsse oberhalb
+der Küstenlinie als Land** (der bloße Kantenabstand meldete für den Hamburger
+Hafen „3,16 km", weil der Punkt *innen* liegt — es braucht einen
+Punkt-in-Polygon-Test). **Die Polygone sind kachelweise zerschnitten**, ein
+Strahlentest über den beschnittenen Segmentsatz erklärte die offene Nordsee zu
+Land; geprüft werden muss je vollständigem Ring. **Douglas-Peucker auf einem
+geschlossenen Ring** hat Anfang und Ende am selben Punkt und ließ 535 Ringe
+entarten, davon 37 größer als 200 m und der größte 1 373 m — echte Inseln.
 ## Stillstand: 77 % liegen still, die Auskunft steckt im „außerhalb"
 
 **2 346 von 3 021 Schiffen liegen still.** „Stillstand" allein ist deshalb
