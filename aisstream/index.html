@@ -1284,6 +1284,7 @@
       Berufs wegen kreist. Ein dünner gestrichelter Kreis sind Lotsenboote,
       Schlepper, Fähren, Fischer oder Bagger — für die ist das der Alltag.
       Braucht einen Proxy; ohne ihn bleibt die Ebene leer.
+      <span id="schleifenStand" style="display:block;margin-top:0.3rem"></span>
     </p>
     <label class="zahlzeile" for="trackLimit">
       Spuren zeichnen bis
@@ -2023,6 +2024,7 @@
   var filterResetEl = document.getElementById("filterReset");
   var showLabelsInput = document.getElementById("showLabels");
   var schleifenAnInput = document.getElementById("schleifenAn");
+  var schleifenStandEl = document.getElementById("schleifenStand");
   var trackLimitInput = document.getElementById("trackLimit");
   var trackStundenInput = document.getElementById("trackStunden");
   var replayInput = document.getElementById("replay");
@@ -7656,11 +7658,35 @@
   var schleifenLaeuft = false;
   var schleifenFehlerLog = false;
 
+  // Eine Ebene, die eingeschaltet ist und nichts zeigt, muss sagen warum.
+  // Gemeldet wurde genau das: "in der Karte sind keine Schleifen markiert" -
+  // und die Ursache stand nur im Protokoll, das niemand offen hatte.
+  function schleifenStand(text, fehler) {
+    if (!schleifenStandEl) return;
+    schleifenStandEl.textContent = text || "";
+    schleifenStandEl.style.color = fehler ? "var(--bad, #e06c6c)" : "";
+  }
+
+  // Aus einem HTTP-Code eine Auskunft machen, die zur naechsten Handlung
+  // fuehrt. "HTTP 401" allein hat hier zwei ganz verschiedene Ursachen, und
+  // die falsche zu vermuten kostet eine Stunde.
+  function schleifenFehlertext(status) {
+    if (status === 401) {
+      return "Der Proxy weist die Anfrage ab (401). Entweder stimmt das " +
+        "Zugangstoken nicht — oder /v1/anomalien steht dort nicht im " +
+        "Caddy-Matcher, dann antwortet Caddy, bevor der Proxy gefragt wird.";
+    }
+    if (status === 404) return "Dieser Proxy kennt /v1/anomalien noch nicht — er braucht ein Update.";
+    if (status === 503) return "Der Schleifenerkenner ist auf diesem Proxy abgeschaltet.";
+    return "Der Proxy antwortet mit HTTP " + status + ".";
+  }
+
   function schleifenWeg() {
     if (mapAvailable) schleifenKreise.forEach(function (k) { map.removeLayer(k); });
     schleifenKreise = [];
     schleifenBox = null;
     schleifenAt = 0;
+    schleifenStand("");
   }
 
   function schleifenName(mmsi) {
@@ -7704,7 +7730,20 @@
 
   function schleifenHolen(erzwingen) {
     if (!schleifenAnInput.checked) return;
-    if (!proxyLiefert() || !mapAvailable || schleifenLaeuft) return;
+    // Drei verschiedene Lagen, und sie duerfen nicht denselben Satz bekommen.
+    // Der erste Anlauf sagte auch dann "ohne Proxy", wenn der Proxy nur noch
+    // nicht verbunden war - beim Umlegen des Schalters ist das der Normalfall,
+    // und die Ebene fuellte sich Sekunden spaeter trotzdem. Ein Fehlertext,
+    // der gleich darauf falsch ist, ist schlimmer als keiner.
+    if (!proxyAktiv()) {
+      schleifenStand("Ohne Proxy gibt es diese Ebene nicht — die Erkennung läuft dort.", true);
+      return;
+    }
+    if (rueckfallAktiv) {
+      schleifenStand("Der Proxy ist gerade nicht erreichbar. Die Ebene füllt sich, sobald er wieder liefert.");
+      return;
+    }
+    if (!mapAvailable || schleifenLaeuft) return;
     var b = map.getBounds();
     var sicht = { latMin: b.getSouth(), lonMin: b.getWest(),
                   latMax: b.getNorth(), lonMax: b.getEast() };
@@ -7719,14 +7758,11 @@
       .map(function (x) { return x.toFixed(4); }).join(",");
 
     schleifenLaeuft = true;
+    schleifenStand("wird geladen…");
     fetch(proxyMitToken(proxyBasis() + "/anomalien?bbox=" + encodeURIComponent(box) +
         "&stunden=" + SCHLEIFEN_STUNDEN))
       .then(function (res) {
-        // 503 heisst: Der Detektor ist auf diesem Proxy abgeschaltet. Das ist
-        // eine Auskunft, kein Fehler - und sie gehoert einmal ins Protokoll,
-        // sonst sucht jemand nach einer Ebene, die es dort nicht gibt.
-        if (res.status === 503) throw new Error("Der Proxy hat den Schleifenerkenner nicht eingeschaltet");
-        if (!res.ok) throw new Error("HTTP " + res.status);
+        if (!res.ok) throw new Error(schleifenFehlertext(res.status));
         return res.json();
       })
       .then(function (d) {
@@ -7736,13 +7772,23 @@
         schleifenAt = Date.now();
         schleifenFehlerLog = false;
         var laut = d.gebiete.filter(function (g) { return g.stufe === "auffaellig"; }).length;
+        schleifenStand(d.gebiete.length
+          ? d.gebiete.length + " Gebiete in den letzten " + d.stunden + " h, davon " +
+            laut + " auffällig"
+          : "In diesem Ausschnitt wurde in den letzten " + d.stunden + " h keine Schleife gefahren.");
         log("Schleifen aus dem Proxy: " + d.gebiete.length + " Gebiete in den letzten " +
           d.stunden + " h, davon " + laut + " mit Schiffen ausserhalb des Berufsverkehrs.");
       })
       .catch(function (e) {
+        var text = (e && e.message) ? e.message : String(e);
+        // In die Einstellungen IMMER, ins Protokoll nur einmal: Die Standzeile
+        // wird gelesen, wenn jemand nachsieht, warum nichts da ist - ein
+        // Protokoll, das bei jeder Kartenbewegung dieselbe Zeile schreibt,
+        // waere zugemauert.
+        schleifenStand(text, true);
         if (schleifenFehlerLog) return;
         schleifenFehlerLog = true;
-        log("Schleifen konnten nicht geladen werden: " + (e && e.message ? e.message : e));
+        log("Schleifen konnten nicht geladen werden: " + text);
       })
       .finally(function () { schleifenLaeuft = false; });
   }
