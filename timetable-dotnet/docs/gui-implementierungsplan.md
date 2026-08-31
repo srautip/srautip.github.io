@@ -457,6 +457,32 @@ fiel eine Lücke auf: `StandHinzufuegen` liefert die verdrängten Ids zurück,
 damit die Oberfläche sie melden kann – ausgewertet hatte sie bis dahin
 niemand. Jetzt erscheinen sie als Hinweis und im Protokoll.
 
+**Nachtrag zu G6 (Startseite).** Die Leiste zeigte bisher drei Schritte, zwei
+davon mit dem Text „noch nicht umgesetzt“. Jetzt sind es die fünf des
+Konzepts, jeder mit echtem Zustand und einer Zeile Substanz – die Skizze in
+8 ist wörtlich gemeint: eine Leiste, die nur Überschriften zeigt, ist ein
+Inhaltsverzeichnis, keine Standortbestimmung.
+
+Drei Entscheidungen:
+
+- **Das Anlegen eines Projekts ist kein Schritt.** „Neue Projekte starten bei
+  [1] mit dem Assistenten-Ergebnis“ – die Leiste setzt ein offenes Projekt
+  voraus. Die Einstiegsknöpfe stehen darüber.
+- **Keine Handregel ist Bereit, nicht Warnung.** Regeln sind optional; eine
+  Warnung, die den Normalfall trifft, erzieht dazu, Warnungen zu übersehen.
+- **„Entscheiden“ führt in das Dashboard, das etwas zeigt.** Immer zum
+  Stundenplan zu springen wäre bei einer Schule, die nur die Klassenbildung
+  nutzt, ein Klick ins Leere.
+
+**Dabei fiel ein Fehler auf**, den erst das zweite Dashboard sichtbar machte:
+`SchrittRechnen` hing am Auslieferungs-Slot („wird gerade etwas
+angezeigt?“). Ein Wechsel auf das leere Board liess damit einen gerechneten
+Stundenplan als ungerechnet erscheinen. Der Schritt liest jetzt die
+STÄNDE – ein Lauf bleibt ein Lauf, unabhängig davon, wohin man schaut.
+
+Der Aufbautest der Leiste ist zugleich die erste Aufbauprüfung, die
+`MainWindow` überhaupt hat.
+
 **Freigabe aus der Sicht** (Nutzerwunsch 26.08.2026): die Klassenbildung ist
 aus dem Board freizugeben, der Stundenplan aus der Stundentafel. Beide Wege
 führen durch DENSELBEN Dialog mit Abweichungen und Begründungspflicht – eine

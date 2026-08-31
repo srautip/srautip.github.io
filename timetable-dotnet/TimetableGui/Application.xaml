@@ -173,6 +173,38 @@
                  Zeichen UND Farbe wechseln gemeinsam: das ist dieselbe
                  Doppelkodierung, die das Konzept fuer die Ampel
                  verlangt (Farbe allein traegt nicht). -->
+            <!-- Ein Schritt der Startleiste ist klickbar (Konzept 8),
+                 soll aber nicht wie ein Knopf aussehen - er ist eine
+                 Zeile, die auf Beruehrung reagiert. Deshalb ein eigener
+                 ControlTemplate statt Setter: bei Button schlaegt
+                 Background wegen der Aero2-Trigger nicht durch. -->
+            <Style x:Key="Schrittknopf" TargetType="Button">
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Margin" Value="0,0,0,4" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Rahmen" Background="Transparent"
+                                    CornerRadius="{StaticResource radius-m}"
+                                    Padding="8,8,8,10">
+                                <ContentPresenter />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Rahmen" Property="Background"
+                                            Value="{StaticResource farbe-flaeche-2}" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Rahmen" Property="Background"
+                                            Value="{StaticResource farbe-flaeche-2}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <Style x:Key="SchrittZeichen" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="{StaticResource schrift-symbole}" />
                 <Setter Property="FontSize" Value="{StaticResource grad-kopf}" />

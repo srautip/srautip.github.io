@@ -24,6 +24,8 @@ Class MainWindow
 
         _speicherung = New Speicherstand(_modell)
         AddHandler _modell.PropertyChanged, AddressOf AufModellAenderung
+        AddHandler _modell.PropertyChanged, Sub() SchrittleisteFuellen()
+        SchrittleisteFuellen()
 
         InputBindings.Add(New KeyBinding(_modell.SpeichernBefehl, Key.S, ModifierKeys.Control))
         InputBindings.Add(New KeyBinding(_modell.KlassenbildungBefehl, Key.F5, ModifierKeys.None))
@@ -107,6 +109,16 @@ Class MainWindow
         Dim f As New RegelnFenster(_modell.Projekt, New WpfDialoge(Me), _speicherung) With {.Owner = Me}
         AddHandler f.Geaendert, Sub() _modell.Geaendert = True
         f.ShowDialog()
+    End Sub
+
+    ''' <summary>Ein Klick auf einen Schritt fuehrt in seinen Bereich
+    ''' (Konzept 8). Das Ziel steht am Knopf, nicht in einer
+    ''' Fallunterscheidung hier - sonst gaebe es zwei Orte, an denen
+    ''' die Zuordnung Schritt-zu-Bereich festgelegt ist.</summary>
+    Private Sub AufSchritt(sender As Object, e As RoutedEventArgs)
+        Dim knopf = TryCast(sender, Button)
+        If knopf Is Nothing OrElse Not TypeOf knopf.Tag Is Bereich Then Return
+        _modell.Bereich = CType(knopf.Tag, Bereich)
     End Sub
 
     Private Sub AufKlarnamenExport(sender As Object, e As RoutedEventArgs)
@@ -236,6 +248,14 @@ Class MainWindow
         If z IsNot Nothing Then _historie.Freigeben(z.Id)
     End Sub
 
+
+    ''' <summary>Die Leiste wird NEU GEBAUT statt gebunden: ihre Zeilen
+    ''' sind abgeleitete Werte, keine Eigenschaften mit
+    ''' Aenderungsmeldung. Ein ItemsSource-Binding zeigte sonst den
+    ''' Stand von vorhin.</summary>
+    Private Sub SchrittleisteFuellen()
+        Schrittleiste.ItemsSource = _modell.Schritte()
+    End Sub
 End Class
 
 ''' <summary>Die WPF-Umsetzung der Dialoge. Liegt bewusst im View - das

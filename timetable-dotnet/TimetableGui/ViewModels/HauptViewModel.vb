@@ -287,7 +287,173 @@ Public NotInheritable Class HauptViewModel
     End Property
 
     ' ---------------------------------------------------------------
-    ' Startseite als Schrittleiste (gui-ui-konzept.md 8)
+    ' Startseite als Schrittleiste (gui-ui-konzept.md 8) - Stufe G6
+    ' ---------------------------------------------------------------
+    '
+    ' Fuenf Schritte, jeder mit ECHTEM Zustand und einer Zeile Substanz.
+    ' Die Skizze im Konzept ist woertlich gemeint: "[3] Rechnen ▶ zuletzt
+    ' 22.08. 14:32 - 10 Loesungen, beste 198.6". Eine Leiste, die nur
+    ' Ueberschriften zeigt, waere ein Inhaltsverzeichnis - sie soll aber
+    ' sagen, wo man steht.
+    '
+    ' Das ANLEGEN eines Projekts ist bewusst kein Schritt: "neue Projekte
+    ' starten bei [1] mit dem Assistenten-Ergebnis" (8), die Leiste setzt
+    ' ein offenes Projekt also voraus. Die Einstiegsknoepfe stehen
+    ' darueber.
+
+    ''' <summary>Eine Zeile der Leiste - fertig aufbereitet, damit die
+    ''' Ansicht nichts entscheidet.</summary>
+    Public NotInheritable Class Startschritt
+        Public Property Nummer As Integer
+        Public Property Titel As String = ""
+        Public Property Text As String = ""
+        Public Property Stand As SchrittStand
+        ''' <summary>Wohin der Klick fuehrt. "Jeder Schritt ist klickbar
+        ''' (fuehrt in den Bereich)" (8).</summary>
+        Public Property Ziel As Bereich
+    End Class
+
+    Public Function Schritte() As List(Of Startschritt)
+        Return New List(Of Startschritt) From {
+            New Startschritt With {.Nummer = 1, .Titel = "Stammdaten", .Ziel = Bereich.Stammdaten,
+                                   .Stand = SchrittStammdaten, .Text = SchrittStammdatenText},
+            New Startschritt With {.Nummer = 2, .Titel = "Regeln", .Ziel = Bereich.Regeln,
+                                   .Stand = SchrittRegeln, .Text = SchrittRegelnText},
+            New Startschritt With {.Nummer = 3, .Titel = "Rechnen", .Ziel = Bereich.Laeufe,
+                                   .Stand = SchrittRechnen, .Text = SchrittRechnenText},
+            New Startschritt With {.Nummer = 4, .Titel = "Entscheiden", .Ziel = Entscheidungsbereich(),
+                                   .Stand = SchrittEntscheiden, .Text = SchrittEntscheidenText},
+            New Startschritt With {.Nummer = 5, .Titel = "Freigabe & Export", .Ziel = Bereich.Laeufe,
+                                   .Stand = SchrittFreigabe, .Text = SchrittFreigabeText}
+        }
+    End Function
+
+    ' --- [2] Regeln -------------------------------------------------
+
+    ''' <summary>Regeln sind OPTIONAL - viele Schulen kommen ohne aus.
+    ''' "Keine Handregel" ist deshalb `Bereit` und nicht `Warnung`: eine
+    ''' Warnung, die den Normalfall trifft, erzieht dazu, Warnungen zu
+    ''' uebersehen.</summary>
+    Public ReadOnly Property SchrittRegeln As SchrittStand
+        Get
+            If Not ProjektOffen Then Return SchrittStand.Offen
+            If RegelBefunde().Count > 0 Then Return SchrittStand.Warnung
+            Return If(_projekt.Constraints.Count > 0, SchrittStand.Erledigt, SchrittStand.Bereit)
+        End Get
+    End Property
+
+    Public ReadOnly Property SchrittRegelnText As String
+        Get
+            If Not ProjektOffen Then Return "Erst ein Projekt anlegen oder oeffnen."
+            Dim n = _projekt.Constraints.Count
+            Dim basis = If(n = 0, "Keine Handregeln - der Plan rechnet allein aus den Stammdaten.",
+                           $"{n} Handregel(n).")
+            Dim befunde = RegelBefunde()
+            If befunde.Count = 0 Then Return basis
+            Return $"{basis} {befunde.Count} Hinweis(e): {befunde(0)}"
+        End Get
+    End Property
+
+    ''' <summary>Was an den Handregeln zu beanstanden ist. Bewusst
+    ''' dieselbe Quelle wie die Regelmaske - eine zweite Pruefung hier
+    ''' waere eine zweite Meinung.</summary>
+    Private Function RegelBefunde() As List(Of String)
+        If Not ProjektOffen Then Return New List(Of String)
+        Return Kennzahlen.RegelnAusserhalb(_projekt.Constraints, _projekt.Bestand.Tage,
+                                           _projekt.Bestand.PeriodsPerDay)
+    End Function
+
+    ' --- [3] Rechnen ------------------------------------------------
+
+    ''' <summary>Die Skizze aus 8: "zuletzt 22.08. 14:32 - 10 Loesungen".
+    ''' Gelesen wird aus den STAENDEN, nicht aus dem Auslieferungs-Slot -
+    ''' ein Lauf bleibt ein Lauf, auch wenn gerade ein anderes Dashboard
+    ''' angezeigt wird.</summary>
+    Public ReadOnly Property SchrittRechnenText As String
+        Get
+            If Not ProjektOffen Then Return "Erst ein Projekt anlegen oder oeffnen."
+            Dim letzter = LetzterStand()
+            If letzter Is Nothing Then
+                Return "Noch nicht gerechnet. Klassenbildung F5, Stundenplan F6."
+            End If
+            Return $"Zuletzt {letzter.Erstellt:dd.MM. HH:mm} - {letzter.Label}. " &
+                   $"{_projekt.Staende.Count} Stand/Staende gesichert."
+        End Get
+    End Property
+
+    Private Function LetzterStand() As ProjektStand
+        If Not ProjektOffen Then Return Nothing
+        Return _projekt.Staende.OrderByDescending(Function(s) s.Erstellt).FirstOrDefault()
+    End Function
+
+    ' --- [4] Entscheiden --------------------------------------------
+
+    ''' <summary>Entschieden ist, wenn eine Loesung als Arbeitsstand
+    ''' markiert wurde (5). Ohne Stand gibt es nichts zu entscheiden.</summary>
+    Public ReadOnly Property SchrittEntscheiden As SchrittStand
+        Get
+            If Not ProjektOffen OrElse LetzterStand() Is Nothing Then Return SchrittStand.Offen
+            Return If(Arbeitsstand() IsNot Nothing, SchrittStand.Erledigt, SchrittStand.Bereit)
+        End Get
+    End Property
+
+    Public ReadOnly Property SchrittEntscheidenText As String
+        Get
+            If Not ProjektOffen Then Return "Erst ein Projekt anlegen oder oeffnen."
+            If LetzterStand() Is Nothing Then Return "Erst rechnen - dann gibt es etwas zu vergleichen."
+            Dim gewaehlt = Arbeitsstand()
+            Dim offen = _projekt.Klassenbildung.Fixierungen.Count
+            Dim zusatz = If(offen = 0, "", $" {offen} Fixierung(en) gesetzt.")
+            If gewaehlt Is Nothing Then
+                Return "Im Dashboard vergleichen und eine Loesung als Arbeitsstand uebernehmen." & zusatz
+            End If
+            Return $"Arbeitsstand: {gewaehlt.Label}." & zusatz
+        End Get
+    End Property
+
+    ''' <summary>Der Stand, in dem eine Loesung als Arbeitsstand markiert
+    ''' ist (lauf.arbeitsstand, gesetzt aus dem Dashboard).</summary>
+    Private Function Arbeitsstand() As ProjektStand
+        If Not ProjektOffen Then Return Nothing
+        Return _projekt.Staende.LastOrDefault(
+            Function(s) s.Lauf IsNot Nothing AndAlso s.Lauf.ContainsKey("arbeitsstand"))
+    End Function
+
+    ''' <summary>Der Klick auf "Entscheiden" fuehrt in das Dashboard, das
+    ''' tatsaechlich etwas zeigt. "Immer Stundenplan" waere bei einer
+    ''' Schule, die nur die Klassenbildung nutzt, ein Klick ins Leere.</summary>
+    Private Function Entscheidungsbereich() As Bereich
+        Dim letzter = LetzterStand()
+        If letzter IsNot Nothing AndAlso letzter.Klassenbildung IsNot Nothing Then Return Bereich.Klassenbildung
+        Return Bereich.Stundenplan
+    End Function
+
+    ' --- [5] Freigabe & Export --------------------------------------
+
+    Public ReadOnly Property SchrittFreigabe As SchrittStand
+        Get
+            If Not ProjektOffen Then Return SchrittStand.Offen
+            If Freigaben().Count > 0 Then Return SchrittStand.Erledigt
+            Return If(Arbeitsstand() IsNot Nothing, SchrittStand.Bereit, SchrittStand.Offen)
+        End Get
+    End Property
+
+    Public ReadOnly Property SchrittFreigabeText As String
+        Get
+            If Not ProjektOffen Then Return "Erst ein Projekt anlegen oder oeffnen."
+            Dim frei = Freigaben()
+            If frei.Count = 0 Then Return "Noch nicht freigegeben."
+            ' Klassenbildung und Stundenplan sind zwei Entscheidungen mit
+            ' je eigenem Nachweis - beide nennen, nicht nur die letzte.
+            Return String.Join("  ·  ", frei.Select(
+                Function(s) $"{Freigabe.ArtVon(s)} freigegeben am {s.Erstellt:dd.MM.yyyy}"))
+        End Get
+    End Property
+
+    Private Function Freigaben() As List(Of ProjektStand)
+        If Not ProjektOffen Then Return New List(Of ProjektStand)
+        Return _projekt.Staende.Where(AddressOf LaeufeViewModel.IstFreigabe).ToList()
+    End Function
     ' ---------------------------------------------------------------
 
     Public ReadOnly Property SchrittProjekt As SchrittStand
@@ -303,14 +469,19 @@ Public NotInheritable Class HauptViewModel
         End Get
     End Property
 
-    ''' <summary>"Erledigt" heisst hier: es liegt ein anzeigbares
-    ''' Ergebnis vor. Genau daran haengt auch die Anzeige selbst, also
-    ''' ist es dieselbe Wahrheit und keine zweite.</summary>
+    ''' <summary>"Erledigt" heisst: es gibt einen gesicherten STAND.
+    '''
+    ''' Frueher hing das am Auslieferungs-Slot ("wird gerade etwas
+    ''' angezeigt?"). Mit zwei Dashboards war das falsch: ein Wechsel
+    ''' auf das leere Board liess einen gerechneten Stundenplan als
+    ''' ungerechnet erscheinen. Ein Lauf bleibt ein Lauf, unabhaengig
+    ''' davon, wohin man gerade schaut.</summary>
     Public ReadOnly Property SchrittRechnen As SchrittStand
         Get
             If Not ProjektOffen Then Return SchrittStand.Offen
-            If Auslieferung.SeitenGroesse > 0 Then Return SchrittStand.Erledigt
-            Return If(KannKlassenbildungRechnen, SchrittStand.Bereit, SchrittStand.Offen)
+            If _projekt.Staende.Count > 0 Then Return SchrittStand.Erledigt
+            Return If(KannKlassenbildungRechnen OrElse KannStundenplanRechnen,
+                      SchrittStand.Bereit, SchrittStand.Offen)
         End Get
     End Property
 
@@ -339,6 +510,13 @@ Public NotInheritable Class HauptViewModel
         Melde(NameOf(SchrittStammdaten))
         Melde(NameOf(SchrittRechnen))
         Melde(NameOf(SchrittStammdatenText))
+        Melde(NameOf(SchrittRegeln))
+        Melde(NameOf(SchrittRegelnText))
+        Melde(NameOf(SchrittRechnenText))
+        Melde(NameOf(SchrittEntscheiden))
+        Melde(NameOf(SchrittEntscheidenText))
+        Melde(NameOf(SchrittFreigabe))
+        Melde(NameOf(SchrittFreigabeText))
         Melde(NameOf(PruefungGruen))
     End Sub
 

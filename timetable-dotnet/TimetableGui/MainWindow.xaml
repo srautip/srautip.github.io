@@ -152,60 +152,52 @@
 
                         <TextBlock Text="Schulplanung" Style="{StaticResource Marke}" />
                         <TextBlock Text="{Binding Titel}" Foreground="{StaticResource farbe-text-3}"
-                                   FontSize="{StaticResource grad-basis}" Margin="0,2,0,24" />
+                                   FontSize="{StaticResource grad-basis}" Margin="0,2,0,20" />
 
-                        <!-- [1] Projekt -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-                            <TextBlock Style="{StaticResource SchrittZeichen}" DataContext="{Binding SchrittProjekt}" />
-                            <TextBlock Text="Projekt" Style="{StaticResource SchrittTitel}" />
-                        </StackPanel>
-                        <TextBlock Style="{StaticResource SchrittText}" Margin="26,2,0,8"
-                                   Text="Ein neues Projekt anlegen oder einen bestehenden Schulordner im tests/&lt;schule&gt;/-Layout übernehmen." />
-                        <StackPanel Orientation="Horizontal" Margin="26,0,0,24">
+                        <!-- Der Einstieg steht ÜBER der Leiste und ist kein
+                             Schritt: "neue Projekte starten bei [1] mit dem
+                             Assistenten-Ergebnis" (Konzept 8) - die Leiste
+                             setzt ein offenes Projekt also voraus. -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                             <Button Content="Neues Projekt…" Style="{StaticResource KnopfPrimaer}" Command="{Binding NeuBefehl}" />
                             <Button Content="Bestehende Schule übernehmen…" Margin="8,0,0,0" Command="{Binding ImportierenBefehl}" />
                             <Button Content="Öffnen…" Margin="8,0,0,0" Command="{Binding OeffnenBefehl}" />
                         </StackPanel>
 
-                        <!-- [2] Stammdaten -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-                            <TextBlock Style="{StaticResource SchrittZeichen}" DataContext="{Binding SchrittStammdaten}" />
-                            <TextBlock Text="Stammdaten" Style="{StaticResource SchrittTitel}" />
-                        </StackPanel>
-                        <TextBlock Style="{StaticResource SchrittText}" Margin="26,2,0,24"
-                                   Text="{Binding SchrittStammdatenText}" />
+                        <!-- Die Schrittleiste (Konzept 8). Jeder Schritt
+                             zeigt seinen echten Stand - Zeichen UND Farbe,
+                             damit er ohne Farbe lesbar bleibt - und führt
+                             per Klick in seinen Bereich. -->
+                        <ItemsControl x:Name="Schrittleiste">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource Schrittknopf}"
+                                            Click="AufSchritt" Tag="{Binding Ziel}">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Style="{StaticResource SchrittZeichen}"
+                                                           DataContext="{Binding Stand}" />
+                                                <TextBlock Text="{Binding Nummer, StringFormat='[{0}]'}"
+                                                           Style="{StaticResource SchrittText}"
+                                                           VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                <TextBlock Text="{Binding Titel}" Style="{StaticResource SchrittTitel}" />
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding Text}" Style="{StaticResource SchrittText}"
+                                                       Margin="26,2,0,0" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
 
-                        <!-- [3] Rechnen -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-                            <TextBlock Style="{StaticResource SchrittZeichen}" DataContext="{Binding SchrittRechnen}" />
-                            <TextBlock Text="Klassenbildung rechnen" Style="{StaticResource SchrittTitel}" />
-                        </StackPanel>
-                        <TextBlock Style="{StaticResource SchrittText}" Margin="26,2,0,8"
-                                   Text="Varianten rechnen und im Board bewerten. Der Lauf läuft im Hintergrund und ist jederzeit abbrechbar – bereits fertige Varianten bleiben erhalten." />
-                        <StackPanel Orientation="Horizontal" Margin="26,0,0,24">
-                            <Button Content="Klassenbildung rechnen" Style="{StaticResource KnopfPrimaer}"
-                                    Command="{Binding KlassenbildungBefehl}" />
-                        </StackPanel>
-
-                        <!-- Noch nicht umgesetzt: ehrlich als eigene
-                             Schritte gezeigt statt als Fussnote, damit
-                             die Leiste den ganzen Weg abbildet. -->
-                        <Border BorderBrush="{StaticResource farbe-linie}" BorderThickness="0,1,0,0" Padding="0,16,0,0">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-                                    <TextBlock Style="{StaticResource SchrittZeichen}" />
-                                    <TextBlock Text="Entscheiden" Style="{StaticResource SchrittTitel}"
-                                               Foreground="{StaticResource farbe-text-3}" />
-                                </StackPanel>
-                                <TextBlock Style="{StaticResource SchrittText}" Margin="26,2,0,12"
-                                           Text="Stundenplan-Dashboard, Stammdaten- und Regel-Masken – noch nicht umgesetzt (Stufe F/G)." />
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-                                    <TextBlock Style="{StaticResource SchrittZeichen}" />
-                                    <TextBlock Text="Freigabe &amp; Export" Style="{StaticResource SchrittTitel}"
-                                               Foreground="{StaticResource farbe-text-3}" />
-                                </StackPanel>
-                                <TextBlock Style="{StaticResource SchrittText}" Margin="26,2,0,0"
-                                           Text="Über den Bereich Läufe: Stand freigeben mit aktiver Bestätigung, danach geschützt gegen Löschen und Verdrängen. Klarnamen-Export folgt in Stufe G5." />
+                        <Border BorderBrush="{StaticResource farbe-linie}" BorderThickness="0,1,0,0"
+                                Margin="0,16,0,0" Padding="0,12,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Klassenbildung rechnen" Command="{Binding KlassenbildungBefehl}" />
+                                <Button Content="Stundenplan rechnen" Margin="8,0,0,0" Command="{Binding StundenplanBefehl}" />
+                                <TextBlock Text="F5 bzw. F6" VerticalAlignment="Center" Margin="12,0,0,0"
+                                           FontSize="{StaticResource grad-klein}"
+                                           Foreground="{StaticResource farbe-text-3}" />
                             </StackPanel>
                         </Border>
 
