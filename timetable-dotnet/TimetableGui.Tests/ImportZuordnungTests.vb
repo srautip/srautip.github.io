@@ -417,6 +417,89 @@ Public Class ImportZuordnungTests
         Next
     End Sub
 
+
+    ' ===============================================================
+    ' Das Ziel eines Attributs (Nutzerbefund 01.09.2026)
+    ' ===============================================================
+
+    ''' <summary>Der Befund aus dem manuellen Test: in der Rollenliste
+    ''' stand "Attribut", aber nicht, WIE das Attribut heissen wird - man
+    ''' sucht dort dann nach dem eigenen Spaltennamen. Der Schluessel ist
+    ''' jetzt ein eigener, sichtbarer Wert.</summary>
+    <TestMethod>
+    Public Sub OhneZielnameGiltDerSpaltenname()
+        Dim w As New Spaltenwahl With {.Name = "Geschlecht", .Rolle = Spaltenrolle.Attribut}
+        Assert.AreEqual("Geschlecht", w.Schluessel)
+
+        w.Zielname = "  geschlecht  "
+        Assert.AreEqual("geschlecht", w.Schluessel, "Leerraum gehoert nicht in einen Schluessel")
+    End Sub
+
+    ''' <summary>Der eigentliche Fehler dahinter: die Beispiel-CSV
+    ''' schreibt `Geschlecht`, die mitgelieferte Klassenbildung
+    ''' `geschlecht`. Ohne Zielname entstuende ein ZWEITES Attribut, und
+    ''' eine Balance-Regel auf dem alten griffe bei den importierten
+    ''' Kindern nicht mehr - ohne jeden Hinweis.</summary>
+    <TestMethod>
+    Public Sub EinZielDasSichNurInDerSchreibweiseUnterscheidetFaelltAuf()
+        Dim w = New List(Of Spaltenwahl) From {
+            New Spaltenwahl With {.Name = "Nachname", .Rolle = Spaltenrolle.Nachname},
+            New Spaltenwahl With {.Name = "Geschlecht", .Rolle = Spaltenrolle.Attribut}}
+
+        Assert.AreEqual(0, Spaltenzuordnung.Einwaende(w).Count,
+                        "ohne bekanntes Vokabular gibt es nichts zu vergleichen")
+
+        Dim einwaende = Spaltenzuordnung.Einwaende(w, {"geschlecht", "kann_kind"})
+        Assert.AreEqual(1, einwaende.Count)
+        StringAssert.Contains(einwaende(0), "geschlecht")
+        StringAssert.Contains(einwaende(0), "Schreibweise")
+    End Sub
+
+    <TestMethod>
+    Public Sub MitPassendemZielnameGibtEsKeinenEinwandMehr()
+        Dim w = New List(Of Spaltenwahl) From {
+            New Spaltenwahl With {.Name = "Nachname", .Rolle = Spaltenrolle.Nachname},
+            New Spaltenwahl With {.Name = "Geschlecht", .Rolle = Spaltenrolle.Attribut,
+                                  .Zielname = "geschlecht"}}
+        Assert.AreEqual(0, Spaltenzuordnung.Einwaende(w, {"geschlecht"}).Count)
+    End Sub
+
+    ''' <summary>Und das Ziel wirkt auch wirklich: die Kinder tragen den
+    ''' gewaehlten Schluessel, nicht den Spaltennamen.</summary>
+    <TestMethod>
+    Public Sub DerZielnameLandetAlsAttributschluesselImBestand()
+        Dim p As New Projekt()
+        Dim m = Modell(p)
+        Dim v = m.ImportPruefen("Nachname;Geschlecht" & vbLf & "Meier;w" & vbLf & "Schulz;m")
+        Dim w = Spaltenzuordnung.Vorschlag(v.Spalten)
+        w(1).Rolle = Spaltenrolle.Attribut
+        w(1).Zielname = "geschlecht"
+
+        m.ImportUebernehmen(v, w)
+
+        CollectionAssert.AreEqual(New List(Of String) From {"geschlecht"}, m.Attributnamen)
+        Assert.AreEqual("w", p.Klassenbildung.Schueler(0).Attribute("geschlecht"))
+    End Sub
+
+    ''' <summary>Dasselbe fuer Gruppen: der Schluessel bestimmt den
+    ''' Gruppennamen, damit eine Spalte "Rel" Gruppen "Religion-ev"
+    ''' erzeugen kann.</summary>
+    <TestMethod>
+    Public Sub DerZielnameBestimmtAuchDenGruppennamen()
+        Dim p As New Projekt()
+        Dim m = Modell(p)
+        Dim v = m.ImportPruefen("Nachname;Rel" & vbLf & "Meier;ev" & vbLf & "Schulz;kath")
+        Dim w = Spaltenzuordnung.Vorschlag(v.Spalten)
+        w(1).Rolle = Spaltenrolle.Gruppe
+        w(1).Zielname = "Religion"
+
+        m.ImportUebernehmen(v, w)
+
+        CollectionAssert.AreEquivalent(New List(Of String) From {"Religion-ev", "Religion-kath"},
+                                       p.Klassenbildung.Gruppen.Select(Function(g) g.Id).ToList())
+    End Sub
+
 End Class
+
 
 

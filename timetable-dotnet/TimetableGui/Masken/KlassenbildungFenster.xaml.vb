@@ -148,7 +148,42 @@ Partial Class KlassenbildungFenster
             Return
         End If
 
-        Dim d As New ImportDialog(v, _dialoge, AddressOf _eingabe.ImportPruefen) With {.Owner = Me}
+        ImportZeigen(v)
+    End Sub
+
+    ''' <summary>Der zweite Weg aus 9.1: eine CSV-Datei. Er braucht
+    ''' einen EIGENEN Knopf - bisher sass er im Dialog, und den oeffnete
+    ''' nur, wer schon brauchbaren Text in der Zwischenablage hatte. Wer
+    ''' eine Datei importieren wollte, musste also erst etwas ganz
+    ''' anderes kopieren.</summary>
+    Private Sub AufCsvDatei(sender As Object, e As RoutedEventArgs)
+        Dim pfad = _dialoge.DateiOeffnen("CSV-Datei wählen",
+                                         "CSV-Datei (*.csv;*.txt)|*.csv;*.txt|Alle Dateien (*.*)|*.*")
+        If pfad Is Nothing Then Return
+        Dim text As String
+        Try
+            text = ImportDialog.DateiLesen(pfad)
+        Catch ex As IO.IOException
+            _dialoge.Hinweis("Datei nicht lesbar", ex.Message)
+            Return
+        Catch ex As UnauthorizedAccessException
+            _dialoge.Hinweis("Datei nicht lesbar", ex.Message)
+            Return
+        End Try
+
+        Dim v = _eingabe.ImportPruefen(text)
+        If v.Datensaetze = 0 Then
+            _dialoge.Hinweis("Import", "Aus der Datei ließ sich keine Zeile lesen.")
+            Return
+        End If
+        ImportZeigen(v)
+    End Sub
+
+    ''' <summary>Beide Wege muenden hier - Zwischenablage und Datei
+    ''' unterscheiden sich nur in der Herkunft des Textes.</summary>
+    Private Sub ImportZeigen(v As KlassenbildungEingabeViewModel.ImportVorschau)
+        Dim d As New ImportDialog(v, _dialoge, AddressOf _eingabe.ImportPruefen,
+                                  _eingabe.Attributnamen) With {.Owner = Me}
         If d.ShowDialog() <> True Then Return
 
         Dim bericht = _eingabe.ImportUebernehmen(d.Vorschau, d.Wahlen)

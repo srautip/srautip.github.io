@@ -41,6 +41,23 @@ Public NotInheritable Class Spaltenwahl
     ''' <summary>Nur bei `Gruppe`: `buendelung` haelt die Kinder
     ''' zusammen, `verteilung` verteilt sie ueber die Klassen.</summary>
     Public Property Gruppentyp As String = "verteilung"
+
+    ''' <summary>Wie das Attribut bzw. die Gruppenfamilie im Bestand
+    ''' HEISSEN soll. Leer bedeutet: wie die Spalte.
+    '''
+    ''' Ohne dieses Feld war der Spaltenname zwingend der Schluessel -
+    ''' und eine Liste mit der Spalte `Geschlecht` erzeugte neben einem
+    ''' vorhandenen `geschlecht` ein ZWEITES Attribut. Balance-Regeln auf
+    ''' dem alten griffen bei den importierten Kindern dann nicht mehr,
+    ''' ohne dass irgendetwas darauf hingewiesen haette.</summary>
+    Public Property Zielname As String = ""
+
+    ''' <summary>Der tatsaechlich verwendete Name.</summary>
+    Public ReadOnly Property Schluessel As String
+        Get
+            Return If(String.IsNullOrWhiteSpace(Zielname), Name, Zielname.Trim())
+        End Get
+    End Property
 End Class
 
 ''' <summary>Was der Import getan hat - im Klartext, weil ein Import,
@@ -92,8 +109,12 @@ Public Module Spaltenzuordnung
         Return ergebnis
     End Function
 
-    ''' <summary>Was der Zuordnung noch fehlt. Leer heisst: uebernehmbar.</summary>
-    Public Function Einwaende(wahlen As IEnumerable(Of Spaltenwahl)) As List(Of String)
+    ''' <summary>Was der Zuordnung noch fehlt. `vorhandene` ist das
+    ''' Attribut-Vokabular des Projekts - damit faellt der gefaehrlichste
+    ''' Fall auf: ein Ziel, das sich von einem vorhandenen NUR IN DER
+    ''' SCHREIBWEISE unterscheidet.</summary>
+    Public Function Einwaende(wahlen As IEnumerable(Of Spaltenwahl),
+                              Optional vorhandene As IEnumerable(Of String) = Nothing) As List(Of String)
         Dim liste = wahlen.ToList()
         Dim fehler As New List(Of String)
 
@@ -111,11 +132,28 @@ Public Module Spaltenzuordnung
         End If
 
         Dim doppelt = liste.Where(Function(w) w.Rolle = Spaltenrolle.Attribut OrElse w.Rolle = Spaltenrolle.Gruppe).
-            GroupBy(Function(w) w.Name, StringComparer.CurrentCultureIgnoreCase).
+            GroupBy(Function(w) w.Schluessel, StringComparer.CurrentCultureIgnoreCase).
             Where(Function(g) g.Count() > 1).Select(Function(g) g.Key).ToList()
         For Each name In doppelt
             fehler.Add($"Zwei Spalten heißen '{name}' – Attribut- und Gruppennamen müssen eindeutig sein.")
         Next
+        ' Der Fall, der im manuellen Test zuschlug: die Spalte heisst
+        ' Geschlecht, das Projekt fuehrt geschlecht. Ohne Hinweis
+        ' entstuende ein zweites Attribut, und Balance-Regeln auf dem
+        ' alten griffen bei den importierten Kindern nicht mehr.
+        If vorhandene IsNot Nothing Then
+            For Each w In liste.Where(Function(x) x.Rolle = Spaltenrolle.Attribut)
+                Dim ziel = w.Schluessel
+                Dim aehnlich = vorhandene.FirstOrDefault(
+                    Function(v) Not String.Equals(v, ziel, StringComparison.Ordinal) AndAlso
+                                String.Equals(v, ziel, StringComparison.CurrentCultureIgnoreCase))
+                If aehnlich IsNot Nothing Then
+                    fehler.Add($"Das Projekt führt bereits das Attribut {aehnlich}. " &
+                               $"{ziel} unterscheidet sich nur in der Schreibweise und " &
+                               "ergäbe ein zweites, an dem bestehende Regeln vorbeigreifen.")
+                End If
+            Next
+        End If
         Return fehler
     End Function
 
@@ -148,7 +186,7 @@ Public Module Spaltenzuordnung
             Dim attribute As New Dictionary(Of String, String)(StringComparer.Ordinal)
             For i = 0 To Math.Min(zeile.Length, wahlen.Count) - 1
                 If wahlen(i).Rolle = Spaltenrolle.Attribut AndAlso zeile(i) <> "" Then
-                    attribute(wahlen(i).Name) = zeile(i)
+                    attribute(wahlen(i).Schluessel) = zeile(i)
                 End If
             Next
 
@@ -165,7 +203,7 @@ Public Module Spaltenzuordnung
                 ' "Religion" + "ev" ergibt "Religion-ev" - der Spaltenname
                 ' allein waere mehrdeutig, der Wert allein verlöre den
                 ' Zusammenhang.
-                Dim name = $"{wahlen(i).Name}-{zeile(i)}"
+                Dim name = $"{wahlen(i).Schluessel}-{zeile(i)}"
                 If Not gruppen.ContainsKey(name) Then
                     gruppen(name) = New List(Of String)
                     gruppentypen(name) = wahlen(i).Gruppentyp

@@ -11,6 +11,7 @@ Partial Class ImportDialog
     Private ReadOnly _dialoge As IDialoge
     Private _vorschau As KlassenbildungEingabeViewModel.ImportVorschau
     Private ReadOnly _neuLesen As Func(Of String, KlassenbildungEingabeViewModel.ImportVorschau)
+    Private ReadOnly _vokabular As List(Of String)
     Private _wahlen As New List(Of Spaltenwahl)
     Private _fuellt As Boolean
 
@@ -33,10 +34,12 @@ Partial Class ImportDialog
     ''' Zerleger waeren zwei Meinungen ueber dasselbe Format.</summary>
     Public Sub New(vorschau As KlassenbildungEingabeViewModel.ImportVorschau,
                    Optional dialoge As IDialoge = Nothing,
-                   Optional neuLesen As Func(Of String, KlassenbildungEingabeViewModel.ImportVorschau) = Nothing)
+                   Optional neuLesen As Func(Of String, KlassenbildungEingabeViewModel.ImportVorschau) = Nothing,
+                   Optional vokabular As IEnumerable(Of String) = Nothing)
         InitializeComponent()
         _dialoge = dialoge
         _neuLesen = neuLesen
+        _vokabular = If(vokabular, Enumerable.Empty(Of String)()).ToList()
         DateiKnopf.Visibility = If(dialoge IsNot Nothing AndAlso neuLesen IsNot Nothing,
                                    Visibility.Visible, Visibility.Collapsed)
         Uebernehmen(vorschau)
@@ -72,14 +75,48 @@ Partial Class ImportDialog
     ' Zuordnung
     ' ===============================================================
 
-    Private Shared ReadOnly Rollen As (Rolle As Spaltenrolle, Text As String)() = {
-        (Spaltenrolle.Verwerfen, "verwerfen"),
-        (Spaltenrolle.Nachname, "Nachname"),
-        (Spaltenrolle.Vorname, "Vorname"),
-        (Spaltenrolle.Attribut, "Attribut"),
-        (Spaltenrolle.Gruppe, "Gruppe"),
-        (Spaltenrolle.Klasse, "Klasse (als Fixierung)")
-    }
+    ''' <summary>Ein waehlbarer Eintrag der Rollenliste. Attribute stehen
+    ''' NAMENTLICH darin, nicht als Sammelbegriff mit zweitem Feld
+    ''' daneben: zwei Listen fuer eine Entscheidung sind eine zu viel
+    ''' (Nutzerbefund 01.09.2026). Zur Spalte "Kann-Kind" waehlt man
+    ''' direkt "Attribut: Kann-Kind".</summary>
+    Private NotInheritable Class Rolleneintrag
+        Public Property Rolle As Spaltenrolle
+        Public Property Zielname As String = ""
+        Public Property Text As String = ""
+        Public Overrides Function ToString() As String
+            Return Text
+        End Function
+    End Class
+
+    ''' <summary>Die Liste je Spalte. Sie haengt von der Spalte ab - der
+    ''' eigene Spaltenname steht als neu anzulegendes Attribut darin -
+    ''' und vom Vokabular des Projekts.</summary>
+    Private Function Rollenliste(spalte As String) As List(Of Rolleneintrag)
+        Dim liste As New List(Of Rolleneintrag) From {
+            New Rolleneintrag With {.Rolle = Spaltenrolle.Verwerfen, .Text = "verwerfen"},
+            New Rolleneintrag With {.Rolle = Spaltenrolle.Nachname, .Text = "Nachname"},
+            New Rolleneintrag With {.Rolle = Spaltenrolle.Vorname, .Text = "Vorname"}
+        }
+
+        ' Das Attribut mit dem Spaltennamen zuerst - es ist der Regelfall.
+        ' Faellt es mit einem vorhandenen zusammen, steht es nur einmal da.
+        Dim schonDa = _vokabular.Any(
+            Function(v) String.Equals(v, spalte, StringComparison.CurrentCultureIgnoreCase))
+        If Not schonDa Then
+            liste.Add(New Rolleneintrag With {
+                .Rolle = Spaltenrolle.Attribut, .Zielname = spalte,
+                .Text = $"Attribut: {spalte}" & If(_vokabular.Count = 0, "", " (neu)")})
+        End If
+        For Each v In _vokabular
+            liste.Add(New Rolleneintrag With {
+                .Rolle = Spaltenrolle.Attribut, .Zielname = v, .Text = $"Attribut: {v}"})
+        Next
+
+        liste.Add(New Rolleneintrag With {.Rolle = Spaltenrolle.Gruppe, .Text = "Gruppe"})
+        liste.Add(New Rolleneintrag With {.Rolle = Spaltenrolle.Klasse, .Text = "Klasse (als Fixierung)"})
+        Return liste
+    End Function
 
     Private Sub ZuordnungBauen()
         Zuordnung.Children.Clear()
@@ -91,11 +128,14 @@ Partial Class ImportDialog
                 .Text = wahl.Name, .Width = 220, .VerticalAlignment = VerticalAlignment.Center,
                 .TextTrimming = TextTrimming.CharacterEllipsis})
 
-            Dim rollenwahl As New ComboBox With {.Width = 200}
-            For Each r In Rollen
-                rollenwahl.Items.Add(r.Text)
+            Dim eintraege = Rollenliste(wahl.Name)
+            Dim rollenwahl As New ComboBox With {.Width = 260}
+            For Each e In eintraege
+                rollenwahl.Items.Add(e)
             Next
-            rollenwahl.SelectedIndex = Array.FindIndex(Rollen, Function(r) r.Rolle = wahl.Rolle)
+            rollenwahl.SelectedIndex = Math.Max(0, eintraege.FindIndex(
+                Function(e) e.Rolle = wahl.Rolle AndAlso
+                            (e.Rolle <> Spaltenrolle.Attribut OrElse e.Zielname = wahl.Schluessel)))
 
             ' Der Gruppentyp erscheint nur, wenn er gebraucht wird - ein
             ' dauerhaft sichtbares, meist wirkungsloses Feld erzieht dazu,
@@ -110,7 +150,10 @@ Partial Class ImportDialog
             AddHandler rollenwahl.SelectionChanged,
                 Sub()
                     If _fuellt Then Return
-                    wahl.Rolle = Rollen(Math.Max(0, rollenwahl.SelectedIndex)).Rolle
+                    Dim e = TryCast(rollenwahl.SelectedItem, Rolleneintrag)
+                    If e Is Nothing Then Return
+                    wahl.Rolle = e.Rolle
+                    wahl.Zielname = e.Zielname
                     typwahl.Visibility = If(wahl.Rolle = Spaltenrolle.Gruppe,
                                             Visibility.Visible, Visibility.Hidden)
                     Zeichnen()
@@ -129,7 +172,7 @@ Partial Class ImportDialog
     End Sub
 
     Private Sub Pruefen()
-        Dim einwaende = Spaltenzuordnung.Einwaende(_wahlen)
+        Dim einwaende = Spaltenzuordnung.Einwaende(_wahlen, _vokabular)
         Dim verworfen = _wahlen.Where(Function(w) w.Rolle = Spaltenrolle.Verwerfen).
             Select(Function(w) w.Name).ToList()
 

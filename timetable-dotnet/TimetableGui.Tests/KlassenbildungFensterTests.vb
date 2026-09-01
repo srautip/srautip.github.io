@@ -192,4 +192,118 @@ Public Class KlassenbildungFensterTests
                End Sub)
     End Sub
 
+
+    ''' <summary>Der CSV-Weg braucht einen EIGENEN Knopf. Bis er den
+    ''' bekam, sass er im Import-Dialog - und den oeffnete nur, wer schon
+    ''' brauchbaren Text in der Zwischenablage hatte. Wer eine Datei
+    ''' importieren wollte, musste also erst etwas ganz anderes kopieren
+    ''' (im manuellen Test aufgefallen, 01.09.2026).</summary>
+    <TestMethod>
+    Public Sub DerCsvWegIstOhneZwischenablageErreichbar()
+        AufSta(Sub()
+                   RessourcenSicherstellen()
+                   Dim p = Projekt()
+                   Dim datei = IO.Path.Combine(TestsWurzel(), "bw-grundschule-beispiel",
+                                               "import-beispiel", "einschulungsliste.csv")
+                   Dim d As New TestDialoge With {.DateiOeffnenPfad = datei}
+                   Dim f As New KlassenbildungFenster(p, d)
+
+                   Assert.IsTrue(f.CsvKnopf.IsEnabled, "der Knopf muss ohne Zwischenablage bedienbar sein")
+               End Sub)
+    End Sub
+
+
+    ''' <summary>Attribute stehen NAMENTLICH in der Rollenliste - zwei
+    ''' Listen fuer eine Entscheidung waren eine zu viel (Nutzerbefund
+    ''' 01.09.2026). Zur Spalte "Kann-Kind" waehlt man direkt
+    ''' "Attribut: Kann-Kind".</summary>
+    <TestMethod>
+    Public Sub DieRollenlisteNenntDieAttributeBeimNamen()
+        AufSta(Sub()
+                   RessourcenSicherstellen()
+                   Dim p = Projekt()
+                   Dim m As New KlassenbildungEingabeViewModel(p, New TestDialoge())
+                   Dim v = m.ImportPruefen("Nachname;Kann-Kind" & vbLf & "Meier;ja")
+                   Dim d As New ImportDialog(v, New TestDialoge(), AddressOf m.ImportPruefen)
+
+                   Dim texte = Rollentexte(d, spalte:=1)
+                   CollectionAssert.Contains(texte, "Attribut: Kann-Kind")
+                   Assert.IsFalse(texte.Contains("Attribut"), "der Sammelbegriff allein hilft niemandem")
+               End Sub)
+    End Sub
+
+    ''' <summary>Fuehrt das Projekt schon ein Attribut, steht es in der
+    ''' Liste - und der Spaltenname erscheint NICHT zusaetzlich, wenn er
+    ''' sich nur in der Schreibweise unterscheidet. Genau daran waere
+    ''' sonst ein zweites Attribut entstanden.</summary>
+    <TestMethod>
+    Public Sub VorhandeneAttributeStehenInDerListeUndVerdraengenDieDublette()
+        AufSta(Sub()
+                   RessourcenSicherstellen()
+                   Dim p = Projekt()
+                   Dim m As New KlassenbildungEingabeViewModel(p, New TestDialoge())
+                   Dim v = m.ImportPruefen("Nachname;Geschlecht" & vbLf & "Meier;w")
+                   ' Das Projekt fuehrt bereits "geschlecht" (klein).
+                   Dim d As New ImportDialog(v, New TestDialoge(), AddressOf m.ImportPruefen,
+                                             New List(Of String) From {"geschlecht", "kann_kind"})
+
+                   Dim texte = Rollentexte(d, spalte:=1)
+                   CollectionAssert.Contains(texte, "Attribut: geschlecht")
+                   CollectionAssert.Contains(texte, "Attribut: kann_kind")
+                   Assert.IsFalse(texte.Any(Function(t) t.Contains("Attribut: Geschlecht")),
+                                  "die Beinahe-Dublette darf gar nicht erst waehlbar sein")
+               End Sub)
+    End Sub
+
+    ''' <summary>Und die Auswahl kommt am Bestand an: der gewaehlte
+    ''' Eintrag setzt Rolle UND Schluessel.</summary>
+    <TestMethod>
+    Public Sub DieAuswahlSetztRolleUndSchluessel()
+        AufSta(Sub()
+                   RessourcenSicherstellen()
+                   Dim p = Projekt()
+                   Dim m As New KlassenbildungEingabeViewModel(p, New TestDialoge())
+                   Dim v = m.ImportPruefen("Nachname;Geschlecht" & vbLf & "Meier;w")
+                   Dim d As New ImportDialog(v, New TestDialoge(), AddressOf m.ImportPruefen,
+                                             New List(Of String) From {"geschlecht"})
+
+                   Dim feld = Rollenfeld(d, spalte:=1)
+                   feld.SelectedIndex = Rollentexte(d, 1).IndexOf("Attribut: geschlecht")
+
+                   Dim wahl = d.Wahlen(1)
+                   Assert.AreEqual(Spaltenrolle.Attribut, wahl.Rolle)
+                   Assert.AreEqual("geschlecht", wahl.Schluessel)
+               End Sub)
+    End Sub
+
+    ''' <summary>Das zweite Auswahlfeld ist weg - eine Zeile traegt jetzt
+    ''' die Rollenliste und (nur bei Gruppen) den Typ.</summary>
+    <TestMethod>
+    Public Sub EineZeileHatHoechstensZweiAuswahlfelder()
+        AufSta(Sub()
+                   RessourcenSicherstellen()
+                   Dim p = Projekt()
+                   Dim m As New KlassenbildungEingabeViewModel(p, New TestDialoge())
+                   Dim v = m.ImportPruefen("Nachname;Geschlecht" & vbLf & "Meier;w")
+                   Dim d As New ImportDialog(v, New TestDialoge(), AddressOf m.ImportPruefen)
+
+                   Dim zeile = CType(d.Zuordnung.Children(1), StackPanel)
+                   Assert.AreEqual(2, zeile.Children.OfType(Of ComboBox)().Count())
+               End Sub)
+    End Sub
+
+    ' ---------------------------------------------------------------
+
+    Private Shared Function Rollenfeld(d As ImportDialog, spalte As Integer) As ComboBox
+        Dim zeile = CType(d.Zuordnung.Children(spalte), StackPanel)
+        Return zeile.Children.OfType(Of ComboBox)().First()
+    End Function
+
+    Private Shared Function Rollentexte(d As ImportDialog, spalte As Integer) As List(Of String)
+        Return Rollenfeld(d, spalte).Items.Cast(Of Object)().
+            Select(Function(o) o.ToString()).ToList()
+    End Function
+
 End Class
+
+
