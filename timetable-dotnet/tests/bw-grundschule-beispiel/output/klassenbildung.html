@@ -866,6 +866,10 @@
        angedeutet. -->
   <symbol id="i-schloss-auf" viewBox="0 0 16 16"><rect x="3.2" y="7" width="9.6" height="6.5" rx="1.2"/><path d="M5.5 7V4.8a2.5 2.5 0 0 1 4.4-1.6"/></symbol>
   <symbol id="i-buendel" viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="8" height="8" rx="1.5"/><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/></symbol>
+  <!-- Undo/Redo (U6): Pfeil zurueck bzw. vor mit Bogen - dieselbe Kontur
+       gespiegelt, wie beim Pin nur gedreht. -->
+  <symbol id="i-undo" viewBox="0 0 16 16"><path d="M6 4.5L3 7.5l3 3"/><path d="M3 7.5h6.5a3 3 0 0 1 0 6H7"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 16 16"><path d="M10 4.5l3 3-3 3"/><path d="M13 7.5H6.5a3 3 0 0 0 0 6H9"/></symbol>
   <symbol id="i-verteil" viewBox="0 0 16 16"><path d="M2.5 6h10M10 3.5L12.5 6 10 8.5M13.5 10h-10M6 7.5L3.5 10 6 12.5"/></symbol>
 </svg>
 
@@ -960,7 +964,18 @@
         } catch (e) { /* Host weg - das Board bleibt trotzdem bedienbar */ }
       }
       function zustand() {
-        return { pins: pins, notPins: notPins, herkunft: pinHerkunft, haertungen: haertungen };
+        // `basis` (U6): die gewaehlte Variante gehoert zum Zustand - Pins
+        // sind relativ zu ihr gemeint, und nach einem Neuladen (Undo/Redo
+        // im Host) soll dieselbe Basis stehen.
+        return { pins: pins, notPins: notPins, herkunft: pinHerkunft, haertungen: haertungen, basis: aktuelleVariante };
+      }
+      function zustandAnwenden(st) {
+        pins = st.pins || {};
+        notPins = st.notPins || {};
+        pinHerkunft = st.herkunft || {};
+        haertungen = st.haertungen || { gruppen: {}, wuensche: {} };
+        var b = parseInt(st.basis, 10);
+        aktuelleVariante = (b >= 0 && b < varianten.length) ? b : 0;
       }
 
       // localStorage-Komfort (file:// ist unzuverlaessig - massgeblich
@@ -979,22 +994,68 @@
           } catch (e) { /* ohne Persistenz weiterarbeiten */ }
         }
         if (!st) return;
-        pins = st.pins || {};
-        notPins = st.notPins || {};
-        pinHerkunft = st.herkunft || {};
-        haertungen = st.haertungen || { gruppen: {}, wuensche: {} };
+        zustandAnwenden(st);
       }
+      // Nur die Browser-Persistenz. Die Nachricht an den Host und der
+      // Verlaufsschritt haengen an render() (schrittMerken), damit eine
+      // Bulk-Aktion mit Dutzenden Pins EIN Schritt und EINE Nachricht ist.
       function speicherePins() {
-        if (brueckeAktiv) {
-          sende('zustand', zustand());
-          return;
-        }
+        if (brueckeAktiv) return;
         try {
-          localStorage.setItem(storeKey, JSON.stringify({
-            pins: pins, notPins: notPins, herkunft: pinHerkunft, haertungen: haertungen }));
+          localStorage.setItem(storeKey, JSON.stringify(zustand()));
         } catch (e) { /* ignorieren */ }
       }
       ladePins();
+
+      // ---- Undo/Redo (U6) ------------------------------------------
+      // Ein Schritt = der Zustand nach einer Bedienaktion (Pin, Bulk,
+      // Verschiebung, hart/weich). Erkannt wird er in render(): jede
+      // Aktion rendert genau einmal. Im Doppelklick-Betrieb lebt der
+      // Verlauf hier; im GUI-Betrieb fuehrt ihn der Host, weil "Neu
+      // rechnen" einen neuen Stand erzeugt und die Seite neu laedt - die
+      // Knoepfe senden dann undo/redo, der Host liefert Stand und
+      // Zustand zurueck und meldet die Tiefe ueber window.__verlauf.
+      var verlauf = { zurueck: [], vor: [] };
+      var letzterZustand = JSON.stringify(zustand());
+      function schrittMerken() {
+        var jetzt = JSON.stringify(zustand());
+        if (jetzt === letzterZustand) return;
+        verlauf.zurueck.push(letzterZustand);
+        verlauf.vor = [];
+        letzterZustand = jetzt;
+        sende('zustand', zustand());
+      }
+      function verlaufSpringen(richtung) {
+        if (brueckeAktiv) {
+          sende(richtung < 0 ? 'undo' : 'redo', {});
+          return;
+        }
+        var von = richtung < 0 ? verlauf.zurueck : verlauf.vor;
+        var nach = richtung < 0 ? verlauf.vor : verlauf.zurueck;
+        if (von.length === 0) return;
+        nach.push(letzterZustand);
+        var s = von.pop();
+        zustandAnwenden(JSON.parse(s));
+        letzterZustand = s;
+        speicherePins();
+        warnungen = null;
+        render();
+      }
+      function verlaufZaehler() {
+        if (brueckeAktiv) {
+          var h = window.__verlauf || {};
+          return { zurueck: h.zurueck || 0, vor: h.vor || 0 };
+        }
+        return { zurueck: verlauf.zurueck.length, vor: verlauf.vor.length };
+      }
+      document.addEventListener('keydown', function (e) {
+        if (!(e.ctrlKey || e.metaKey)) return;
+        var t = e.target && e.target.tagName;
+        if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+        var k = (e.key || '').toLowerCase();
+        if (k === 'z' && !e.shiftKey) { e.preventDefault(); verlaufSpringen(-1); }
+        else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); verlaufSpringen(1); }
+      });
 
       // ---- Gruppen-Identitaet (U1): Farbe + Kuerzel ----------------
       // Macht ein Element per Tastatur bedienbar. Ohne `aktion` loest
@@ -1504,6 +1565,28 @@
         // man sie nach dem Scrollen erst suchen musste.
         var knoepfe = document.createElement('span');
         knoepfe.className = 'knoepfe';
+        // Undo/Redo (U6) ganz links: sie wirken auf alles, was rechts
+        // davon steht - und im GUI-Betrieb auch auf "Neu rechnen".
+        var vz = verlaufZaehler();
+        var bUndo = document.createElement('button');
+        bUndo.id = 'btn-undo';
+        bUndo.innerHTML = ikone('i-undo');
+        bUndo.title = 'Rueckgaengig (Strg+Z)' + (vz.zurueck > 0 ? ' - ' + vz.zurueck + ' Schritt(e)' : '');
+        bUndo.setAttribute('aria-label', 'Rueckgaengig');
+        bUndo.disabled = vz.zurueck === 0;
+        bUndo.addEventListener('click', function () { verlaufSpringen(-1); });
+        knoepfe.appendChild(bUndo);
+        var bRedo = document.createElement('button');
+        bRedo.id = 'btn-redo';
+        bRedo.innerHTML = ikone('i-redo');
+        bRedo.title = 'Wiederholen (Strg+Y)' + (vz.vor > 0 ? ' - ' + vz.vor + ' Schritt(e)' : '');
+        bRedo.setAttribute('aria-label', 'Wiederholen');
+        bRedo.disabled = vz.vor === 0;
+        bRedo.addEventListener('click', function () { verlaufSpringen(1); });
+        knoepfe.appendChild(bRedo);
+        var trennerV = document.createElement('span');
+        trennerV.className = 'trenner';
+        knoepfe.appendChild(trennerV);
         var offeneKonsens = (data.konsens_kern || []).filter(function (id) { return !istFixiert(id); }).length;
         var bKonsens = document.createElement('button');
         bKonsens.className = brueckeAktiv ? '' : 'primaer';
@@ -2023,6 +2106,7 @@
 
       // ---- Board (U1/U2) -------------------------------------------
       function render() {
+        schrittMerken();
         renderProzess();
         renderVarianten();
         renderPanel();
@@ -2491,7 +2575,11 @@
         // der Test beide Betriebsarten und das Nachrichtenformat pruefen
         // kann, ohne den DOM zu interpretieren.
         brueckeAktiv: brueckeAktiv,
-        fixierungen: fixierungsListe
+        fixierungen: fixierungsListe,
+        // U6: Verlauf (Doppelklick-Betrieb) fuer den Interaktionstest.
+        verlauf: verlaufZaehler,
+        undo: function () { verlaufSpringen(-1); },
+        redo: function () { verlaufSpringen(1); }
       };
     })();
   

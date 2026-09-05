@@ -56,7 +56,8 @@ Public Module Bruecke
     ''' gerendert (Datenhaltung 6.1/6.2).</summary>
     Public Function StartSkript(zustand As JsonObject, anzeigeNamen As Dictionary(Of String, String),
                                 Optional planParameter As JsonObject = Nothing,
-                                Optional freigabe As JsonObject = Nothing) As String
+                                Optional freigabe As JsonObject = Nothing,
+                                Optional verlauf As JsonObject = Nothing) As String
         Dim namen As New JsonObject()
         If anzeigeNamen IsNot Nothing Then
             For Each kvp In anzeigeNamen
@@ -66,10 +67,13 @@ Public Module Bruecke
         ' Die Plan-Kurzparameter sind fuer das Stundentafel-Dashboard;
         ' das Board ignoriert die Variable. Ein zweites Startskript je
         ' Seite waere eine Fallunterscheidung ohne Gegenwert.
+        ' __verlauf (U6): wie viele Schritte der Host zurueck und vor
+        ' kennt - das Board schaltet danach seine Undo/Redo-Knoepfe.
         Return $"window.__gastZustand = {If(zustand Is Nothing, "null", zustand.ToJsonString())};" &
                $"window.__anzeigeNamen = {namen.ToJsonString()};" &
                $"window.__planParameter = {If(planParameter Is Nothing, "null", planParameter.ToJsonString())};" &
-               $"window.__freigabe = {If(freigabe Is Nothing, "null", freigabe.ToJsonString())};"
+               $"window.__freigabe = {If(freigabe Is Nothing, "null", freigabe.ToJsonString())};" &
+               $"window.__verlauf = {If(verlauf Is Nothing, "null", verlauf.ToJsonString())};"
     End Function
 
     ''' <summary>Uebersetzt die Fixierungsliste der Bruecke in

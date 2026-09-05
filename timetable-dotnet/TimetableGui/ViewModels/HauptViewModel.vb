@@ -253,6 +253,68 @@ Public NotInheritable Class HauptViewModel
     ''' Antwort, sobald jemand einen aelteren Stand angesehen hat.</summary>
     Private ReadOnly _standIds As New Dictionary(Of Bereich, String)
 
+    ''' <summary>Undo/Redo des Boards (U6, Infrastruktur/Verlauf.vb). Nur
+    ''' fuer die Klassenbildung - die Stundentafel hat keine Bedienschritte,
+    ''' die sich zurücknehmen liessen.</summary>
+    Private ReadOnly _verlauf As New Verlauf
+    ''' <summary>Waehrend eines Sprungs im Verlauf darf das Anzeigen des
+    ''' Standes keinen neuen Schritt erzeugen.</summary>
+    Private _verlaufSpringt As Boolean
+
+    Friend ReadOnly Property Verlauf As Verlauf
+        Get
+            Return _verlauf
+        End Get
+    End Property
+
+    ''' <summary>Einen Schritt festhalten: der Stand des Boards, der
+    ''' Board-Zustand und die Eingaben, die "Neu rechnen" veraendert.</summary>
+    Private Sub VerlaufMerken(standId As String)
+        If _verlaufSpringt OrElse Not ProjektOffen Then Return
+        _verlauf.Merke(New VerlaufSchritt With {
+            .StandId = standId,
+            .Zustand = TryCast(_projekt.GuiState?.DeepClone(), JsonObject),
+            .Eingabe = Eingabeschnappschuss.Aufnehmen(_projekt.Klassenbildung)})
+    End Sub
+
+    ''' <summary>Zurueck (-1) oder vor (+1): Board-Zustand und Eingaben
+    ''' wiederherstellen und den Stand des Schritts zeigen - denselben
+    ''' Stand mit altem Zustand neu laden, einen anderen ueber
+    ''' StandAnzeigen. Danach zeigt das Board sofort das zugehoerige
+    ''' Ergebnis.</summary>
+    Friend Sub VerlaufSpringen(richtung As Integer)
+        If Not ProjektOffen Then Return
+        Dim ziel = If(richtung < 0, _verlauf.Zurueck(), _verlauf.Vor())
+        If ziel Is Nothing Then Return
+        _verlaufSpringt = True
+        Try
+            _projekt.GuiState = TryCast(ziel.Zustand?.DeepClone(), JsonObject)
+            Eingabeschnappschuss.Anwenden(_projekt.Klassenbildung, ziel.Eingabe)
+            Geaendert = True
+
+            Dim angezeigt As String = Nothing
+            _standIds.TryGetValue(Bereich.Klassenbildung, angezeigt)
+            If ziel.StandId Is Nothing OrElse ziel.StandId = angezeigt Then
+                Dim html As String = Nothing
+                If _seiten.TryGetValue(Bereich.Klassenbildung, html) Then
+                    SeiteHinterlegen(Bereich.Klassenbildung, html, angezeigt)
+                End If
+            Else
+                Dim stand = _projekt.Staende.FirstOrDefault(Function(x) x.Id = ziel.StandId)
+                If stand Is Nothing Then
+                    _dialoge.Hinweis("Verlauf", "Der Stand dieses Schritts wurde inzwischen gelöscht.")
+                Else
+                    StandAnzeigen(stand)
+                End If
+            End If
+            Meldung = If(richtung < 0, "Rückgängig", "Wiederholt") &
+                      $" - {_verlauf.Zurueckzaehler} Schritt(e) zurück, {_verlauf.Vorzaehler} vor."
+        Finally
+            _verlaufSpringt = False
+        End Try
+        MeldeSchritte()
+    End Sub
+
     ''' <summary>Synthetischer PropertyChanged-Name (keine echte
     ''' Eigenschaft): feuert IMMER, wenn SeiteHinterlegen die aktuell
     ''' sichtbare Seite neu setzt - auch wenn Bereich sich dabei NICHT
@@ -279,6 +341,7 @@ Public NotInheritable Class HauptViewModel
                 _standIds(zielbereich) = standId
             End If
         End If
+        If zielbereich = Bereich.Klassenbildung AndAlso standId IsNot Nothing Then VerlaufMerken(standId)
         If _bereich = zielbereich Then
             Auslieferung.Setze(html)
             Melde(NameOf(HatAnzeige))
@@ -835,6 +898,7 @@ Public NotInheritable Class HauptViewModel
 
         _seiten.Clear()
         _standIds.Clear()
+        _verlauf.Leeren()
         _pfad = Nothing
         _passwort = Nothing
         Geaendert = False
@@ -911,6 +975,7 @@ Public NotInheritable Class HauptViewModel
     Private Sub Uebernehme(p As Projekt, pfad As String, passwort As String)
         _pfad = pfad
         _passwort = passwort
+        _verlauf.Leeren()
         Projekt = p
         Geaendert = True
         Melde(NameOf(Titel))
@@ -1157,8 +1222,10 @@ Public NotInheritable Class HauptViewModel
         If stand IsNot Nothing AndAlso LaeufeViewModel.IstFreigabe(stand) Then
             freigabe = stand.Lauf("freigabe").DeepClone().AsObject()
         End If
+        Dim verlaufTiefe As New JsonObject From {
+            {"zurueck", _verlauf.Zurueckzaehler}, {"vor", _verlauf.Vorzaehler}}
         Return Bruecke.StartSkript(If(ProjektOffen, _projekt.GuiState, Nothing), namen,
-                                   planParameter, freigabe)
+                                   planParameter, freigabe, verlaufTiefe)
     End Function
 
     ''' <summary>Nimmt eine Nachricht des Boards entgegen. Unbekannte
@@ -1174,9 +1241,20 @@ Public NotInheritable Class HauptViewModel
             Case "zustand"
                 ' Ersetzt die localStorage-Rolle der Vorlage: der Zustand
                 ' wandert nach gui-state.json in der Projektdatei
-                ' (Datenhaltung 7.6).
+                ' (Datenhaltung 7.6). Jede Nachricht ist ein Bedienschritt
+                ' (die Seite sendet je Aktion genau eine) - und damit ein
+                ' Schritt im Verlauf.
                 _projekt.GuiState = n.Nutzlast
                 Geaendert = True
+                Dim angezeigt As String = Nothing
+                _standIds.TryGetValue(Bereich.Klassenbildung, angezeigt)
+                VerlaufMerken(angezeigt)
+
+            Case "undo"
+                VerlaufSpringen(-1)
+
+            Case "redo"
+                VerlaufSpringen(1)
 
             Case "neu-rechnen"
                 NeuRechnenAsync(n.Nutzlast)

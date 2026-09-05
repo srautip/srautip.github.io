@@ -357,6 +357,25 @@ Highlight-Mengen, Pin-Export-Inhalt, Live-Bewertung == Bewerte).
     erfuellt" - und erzwang damit eine Begruendung fuer 50 Regeln, die
     gehalten haben. Jetzt zaehlt nur `mass > 0`, die Zeile nennt Prio
     in Worten und das Mass (`FreigabeTests.ErfuellteRegelnSindKeineAbweichung`).
+  - **Undo/Redo** (Nutzerwunsch 05.09.2026) im Kopfkasten links, auch
+    Strg+Z / Strg+Y. Ein Schritt ist der Zustand nach einer
+    Bedienaktion - Pin, Verschiebung, hart/weich, Bulk-Fixierung (58
+    Pins = EIN Schritt, weil der Schritt in `render()` erkannt wird,
+    nicht je Pin). Im Doppelklick-Betrieb fuehrt die Seite den Verlauf
+    selbst. Im GUI-Betrieb fuehrt ihn der Host (`Infrastruktur/
+    Verlauf.vb`): "Neu rechnen" erzeugt einen neuen Stand und laedt die
+    Seite neu, also traegt jeder Schritt Stand-Id, Board-Zustand und
+    einen Schnappschuss der Eingaben, die das Neurechnen veraendert
+    (Fixierungen, Modus der Regeln). Undo/Redo senden `undo`/`redo`
+    an den Host, der stellt alle drei wieder her und zeigt den Stand
+    des Schritts sofort an - denselben mit altem Zustand neu geladen,
+    einen anderen ueber die Staende-Historie. Die Tiefe kommt per
+    `window.__verlauf` zurueck und schaltet die Knoepfe. Die Basis-
+    Variante gehoert seither zum Zustand (`basis`), damit sie ein
+    Neuladen ueberlebt. Der Verlauf lebt nur in der Sitzung - er ist
+    Komfort, kein Nachweis; Staende und Protokoll bleiben unberuehrt.
+    Tests: `VerlaufTests` (Host, inkl. echtem Neurechnen mit zwei
+    Staenden) und `KlassenbildungBoardTests.UndoUndRedoImDoppelklickBetrieb`.
   - **"1 von 100 fixiert" direkt nach dem ersten Lauf** ist kein
     Fehler: die Beispielschule fixiert `S030` in `input/
     klassenbildung.yaml` (Rollstuhl, barrierefreier Raum). Der Zaehler

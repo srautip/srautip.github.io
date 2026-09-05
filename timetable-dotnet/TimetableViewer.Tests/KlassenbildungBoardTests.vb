@@ -249,6 +249,36 @@ Public Class KlassenbildungBoardTests
         Assert.IsTrue(zurueck, "die Aufweichung muss sich zuruecknehmen lassen")
     End Function
 
+    ''' <summary>Undo/Redo im Doppelklick-Betrieb: eine Verschiebung ist
+    ''' ein Schritt, ein Bulk mit Dutzenden Pins ebenfalls EINER, und die
+    ''' Knoepfe zeigen, ob etwas zu tun ist.</summary>
+    <TestMethod>
+    Public Async Function UndoUndRedoImDoppelklickBetrieb() As Task
+        Await SeiteOeffnenAsync(KlassenbildungSeite())
+        Dim frei = Await FreiesKindAsync()
+        Assert.IsTrue(Await Seite.Locator("#btn-undo").IsDisabledAsync(), "ohne Schritt ist Undo aus")
+        Assert.IsTrue(Await Seite.Locator("#btn-redo").IsDisabledAsync())
+
+        Await Seite.EvaluateAsync("(id) => window.__kbTest.verschiebe(id, window.__kbTest.sicht().zuordnung[id] === 1 ? 2 : 1)", frei)
+        Assert.IsFalse(Await Seite.Locator("#btn-undo").IsDisabledAsync())
+
+        Await Seite.Locator("#btn-undo").ClickAsync()
+        Assert.IsFalse(Await Seite.EvaluateAsync(Of Boolean)("(id) => window.__kbTest.pins().hasOwnProperty(id)", frei), "undo hat den Pin nicht zurueckgenommen")
+        Assert.IsFalse(Await Seite.Locator("#btn-redo").IsDisabledAsync())
+
+        Await Seite.Locator("#btn-redo").ClickAsync()
+        Assert.IsTrue(Await Seite.EvaluateAsync(Of Boolean)("(id) => window.__kbTest.pins().hasOwnProperty(id)", frei), "redo hat den Pin nicht wiederhergestellt")
+
+        ' Bulk = ein Schritt.
+        Await Seite.Locator("#btn-konsens").ClickAsync()
+        Dim pinsNachBulk = Await Seite.EvaluateAsync(Of Integer)("() => Object.keys(window.__kbTest.pins()).length")
+        Assert.IsTrue(pinsNachBulk > 2, "Testgrundlage: der Konsens-Kern hat viele Kinder")
+        Assert.AreEqual(2, Await Seite.EvaluateAsync(Of Integer)("() => window.__kbTest.verlauf().zurueck"))
+        Await Seite.Keyboard.PressAsync("Control+z")
+        Assert.AreEqual(1, Await Seite.EvaluateAsync(Of Integer)("() => Object.keys(window.__kbTest.pins()).length"),
+                        "Strg+Z muss den ganzen Bulk zuruecknehmen")
+    End Function
+
     ''' <summary>Eine Ampel-Sprache: Legende mit vier Punkten, jede Karte
     ''' traegt genau einen Worst-of-Punkt, jede Panelzeile einen.</summary>
     <TestMethod>

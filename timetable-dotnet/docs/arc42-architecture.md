@@ -1020,7 +1020,7 @@ eines fest — sie nennen nur Transportmittel und fachliche Nutzlasten. Es
 entsteht daher hier, mit einem **versionierten Umschlag**:
 
 ```json
-{"v": 1, "typ": "zustand" | "neu-rechnen", "nutzlast": { … }}
+{"v": 1, "typ": "zustand" | "neu-rechnen" | "undo" | "redo", "nutzlast": { … }}
 ```
 
 Die Versionierung ist nicht vorsorglich: die Vorlagen sind Embedded
