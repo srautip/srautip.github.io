@@ -356,6 +356,290 @@
     }
   };
 
+  var TRAEGERAUSKUNFT = {
+
+    /* ------------------------------------------------------------------ */
+    ehezeitanteil: {
+      titel: 'Ehezeitanteil',
+      recht: '§ 39, § 45 VersAusglG',
+      woher: 'Trägerauskunft – die zentrale Wertangabe',
+      bedeutung: 'Der Teil des Anrechts, der in der Ehezeit erworben wurde. Er ist die ' +
+        'Bezugsgröße der gesamten Berechnung: Aus ihm entsteht durch Halbteilung der ' +
+        'Ausgleichswert, und an ihm bemisst sich die Angemessenheit der Teilungskosten.',
+      auspraegungen: [
+        { name: 'positiver Wert – der Regelfall',
+          text: 'Die Prüfung rechnet den Wert in Schritt 2 nach – zeitratierlich über m/n oder ' +
+            'über den Zuwachs des Deckungskapitals – und leitet in Schritt 4 die Halbteilung ab.' },
+        { name: 'null',
+          text: 'In der Ehezeit wurde nichts erworben. Hinweis EA02; ein Ausgleich findet nicht ' +
+            'statt. Plausibel etwa, wenn das Dienstverhältnis erst nach dem Ehezeitende begann.' },
+        { name: 'negativer Wert',
+          text: 'Fachlich unmöglich. Fehler EA01, die Prüfung endet mit Abbruch.' }
+      ],
+      wirkung: [
+        'Schritt 2: Wird gegen die Nachrechnung geprüft (m/n beziehungsweise Kapitalzuwachs).',
+        'Schritt 4: Halber Ehezeitanteil ist der Sollwert der Halbteilung.',
+        'Schritt 7: Bei Rentenanrechten Basis der Umrechnung der Eurokosten in Rente.',
+        'Schritt 8: Obergrenze des Ausgleichsbetrags – mehr als die Hälfte darf nie übertragen ' +
+          'werden (ER02).'
+      ],
+      befunde: ['EA01 – negativer Ehezeitanteil', 'EA02 – kein Erwerb in der Ehezeit',
+                'EA04 – Abweichung zur m/n-Nachrechnung', 'EA06 – Ehezeitanteil > Gesamtanrecht',
+                'EA09 – Abweichung zum Zuwachs des Deckungskapitals',
+                'HT03 – Ausgleichswert nicht als Halbteilung nachvollziehbar'],
+      praxis: 'Nicht mit dem Gesamtanrecht verwechseln: Der Ehezeitanteil ist der ehezeitbezogene ' +
+        'Ausschnitt, das Gesamtanrecht die volle erreichbare Anwartschaft. Und die Einheit ' +
+        'beachten – der Wert muss in derselben Größe stehen, die in den Stammdaten gewählt ist.'
+    },
+
+    /* ------------------------------------------------------------------ */
+    ausgleichswert: {
+      titel: 'Ausgleichswert laut Träger',
+      recht: '§ 1 Abs. 1, § 5 Abs. 3 VersAusglG',
+      woher: 'Trägerauskunft – Vorschlag des Trägers',
+      bedeutung: 'Der Wert, den der Träger auf den Berechtigten übertragen will. Nach dem ' +
+        'Halbteilungsgrundsatz ist das die Hälfte des Ehezeitanteils. Die App übernimmt ihn nicht, ' +
+        'sondern rechnet ihn in Schritt 4 nach.',
+      auspraegungen: [
+        { name: 'genau die Hälfte des Ehezeitanteils',
+          text: 'Der Regelfall. Teilungskosten sind noch nicht abgezogen und werden in Schritt 7 ' +
+            'berücksichtigt.' },
+        { name: '(Ehezeitanteil − Teilungskosten) / 2',
+          text: 'Der Träger hat die Kosten schon vor der Halbteilung abgezogen. Die App erkennt ' +
+            'das (HT01) und zieht sie später kein zweites Mal ab.' },
+        { name: 'passend zum halben kostenbereinigten Kapitalwert',
+          text: 'Bei Rentenanrechten rechnen Träger die Eurokosten oft über den Kapitalwert um. ' +
+            'Erkannt wird das nur, wenn zusätzlich der Ausgleichswert als Kapital erfasst ist (HT02).' },
+        { name: 'keine dieser Varianten',
+          text: 'Der Wert ist nicht herleitbar. Fehler HT03, die Prüfung endet mit Abbruch – die ' +
+            'Auskunft ist zu beanstanden.' }
+      ],
+      wirkung: [
+        'Schritt 4: Gegenstand der Halbteilungsprüfung.',
+        'Schritt 5: Wird gegen die Bagatellgrenze gehalten.',
+        'Schritt 6: Wird bei den allgemeinen Grenzwerten des § 14 Abs. 2 Nr. 2 verglichen.'
+      ],
+      befunde: ['HT01 – Kosten bereits im Ausgleichswert enthalten',
+                'HT02 – Kostenabzug auf Kapitalwertebene erkannt',
+                'HT03 – nicht als Halbteilung nachvollziehbar',
+                'BG01 – Geringfügigkeit', 'TA01 – externe Teilung ohne Rechtsgrundlage'],
+      praxis: 'Wichtig für das Verständnis der Schritte 5 und 6: Bagatellgrenze und ' +
+        '§-14-Grenzwert werden gegen diesen Wert des Trägers geprüft, nicht gegen den von der App ' +
+        'nachgerechneten. Der Vorschlag des Trägers bindet das Gericht nicht – er ist Prüfstoff.'
+    },
+
+    /* ------------------------------------------------------------------ */
+    ausgleichswert_kapital: {
+      titel: 'Ausgleichswert als Kapital',
+      recht: '§ 13, § 47 VersAusglG',
+      woher: 'Trägerauskunft, sofern dort zusätzlich ein Kapitalbetrag genannt ist',
+      bedeutung: 'Ein zusätzlicher Kapitalbetrag, den manche Träger bei Rentenanrechten neben der ' +
+        'Monatsrente ausweisen. Er dient hier einem einzigen Zweck: zu erkennen, ob der Träger die ' +
+        'Teilungskosten auf Kapitalwertebene abgezogen hat.',
+      auspraegungen: [
+        { name: 'leer – der Regelfall',
+          text: 'Keine zusätzliche Prüfung. Bei Kapitalanrechten ist das Feld ohnehin ohne ' +
+            'Bedeutung, weil der Ausgleichswert dort bereits ein Eurobetrag ist.' },
+        { name: 'Betrag angegeben',
+          text: 'Passt er zu (Kapitalwert − Teilungskosten) / 2, erkennt die App den Vorabzug ' +
+            'auf Kapitalebene (HT02) und vermeidet den doppelten Abzug.' }
+      ],
+      wirkung: ['Schritt 4: Wird nur ausgewertet, wenn die Einheit Monatsrente ist und ' +
+                'Teilungskosten geltend gemacht werden.'],
+      befunde: ['HT02 – Kostenabzug auf Kapitalwertebene erkannt',
+                'HT03 – ohne diesen Wert bleibt die Halbteilung unter Umständen unauflösbar'],
+      praxis: 'Meldet die App bei einem Rentenanrecht mit Teilungskosten den Fehler HT03, lohnt ' +
+        'der Blick in die Auskunft, ob dort ein Kapitalbetrag steht. Oft löst allein dieser Wert ' +
+        'den vermeintlichen Fehler auf.'
+    },
+
+    /* ------------------------------------------------------------------ */
+    korr_kapitalwert: {
+      titel: 'Korrespondierender Kapitalwert',
+      recht: '§ 47 VersAusglG, § 4 Abs. 5 BetrAVG',
+      woher: 'Trägerauskunft – Pflichtangabe',
+      bedeutung: 'Der Kapitalbetrag, der dem Ehezeitanteil entspricht: der Übertragungswert nach ' +
+        '§ 4 Abs. 5 BetrAVG oder der mit dem Rechnungszins des Trägers ermittelte Barwert. Er ist ' +
+        'die gemeinsame Währung, in der sich Renten- und Kapitalanrechte vergleichen lassen.',
+      auspraegungen: [
+        { name: 'positiver Wert – der Regelfall',
+          text: 'Bei Kapitalanrechten muss er mit dem Ehezeitanteil übereinstimmen (KW02), bei ' +
+            'Rentenanrechten wird er über den Barwertfaktor und eine Näherungsrechnung geprüft ' +
+            '(KW03, KW04).' },
+        { name: 'null oder leer bei positivem Ehezeitanteil',
+          text: 'Fehler KW01. Ohne Kapitalwert sind weder Bagatellgrenze noch externe Teilung noch ' +
+            'die Kostenquote prüfbar – die Auskunft ist unvollständig.' }
+      ],
+      wirkung: [
+        'Schritt 3: Gegenstand aller Kapitalwertprüfungen.',
+        'Schritt 6: Die Hälfte dieses Werts wird bei Direktzusage und Unterstützungskasse gegen ' +
+          'die Beitragsbemessungsgrenze gehalten (§ 17 VersAusglG).',
+        'Schritt 6: Die Hälfte gilt als das Kapital, das bei externer Teilung in die ' +
+          'Zielversorgung fließt – Grundlage der Transferverlustrechnung.',
+        'Schritt 7: Nenner der Kostenquote und Umrechnungsschlüssel für Kosten bei Rentenanrechten.'
+      ],
+      befunde: ['KW01 – Kapitalwert 0 bei positivem Ehezeitanteil',
+                'KW02 – Ehezeitanteil ≠ Kapitalwert', 'KW03 – Barwertfaktor außerhalb der Spanne',
+                'KW04 – Abweichung zur Näherungsrechnung', 'TK03 – Kostenquote über der Obergrenze'],
+      praxis: 'Der wirkungsvollste Hebel im ganzen Verfahren. Ein niedrig gerechneter Kapitalwert ' +
+        'kann ein Anrecht unter die Grenze des § 17 drücken und damit erst die einseitige externe ' +
+        'Teilung eröffnen – zum Nachteil des Berechtigten. Deshalb gehören Rechnungszins und ' +
+        'Rechnungsgrundlagen hier immer mitgeprüft.'
+    },
+
+    /* ------------------------------------------------------------------ */
+    rechnungszins: {
+      titel: 'Rechnungszins',
+      recht: '§ 47 Abs. 4 VersAusglG',
+      woher: 'Trägerauskunft – Angabe zu den Rechnungsgrundlagen',
+      bedeutung: 'Der Zinssatz, mit dem der Träger künftige Leistungen auf den Stichtag abzinst. ' +
+        'Der Zusammenhang ist gegenläufig: Je höher der Zins, desto niedriger der Kapitalwert und ' +
+        'damit der Wert des Anrechts.',
+      auspraegungen: [
+        { name: 'innerhalb der konfigurierten Spanne',
+          text: 'Vorbelegt sind 0,5 % bis 6 % (Abschnitt 8 der Formulare). Keine Beanstandung.' },
+        { name: 'außerhalb der Spanne',
+          text: 'Warnung KW05. Der Träger muss die Herleitung offenlegen; ein unüblicher Zins ' +
+            'verschiebt den Kapitalwert erheblich.' },
+        { name: 'über der gesonderten Grenze bei Direktzusage oder Unterstützungskasse',
+          text: 'Warnung KW06. Vorbelegt sind 3,5 %. Ein hoher Zins ist hier besonders kritisch, ' +
+            'weil er zugleich Grenzwertprüfung und Transferverlust beeinflusst.' }
+      ],
+      wirkung: [
+        'Schritt 3: Zwei Plausibilitätsprüfungen und Eingangsgröße der Barwert-Näherung (KW04).'
+      ],
+      befunde: ['KW05 – Rechnungszins außerhalb der üblichen Spanne',
+                'KW06 – hoher Zins bei Direktzusage oder Unterstützungskasse'],
+      praxis: 'Bei Direktzusagen wird oft mit einem handels- oder steuerrechtlich geprägten Zins ' +
+        'gerechnet, der mit dem Marktniveau wenig zu tun hat. Der Effekt ist doppelt: Der ' +
+        'Kapitalwert sinkt, das Anrecht rutscht eher unter Grenzwerte, und bei externer Teilung ' +
+        'wächst der Transferverlust. Der Zins ist deshalb einer der häufigsten Streitpunkte.'
+    },
+
+    /* ------------------------------------------------------------------ */
+    ehezeit_monate_traeger: {
+      titel: 'Ehezeitmonate laut Träger',
+      recht: '§ 3 Abs. 1 VersAusglG',
+      woher: 'Trägerauskunft – Angabe zur zugrunde gelegten Ehezeit',
+      bedeutung: 'Die Monatszahl, mit der der Träger gerechnet hat. Das Feld hat keinen eigenen ' +
+        'Rechenwert; es dient allein dem Abgleich mit der Ehezeit des Verfahrens aus Abschnitt 1.',
+      auspraegungen: [
+        { name: 'gleich der Monatszahl des Verfahrens',
+          text: 'Träger und Gericht legen dieselbe Ehezeit zugrunde. Die Prüfung läuft weiter.' },
+        { name: 'abweichend',
+          text: 'Fehler GD02 mit sofortigem Abbruch. Bei abweichender Ehezeit ist der gesamte ' +
+            'Ehezeitanteil falsch abgegrenzt – jede weitere Rechnung wäre wertlos.' }
+      ],
+      wirkung: ['Schritt 1: Abbruchkriterium. Ohne übereinstimmende Ehezeit wird nicht gerechnet.'],
+      befunde: ['GD02 – Ehezeitmonate weichen ab'],
+      praxis: 'Weicht die Zahl um genau einen Monat ab, ist fast immer die Zählweise die Ursache ' +
+        'und kein Rechenfehler: Die Ehezeit läuft vom ersten Tag des Heiratsmonats bis zum letzten ' +
+        'Tag des Monats vor Zustellung, und beide Monate zählen mit. Bei größeren Abweichungen ' +
+        'stimmt meist das Zustellungsdatum nicht.'
+    },
+
+    /* ------------------------------------------------------------------ */
+    teilungskosten: {
+      titel: 'Teilungskosten',
+      recht: '§ 13 VersAusglG',
+      woher: 'Trägerauskunft – stets als Eurobetrag, auch bei Rentenanrechten',
+      bedeutung: 'Die Kosten, die der Träger für den Vollzug der internen Teilung geltend macht. ' +
+        'Sie werden mit dem Ehezeitanteil verrechnet, so dass beide Ehegatten sie hälftig tragen.',
+      auspraegungen: [
+        { name: 'null',
+          text: 'Der Träger erhebt keine Kosten (Hinweis TK02). Der volle halbe Ehezeitanteil ' +
+            'wird übertragen.' },
+        { name: 'übliche Pauschale',
+          text: 'Angemessen sind nach der Rechtsprechung regelmäßig 2 bis 3 % des Ehezeitanteils, ' +
+            'begrenzt der Höhe nach. Die Grenzen sind in Abschnitt 8 einstellbar.' },
+        { name: 'über der Kostenquote',
+          text: 'Warnung TK03. Bei kleinen Anrechten kann eine Mindestpauschale die Quote ' +
+            'zwangsläufig überschreiten – dann zusätzlich Hinweis TK05.' },
+        { name: 'über der absoluten Obergrenze',
+          text: 'Warnung TK04. Vorbelegt sind 500 €.' },
+        { name: 'negativer Wert',
+          text: 'Fachlich unmöglich. Fehler TK01.' }
+      ],
+      wirkung: [
+        'Schritt 4: Grundlage der Prüfung, ob der Träger die Kosten bereits vorab abgezogen hat.',
+        'Schritt 7: Angemessenheitsprüfung und hälftiger Abzug; bei Rentenanrechten werden die ' +
+          'Eurokosten proportional zum Kapitalwert in Rente umgerechnet.',
+        'Schritt 8: Mindert den Ausgleichsbetrag.'
+      ],
+      befunde: ['TK01 bis TK07 – sämtliche Kostenprüfungen',
+                'HT01, HT02 – Erkennung eines bereits erfolgten Abzugs'],
+      praxis: 'Zwei Fallen. Erstens: Bei externer Teilung dürfen keine Kosten abgezogen werden ' +
+        '(Hinweis TK06) – § 13 gilt nur für die interne Teilung. Zweitens der Doppelabzug: Hat der ' +
+        'Träger die Kosten schon im Ausgleichswert berücksichtigt, darf man sie nicht erneut ' +
+        'abziehen. Genau das prüft Schritt 4, bevor Schritt 7 rechnet.'
+    },
+
+    /* ------------------------------------------------------------------ */
+    teilungsart_vorschlag: {
+      titel: 'Vorschlag des Trägers zur Teilungsart',
+      recht: '§§ 10, 14, 17 VersAusglG',
+      woher: 'Trägerauskunft – Antrag beziehungsweise Vorschlag',
+      bedeutung: 'Welche Art der Teilung der Träger vorschlägt. Der Vorschlag bindet das Gericht ' +
+        'nicht: Die App prüft in Schritt 6, ob er von einer Rechtsgrundlage getragen wird.',
+      auspraegungen: [
+        { wert: 'INTERN', name: 'interne Teilung',
+          text: 'Wird ohne weitere Prüfung übernommen. Die interne Teilung ist der gesetzliche ' +
+            'Regelfall des § 10 VersAusglG und immer zulässig – beim Berechtigten entsteht ein ' +
+            'eigenständiges Anrecht beim selben Träger.' },
+        { wert: 'EXTERN', name: 'externe Teilung',
+          text: 'Nur zulässig mit Zustimmung des Berechtigten (§ 14 Abs. 2 Nr. 1), innerhalb der ' +
+            'allgemeinen Grenzwerte (§ 14 Abs. 2 Nr. 2) oder – bei Direktzusage und ' +
+            'Unterstützungskasse – bis zur Beitragsbemessungsgrenze (§ 17). Trägt keine dieser ' +
+            'Grundlagen, ordnet die App die interne Teilung an und meldet TA01.' }
+      ],
+      wirkung: [
+        'Schritt 6: Ausgangspunkt der Prüfung der Teilungsart.',
+        'Schritt 7: Bei externer Teilung entfällt der Kostenabzug vollständig.'
+      ],
+      befunde: ['TA01 – externe Teilung ohne Rechtsgrundlage verlangt',
+                'TA02 bis TA05 – Folgeprüfungen der externen Teilung'],
+      praxis: 'Die Asymmetrie ist beabsichtigt: Ein interner Vorschlag wird übernommen, ein ' +
+        'externer muss sich rechtfertigen. Verlangt der Träger extern und ist der Grenzwert ' +
+        'überschritten, hat man zwei Wege – interne Teilung anordnen oder die Zustimmung des ' +
+        'Berechtigten einholen.'
+    },
+
+    /* ------------------------------------------------------------------ */
+    auskunftsdatum: {
+      titel: 'Datum der Auskunft',
+      recht: '§ 5 Abs. 2 VersAusglG',
+      woher: 'Trägerauskunft – Erstellungsdatum',
+      bedeutung: 'Wann der Träger die Auskunft erstellt hat. Bewertungsstichtag ist und bleibt das ' +
+        'Ehezeitende; das Erstellungsdatum sagt nur etwas über die Belastbarkeit der Angaben.',
+      auspraegungen: [
+        { name: 'nach dem Ehezeitende und aktuell',
+          text: 'Der Regelfall, keine Beanstandung.' },
+        { name: 'vor dem Ehezeitende',
+          text: 'Warnung GD03. Zum Zeitpunkt der Erstellung stand der Ehezeitanteil noch nicht ' +
+            'fest – die Auskunft kann ihn nicht endgültig ausweisen.' },
+        { name: 'mehr als zwölf Monate vor dem Prüfdatum',
+          text: 'Warnung GD04. Rechtlich bleibt der Stichtag maßgeblich, zwischenzeitliche ' +
+            'rückwirkende Änderungen sind aber nach § 5 Abs. 2 S. 2 VersAusglG zu berücksichtigen.' }
+      ],
+      wirkung: ['Schritt 1: Beide Prüfungen laufen gegen das Prüfdatum aus Abschnitt 1, nicht ' +
+                'gegen den heutigen Tag – so bleiben Altfälle reproduzierbar nachvollziehbar.'],
+      befunde: ['GD03 – Auskunft vor Ehezeitende erstellt', 'GD04 – Auskunft älter als 12 Monate'],
+      praxis: 'Die beiden Warnungen bedeuten Unterschiedliches. GD03 heißt: neu anfordern, der ' +
+        'Wert kann nicht stimmen. GD04 heißt nur: prüfen, ob sich rückwirkend etwas geändert hat – ' +
+        'etwa der Eintritt der Unverfallbarkeit oder eine korrigierte Zusage.'
+    }
+  };
+
+  /* Nachschlagewerk über alle dokumentierten Felder */
+  var FELDER = {};
+  [STAMMDATEN, TRAEGERAUSKUNFT].forEach(function (gruppe) {
+    Object.keys(gruppe).forEach(function (k) { FELDER[k] = gruppe[k]; });
+  });
+
   global.BAV = global.BAV || {};
-  global.BAV.hilfe = { STAMMDATEN: STAMMDATEN };
+  global.BAV.hilfe = {
+    STAMMDATEN: STAMMDATEN,
+    TRAEGERAUSKUNFT: TRAEGERAUSKUNFT,
+    FELDER: FELDER
+  };
 })(typeof window !== 'undefined' ? window : this);

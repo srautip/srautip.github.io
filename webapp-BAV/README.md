@@ -28,7 +28,7 @@ node js/tests.js               # dieselben Tests auf der Kommandozeile
 | `js/engine.js` | Prüf- und Berechnungslogik, ohne DOM-Zugriffe |
 | `js/config.js` | Bezugsgröße, Beitragsbemessungsgrenze und Prüfgrenzen je Jahr |
 | `js/examples.js` | Beispielfälle (entsprechen den Testfällen der Spezifikation) |
-| `js/hilfe.js` | Erläuterungen zu den Stammdatenfeldern für den Schulungseinsatz |
+| `js/hilfe.js` | Erläuterungen zu den Eingabefeldern für den Schulungseinsatz |
 | `js/ui.js` | Formularaufbau, Zustand, schrittweise Ergebnisdarstellung |
 | `js/tests.js`, `tests.html` | Testfälle für Browser und Kommandozeile |
 
@@ -65,25 +65,30 @@ ehezeit, config, optionen)` verändert die Eingabedaten nicht und liefert
 
 ## Einsatz in der Schulung
 
-Hinter jedem Feld in Abschnitt 3 (Stammdaten des Anrechts) steht ein kleiner
-(i)-Knopf. Er öffnet ein Infofenster mit
+Hinter jedem Feld in Abschnitt 3 (Stammdaten des Anrechts) und Abschnitt 4
+(Angaben der Trägerauskunft) steht ein kleiner (i)-Knopf. Er öffnet ein
+Infofenster mit
 
 * der fachlichen Bedeutung des Feldes und der Quelle der Angabe,
-* **allen** Ausprägungen einzeln erläutert – etwa die fünf Durchführungswege mit
-  ihren unterschiedlichen Bewertungsmethoden und Grenzwerten,
+* **allen** Ausprägungen einzeln erläutert – bei Auswahlfeldern etwa die fünf
+  Durchführungswege mit ihren unterschiedlichen Bewertungsmethoden und
+  Grenzwerten, bei Zahlenfeldern die Wertebereiche, die zu einem Befund führen
+  (Teilungskosten von null über die übliche Pauschale bis zum negativen Wert),
 * der konkreten Auswirkung auf die Berechnung, mit Angabe des betroffenen Schritts,
 * den Befunden, die dieses Feld auslösen kann,
 * einem Praxishinweis auf typische Fehler und Streitpunkte.
 
 Das Fenster schließt über Esc, das Kreuz oder einen Klick auf den Hintergrund.
 
-Die Inhalte stehen in `js/hilfe.js`, getrennt von der Oberfläche. Ein neues Feld
-wird dokumentiert, indem dort ein Eintrag unter dem Feldschlüssel ergänzt wird –
-der (i)-Knopf erscheint dann automatisch. Vier Testfälle sichern ab, dass die
-Erläuterungen nicht von der Engine abdriften: Jedes Stammdatenfeld muss
-dokumentiert sein, jeder Eintrag inhaltlich vollständig, die Ausprägungen der
-Auswahlfelder müssen den Aufzählungstypen aus `engine.js` exakt entsprechen, und
-jeder genannte Befundcode muss im Katalog existieren.
+Die Inhalte stehen in `js/hilfe.js`, getrennt von der Oberfläche, gruppiert nach
+`STAMMDATEN` und `TRAEGERAUSKUNFT` und über `FELDER` gemeinsam nachschlagbar. Ein
+weiteres Feld wird dokumentiert, indem dort ein Eintrag unter dem Feldschlüssel
+ergänzt wird – der (i)-Knopf erscheint dann automatisch, auch in den übrigen
+Formularabschnitten. Vier Testfälle sichern ab, dass die Erläuterungen nicht von
+der Engine abdriften: Jedes Feld beider Abschnitte muss dokumentiert sein und
+umgekehrt kein Eintrag verwaist, jeder Eintrag inhaltlich vollständig, die
+Ausprägungen der Auswahlfelder müssen den Aufzählungstypen aus `engine.js` exakt
+entsprechen, und jeder genannte Befundcode muss im Katalog existieren.
 
 ## Prüf- und Rechenschritte
 

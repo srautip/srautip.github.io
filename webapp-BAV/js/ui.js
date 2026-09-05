@@ -8,7 +8,7 @@
   var C = global.BAV.config;
   var X = global.BAV.examples;
   var H = E.helpers;
-  var HILFE = (global.BAV.hilfe && global.BAV.hilfe.STAMMDATEN) || {};
+  var HILFE = (global.BAV.hilfe && global.BAV.hilfe.FELDER) || {};
   var SPEICHER = 'bav-va-state-v1';
 
   /* ------------------------------------------------------------------

@@ -216,21 +216,37 @@
     gleich(JSON.stringify(f.anrecht), kopie, 'Anrecht unverändert');
   });
 
-  /* ---------------- Erläuterungen zu den Stammdaten ---------------- */
-  var HILFE = (global.BAV.hilfe && global.BAV.hilfe.STAMMDATEN) || {};
+  /* ---------------- Erläuterungen zu den Eingabefeldern ---------------- */
+  var hilfeModul = global.BAV.hilfe || {};
+  var HILFE = hilfeModul.FELDER || {};
 
-  /* Muss mit F_STAMM in ui.js übereinstimmen */
-  var STAMMDATEN_FELDER = ['id', 'traeger', 'durchfuehrungsweg', 'zusageart', 'einheit',
-    'bewertung', 'unverfallbar', 'unverfallbar_ab', 'laufende_leistung',
-    'kapitalwahlrecht_ausgeuebt', 'traeger_teilungsordnung_vorhanden'];
+  /* Muss mit F_STAMM und F_AUSKUNFT in ui.js übereinstimmen */
+  var GRUPPEN = [
+    { name: 'Stammdaten', quelle: hilfeModul.STAMMDATEN || {},
+      felder: ['id', 'traeger', 'durchfuehrungsweg', 'zusageart', 'einheit', 'bewertung',
+        'unverfallbar', 'unverfallbar_ab', 'laufende_leistung', 'kapitalwahlrecht_ausgeuebt',
+        'traeger_teilungsordnung_vorhanden'] },
+    { name: 'Trägerauskunft', quelle: hilfeModul.TRAEGERAUSKUNFT || {},
+      felder: ['ehezeitanteil', 'ausgleichswert', 'ausgleichswert_kapital', 'korr_kapitalwert',
+        'rechnungszins', 'ehezeit_monate_traeger', 'teilungskosten', 'teilungsart_vorschlag',
+        'auskunftsdatum'] }
+  ];
 
-  test('Jedes Stammdatenfeld hat eine Erläuterung', function () {
-    STAMMDATEN_FELDER.forEach(function (k) {
-      if (!HILFE[k]) throw new Error('Erläuterung fehlt für Feld ' + k);
+  test('Jedes Feld der Stammdaten und der Trägerauskunft hat eine Erläuterung', function () {
+    var alle = [];
+    GRUPPEN.forEach(function (g) {
+      g.felder.forEach(function (k) {
+        alle.push(k);
+        if (!g.quelle[k]) throw new Error(g.name + ': Erläuterung fehlt für Feld ' + k);
+      });
+      Object.keys(g.quelle).forEach(function (k) {
+        if (g.felder.indexOf(k) < 0) throw new Error(g.name + ': Erläuterung ohne zugehöriges Feld: ' + k);
+      });
     });
     Object.keys(HILFE).forEach(function (k) {
-      if (STAMMDATEN_FELDER.indexOf(k) < 0) throw new Error('Erläuterung ohne zugehöriges Feld: ' + k);
+      if (alle.indexOf(k) < 0) throw new Error('Nachschlagewerk enthält unbekanntes Feld: ' + k);
     });
+    gleich(Object.keys(HILFE).length, alle.length, 'Anzahl dokumentierter Felder');
   });
 
   test('Jede Erläuterung ist inhaltlich vollständig', function () {
@@ -248,7 +264,8 @@
 
   test('Ausprägungen der Auswahlfelder decken die Aufzählungstypen exakt ab', function () {
     [['durchfuehrungsweg', E.DURCHFUEHRUNGSWEG], ['zusageart', E.ZUSAGEART],
-     ['einheit', E.EINHEIT], ['bewertung', E.BEWERTUNG]].forEach(function (paar) {
+     ['einheit', E.EINHEIT], ['bewertung', E.BEWERTUNG],
+     ['teilungsart_vorschlag', E.TEILUNGSART]].forEach(function (paar) {
       var feld = paar[0], enumWerte = Object.keys(paar[1]);
       var dokumentiert = HILFE[feld].auspraegungen.map(function (a) { return a.wert; });
       enumWerte.forEach(function (w) {
