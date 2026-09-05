@@ -74,7 +74,7 @@
              Staende, Extras fuer das, was keiner Rechnung gehoert. Alle
              Eintraege haengen an Befehlen des ViewModels - Menue,
              Startkarte und Bereichskopf gehen damit denselben Weg. -->
-        <Menu DockPanel.Dock="Top">
+        <Menu x:Name="Hauptmenue" DockPanel.Dock="Top">
             <MenuItem Header="_Datei">
                 <MenuItem Header="Neues Projekt…" Command="{Binding NeuBefehl}" />
                 <MenuItem Header="Bestehende Schule übernehmen…" Command="{Binding ImportierenBefehl}" />

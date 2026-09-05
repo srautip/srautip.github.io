@@ -228,6 +228,14 @@ Class MainWindow
             Await BildAufnehmenAsync(auftrag, b.ToString().ToLowerInvariant())
         Next
 
+        If auftrag.Menues Then
+            _modell.Bereich = Bereich.Start
+            Await System.Windows.Threading.Dispatcher.Yield(DispatcherPriority.Background)
+            For Each eintrag As MenuItem In Hauptmenue.Items
+                Await MenueAufnehmenAsync(auftrag, eintrag)
+            Next
+        End If
+
         If auftrag.Masken Then
             Dim dialoge As New WpfDialoge(Me)
             Await MaskeAufnehmenAsync(auftrag, "stammdaten",
@@ -259,7 +267,33 @@ Class MainWindow
         End If
         Await System.Windows.Threading.Dispatcher.Yield(DispatcherPriority.Background)
         _bildNummer += 1
-        Bildprobe.Speichern(Me, IO.Path.Combine(auftrag.Ordner, $"{_bildNummer:00}-{name}.png"), Dashboard, web)
+        Dim einblendung As Einblendung = Nothing
+        If web IsNot Nothing AndAlso Dashboard.IsVisible Then
+            Dim ecke = Dashboard.TranslatePoint(New Point(0, 0), Bildprobe.Wurzel(Me))
+            einblendung = New Einblendung(New Rect(ecke.X, ecke.Y, Dashboard.ActualWidth, Dashboard.ActualHeight), web)
+        End If
+        Bildprobe.Speichern(Me, IO.Path.Combine(auftrag.Ordner, $"{_bildNummer:00}-{name}.png"), einblendung)
+    End Function
+
+    ''' <summary>Ein Hauptmenue aufklappen und mit seinem Popup
+    ''' fotografieren. Das Popup ist ein eigenes Fenster und fehlt im
+    ''' Fensterbild - es wird getrennt gerendert und unter dem Eintrag
+    ''' eingeblendet.</summary>
+    Private Async Function MenueAufnehmenAsync(auftrag As BildprobeAuftrag, eintrag As MenuItem) As Task
+        eintrag.IsSubmenuOpen = True
+        Await System.Windows.Threading.Dispatcher.Yield(DispatcherPriority.Background)
+        Dim popup = TryCast(eintrag.Template.FindName("PART_Popup", eintrag), Primitives.Popup)
+        Dim inhalt = TryCast(popup?.Child, FrameworkElement)
+        Dim einblendung As Einblendung = Nothing
+        If inhalt IsNot Nothing AndAlso inhalt.ActualWidth > 0 Then
+            Dim ecke = eintrag.TranslatePoint(New Point(0, eintrag.ActualHeight), Bildprobe.Wurzel(Me))
+            einblendung = New Einblendung(New Rect(ecke.X, ecke.Y, inhalt.ActualWidth, inhalt.ActualHeight),
+                                          Bildprobe.Rendern(inhalt))
+        End If
+        _bildNummer += 1
+        Dim name = CStr(eintrag.Header).Replace("_", "").ToLowerInvariant()
+        Bildprobe.Speichern(Me, IO.Path.Combine(auftrag.Ordner, $"{_bildNummer:00}-menue-{name}.png"), einblendung)
+        eintrag.IsSubmenuOpen = False
     End Function
 
     Private Async Function MaskeAufnehmenAsync(auftrag As BildprobeAuftrag, name As String, maske As Window) As Task

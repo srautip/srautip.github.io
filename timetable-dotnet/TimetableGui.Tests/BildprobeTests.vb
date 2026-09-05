@@ -15,11 +15,12 @@ Public Class BildprobeTests
 
     <TestMethod>
     Public Sub AlleSchalterWerdenGelesen()
-        Dim a = Bildprobe.Lesen({"--bildprobe", "C:\bilder", "--schule", "tests\gs", "--rechnen", "Stundenplan", "--masken"})
+        Dim a = Bildprobe.Lesen({"--bildprobe", "C:\bilder", "--schule", "tests\gs", "--rechnen", "Stundenplan", "--masken", "--menues"})
         Assert.AreEqual("C:\bilder", a.Ordner)
         Assert.AreEqual("tests\gs", a.Schule)
         Assert.AreEqual("stundenplan", a.Rechnen)
         Assert.IsTrue(a.Masken)
+        Assert.IsTrue(a.Menues)
         Assert.IsNull(a.Projekt)
     End Sub
 

@@ -29,6 +29,19 @@ Public NotInheritable Class BildprobeAuftrag
     Public Property Projekt As String
     Public Property Rechnen As String
     Public Property Masken As Boolean
+    Public Property Menues As Boolean
+End Class
+
+''' <summary>Etwas, das WPF im Fensterbild nicht selbst zeichnet - ein
+''' WebView2 oder ein aufgeklapptes Menue (eigenes Popup-Fenster) - und
+''' deshalb als fertiges Bild an seiner Stelle eingeblendet wird.</summary>
+Public NotInheritable Class Einblendung
+    Public Sub New(lage As Rect, bild As BitmapSource)
+        Me.Lage = lage
+        Me.Bild = bild
+    End Sub
+    Public ReadOnly Property Lage As Rect
+    Public ReadOnly Property Bild As BitmapSource
 End Class
 
 Public Module Bildprobe
@@ -58,6 +71,7 @@ Public Module Bildprobe
                         Throw New ArgumentException($"--rechnen erwartet stundenplan oder klassenbildung, nicht '{a.Rechnen}'.")
                     End If
                 Case "--masken" : a.Masken = True
+                Case "--menues" : a.Menues = True
                 Case Else
                     Throw New ArgumentException($"Unbekannter Schalter: {schalter}")
             End Select
@@ -100,21 +114,32 @@ Public Module Bildprobe
         Return p
     End Function
 
-    ''' <summary>Rendert den Inhalt eines angezeigten Fensters als PNG.
-    ''' `einblendung` (ein von WPF nicht zeichenbares Steuerelement wie
-    ''' WebView2) wird durch `einblendungBild` an seiner Stelle ersetzt.
-    ''' Der Fensterhintergrund wird zuerst gemalt - der Inhalt allein
-    ''' waere dort transparent, wo nichts zeichnet.</summary>
-    Public Sub Speichern(fenster As Window, pfad As String,
-                         Optional einblendung As FrameworkElement = Nothing,
-                         Optional einblendungBild As BitmapSource = Nothing)
-        ' Die WURZEL der Fenstervorlage, nicht Window.Content: der Inhalt
-        ' traegt oft einen Rand (pad-platte), und ein Visual rendert an
-        ' seiner eigenen Position - das Bild waere um den Rand versetzt
-        ' und rechts/unten beschnitten.
-        Dim wurzel = CType(VisualTreeHelper.GetChild(fenster, 0), FrameworkElement)
-        Dim breite = Math.Max(1, CInt(Math.Ceiling(wurzel.ActualWidth)))
-        Dim hoehe = Math.Max(1, CInt(Math.Ceiling(wurzel.ActualHeight)))
+    ''' <summary>Die Wurzel der Fenstervorlage - NICHT Window.Content: der
+    ''' Inhalt traegt oft einen Rand (pad-platte), und ein Visual rendert
+    ''' an seiner eigenen Position; das Bild waere um den Rand versetzt
+    ''' und rechts/unten beschnitten. Lagen (Einblendungen) beziehen sich
+    ''' auf diese Wurzel.</summary>
+    Public Function Wurzel(fenster As Window) As FrameworkElement
+        Return CType(VisualTreeHelper.GetChild(fenster, 0), FrameworkElement)
+    End Function
+
+    ''' <summary>Rendert ein Element an seiner Groesse - fuer Popups, die
+    ''' im Fensterbild fehlen, weil sie ein eigenes Fenster sind.</summary>
+    Public Function Rendern(element As FrameworkElement) As BitmapSource
+        Dim breite = Math.Max(1, CInt(Math.Ceiling(element.ActualWidth)))
+        Dim hoehe = Math.Max(1, CInt(Math.Ceiling(element.ActualHeight)))
+        Dim bild As New RenderTargetBitmap(breite, hoehe, 96, 96, PixelFormats.Pbgra32)
+        bild.Render(element)
+        Return bild
+    End Function
+
+    ''' <summary>Rendert den Inhalt eines angezeigten Fensters als PNG,
+    ''' Einblendungen obenauf. Der Fensterhintergrund wird zuerst gemalt -
+    ''' der Inhalt allein waere dort transparent, wo nichts zeichnet.</summary>
+    Public Sub Speichern(fenster As Window, pfad As String, ParamArray einblendungen As Einblendung())
+        Dim root = Wurzel(fenster)
+        Dim breite = Math.Max(1, CInt(Math.Ceiling(root.ActualWidth)))
+        Dim hoehe = Math.Max(1, CInt(Math.Ceiling(root.ActualHeight)))
 
         Dim bild As New RenderTargetBitmap(breite, hoehe, 96, 96, PixelFormats.Pbgra32)
         Dim grund As New DrawingVisual()
@@ -122,18 +147,16 @@ Public Module Bildprobe
             zeichner.DrawRectangle(If(fenster.Background, Brushes.White), Nothing, New Rect(0, 0, breite, hoehe))
         End Using
         bild.Render(grund)
-        bild.Render(wurzel)
+        bild.Render(root)
 
-        If einblendung IsNot Nothing AndAlso einblendungBild IsNot Nothing AndAlso
-           einblendung.IsVisible AndAlso einblendung.ActualWidth > 0 Then
-            Dim ecke = einblendung.TranslatePoint(New Point(0, 0), wurzel)
+        For Each e In einblendungen
+            If e Is Nothing OrElse e.Bild Is Nothing Then Continue For
             Dim lage As New DrawingVisual()
             Using zeichner = lage.RenderOpen()
-                zeichner.DrawImage(einblendungBild,
-                                   New Rect(ecke.X, ecke.Y, einblendung.ActualWidth, einblendung.ActualHeight))
+                zeichner.DrawImage(e.Bild, e.Lage)
             End Using
             bild.Render(lage)
-        End If
+        Next
 
         Directory.CreateDirectory(Path.GetDirectoryName(pfad))
         Dim kodierer As New PngBitmapEncoder()

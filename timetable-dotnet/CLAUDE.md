@@ -53,8 +53,9 @@ pauschal die volle Suite zu fahren:
   ```
 
   schreibt `01-start-ohne-projekt.png`, `02-start.png`, `03-klassenbildung.png`
-  (Board eingeblendet), `04-stundenplan.png`, `05-laeufe.png` und mit
-  `--masken` die vier Pflegemasken, beendet sich dann (Exitcode 0; bei
+  (Board eingeblendet), `04-stundenplan.png`, `05-laeufe.png`, mit
+  `--menues` jedes Hauptmenue aufgeklappt und mit `--masken` die vier
+  Pflegemasken, beendet sich dann (Exitcode 0; bei
   Fehler `fehler.txt` im Ordner, Exitcode 1). `--schule` haengt die
   `output/*.json` der Beispielschule als Staende ein - beide Dashboards
   ohne Solver-Lauf. `--projekt <datei.splanx>` mit Passwort aus
