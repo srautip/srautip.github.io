@@ -76,38 +76,74 @@
              Startkarte und Bereichskopf gehen damit denselben Weg. -->
         <Menu x:Name="Hauptmenue" DockPanel.Dock="Top">
             <MenuItem Header="_Datei">
-                <MenuItem Header="Neues Projekt…" Command="{Binding NeuBefehl}" />
-                <MenuItem Header="Bestehende Schule übernehmen…" Command="{Binding ImportierenBefehl}" />
-                <MenuItem Header="Öffnen…" Command="{Binding OeffnenBefehl}" />
+                <MenuItem Header="Neues Projekt…" Command="{Binding NeuBefehl}">
+                    <MenuItem.Icon><TextBlock Text="&#xE8A5;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Bestehende Schule übernehmen…" Command="{Binding ImportierenBefehl}">
+                    <MenuItem.Icon><TextBlock Text="&#xE8B5;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Öffnen…" Command="{Binding OeffnenBefehl}">
+                    <MenuItem.Icon><TextBlock Text="&#xE8E5;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
                 <Separator />
-                <MenuItem Header="Speichern" InputGestureText="Strg+S" Command="{Binding SpeichernBefehl}" />
-                <MenuItem Header="Speichern unter…" Command="{Binding SpeichernUnterBefehl}" />
+                <MenuItem Header="Speichern" InputGestureText="Strg+S" Command="{Binding SpeichernBefehl}">
+                    <MenuItem.Icon><TextBlock Text="&#xE74E;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Speichern unter…" Command="{Binding SpeichernUnterBefehl}">
+                    <MenuItem.Icon><TextBlock Text="&#xE792;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
                 <Separator />
-                <MenuItem Header="Projekt schließen" Command="{Binding SchliessenBefehl}" />
-                <MenuItem Header="Beenden" Click="AufBeenden" />
+                <MenuItem Header="Projekt schließen" Command="{Binding SchliessenBefehl}">
+                    <MenuItem.Icon><TextBlock Text="&#xE8BB;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Beenden" Click="AufBeenden">
+                    <MenuItem.Icon><TextBlock Text="&#xE7E8;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="_Bearbeiten">
-                <MenuItem Header="Stammdaten…" Command="{Binding StammdatenBefehl}" />
-                <MenuItem Header="Regeln…" Command="{Binding RegelnBefehl}" />
-                <MenuItem Header="Klassenbildung: Kinder &amp; Regeln…" Command="{Binding KlassenbildungEingabenBefehl}" />
+                <MenuItem Header="Stammdaten…" Command="{Binding StammdatenBefehl}">
+                    <MenuItem.Icon><TextBlock Text="&#xE8FD;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Regeln…" Command="{Binding RegelnBefehl}">
+                    <MenuItem.Icon><TextBlock Text="&#xE7C1;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Klassenbildung: Kinder &amp; Regeln…" Command="{Binding KlassenbildungEingabenBefehl}">
+                    <MenuItem.Icon><TextBlock Text="&#xE716;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
                 <Separator />
-                <MenuItem Header="Solver-Einstellungen…" Command="{Binding SolverEinstellungenBefehl}" />
+                <MenuItem Header="Solver-Einstellungen…" Command="{Binding SolverEinstellungenBefehl}">
+                    <MenuItem.Icon><TextBlock Text="&#xE713;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="_Planung">
-                <MenuItem Header="Klassenbildung rechnen" InputGestureText="F5" Command="{Binding KlassenbildungBefehl}" />
-                <MenuItem Header="Stundenplan rechnen" InputGestureText="F6" Command="{Binding StundenplanBefehl}" />
-                <MenuItem Header="Lauf abbrechen" Command="{Binding Monitor.AbbrechenBefehl}" />
+                <MenuItem Header="Klassenbildung rechnen" InputGestureText="F5" Command="{Binding KlassenbildungBefehl}">
+                    <MenuItem.Icon><TextBlock Text="&#xE768;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Stundenplan rechnen" InputGestureText="F6" Command="{Binding StundenplanBefehl}">
+                    <MenuItem.Icon><TextBlock Text="&#xE768;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Lauf abbrechen" Command="{Binding Monitor.AbbrechenBefehl}">
+                    <MenuItem.Icon><TextBlock Text="&#xE71A;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
                 <Separator />
                 <MenuItem Header="Läufe und Stände" Command="{Binding WechsleBefehl}"
-                          CommandParameter="{x:Static app:Bereich.Laeufe}" />
+                          CommandParameter="{x:Static app:Bereich.Laeufe}">
+                    <MenuItem.Icon><TextBlock Text="&#xE81C;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="_Extras">
-                <MenuItem Header="Klarnamen exportieren…" Click="AufKlarnamenExport" />
+                <MenuItem Header="Klarnamen exportieren…" Click="AufKlarnamenExport">
+                    <MenuItem.Icon><TextBlock Text="&#xE7B8;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
                 <Separator />
-                <MenuItem Header="Browserdaten bereinigen" Click="AufBrowserdatenBereinigen" />
+                <MenuItem Header="Browserdaten bereinigen" Click="AufBrowserdatenBereinigen">
+                    <MenuItem.Icon><TextBlock Text="&#xE74D;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="_Hilfe">
-                <MenuItem Header="Über" Click="AufUeber" />
+                <MenuItem Header="Über" Click="AufUeber">
+                    <MenuItem.Icon><TextBlock Text="&#xE946;" Style="{StaticResource Menuesymbol}" /></MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
         </Menu>
 

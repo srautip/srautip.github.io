@@ -38,6 +38,18 @@
                 <Setter Property="BorderThickness" Value="0,0,0,1" />
             </Style>
 
+            <!-- Symbol in der Icon-Spalte eines Menueeintrags. Die Spalte
+                 zeichnet WPF ohnehin - leer sah sie wie ein Fehler aus.
+                 Zeichen aus Segoe MDL2 Assets, in beiden Symbolschriften
+                 vorhanden (DesignKanonTests). -->
+            <Style x:Key="Menuesymbol" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{StaticResource schrift-symbole}" />
+                <Setter Property="FontSize" Value="{StaticResource grad-basis}" />
+                <Setter Property="Foreground" Value="{StaticResource farbe-text-2}" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+
             <Style TargetType="StatusBar">
                 <Setter Property="Background" Value="{StaticResource farbe-flaeche-2}" />
                 <Setter Property="Foreground" Value="{StaticResource farbe-text-2}" />
