@@ -404,15 +404,18 @@
   }
 
   /* ------------------------------------------------------------------
-     Infofenster zu einem Eingabefeld
+     Infofenster – generischer Aufbau aus Abschnitten
      ------------------------------------------------------------------ */
+  var HILFE_SCHRITTE = (global.BAV.hilfe && global.BAV.hilfe.SCHRITTE) || {};
+  var HILFE_BEFUNDE = (global.BAV.hilfe && global.BAV.hilfe.BEFUNDE) || {};
+  var HILFE_GRADE = (global.BAV.hilfe && global.BAV.hilfe.SCHWEREGRADE) || null;
+
   var dialog = null;
 
   function baueDialog() {
     if (dialog) return dialog;
     dialog = el('dialog', { class: 'info-dialog', id: 'hilfe-dialog' });
-    dialog.appendChild(el('div', { class: 'info-inhalt', id: 'hilfe-inhalt' }));
-    /* Klick auf den Hintergrund schließt das Fenster */
+    dialog.appendChild(el('div', { class: 'info-inhalt' }));
     dialog.addEventListener('click', function (ev) {
       if (ev.target === dialog) dialog.close();
     });
@@ -420,14 +423,40 @@
     return dialog;
   }
 
-  function abschnitt(titel, kinder) {
-    if (!kinder || !kinder.length) return null;
-    return el('section', {}, [el('h3', { text: titel })].concat(kinder));
+  /** Baut einen Abschnitt aus {titel, art, inhalt}. */
+  function baueAbschnitt(a) {
+    if (!a || !a.inhalt || (Array.isArray(a.inhalt) && !a.inhalt.length)) return null;
+    var koerper;
+
+    if (a.art === 'definitionen') {
+      koerper = el('dl', { class: 'auspraegungen' });
+      a.inhalt.forEach(function (d) {
+        koerper.appendChild(el('dt', { text: d.name }));
+        koerper.appendChild(el('dd', { text: d.text }));
+      });
+    } else if (a.art === 'befundliste') {
+      koerper = el('ul', { class: 'befund-liste' });
+      a.inhalt.forEach(function (eintrag) {
+        var text = eintrag;
+        if (E.KATALOG[eintrag]) {
+          text = eintrag + ' – ' + E.KATALOG[eintrag].titel + ' (' + E.KATALOG[eintrag].sev + ')';
+        }
+        koerper.appendChild(el('li', { text: text }));
+      });
+    } else if (a.art === 'liste') {
+      koerper = el('ul', {});
+      a.inhalt.forEach(function (t) { koerper.appendChild(el('li', { text: t })); });
+    } else if (a.art === 'praxis') {
+      koerper = el('p', { class: 'praxis', text: a.inhalt });
+    } else {
+      koerper = el('p', { text: a.inhalt });
+    }
+
+    return el('section', {}, [el('h3', { text: a.titel }), koerper]);
   }
 
-  function zeigeHilfe(key) {
-    var e = HILFE[key];
-    if (!e) return;
+  /** daten = {titel, recht, badge, kopf:{label,text}, lead, abschnitte:[...]} */
+  function oeffneHilfe(daten) {
     var d = baueDialog();
     var c = d.querySelector('.info-inhalt');
     c.innerHTML = '';
@@ -437,52 +466,122 @@
 
     c.appendChild(el('header', { class: 'info-head' }, [
       el('div', {}, [
-        el('h2', { text: e.titel }),
-        e.recht ? el('div', { class: 'legal', text: e.recht }) : null
+        el('div', { class: 'info-titelzeile' }, [
+          daten.badge ? el('span', { class: 'badge ' + daten.badge.klasse, text: daten.badge.text }) : null,
+          el('h2', { text: daten.titel })
+        ]),
+        daten.recht ? el('div', { class: 'legal', text: daten.recht }) : null
       ]),
       schliessen
     ]));
 
     var koerper = el('div', { class: 'info-body' });
-
-    if (e.woher) {
+    if (daten.kopf) {
       koerper.appendChild(el('p', { class: 'woher' }, [
-        el('strong', { text: 'Quelle der Angabe: ' }),
-        el('span', { text: e.woher })
+        el('strong', { text: daten.kopf.label + ': ' }),
+        el('span', { text: daten.kopf.text })
       ]));
     }
-    if (e.bedeutung) koerper.appendChild(el('p', { class: 'lead', text: e.bedeutung }));
-
-    if (e.auspraegungen && e.auspraegungen.length) {
-      var dl = el('dl', { class: 'auspraegungen' });
-      e.auspraegungen.forEach(function (a) {
-        dl.appendChild(el('dt', { text: a.name }));
-        dl.appendChild(el('dd', { text: a.text }));
-      });
-      koerper.appendChild(abschnitt('Ausprägungen', [dl]));
-    }
-
-    if (e.wirkung && e.wirkung.length) {
-      var ulW = el('ul', {});
-      e.wirkung.forEach(function (w) { ulW.appendChild(el('li', { text: w })); });
-      koerper.appendChild(abschnitt('Auswirkung auf die Berechnung', [ulW]));
-    }
-
-    if (e.befunde && e.befunde.length) {
-      var ulB = el('ul', { class: 'befund-liste' });
-      e.befunde.forEach(function (b) { ulB.appendChild(el('li', { text: b })); });
-      koerper.appendChild(abschnitt('Betroffene Befunde', [ulB]));
-    }
-
-    if (e.praxis) {
-      koerper.appendChild(abschnitt('Praxishinweis', [el('p', { class: 'praxis', text: e.praxis })]));
-    }
-
+    if (daten.lead) koerper.appendChild(el('p', { class: 'lead', text: daten.lead }));
+    (daten.abschnitte || []).forEach(function (a) {
+      var s = baueAbschnitt(a);
+      if (s) koerper.appendChild(s);
+    });
     c.appendChild(koerper);
 
     if (typeof d.showModal === 'function') d.showModal();
     else d.setAttribute('open', 'open');
     schliessen.focus();
+  }
+
+  /* ---- Erläuterung zu einem Eingabefeld ---- */
+  function zeigeHilfe(key) {
+    var e = HILFE[key];
+    if (!e) return;
+    oeffneHilfe({
+      titel: e.titel,
+      recht: e.recht,
+      kopf: e.woher ? { label: 'Quelle der Angabe', text: e.woher } : null,
+      lead: e.bedeutung,
+      abschnitte: [
+        { titel: 'Ausprägungen', art: 'definitionen', inhalt: e.auspraegungen },
+        { titel: 'Auswirkung auf die Berechnung', art: 'liste', inhalt: e.wirkung },
+        { titel: 'Betroffene Befunde', art: 'liste', inhalt: e.befunde },
+        { titel: 'Praxishinweis', art: 'praxis', inhalt: e.praxis }
+      ]
+    });
+  }
+
+  /* ---- Erläuterung zu einem Prüfschritt ---- */
+  function zeigeHilfeSchritt(nr) {
+    var e = HILFE_SCHRITTE[nr];
+    if (!e) return;
+    oeffneHilfe({
+      titel: 'Schritt ' + nr + ' – ' + e.titel,
+      recht: e.recht,
+      lead: e.zweck,
+      abschnitte: [
+        { titel: 'Was geprüft wird', art: 'liste', inhalt: e.prueft },
+        { titel: 'Wie es weitergeht', art: 'liste', inhalt: e.ergebnis },
+        { titel: 'Mögliche Befunde in diesem Schritt', art: 'befundliste', inhalt: e.befunde },
+        { titel: 'Praxishinweis', art: 'praxis', inhalt: e.praxis }
+      ]
+    });
+  }
+
+  /* ---- Erläuterung zu einem Befund ---- */
+  function zeigeHilfeBefund(code) {
+    var k = E.KATALOG[code];
+    if (!k) return;
+    var e = HILFE_BEFUNDE[code] || {};
+    oeffneHilfe({
+      titel: code + ' – ' + k.titel,
+      recht: k.recht,
+      badge: { klasse: k.sev.toLowerCase(), text: k.sev },
+      kopf: { label: 'Befundart', text: befundartText(k.sev) },
+      lead: k.erklaerung,
+      abschnitte: [
+        { titel: 'Warum der Befund erscheint', art: 'liste', inhalt: e.ursachen },
+        { titel: 'Was jetzt zu tun ist', art: 'liste', inhalt: e.massnahmen },
+        { titel: 'Vertiefung', art: 'praxis', inhalt: e.vertiefung }
+      ]
+    });
+  }
+
+  function befundartText(sev) {
+    if (sev === 'ERROR') return 'Fehler – die Berechnung ist nicht tragfähig, die Prüfung endet mit Abbruch.';
+    if (sev === 'WARN') return 'Warnung – die Anordnung ist möglich, braucht aber eine protokollierte Freigabe.';
+    return 'Hinweis – kein Mangel, nur eine Feststellung.';
+  }
+
+  /* ---- Erläuterung zu Befundarten und Ergebnisstatus ---- */
+  function zeigeHilfeStatus() {
+    var e = HILFE_GRADE;
+    if (!e) return;
+    oeffneHilfe({
+      titel: e.titel,
+      recht: e.recht,
+      lead: e.bedeutung,
+      abschnitte: [
+        { titel: 'Befundarten', art: 'definitionen', inhalt: e.arten },
+        { titel: 'Ergebnisstatus', art: 'definitionen', inhalt: e.status },
+        { titel: 'Praxishinweis', art: 'praxis', inhalt: e.praxis }
+      ]
+    });
+  }
+
+  /** Infoknopf für Schritte, Befunde und Statuszeile (verhindert das Zuklappen). */
+  function baueInfoKnopfFuer(beschriftung, aktion) {
+    var b = el('button', {
+      type: 'button', class: 'info-btn',
+      'aria-label': beschriftung, title: 'Erläuterung anzeigen', text: 'i'
+    });
+    b.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      aktion();
+    });
+    return b;
   }
 
   /* ------------------------------------------------------------------
@@ -519,6 +618,9 @@
         el('span', { class: 'code', text: b.code }),
         el('span', { class: 'badge ' + b.severity.toLowerCase(), text: b.severity }),
         el('span', { class: 'titel', text: b.titel }),
+        baueInfoKnopfFuer('Erläuterung zum Befund ' + b.code + ' anzeigen', function () {
+          zeigeHilfeBefund(b.code);
+        }),
         b.rechtsgrundlage ? el('span', { class: 'legal', text: b.rechtsgrundlage }) : null
       ]),
       b.text ? el('p', { class: 'text', text: b.text }) : null,
@@ -530,6 +632,9 @@
     var kopf = el('div', { class: 'step-head' }, [
       el('span', { class: 'nr', text: String(s.nr) }),
       el('span', { class: 'titel', text: s.titel }),
+      baueInfoKnopfFuer('Erläuterung zu Schritt ' + s.nr + ' anzeigen', function () {
+        zeigeHilfeSchritt(s.nr);
+      }),
       s.rechtsgrundlage ? el('span', { class: 'legal', text: s.rechtsgrundlage }) : null,
       el('span', { class: 'spacer', style: 'flex:1 1 auto;' }),
       s.befunde.length ? el('span', {
@@ -588,6 +693,7 @@
       c.appendChild(el('div', { class: 'status-line' }, [
         el('span', { class: 'badge ' + st.badge, text: st.text }),
         el('span', { style: 'font-size:.8rem;color:var(--text-muted);', text: 'Status: ' + r.status }),
+        baueInfoKnopfFuer('Erläuterung zu Befundarten und Ergebnisstatus anzeigen', zeigeHilfeStatus),
         el('span', { style: 'flex:1 1 auto;' }),
         el('span', {
           class: 'badge neutral',
@@ -669,7 +775,10 @@
     /* Befundübersicht */
     if (alleSichtbar && r.befunde.length) {
       var ueb = el('div', { class: 'body', style: 'border-top:1px solid var(--border);' }, [
-        el('h3', { style: 'margin:0 0 .5rem;font-size:.88rem;', text: 'Alle Befunde im Überblick' })
+        el('div', { style: 'display:flex;align-items:center;gap:.4rem;margin:0 0 .5rem;' }, [
+          el('h3', { style: 'margin:0;font-size:.88rem;', text: 'Alle Befunde im Überblick' }),
+          baueInfoKnopfFuer('Erläuterung zu Befundarten und Ergebnisstatus anzeigen', zeigeHilfeStatus)
+        ])
       ]);
       ['ERROR', 'WARN', 'INFO'].forEach(function (sev) {
         r.befunde.filter(function (b) { return b.severity === sev; })

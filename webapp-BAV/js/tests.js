@@ -287,6 +287,66 @@
     });
   });
 
+  test('Jeder Befund des Katalogs hat Ursachen und Handlungsschritte', function () {
+    var B = hilfeModul.BEFUNDE || {};
+    Object.keys(E.KATALOG).forEach(function (code) {
+      var e = B[code];
+      if (!e) throw new Error('Befund ' + code + ' ist nicht dokumentiert');
+      if (!e.ursachen || !e.ursachen.length) throw new Error(code + ': keine Ursachen hinterlegt');
+      if (!e.massnahmen || !e.massnahmen.length) throw new Error(code + ': keine Handlungsschritte hinterlegt');
+    });
+    Object.keys(B).forEach(function (code) {
+      if (!E.KATALOG[code]) throw new Error('Dokumentierter Befund ' + code + ' existiert im Katalog nicht');
+    });
+    gleich(Object.keys(B).length, Object.keys(E.KATALOG).length, 'Anzahl dokumentierter Befunde');
+  });
+
+  test('Alle acht Prüfschritte sind erläutert', function () {
+    var S = hilfeModul.SCHRITTE || {};
+    for (var nr = 1; nr <= 8; nr++) {
+      var e = S[nr];
+      if (!e) throw new Error('Schritt ' + nr + ' ist nicht erläutert');
+      ['titel', 'recht', 'zweck', 'praxis'].forEach(function (feld) {
+        if (!e[feld]) throw new Error('Schritt ' + nr + ': ' + feld + ' fehlt');
+      });
+      if (!e.prueft || !e.prueft.length) throw new Error('Schritt ' + nr + ': keine Prüfungen genannt');
+      if (!e.ergebnis || !e.ergebnis.length) throw new Error('Schritt ' + nr + ': kein Ausgang beschrieben');
+    }
+    gleich(Object.keys(S).length, 8, 'Anzahl erläuterter Schritte');
+  });
+
+  test('Die Schritte nennen genau die Befunde, die sie erzeugen können', function () {
+    var S = hilfeModul.SCHRITTE || {};
+    var genannt = [];
+    Object.keys(S).forEach(function (nr) {
+      (S[nr].befunde || []).forEach(function (code) {
+        if (!E.KATALOG[code]) throw new Error('Schritt ' + nr + ' nennt unbekannten Befund ' + code);
+        if (genannt.indexOf(code) >= 0) throw new Error('Befund ' + code + ' ist mehreren Schritten zugeordnet');
+        genannt.push(code);
+      });
+    });
+    Object.keys(E.KATALOG).forEach(function (code) {
+      if (genannt.indexOf(code) < 0) throw new Error('Befund ' + code + ' ist keinem Schritt zugeordnet');
+    });
+  });
+
+  test('Befundarten und Ergebnisstatus sind vollständig erläutert', function () {
+    var G = hilfeModul.SCHWEREGRADE;
+    if (!G) throw new Error('Erläuterung zu Befundarten fehlt');
+    gleich(G.arten.length, 3, 'Anzahl Befundarten');
+    ['ERROR', 'WARN', 'INFO'].forEach(function (sev) {
+      if (!G.arten.some(function (a) { return a.name.indexOf(sev) === 0; })) {
+        throw new Error('Befundart ' + sev + ' ist nicht erläutert');
+      }
+    });
+    ['OK', 'FREIGABE_ERFORDERLICH', 'ABBRUCH', 'BAGATELL_VORSCHLAG',
+     'SCHULDRECHTLICH_VORBEHALTEN', 'NICHT_VA_SONDERN_ZUGEWINN'].forEach(function (st) {
+      if (!G.status.some(function (a) { return a.name === st; })) {
+        throw new Error('Status ' + st + ' ist nicht erläutert');
+      }
+    });
+  });
+
   /* ---------------- Ausführung ---------------- */
   function run() {
     return tests.map(function (t) {

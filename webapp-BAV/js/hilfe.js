@@ -630,6 +630,465 @@
     }
   };
 
+  /* ====================================================================
+     Befunde: typische Ursachen und konkrete Handlungsschritte.
+     Titel, Rechtsgrundlage und die fachliche Erläuterung stehen im
+     Katalog der Engine; hier steht, was zu tun ist.
+     ==================================================================== */
+  var BEFUNDE = {
+    /* ---- Schritt 1: Grunddaten ---- */
+    GD01: { ursachen: ['Die Auskunft enthält die gesetzlichen Pflichtangaben nicht vollständig.',
+                       'Angaben liegen vor, sind aber noch nicht in das Formular übertragen.',
+                       'Der Träger verwendet ein eigenes Formular ohne die Angaben nach § 5 VersAusglG.'],
+            massnahmen: ['Die fehlenden Werte in der Auskunft suchen und nachtragen.',
+                         'Ergänzende Auskunft nach § 4 Abs. 1 VersAusglG anfordern.',
+                         'Bei Weigerung des Trägers Auskunftsanordnung des Gerichts erwirken.'] },
+    GD02: { ursachen: ['Der Träger legt ein anderes Zustellungsdatum des Scheidungsantrags zugrunde.',
+                       'Anfangs- oder Endmonat wurde nicht mitgezählt.',
+                       'Der Träger rechnet in vollen Kalendermonaten statt nach § 3 Abs. 1 VersAusglG.'],
+            massnahmen: ['Zustellungsdatum aus der Akte prüfen.',
+                         'Ehezeit neu abgrenzen: erster Tag des Heiratsmonats bis letzter Tag des Monats vor Zustellung, beide Monate zählen mit.',
+                         'Liegt der Fehler beim Träger, korrigierte Auskunft anfordern.'] },
+    GD03: { ursachen: ['Die Auskunft stammt aus einem früheren Verfahren oder einer Vorabanfrage.',
+                       'Der Träger hat auf einen anderen Stichtag gerechnet.'],
+            massnahmen: ['Auskunft zum Stichtag Ehezeitende neu anfordern.',
+                         'Die vorliegende Auskunft nicht als Berechnungsgrundlage verwenden.'] },
+    GD04: { ursachen: ['Langes Verfahren, die Auskunft wurde früh eingeholt.'],
+            massnahmen: ['Prüfen, ob rückwirkende Änderungen eingetreten sind – eingetretene Unverfallbarkeit, korrigierte Zusage, Nachverrechnung (§ 5 Abs. 2 S. 2 VersAusglG).',
+                         'Bei Zweifeln aktualisierte Auskunft anfordern.'],
+            vertiefung: 'Der Bewertungsstichtag bleibt das Ehezeitende. Das Alter der Auskunft macht sie nicht falsch – es erhöht nur die Wahrscheinlichkeit, dass zwischenzeitlich etwas passiert ist, das zurückwirkt.' },
+    GD05: { ursachen: ['Die Zusage bestand zum Ehezeitende noch nicht lange genug.',
+                       'Das nach § 1b BetrAVG erforderliche Lebensalter war noch nicht erreicht.'],
+            massnahmen: ['Das Anrecht im Beschluss dem schuldrechtlichen Ausgleich vorbehalten (§ 19 Abs. 4 VersAusglG).',
+                         'Prüfen, ob die Unverfallbarkeit zwischenzeitlich eingetreten ist – dann gilt Befund GD06.'] },
+    GD06: { ursachen: ['Das Verfahren dauert an, die Frist des § 1b BetrAVG ist inzwischen erfüllt.'],
+            massnahmen: ['Aktualisierte Auskunft anfordern.',
+                         'Das Anrecht wird dann doch im Wertausgleich bei der Scheidung geteilt.'],
+            vertiefung: 'Der nachträgliche Eintritt der Unverfallbarkeit ist eine auf den Ehezeitanteil zurückwirkende Veränderung im Sinne des § 5 Abs. 2 S. 2 VersAusglG und deshalb zu berücksichtigen.' },
+    GD07: { ursachen: ['Es handelt sich um eine beitragsorientierte Zusage – dann ist die unmittelbare Bewertung zulässig, die Zusageart ist aber im Formular nicht so erfasst.',
+                       'Der Träger hat vom Wahlrecht des § 45 Abs. 1 VersAusglG Gebrauch gemacht.',
+                       'Durchführungsweg oder Bewertungsmethode wurden falsch erfasst.'],
+            massnahmen: ['Zusageart in den Stammdaten prüfen und gegebenenfalls korrigieren.',
+                         'Begründung des Trägers für die gewählte Methode einholen.'] },
+    GD08: { ursachen: ['Die Auskunft nennt nur die Monatsrente.',
+                       'Der Übertragungswert ist an anderer Stelle der Auskunft ausgewiesen.'],
+            massnahmen: ['Deckungskapital beziehungsweise Übertragungswert zum Ehezeitende nachfordern.',
+                         'Ohne diesen Wert lässt sich der Kapitalwert nicht gegenprüfen.'] },
+
+    /* ---- Schritt 2: Ehezeitanteil ---- */
+    EA01: { ursachen: ['Vorzeichenfehler bei der Erfassung.',
+                       'Der Träger hat eine Verrechnung oder Rückforderung ausgewiesen.'],
+            massnahmen: ['Wert gegen die Auskunft prüfen.',
+                         'Bei tatsächlich negativem Wert Rückfrage beim Träger – ein negativer Ehezeitanteil ist fachlich ausgeschlossen.'] },
+    EA02: { ursachen: ['Das Dienstverhältnis begann erst nach dem Ehezeitende.',
+                       'Der Vertrag war während der gesamten Ehezeit beitragsfrei gestellt.',
+                       'Das Anrecht ruht.'],
+            massnahmen: ['Gegen Diensteintritt beziehungsweise Vertragsbeginn plausibilisieren.',
+                         'Bestätigt sich die Null, findet für dieses Anrecht kein Ausgleich statt.'] },
+    EA03: { ursachen: ['Die Auskunft nennt nur den Ehezeitanteil ohne Herleitung.',
+                       'Die Angaben liegen vor, sind aber in Abschnitt 5 nicht erfasst.'],
+            massnahmen: ['Gesamtanrecht, Diensteintritt und feste Altersgrenze nachfordern.',
+                         'Ohne diese drei Werte ist die Auskunft nicht nachrechenbar und damit nicht prüfbar.'] },
+    EA04: { ursachen: ['Sonderregelungen der Zusage: Festbeträge, Bausteine, anrechnungsfreie Zeiten, Dynamisierung.',
+                       'Der Träger legt eine andere Altersgrenze zugrunde als erfasst.',
+                       'Vordienstzeiten wurden angerechnet.',
+                       'Diensteintritt oder feste Altersgrenze wurden falsch erfasst.'],
+            massnahmen: ['Beide Datumsangaben gegen die Auskunft prüfen.',
+                         'Vollständige Herleitung des Ehezeitanteils beim Träger anfordern.',
+                         'Bei Bausteinsystemen die Abweichung würdigen – dort ist die zeitratierliche Nachrechnung ohnehin nur eine Näherung.'] },
+    EA05: { ursachen: ['Erfassungsfehler.',
+                       'Verwechslung von Diensteintritt und Datum der Versorgungszusage.'],
+            massnahmen: ['Diensteintritt korrigieren.',
+                         'Liegt er tatsächlich nach dem Ehezeitende, muss der Ehezeitanteil null sein – dann ist die Auskunft zu beanstanden.'] },
+    EA06: { ursachen: ['Die beiden Felder wurden vertauscht.',
+                       'Die Werte stehen in unterschiedlichen Einheiten – Monatsrente gegen Kapitalwert.'],
+            massnahmen: ['Ehezeitanteil und Gesamtanrecht gegen die Auskunft prüfen.',
+                         'Einheit in den Stammdaten kontrollieren.'] },
+    EA07: { ursachen: ['Der Träger zieht Zeiten ab, die er nicht für anrechnungsfähig hält.',
+                       'Es gilt eine andere Altersgrenze als erfasst.'],
+            massnahmen: ['Herleitung des Ehezeitanteils anfordern.',
+                         'Feste Altersgrenze der Zusage prüfen.'] },
+    EA08: { ursachen: ['Beitragsfreistellung während der Ehezeit.',
+                       'Entnahme, Beleihung oder Abtretung des Vertrags.',
+                       'Verrechnung von Abschluss- und Verwaltungskosten.',
+                       'Kursverluste – vor allem beim Pensionsfonds.'],
+            massnahmen: ['Ursache beim Träger klären.',
+                         'Bei einseitiger Verfügung des Inhabers zulasten des anderen Ehegatten § 27 VersAusglG prüfen.',
+                         'Marktbedingte Kursverluste sind hinzunehmen.'] },
+    EA09: { ursachen: ['Überschussanteile, die nicht im Ehezeitanteil enthalten sind.',
+                       'Abschluss- und Verwaltungskosten, Zillmerung.',
+                       'Die Deckungskapitalien beziehen sich auf andere Stichtage als die Ehezeit.'],
+            massnahmen: ['Aufschlüsselung des Ehezeitanteils anfordern.',
+                         'Stichtage der beiden Kapitalwerte prüfen.'],
+            vertiefung: 'Kleine Abweichungen sind bei versicherungsförmiger bAV normal. Große Abweichungen deuten darauf hin, dass der Träger nicht den Zuwachs, sondern etwa den Endstand als Ehezeitanteil ausweist.' },
+    EA10: { ursachen: ['Der Vertrag hat innerhalb der Ehezeit begonnen.'],
+            massnahmen: ['Prüfen, ob der Ehezeitanteil dem gesamten Anrecht entspricht.',
+                         'Weicht er ab, Herleitung anfordern.'] },
+
+    /* ---- Schritt 3: Kapitalwert ---- */
+    KW01: { ursachen: ['Die Angabe fehlt in der Auskunft.', 'Erfassungsfehler.'],
+            massnahmen: ['Korrespondierenden Kapitalwert nachfordern – § 5 Abs. 3 VersAusglG verpflichtet den Träger ausdrücklich dazu.',
+                         'Ohne ihn sind Bagatellgrenze, externe Teilung und Kostenquote nicht prüfbar.'] },
+    KW02: { ursachen: ['Kapitalwert und Ehezeitanteil beziehen sich auf verschiedene Stichtage.',
+                       'Der Kapitalwert enthält Überschussanteile, der Ehezeitanteil nicht.',
+                       'Erfassungsfehler in einem der beiden Felder.'],
+            massnahmen: ['Beide Werte gegen die Auskunft prüfen.',
+                         'Herleitung anfordern, wenn die Abweichung bestehen bleibt.'] },
+    KW03: { ursachen: ['Unüblicher Rechnungszins.',
+                       'Der Inhaber ist zum Ehezeitende noch weit vom Leistungsbeginn entfernt – dann ist der Faktor klein.',
+                       'Falsche Einheit erfasst: ein Kapitalbetrag steht im Feld Monatsrente oder umgekehrt.',
+                       'Es handelt sich um eine bereits laufende Rente.'],
+            massnahmen: ['Einheit und Zahlenwerte prüfen – das ist die häufigste Ursache.',
+                         'Rechnungsgrundlagen beim Träger anfordern.',
+                         'Passt die Spanne für den Fall nicht, lässt sie sich in Abschnitt 8 anpassen.'] },
+    KW04: { ursachen: ['Die Sterbetafel des Trägers weicht von der vereinfachten Näherung ab – Generationentafeln liefern deutlich höhere Barwerte.',
+                       'Eine Hinterbliebenenversorgung ist mitbewertet.',
+                       'Der Leistungsbeginn weicht von der erfassten Altersgrenze ab.'],
+            massnahmen: ['Den Befund allein nie als Beanstandung verwenden.',
+                         'Ernst nehmen, wenn zugleich KW03 oder KW05 anschlagen.',
+                         'Dann Rechnungsgrundlagen anfordern: Sterbetafel, Zins, Leistungsbeginn.'] },
+    KW05: { ursachen: ['Steuerlicher Zins von 6 % statt eines Marktzinses.',
+                       'Zins null bei einer reinen Kapitalzusage.',
+                       'Erfassungsfehler: 0,0175 statt 1,75.'],
+            massnahmen: ['Eingabeformat prüfen – der Zins wird in Prozent erfasst, nicht als Dezimalzahl.',
+                         'Herleitung des Zinssatzes beim Träger anfordern.'] },
+    KW06: { ursachen: ['Der Träger verwendet einen handels- oder steuerrechtlich geprägten Zins.'],
+            massnahmen: ['Auswirkung auf den Kapitalwert quantifizieren.',
+                         'Bei externer Teilung zwingend den Transferverlust prüfen.',
+                         'Prüfen, ob der Zins das Anrecht künstlich unter einen Grenzwert drückt.'],
+            vertiefung: 'Der Effekt ist doppelt: Ein hoher Zins senkt den Kapitalwert, wodurch das Anrecht eher unter die Grenze des § 17 fällt und die einseitige externe Teilung möglich wird – und zugleich wächst der Transferverlust für den Berechtigten.' },
+
+    /* ---- Schritt 4: Halbteilung ---- */
+    HT01: { ursachen: ['Der Träger zieht die Teilungskosten vor der Halbteilung vom Ehezeitanteil ab.'],
+            massnahmen: ['Kein Handlungsbedarf zur Rechnung – die Anwendung vermeidet den doppelten Abzug.',
+                         'Die Angemessenheit der Kosten wird in Schritt 7 trotzdem geprüft.'] },
+    HT02: { ursachen: ['Der Träger rechnet die Eurokosten über den Kapitalwert um und zieht sie dort ab.'],
+            massnahmen: ['Kein Handlungsbedarf zur Rechnung.',
+                         'Der Rechenweg des Trägers sollte in der Auskunft dokumentiert sein.'] },
+    HT03: { ursachen: ['Ausgleichswert und Ehezeitanteil passen rechnerisch nicht zusammen.',
+                       'Die Kosten wurden auf Kapitalebene abgezogen, das Feld „Ausgleichswert als Kapital" ist aber leer.',
+                       'Erfassungsfehler in einem der Felder.'],
+            massnahmen: ['Prüfen, ob die Auskunft einen Kapitalbetrag für den Ausgleichswert nennt, und ihn erfassen – das löst den Befund häufig auf.',
+                         'Ehezeitanteil, Ausgleichswert und Teilungskosten gegen die Auskunft prüfen.',
+                         'Bleibt der Wert unerklärt, die Auskunft beanstanden: Der Halbteilungsgrundsatz verlangt Nachvollziehbarkeit.'] },
+
+    /* ---- Schritt 5: Bagatelle ---- */
+    BG01: { ursachen: ['Der Ausgleichswert liegt unter der Grenze des § 18 Abs. 3 VersAusglG.'],
+            massnahmen: ['Ermessensentscheidung treffen – § 18 Abs. 2 ist eine Soll-Vorschrift, kein Automatismus.',
+                         'Beteiligte anhören.',
+                         'Zusätzlich § 18 Abs. 1 prüfen: mehrere Anrechte gleicher Art mit geringer Wertdifferenz.'],
+            vertiefung: 'Gegen den Ausschluss kann sprechen, dass der Berechtigte auf jedes Anrecht angewiesen ist oder dass sich mehrere kleine Anrechte summieren. Die Anwendung betrachtet jedes Anrecht einzeln und kann diese Gesamtschau nicht leisten.' },
+
+    /* ---- Schritt 6: Teilungsart ---- */
+    TA01: { ursachen: ['Der Grenzwert des § 14 beziehungsweise § 17 VersAusglG ist überschritten.',
+                       'Die Zustimmung des Berechtigten liegt nicht vor.'],
+            massnahmen: ['Interne Teilung anordnen – sie ist der gesetzliche Regelfall.',
+                         'Alternativ Zustimmung des Berechtigten einholen (§ 14 Abs. 2 Nr. 1 VersAusglG).',
+                         'Den Träger auf die fehlende Rechtsgrundlage hinweisen.'] },
+    TA02: { ursachen: ['Der Berechtigte hat keine Zielversorgung gewählt.'],
+            massnahmen: ['Berechtigten zur Wahl auffordern (§ 15 Abs. 1 VersAusglG).',
+                         'Ohne Wahl die Auffangversorgung im Tenor benennen: Versorgungsausgleichskasse bei Direktzusage und Unterstützungskasse, sonst gesetzliche Rentenversicherung.'] },
+    TA03: { ursachen: ['Die Auskunft nennt nur den externen Ausgleichswert.',
+                       'Der Rentenfaktor der Zielversorgung ist nicht bekannt.'],
+            massnahmen: ['Beim abgebenden Träger anfordern, welche Leistung der Berechtigte bei interner Teilung erhielte.',
+                         'Bei der Zielversorgung die erwartete Leistung aus dem Ausgleichskapital erfragen.'] },
+    TA04: { ursachen: ['Hoher Rechnungszins beim abgebenden Träger senkt das übertragene Kapital.',
+                       'Niedriger Rentenfaktor oder hohe Kosten der Zielversorgung.',
+                       'Zinsniveau zum Stichtag.'],
+            massnahmen: ['Ausgleichsbetrag erhöhen – das BVerfG verlangt eine verfassungskonforme Handhabung des § 17 VersAusglG.',
+                         'Oder intern teilen.',
+                         'Oder mit dem Berechtigten eine günstigere Zielversorgung suchen.'],
+            vertiefung: 'BVerfG, Beschluss vom 26.05.2020 – 1 BvL 5/18: Die externe Teilung nach § 17 VersAusglG ist nur verfassungsgemäß, wenn die Gerichte sicherstellen, dass der Berechtigte keine unzumutbaren Transferverluste erleidet. Als Orientierung dient eine Grenze von rund 10 %.' },
+    TA05: { ursachen: ['Das Anrecht befindet sich bereits im Leistungsbezug.'],
+            massnahmen: ['Prüfen, ob die Zielversorgung eine sofort beginnende Leistung darstellen kann.',
+                         'Andernfalls interne Teilung vorziehen.'] },
+    TA06: { ursachen: ['Der Arbeitgeber hat keine Teilungsordnung.',
+                       'Sie wurde mit der Auskunft nicht übersandt.'],
+            massnahmen: ['Teilungsordnung anfordern.',
+                         'Gleichwertigkeit nach § 11 VersAusglG prüfen: eigenständiges Anrecht, vergleichbare Wertentwicklung, grundsätzlich gleicher Risikoschutz.',
+                         'Ohne Regelung kann die interne Teilung nicht vollzogen werden.'],
+            vertiefung: 'Häufige Streitpunkte sind der Ausschluss der Hinterbliebenenversorgung für den Berechtigten und abweichende Rechnungsgrundlagen für das neu begründete Anrecht.' },
+
+    /* ---- Schritt 7: Teilungskosten ---- */
+    TK01: { ursachen: ['Erfassungsfehler.'],
+            massnahmen: ['Wert gegen die Auskunft prüfen und korrigieren.'] },
+    TK02: { ursachen: ['Der Träger macht keine Kosten geltend.'],
+            massnahmen: ['Kein Handlungsbedarf. Der volle halbe Ehezeitanteil wird übertragen.'] },
+    TK03: { ursachen: ['Mindestpauschale des Trägers bei einem kleinen Anrecht.',
+                       'Der Träger setzt tatsächlich entstandene Kosten an.'],
+            massnahmen: ['Herleitung der Kosten anfordern.',
+                         'Angemessenheit nach § 13 VersAusglG würdigen – das Gericht kann den Abzug auf das angemessene Maß begrenzen.',
+                         'Die Obergrenze in Abschnitt 8 an die eigene Rechtsprechungslinie anpassen.'] },
+    TK04: { ursachen: ['Der Träger setzt einen hohen Festbetrag an.'],
+            massnahmen: ['Herleitung anfordern und Angemessenheit prüfen.',
+                         'Absolute Obergrenze in Abschnitt 8 an die eigene Rechtsprechungslinie anpassen.'] },
+    TK05: { ursachen: ['Mindestpauschale, die bei einem kleinen Anrecht die Quote zwangsläufig überschreitet.'],
+            massnahmen: ['Grundsätzlich zulässig, aber zu würdigen.',
+                         'Prüfen, ob nicht ohnehin die Bagatellgrenze des § 18 Abs. 2 VersAusglG greift.'] },
+    TK06: { ursachen: ['Der Träger nennt Kosten, es wird aber extern geteilt.'],
+            massnahmen: ['Kein Handlungsbedarf – § 13 VersAusglG gilt nur für die interne Teilung.',
+                         'Im Tenor keinen Kostenabzug ausweisen.'] },
+    TK07: { ursachen: ['Der Träger hat die Kosten bereits vor der Halbteilung abgezogen.'],
+            massnahmen: ['Kein Handlungsbedarf.'],
+            vertiefung: 'Schritt 8 rechnet vom ungekürzten halben Ehezeitanteil. Damit der Kostenabzug weder verloren geht noch doppelt wirkt, wird der hälftige Kostenanteil hier genau einmal berücksichtigt. Das Ergebnis entspricht dem kostenbereinigten Ausgleichswert der Auskunft.' },
+
+    /* ---- Schritt 8: Ergebnis ---- */
+    ER01: { ursachen: ['Die Teilungskosten übersteigen den halben Ehezeitanteil.',
+                       'Sehr kleines Anrecht mit Mindestpauschale.'],
+            massnahmen: ['Kostenansatz prüfen und auf das angemessene Maß kürzen.',
+                         'Ausschluss wegen Geringfügigkeit nach § 18 Abs. 2 VersAusglG erwägen.'] },
+    ER02: { ursachen: ['Rechnerische Inkonsistenz in den Eingaben.'],
+            massnahmen: ['Ehezeitanteil, Ausgleichswert und Teilungskosten gegen die Auskunft prüfen.'] },
+    ER03: { ursachen: ['Das Anrecht befindet sich im Leistungsbezug.'],
+            massnahmen: ['Kürzungszeitpunkt im Tenor beachten: Die Kürzung wirkt ab Rechtskraft.',
+                         'Leistungsschutz nach § 30 VersAusglG prüfen – bis zur Rechtskraft an den Verpflichteten erbrachte Leistungen sind geschützt.'] },
+    ER04: { ursachen: ['Die kapitalbezogene Mindestleistung ist als Monatsrente dargestellt.'],
+            massnahmen: ['Darstellung der Teilung auf Kapitalbasis beim Träger anfordern.',
+                         'Sicherstellen, dass die Mindestleistung auch beim Berechtigten abgebildet wird.'] },
+    ER05: { ursachen: ['Zusammenfassung des Ergebnisses – kein Mangel.'],
+            massnahmen: ['Tenor formulieren: Anrecht, Träger, Ausgleichswert, Teilungsart, Stichtag Ehezeitende.',
+                         'Bei interner Teilung auf die Teilungsordnung Bezug nehmen.'] }
+  };
+
+  /* ====================================================================
+     Die acht Prüfschritte
+     ==================================================================== */
+  var SCHRITTE = {
+    1: {
+      titel: 'Grunddaten und Ausgleichsreife',
+      recht: '§§ 5, 19 VersAusglG, § 1b BetrAVG',
+      zweck: 'Der Torwächter der ganzen Prüfung. Bevor irgendetwas gerechnet wird, muss ' +
+        'feststehen, dass die Auskunft vollständig ist, dieselbe Ehezeit zugrunde liegt und das ' +
+        'Anrecht überhaupt jetzt geteilt werden darf.',
+      prueft: [
+        'Sind alle Pflichtangaben der Auskunft vorhanden?',
+        'Rechnet der Träger mit derselben Ehezeit wie das Verfahren?',
+        'Ist die Auskunft nach dem Ehezeitende erstellt und noch aktuell?',
+        'Ist die Anwartschaft unverfallbar und damit ausgleichsreif?',
+        'Passt die Bewertungsmethode zum Durchführungsweg?'
+      ],
+      ergebnis: [
+        'Verfallbare Anwartschaft: sofortiger Abbruch mit Status SCHULDRECHTLICH_VORBEHALTEN.',
+        'Ausgeübtes Kapitalwahlrecht: sofortiger Abbruch mit Status NICHT_VA_SONDERN_ZUGEWINN.',
+        'Fehlerbefund: Abbruch – ohne belastbare Grunddaten wird nicht gerechnet.',
+        'Sonst: die Prüfung läuft weiter zu Schritt 2.'
+      ],
+      befunde: ['GD01', 'GD02', 'GD03', 'GD04', 'GD05', 'GD06', 'GD07', 'GD08'],
+      praxis: 'Dieser Schritt ist der einzige, der bei einem Fehler sofort abbricht. Das ist ' +
+        'Absicht: Eine falsch abgegrenzte Ehezeit oder eine unvollständige Auskunft macht jede ' +
+        'weitere Zahl wertlos. Alle späteren Schritte sammeln dagegen weiter, damit man in einem ' +
+        'Durchgang das vollständige Bild der Beanstandungen bekommt.'
+    },
+    2: {
+      titel: 'Ehezeitanteil prüfen und nachrechnen',
+      recht: '§ 45 VersAusglG, § 2 Abs. 1 BetrAVG',
+      zweck: 'Der Ehezeitanteil ist die Basis von allem. Hier wird er nicht übernommen, sondern ' +
+        'mit der Methode nachgerechnet, die der Träger selbst gewählt hat.',
+      prueft: [
+        'Zeitratierlich: Gesamtanrecht × m / n – stimmt der ausgewiesene Wert mit der ' +
+          'Nachrechnung überein?',
+        'Zeitratierlich: Liegt der Diensteintritt vor dem Ehezeitende, ist der Ehezeitanteil ' +
+          'kleiner als das Gesamtanrecht, deckt die Ehezeit die ganze Dienstzeit ab?',
+        'Unmittelbar: Entspricht der Ehezeitanteil dem Zuwachs des Deckungskapitals?',
+        'Unmittelbar: Ist das Deckungskapital in der Ehezeit gesunken?'
+      ],
+      ergebnis: [
+        'Die Prüfung läuft in jedem Fall weiter – auch Fehlerbefunde führen erst in Schritt 8 ' +
+          'zum Abbruch.',
+        'Der Ehezeitanteil des Trägers bleibt maßgeblich; die Nachrechnung ist Kontrolle, nicht ' +
+          'Ersatz.'
+      ],
+      befunde: ['EA01', 'EA02', 'EA03', 'EA04', 'EA05', 'EA06', 'EA07', 'EA08', 'EA09', 'EA10'],
+      praxis: 'Die Toleranz liegt bei 0,5 %. Kleine Abweichungen sind Rundung, größere haben ' +
+        'immer eine Ursache – Sonderregelungen der Zusage, abweichende Altersgrenze, angerechnete ' +
+        'Vordienstzeiten. Die App kann die Ursache nicht kennen; sie zeigt nur, dass es eine gibt.'
+    },
+    3: {
+      titel: 'Kapitalwert und Rechnungszins',
+      recht: '§ 47 VersAusglG, § 4 Abs. 5 BetrAVG',
+      zweck: 'Der korrespondierende Kapitalwert entscheidet über Bagatellgrenze, externe Teilung ' +
+        'und Transferverlust. Er ist damit der wirkungsvollste Hebel im Verfahren – und wird hier ' +
+        'auf innere Stimmigkeit geprüft.',
+      prueft: [
+        'Kapitalanrechte: Stimmen Ehezeitanteil und Kapitalwert überein?',
+        'Rentenanrechte: Liegt der Barwertfaktor in der plausiblen Spanne von 8 bis 25 Jahresrenten?',
+        'Rentenanrechte: Wie weit weicht der Kapitalwert von einer eigenen Näherungsrechnung ab?',
+        'Liegt der Rechnungszins in der üblichen Spanne, bei Direktzusage und Unterstützungskasse ' +
+          'zusätzlich unter der gesonderten Grenze?'
+      ],
+      ergebnis: [
+        'Alle Befunde dieses Schritts sind Warnungen oder Hinweise – bis auf KW01, wenn der ' +
+          'Kapitalwert ganz fehlt.'
+      ],
+      befunde: ['KW01', 'KW02', 'KW03', 'KW04', 'KW05', 'KW06'],
+      praxis: 'Die Näherungsrechnung (KW04) arbeitet mit einer vereinfachten Sterblichkeit und ' +
+        'ersetzt keine Sterbetafel. Sie ist bewusst mit 15 % Toleranz ausgestattet und nie ein ' +
+        'Fehler. Ernst wird es, wenn KW03, KW04 und KW05 gemeinsam anschlagen – dann stimmt an ' +
+        'den Rechnungsgrundlagen etwas nicht.'
+    },
+    4: {
+      titel: 'Halbteilung',
+      recht: '§ 1 Abs. 1 VersAusglG',
+      zweck: 'Der Halbteilungsgrundsatz ist der Kern des Versorgungsausgleichs. Der Ausgleichswert ' +
+        'muss die Hälfte des Ehezeitanteils sein – hier wird geprüft, ob der Wert des Trägers das ' +
+        'hergibt und ob er die Teilungskosten bereits enthält.',
+      prueft: [
+        'Entspricht der Ausgleichswert genau dem halben Ehezeitanteil?',
+        'Falls nicht: Passt er zu (Ehezeitanteil − Teilungskosten) / 2?',
+        'Bei Rentenanrechten: Passt der als Kapital genannte Ausgleichswert zu ' +
+          '(Kapitalwert − Kosten) / 2?'
+      ],
+      ergebnis: [
+        'Trifft eine der Kostenvarianten zu, wird das für Schritt 7 gemerkt – der Kostenanteil ' +
+          'wird dann genau einmal abgezogen, nicht zweimal.',
+        'Lässt sich der Wert gar nicht herleiten: Fehler HT03, am Ende Abbruch.'
+      ],
+      befunde: ['HT01', 'HT02', 'HT03'],
+      praxis: 'Dieser Schritt entscheidet über den häufigsten Rechenfehler der Praxis, den ' +
+        'doppelten Kostenabzug. Die Auskünfte sind uneinheitlich: Manche Träger nennen den ' +
+        'ungekürzten halben Ehezeitanteil und die Kosten getrennt, andere haben sie schon ' +
+        'verrechnet. Man sieht es dem Wert nicht an – man muss es nachrechnen.'
+    },
+    5: {
+      titel: 'Geringfügigkeit (Bagatellprüfung)',
+      recht: '§ 18 Abs. 2, 3 VersAusglG',
+      zweck: 'Kleine Anrechte sollen nicht geteilt werden, weil der Verwaltungsaufwand außer ' +
+        'Verhältnis zum Nutzen steht.',
+      prueft: [
+        'Liegt der Ausgleichswert unter 1 % der monatlichen Bezugsgröße (Rente) beziehungsweise ' +
+          '120 % (Kapital)?'
+      ],
+      ergebnis: [
+        'Bagatelle ohne vorherige Fehlerbefunde: Abbruch mit Status BAGATELL_VORSCHLAG.',
+        'Bagatelle mit Fehlerbefunden: Hinweis, aber kein Abbruch – ein Ausschluss setzt ' +
+          'belastbare Zahlen voraus.',
+        'Sonst: weiter zu Schritt 6.'
+      ],
+      befunde: ['BG01'],
+      praxis: '§ 18 Abs. 2 ist eine Soll-Vorschrift, keine zwingende. Das Gericht entscheidet ' +
+        'nach Ermessen und muss die Beteiligten anhören. Zu prüfen ist außerdem § 18 Abs. 1: ' +
+        'Mehrere Anrechte gleicher Art mit geringer Wertdifferenz können ebenfalls ausgeschlossen ' +
+        'werden – das erfasst diese Anwendung nicht, weil sie jedes Anrecht einzeln betrachtet.'
+    },
+    6: {
+      titel: 'Teilungsart bestimmen',
+      recht: '§§ 10, 14, 17 VersAusglG',
+      zweck: 'Interne oder externe Teilung? Die interne ist der gesetzliche Regelfall; die ' +
+        'externe braucht eine Rechtsgrundlage. Bei ihr kommt die verfassungsrechtliche Grenze des ' +
+        'Transferverlusts hinzu.',
+      prueft: [
+        'Schlägt der Träger intern vor, wird das übernommen.',
+        'Liegt die Zustimmung des Berechtigten vor, ist extern zulässig.',
+        'Direktzusage und Unterstützungskasse: Liegt der halbe Kapitalwert unter der ' +
+          'Beitragsbemessungsgrenze (§ 17)?',
+        'Übrige Wege: Liegt der Ausgleichswert unter 2 % beziehungsweise 240 % der Bezugsgröße ' +
+          '(§ 14 Abs. 2 Nr. 2)?',
+        'Bei externer Teilung: Zielversorgung gewählt, Transferverlust unter 10 %, kein ' +
+          'Leistungsbezug?',
+        'Bei interner Teilung einer Direktzusage: Liegt die Teilungsordnung vor?'
+      ],
+      ergebnis: [
+        'Das Ergebnis steuert Schritt 7: Bei externer Teilung entfällt der Kostenabzug vollständig.'
+      ],
+      befunde: ['TA01', 'TA02', 'TA03', 'TA04', 'TA05', 'TA06'],
+      praxis: 'Die Grenzwerte liegen weit auseinander. Bei einer Pensionskasse endet die ' +
+        'einseitige externe Teilung 2020 schon bei rund 7.600 € Kapital, bei einer Direktzusage ' +
+        'erst bei 82.800 €. Wer den Durchführungsweg falsch erfasst, bekommt hier zuverlässig die ' +
+        'falsche Teilungsart.'
+    },
+    7: {
+      titel: 'Teilungskosten',
+      recht: '§ 13 VersAusglG',
+      zweck: 'Der Träger darf die angemessenen Kosten der internen Teilung mit dem Ehezeitanteil ' +
+        'verrechnen. Beide Ehegatten tragen sie hälftig – der Abzug beim Ausgleichswert beträgt ' +
+        'also die Hälfte der Kosten.',
+      prueft: [
+        'Liegt die Kostenquote unter der Obergrenze von üblicherweise 3 %?',
+        'Bleiben die Kosten unter der absoluten Obergrenze?',
+        'Handelt es sich um eine Mindestpauschale bei einem kleinen Anrecht?',
+        'Wird bei externer Teilung fälschlich ein Kostenabzug verlangt?'
+      ],
+      ergebnis: [
+        'Externe Teilung: Abzug null.',
+        'Interne Teilung: die Hälfte der Kosten, bei Rentenanrechten zuvor über den Kapitalwert ' +
+          'in Rente umgerechnet.'
+      ],
+      befunde: ['TK01', 'TK02', 'TK03', 'TK04', 'TK05', 'TK06', 'TK07'],
+      praxis: 'Die Umrechnung bei Rentenanrechten ist der Punkt, an dem die Nachvollziehbarkeit ' +
+        'leidet: 500 € Kosten werden bei einem Kapitalwert von 62.000 € und 560 € Monatsrente zu ' +
+        '4,52 € Rente, hälftig also 2,26 €. Die Anwendung zeigt diesen Rechenweg offen an.'
+    },
+    8: {
+      titel: 'Ergebnis und Anordnung',
+      recht: '§§ 10, 14, 30 VersAusglG',
+      zweck: 'Zusammenführung: halber Ehezeitanteil abzüglich Kostenanteil ergibt den ' +
+        'Ausgleichsbetrag. Anschließend wird geprüft, ob das Ergebnis in sich schlüssig ist.',
+      prueft: [
+        'Ist der Ausgleichsbetrag größer als null?',
+        'Übersteigt er den halben Ehezeitanteil?',
+        'Steht das Anrecht bereits im Leistungsbezug?',
+        'Ist eine kapitalbezogene Mindestleistung als Rente dargestellt?'
+      ],
+      ergebnis: [
+        'Fehlerbefunde irgendwo in den Schritten 2 bis 8: Status ABBRUCH.',
+        'Nur Warnungen: Status FREIGABE_ERFORDERLICH – rechnerisch schlüssig, aber jede Warnung ' +
+          'braucht eine dokumentierte Freigabe.',
+        'Keine Warnungen: Status OK, die Anordnung kann so ergehen.'
+      ],
+      befunde: ['ER01', 'ER02', 'ER03', 'ER04', 'ER05'],
+      praxis: 'Hier laufen alle bis dahin gesammelten Befunde zusammen. Ein Fehler aus Schritt 2 ' +
+        'führt erst jetzt zum Abbruch – deshalb sieht man in der Schrittfolge auch bei Fehlern ' +
+        'noch, was Teilungsart und Kosten ergeben hätten.'
+    }
+  };
+
+  /* ====================================================================
+     Schweregrade und Ergebnisstatus
+     ==================================================================== */
+  var SCHWEREGRADE = {
+    titel: 'Befundarten und Ergebnisstatus',
+    recht: 'Aufbau der Prüfung',
+    bedeutung: 'Jede Einzelprüfung erzeugt entweder nichts oder einen Befund. Die Befundart sagt, ' +
+      'wie mit dem Ergebnis umzugehen ist; der Status am Kopf der Auswertung fasst alle Befunde ' +
+      'des Anrechts zusammen.',
+    arten: [
+      { name: 'ERROR – Fehler',
+        text: 'Die Berechnung ist nicht tragfähig. Ein Fehler in Schritt 1 bricht sofort ab, ' +
+          'Fehler in späteren Schritten führen in Schritt 8 zum Abbruch. Es ergeht keine ' +
+          'Anordnung, bevor die Ursache geklärt ist – in aller Regel durch Rückfrage beim ' +
+          'Versorgungsträger oder Korrektur der Erfassung.' },
+      { name: 'WARN – Warnung',
+        text: 'Die Rechnung geht auf, aber etwas ist erklärungsbedürftig. Die Anordnung kann ' +
+          'ergehen, jede Warnung braucht jedoch eine protokollierte Freigabe mit Begründung. ' +
+          'Warnungen sind der eigentliche Arbeitsvorrat der Sachbearbeitung.' },
+      { name: 'INFO – Hinweis',
+        text: 'Kein Mangel, sondern eine Feststellung, die man kennen sollte – etwa dass der ' +
+          'Träger keine Teilungskosten erhebt oder dass ein Kostenabzug bereits enthalten war. ' +
+          'Hinweise erfordern keine Freigabe.' }
+    ],
+    status: [
+      { name: 'OK', text: 'Keine Warnung und kein Fehler. Die Anordnung kann so ergehen.' },
+      { name: 'FREIGABE_ERFORDERLICH',
+        text: 'Rechnerisch schlüssig, aber mindestens eine Warnung. Vor der Anordnung sind alle ' +
+          'Warnungen zu würdigen und freizugeben.' },
+      { name: 'ABBRUCH',
+        text: 'Mindestens ein Fehler. Es wird kein Ausgleichsbetrag vorgeschlagen.' },
+      { name: 'BAGATELL_VORSCHLAG',
+        text: 'Der Ausgleichswert liegt unter der Geringfügigkeitsgrenze. Vorgeschlagen wird der ' +
+          'Ausschluss nach § 18 Abs. 2 VersAusglG – eine Ermessensentscheidung des Gerichts.' },
+      { name: 'SCHULDRECHTLICH_VORBEHALTEN',
+        text: 'Die Anwartschaft war zum Ehezeitende noch verfallbar und damit nicht ' +
+          'ausgleichsreif. Der Ausgleich bleibt dem Verfahren nach der Scheidung vorbehalten ' +
+          '(§ 19 Abs. 4, §§ 20 ff. VersAusglG).' },
+      { name: 'NICHT_VA_SONDERN_ZUGEWINN',
+        text: 'Das Kapitalwahlrecht wurde ausgeübt. Das Anrecht gehört nach herrschender ' +
+          'Auffassung in den Zugewinnausgleich.' }
+    ],
+    praxis: 'Für die Schulung wichtig: Die Anwendung entscheidet nichts. Sie stellt fest, rechnet ' +
+      'nach und benennt, was zu klären ist. Ob eine Warnung im konkreten Fall hinnehmbar ist, ' +
+      'bleibt eine fachliche Entscheidung, die dokumentiert werden muss.'
+  };
+
   /* Nachschlagewerk über alle dokumentierten Felder */
   var FELDER = {};
   [STAMMDATEN, TRAEGERAUSKUNFT].forEach(function (gruppe) {
@@ -640,6 +1099,9 @@
   global.BAV.hilfe = {
     STAMMDATEN: STAMMDATEN,
     TRAEGERAUSKUNFT: TRAEGERAUSKUNFT,
-    FELDER: FELDER
+    FELDER: FELDER,
+    SCHRITTE: SCHRITTE,
+    SCHWEREGRADE: SCHWEREGRADE,
+    BEFUNDE: BEFUNDE
   };
 })(typeof window !== 'undefined' ? window : this);
