@@ -1452,6 +1452,22 @@ Public Module Solver
             If useStagedHints AndAlso rehintFoundSolutions Then ApplyLessonHints(built.Model, built.Lesson, solver)
         Loop
 
+        ' Abschlussmeldung mit der WIRKLICHEN Endzahl - dieselbe Ursache wie
+        ' bei SolveKlassenbildungTop (siehe dort): das Template je Iteration
+        ' traegt SolutionsFound=solutions.Count von VOR dieser Iteration,
+        ' die letzte Meldung der Schleife bleibt also einen Schritt zurueck.
+        If progress IsNot Nothing Then
+            Try
+                progress.Report(New SolveProgress With {
+                    .Phase = SolvePhase.Iteration, .PhaseIndex = iterations,
+                    .SolutionsFound = solutions.Count, .BudgetS = totalTimeLimitS,
+                    .ElapsedS = sw.Elapsed.TotalSeconds,
+                    .Label = $"{solutions.Count} Loesung(en) gefunden"})
+            Catch
+                ' Bewusst geschluckt (Konvention SolveRunner.Report).
+            End Try
+        End If
+
         Return New MultiSolveResult With {
             .Solutions = solutions.OrderBy(Function(s) s.Quality.Total).ToList(),
             .StopReason = stopReason, .IterationsRun = iterations, .ElapsedS = sw.Elapsed.TotalSeconds,

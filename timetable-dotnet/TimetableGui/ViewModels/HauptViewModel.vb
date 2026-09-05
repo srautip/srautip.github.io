@@ -172,6 +172,17 @@ Public NotInheritable Class HauptViewModel
     ''' Antwort, sobald jemand einen aelteren Stand angesehen hat.</summary>
     Private ReadOnly _standIds As New Dictionary(Of Bereich, String)
 
+    ''' <summary>Synthetischer PropertyChanged-Name (keine echte
+    ''' Eigenschaft): feuert IMMER, wenn SeiteHinterlegen die aktuell
+    ''' sichtbare Seite neu setzt - auch wenn Bereich sich dabei NICHT
+    ''' aendert. Ohne dieses Signal blieb WebView2 nach einem zweiten
+    ''' Rechnen aus einem bereits offenen Dashboard auf dem alten Stand
+    ''' stehen: Bereichs Setter meldet nur bei echtem Wertwechsel
+    ''' (Beobachtbar.Setze), und genau der bleibt beim erneuten Rechnen
+    ''' im selben Dashboard aus - live erlebt bei der Klassenbildung
+    ''' (Statuszeile zeigte den neuen Lauf, das Board noch den alten).</summary>
+    Public Const AnzeigeAktualisiert As String = "AnzeigeAktualisiert"
+
     ''' <summary>Hinterlegt die Seite eines Bereichs samt zugehoerigem
     ''' Stand und liefert sie aus, falls dieser Bereich sichtbar ist.</summary>
     Private Sub SeiteHinterlegen(zielbereich As Bereich, html As String,
@@ -187,7 +198,10 @@ Public NotInheritable Class HauptViewModel
                 _standIds(zielbereich) = standId
             End If
         End If
-        If _bereich = zielbereich Then Auslieferung.Setze(html)
+        If _bereich = zielbereich Then
+            Auslieferung.Setze(html)
+            Melde(AnzeigeAktualisiert)
+        End If
     End Sub
 
     ''' <summary>Der Stand, den das aktuelle Dashboard zeigt - Nothing,

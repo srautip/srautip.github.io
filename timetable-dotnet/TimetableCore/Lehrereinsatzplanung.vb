@@ -794,6 +794,23 @@ Public Module Lehrereinsatzplanung
                 End If
             End If
         Next
+
+        ' Abschlussmeldung mit der WIRKLICHEN Endzahl - dieselbe Ursache wie
+        ' bei SolveKlassenbildungTop (siehe dort): das Template je Iteration
+        ' traegt SolutionsFound=results.Count von VOR dieser Iteration, die
+        ' letzte Meldung der Schleife bleibt also einen Schritt zurueck.
+        If progress IsNot Nothing Then
+            Try
+                progress.Report(New SolveProgress With {
+                    .Phase = SolvePhase.Zuteilung, .PhaseIndex = gesamt, .PhaseCount = gesamt,
+                    .SolutionsFound = results.Count, .BudgetS = timeLimitS * gesamt,
+                    .ElapsedS = sw.Elapsed.TotalSeconds,
+                    .Label = $"{results.Count} von {gesamt} Zuteilungen fertig"})
+            Catch
+                ' Bewusst geschluckt (Konvention SolveRunner.Report).
+            End Try
+        End If
+
         Return results
     End Function
 

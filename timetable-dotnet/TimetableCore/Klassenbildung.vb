@@ -487,6 +487,28 @@ Public Module Klassenbildung
             Next
         Next
 
+        ' Abschlussmeldung mit der WIRKLICHEN Endzahl. Die letzte Meldung
+        ' INNERHALB der Schleife (auch RunSolves eigene "Abschlussmeldung"
+        ' je Solve) traegt noch das Template von VOR dieser Variante -
+        ' SolutionsFound=varianten.Count wird beim Aufbau des Templates
+        ' gesetzt (oben), bevor der Solve ueberhaupt lief. Ohne diesen
+        ' zweiten, echten Abschluss bleibt die Statuszeile dauerhaft einen
+        ' Schritt hinter dem tatsaechlichen Ergebnis zurueck (live erlebt:
+        ' "8/8 Varianten - 7 Loesungen" nach einem Lauf, der alle 8 fand).
+        If progress IsNot Nothing Then
+            Try
+                progress.Report(New SolveProgress With {
+                    .Phase = SolvePhase.Variante, .PhaseIndex = gesamt, .PhaseCount = gesamt,
+                    .SolutionsFound = varianten.Count, .BudgetS = zeitlimitS * gesamt,
+                    .ElapsedS = sw.Elapsed.TotalSeconds,
+                    .Label = $"{varianten.Count} von {gesamt} Varianten fertig"
+                })
+            Catch
+                ' Bewusst geschluckt - ein Anzeigefehler darf den fertigen
+                ' Lauf nicht mehr zum Scheitern bringen (Konvention SolveRunner.Report).
+            End Try
+        End If
+
         ' Konsens-Kern: identische Klasse in ALLEN gefundenen Varianten.
         Dim konsens As New List(Of String)
         Dim geloeste = varianten.Where(Function(v) v.Zuordnung IsNot Nothing).ToList()

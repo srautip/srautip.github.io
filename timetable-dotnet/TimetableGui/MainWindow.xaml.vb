@@ -33,6 +33,13 @@ Class MainWindow
     End Sub
 
     Private Async Sub AufModellAenderung(sender As Object, e As PropertyChangedEventArgs)
+        If e.PropertyName = HauptViewModel.AnzeigeAktualisiert Then
+            ' Bereich selbst hat sich nicht geaendert (erneutes Rechnen aus
+            ' dem schon offenen Dashboard) - dort bliebe WebView2 sonst auf
+            ' dem vorigen Stand stehen, siehe HauptViewModel.AnzeigeAktualisiert.
+            If _modell.Auslieferung.SeitenGroesse > 0 Then Await _host.AnzeigenAsync()
+            Return
+        End If
         If e.PropertyName <> NameOf(HauptViewModel.Bereich) Then Return
 
         ' Stammdaten oeffnen als MODALER Dialog ueber der Flaeche - "das

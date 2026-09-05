@@ -44,6 +44,25 @@ Public Module KlassenbildungBericht
         Return zaehler
     End Function
 
+    ''' <summary>Anzeigereihenfolge nach Qualitaet (Nutzerwunsch): zuerst
+    ''' Zielwert (kleiner = besser - der Solver minimiert, Klassenbildung.
+    ''' vb Zeile 690), bei Gleichstand nach Ampel-Verteilung (weniger rote
+    ''' Kinder zuerst, dann weniger gelbe). Vorher war die Reihenfolge die
+    ''' reine Fundreihenfolge des Solvers ohne Qualitaetsaussage - "Variante
+    ''' 1" war schlicht der erste (unbeschraenkte) Solve. Liefert die
+    ''' ORIGINALEN Indizes in geloeste/bewertungen in der neuen Reihenfolge,
+    ''' damit BaueJson/BaueMarkdown beide Listen synchron durchlaufen
+    ''' koennen, ohne sie selbst umzusortieren.</summary>
+    Private Function QualitaetsRang(input As KlassenbildungInput,
+                                     geloeste As List(Of KlassenbildungResult),
+                                     bewertungen As List(Of KlassenbildungBewertung)) As List(Of Integer)
+        Return Enumerable.Range(0, geloeste.Count).
+            OrderBy(Function(i) geloeste(i).Objective).
+            ThenBy(Function(i) AmpelZaehler(input, bewertungen(i))("rot")).
+            ThenBy(Function(i) AmpelZaehler(input, bewertungen(i))("gelb")).
+            ToList()
+    End Function
+
     Public Function BaueMarkdown(schule As String, input As KlassenbildungInput, top As KlassenbildungTopResult,
                                    geloeste As List(Of KlassenbildungResult), bewertungen As List(Of KlassenbildungBewertung),
                                    zeitlimit As Double, nVarianten As Integer, epsilon As Double, minDistanz As Integer) As String
@@ -65,13 +84,16 @@ Public Module KlassenbildungBericht
               If(geloeste.Count < 2, " (nur eine Variante - Konsens ohne Aussagekraft)", " - der stabile Kern fuer eine Bulk-Fixierung") & ".")
         z.Add("")
 
-        For i = 0 To geloeste.Count - 1
+        Dim rang = QualitaetsRang(input, geloeste, bewertungen)
+        Dim erste = geloeste(rang(0))
+        For rangIndex = 0 To rang.Count - 1
+            Dim i = rang(rangIndex)
             Dim v = geloeste(i)
             Dim bewertung = bewertungen(i)
-            z.Add($"## Variante {i + 1} ({v.Status}, Zielwert {v.Objective})")
+            z.Add($"## Variante {rangIndex + 1} ({v.Status}, Zielwert {v.Objective})")
             z.Add("")
-            If i > 0 Then
-                z.Add($"Diff zu Variante 1: **{DiffZuErster(geloeste(0), v)} Kinder anders zugeordnet**.")
+            If rangIndex > 0 Then
+                z.Add($"Diff zu Variante 1: **{DiffZuErster(erste, v)} Kinder anders zugeordnet**.")
                 z.Add("")
             End If
 
@@ -117,7 +139,10 @@ Public Module KlassenbildungBericht
                                geloeste As List(Of KlassenbildungResult), bewertungen As List(Of KlassenbildungBewertung),
                                zeitlimit As Double, epsilon As Double, minDistanz As Integer) As JsonObject
         Dim variantenJson As New JsonArray()
-        For i = 0 To geloeste.Count - 1
+        Dim rang = QualitaetsRang(input, geloeste, bewertungen)
+        Dim erste = geloeste(rang(0))
+        For rangIndex = 0 To rang.Count - 1
+            Dim i = rang(rangIndex)
             Dim v = geloeste(i)
             Dim bewertung = bewertungen(i)
             Dim zuordnungJson As New JsonObject()
@@ -147,10 +172,10 @@ Public Module KlassenbildungBericht
                 {"status", c.Status}, {"text", c.Text}
             }, JsonNode)).ToArray())
             variantenJson.Add(New JsonObject From {
-                {"index", i + 1},
+                {"index", rangIndex + 1},
                 {"status", v.Status.ToString()},
                 {"objective", v.Objective},
-                {"diff_zu_v1", DiffZuErster(geloeste(0), v)},
+                {"diff_zu_v1", DiffZuErster(erste, v)},
                 {"zuordnung", zuordnungJson},
                 {"balance_kennzahlen", balanceJson},
                 {"verletzungen", verletzungenJson},
