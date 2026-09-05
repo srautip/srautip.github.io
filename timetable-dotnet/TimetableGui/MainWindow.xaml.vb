@@ -8,6 +8,7 @@ Class MainWindow
     Private ReadOnly _modell As HauptViewModel
     Private ReadOnly _host As ViewerHost
     Private ReadOnly _speicherung As Speicherstand
+    Private _fuelltStandwahl As Boolean
 
     Public Sub New()
         InitializeComponent()
@@ -16,16 +17,21 @@ Class MainWindow
         ' Progress(Of SolveProgress) faengt damit den richtigen
         ' SynchronizationContext ein und marshallt die Solver-Meldungen
         ' selbsttaetig zurueck (arc42 8.11).
-        _modell = New HauptViewModel(New WpfDialoge(Me))
+        Dim dialoge As New WpfDialoge(Me)
+        _modell = New HauptViewModel(dialoge)
         DataContext = _modell
+        ' Die Pflegemasken brauchen Modell und Speicherstand; beide gibt
+        ' es erst jetzt - deshalb nachtraeglich verdrahtet.
+        _speicherung = New Speicherstand(_modell)
+        dialoge.Verdrahte(_modell, _speicherung)
+
         _host = New ViewerHost(Dashboard, _modell.Auslieferung,
                                AddressOf _modell.VerarbeiteBrueckenNachricht,
                                AddressOf _modell.BrueckenStartSkript)
 
-        _speicherung = New Speicherstand(_modell)
         AddHandler _modell.PropertyChanged, AddressOf AufModellAenderung
-        AddHandler _modell.PropertyChanged, Sub() SchrittleisteFuellen()
-        SchrittleisteFuellen()
+        AnsichtenFuellen()
+        SichtbarkeitSetzen()
 
         InputBindings.Add(New KeyBinding(_modell.SpeichernBefehl, Key.S, ModifierKeys.Control))
         InputBindings.Add(New KeyBinding(_modell.KlassenbildungBefehl, Key.F5, ModifierKeys.None))
@@ -33,96 +39,111 @@ Class MainWindow
     End Sub
 
     Private Async Sub AufModellAenderung(sender As Object, e As PropertyChangedEventArgs)
-        If e.PropertyName = HauptViewModel.AnzeigeAktualisiert Then
-            ' Bereich selbst hat sich nicht geaendert (erneutes Rechnen aus
-            ' dem schon offenen Dashboard) - dort bliebe WebView2 sonst auf
-            ' dem vorigen Stand stehen, siehe HauptViewModel.AnzeigeAktualisiert.
-            If _modell.Auslieferung.SeitenGroesse > 0 Then Await _host.AnzeigenAsync()
-            Return
-        End If
-        If e.PropertyName <> NameOf(HauptViewModel.Bereich) Then Return
+        Select Case e.PropertyName
+            Case HauptViewModel.AnzeigeAktualisiert
+                ' Bereich selbst hat sich nicht geaendert (erneutes Rechnen aus
+                ' dem schon offenen Dashboard) - dort bliebe WebView2 sonst auf
+                ' dem vorigen Stand stehen, siehe HauptViewModel.AnzeigeAktualisiert.
+                KopfFuellen()
+                If _modell.HatAnzeige Then Await _host.AnzeigenAsync()
 
-        ' Stammdaten oeffnen als MODALER Dialog ueber der Flaeche - "das
-        ' Dashboard bleibt der Anker" (gui-ui-konzept.md 2). Der Bereich
-        ' springt danach auf Start zurueck, damit die Seitenleiste nicht
-        ' auf einem Eintrag stehenbleibt, hinter dem nichts liegt.
-        If _modell.Bereich = Bereich.Stammdaten Then
-            StammdatenOeffnen()
-            _modell.Bereich = Bereich.Start
-            Return
-        End If
-        If _modell.Bereich = Bereich.Regeln Then
-            RegelnOeffnen()
-            _modell.Bereich = Bereich.Start
-            Return
-        End If
+            Case NameOf(HauptViewModel.Bereich), NameOf(HauptViewModel.HatAnzeige)
+                SichtbarkeitSetzen()
+                KopfFuellen()
+                If _modell.Bereich = Bereich.Laeufe Then LaeufeAufbauen()
+                If e.PropertyName = NameOf(HauptViewModel.Bereich) AndAlso
+                   ZeigtRechnung() AndAlso _modell.HatAnzeige Then
+                    Await _host.AnzeigenAsync()
+                End If
 
-        Dim zeigtDashboard = _modell.Bereich = Bereich.Klassenbildung OrElse _modell.Bereich = Bereich.Stundenplan
-        Dim zeigtLaeufe = _modell.Bereich = Bereich.Laeufe
-        Startseite.Visibility = If(zeigtDashboard OrElse zeigtLaeufe, Visibility.Collapsed, Visibility.Visible)
-        Dashboard.Visibility = If(zeigtDashboard, Visibility.Visible, Visibility.Collapsed)
-        Laeufe.Visibility = If(zeigtLaeufe, Visibility.Visible, Visibility.Collapsed)
-        If zeigtLaeufe Then LaeufeAufbauen()
-
-        If zeigtDashboard AndAlso _modell.Auslieferung.SeitenGroesse > 0 Then
-            Await _host.AnzeigenAsync()
-        End If
+            Case HauptViewModel.KartenAktualisiert, NameOf(HauptViewModel.Projekt)
+                AnsichtenFuellen()
+        End Select
     End Sub
 
-    ''' <summary>Oeffnet die Stammdaten-Pflege. Ohne Projekt gibt es
-    ''' nichts zu pflegen - dann der Hinweis statt eines leeren Fensters,
-    ''' in dem jede Aktion ins Nichts liefe.</summary>
-    Private Sub StammdatenOeffnen()
-        If Not _modell.ProjektOffen Then
-            MessageBox.Show(Me, "Erst ein Projekt anlegen, öffnen oder eine Schule übernehmen.",
-                            "Stammdaten", MessageBoxButton.OK, MessageBoxImage.Information)
-            Return
-        End If
+    Private Function ZeigtRechnung() As Boolean
+        Return HauptViewModel.ArtDesBereichs(_modell.Bereich).HasValue
+    End Function
 
-        Dim f As New StammdatenFenster(_modell.Projekt, New WpfDialoge(Me), _speicherung) With {.Owner = Me}
-        ' Jede Aenderung in den Masken macht das Projekt ungespeichert -
-        ' Autosave ist ausdruecklich abgelehnt (Konzept 7), also muss der
-        ' Indikator stimmen.
-        AddHandler f.Geaendert, Sub() _modell.Geaendert = True
-        f.ShowDialog()
+    Private Shared Function Sichtbar(ja As Boolean) As Visibility
+        Return If(ja, Visibility.Visible, Visibility.Collapsed)
+    End Function
+
+    ''' <summary>Welche Flaeche zu sehen ist. Ein Rechnungs-Bereich zeigt
+    ''' Kopf plus Dashboard - oder Kopf plus Leerseite, solange kein
+    ''' Ergebnis da ist. Vorher wurde WebView2 in beiden Faellen
+    ''' eingeblendet und blieb ohne Ergebnis weiss oder auf dem zuletzt
+    ''' geladenen Inhalt stehen.</summary>
+    Private Sub SichtbarkeitSetzen()
+        Dim rechnung = ZeigtRechnung()
+        Startseite.Visibility = Sichtbar(_modell.Bereich = Bereich.Start)
+        Laeufe.Visibility = Sichtbar(_modell.Bereich = Bereich.Laeufe)
+        Bereichskopf.Visibility = Sichtbar(rechnung)
+        Dashboard.Visibility = Sichtbar(rechnung AndAlso _modell.HatAnzeige)
+        Leerseite.Visibility = Sichtbar(rechnung AndAlso Not _modell.HatAnzeige)
     End Sub
 
-    ''' <summary>Die Eingaben der Klassenbildung (6.11) samt
-    ''' Solver-Einstellungen (6.12). Eigenes Fenster, weil die
-    ''' Einschulungsliste ausdruecklich NICHT die Schuelerliste der
-    ''' Stammdaten ist - "die Klassenbildung laeuft VOR der
-    ''' Klassenzuteilung".</summary>
-    Private Sub KlassenbildungEingabenOeffnen()
-        If Not _modell.ProjektOffen Then
-            MessageBox.Show(Me, "Erst ein Projekt anlegen, öffnen oder eine Schule übernehmen.",
-                            "Klassenbildung", MessageBoxButton.OK, MessageBoxImage.Information)
-            Return
-        End If
-        Dim f As New KlassenbildungFenster(_modell.Projekt, New WpfDialoge(Me), _speicherung) With {.Owner = Me}
-        AddHandler f.Geaendert, Sub() _modell.Geaendert = True
-        f.ShowDialog()
+    ''' <summary>Karten, Kopf und Leerseite werden NEU GEBAUT statt
+    ''' gebunden: ihre Zeilen sind abgeleitete Werte, keine Eigenschaften
+    ''' mit Aenderungsmeldung. Ein ItemsSource-Binding zeigte sonst den
+    ''' Stand von vorhin.</summary>
+    Private Sub AnsichtenFuellen()
+        Startkarten.ItemsSource = _modell.Karten()
+        KopfFuellen()
     End Sub
 
-    ''' <summary>Die Regelverwaltung (6.10). Sie sitzt auf dem
-    ''' Seitenleisten-Eintrag "Regeln"; die Eingaben der Klassenbildung,
-    ''' die dort zwischenzeitlich lagen, bleiben ueber Extras erreichbar -
-    ''' sie sind Stammdaten eines anderen Laufs, keine Regeln.</summary>
-    Private Sub RegelnOeffnen()
-        If Not _modell.ProjektOffen Then
-            MessageBox.Show(Me, "Erst ein Projekt anlegen, öffnen oder eine Schule übernehmen.",
-                            "Regeln", MessageBoxButton.OK, MessageBoxImage.Information)
-            Return
-        End If
-        Dim f As New RegelnFenster(_modell.Projekt, New WpfDialoge(Me), _speicherung) With {.Owner = Me}
-        AddHandler f.Geaendert, Sub() _modell.Geaendert = True
-        f.ShowDialog()
+    Private Sub KopfFuellen()
+        Dim art = HauptViewModel.ArtDesBereichs(_modell.Bereich)
+        If Not art.HasValue Then Return
+
+        Dim klassenbildung = art.Value = Rechnungsart.Klassenbildung
+        Kopftitel.Text = _modell.KopfTitel
+        Kopfzeilen.ItemsSource = _modell.KopfZeilen()
+        KopfRechnen.Command = If(klassenbildung, _modell.KlassenbildungBefehl, _modell.StundenplanBefehl)
+        KopfRechnen.Content = If(klassenbildung, "Klassenbildung rechnen  (F5)", "Stundenplan rechnen  (F6)")
+
+        LeerTitel.Text = _modell.KopfTitel
+        Leerzeilen.ItemsSource = _modell.Karte(art.Value).Zeilen
+
+        StandwahlFuellen()
     End Sub
 
-    ''' <summary>Ein Klick auf einen Schritt fuehrt in seinen Bereich
-    ''' (Konzept 8). Das Ziel steht am Knopf, nicht in einer
-    ''' Fallunterscheidung hier - sonst gaebe es zwei Orte, an denen
-    ''' die Zuordnung Schritt-zu-Bereich festgelegt ist.</summary>
-    Private Sub AufSchritt(sender As Object, e As RoutedEventArgs)
+    ''' <summary>Der Stand-Wechsler zeigt die Staende der aktiven Rechnung
+    ''' und markiert den, den das Dashboard gerade zeigt. Das Fuellen
+    ''' loest SelectionChanged aus - die Sperre haelt das vom Modell fern.</summary>
+    Private Sub StandwahlFuellen()
+        _fuelltStandwahl = True
+        Try
+            Dim zeilen = _modell.StaendeDesBereichs()
+            Standwahl.ItemsSource = zeilen
+            Standwahl.IsEnabled = zeilen.Count > 0
+            Dim angezeigt = _modell.AngezeigterStand()
+            Standwahl.SelectedItem = If(angezeigt Is Nothing, Nothing,
+                                        zeilen.FirstOrDefault(Function(z) z.Id = angezeigt.Id))
+        Finally
+            _fuelltStandwahl = False
+        End Try
+    End Sub
+
+    Private Sub AufStandwahl(sender As Object, e As SelectionChangedEventArgs)
+        If _fuelltStandwahl Then Return
+        Dim z = TryCast(Standwahl.SelectedItem, Standzeile)
+        If z Is Nothing Then Return
+        Dim angezeigt = _modell.AngezeigterStand()
+        If angezeigt IsNot Nothing AndAlso angezeigt.Id = z.Id Then Return
+        _modell.StandAnzeigen(z.Id)
+    End Sub
+
+    ''' <summary>Ein Klick auf eine Zeile fuehrt ihre Aktion aus. Die
+    ''' steht am Objekt, nicht in einer Fallunterscheidung hier - sonst
+    ''' gaebe es zwei Orte, an denen festgelegt ist, was eine Zeile tut.</summary>
+    Private Sub AufSchrittAktion(sender As Object, e As RoutedEventArgs)
+        Dim knopf = TryCast(sender, Button)
+        Dim zeile = TryCast(knopf?.Tag, HauptViewModel.Startschritt)
+        zeile?.Aktion?.Invoke()
+    End Sub
+
+    Private Sub AufKarteOeffnen(sender As Object, e As RoutedEventArgs)
         Dim knopf = TryCast(sender, Button)
         If knopf Is Nothing OrElse Not TypeOf knopf.Tag Is Bereich Then Return
         _modell.Bereich = CType(knopf.Tag, Bereich)
@@ -130,18 +151,6 @@ Class MainWindow
 
     Private Sub AufKlarnamenExport(sender As Object, e As RoutedEventArgs)
         _modell.KlarnamenExportieren()
-    End Sub
-
-    Private Sub AufRegeln(sender As Object, e As RoutedEventArgs)
-        RegelnOeffnen()
-    End Sub
-
-    Private Sub AufStammdaten(sender As Object, e As RoutedEventArgs)
-        StammdatenOeffnen()
-    End Sub
-
-    Private Sub AufKlassenbildungEingaben(sender As Object, e As RoutedEventArgs)
-        KlassenbildungEingabenOeffnen()
     End Sub
 
     Private Sub AufBeenden(sender As Object, e As RoutedEventArgs)
@@ -254,15 +263,6 @@ Class MainWindow
         Dim z = GewaehlterStand()
         If z IsNot Nothing Then _historie.Freigeben(z.Id)
     End Sub
-
-
-    ''' <summary>Die Leiste wird NEU GEBAUT statt gebunden: ihre Zeilen
-    ''' sind abgeleitete Werte, keine Eigenschaften mit
-    ''' Aenderungsmeldung. Ein ItemsSource-Binding zeigte sonst den
-    ''' Stand von vorhin.</summary>
-    Private Sub SchrittleisteFuellen()
-        Schrittleiste.ItemsSource = _modell.Schritte()
-    End Sub
 End Class
 
 ''' <summary>Die WPF-Umsetzung der Dialoge. Liegt bewusst im View - das
@@ -272,9 +272,20 @@ Friend NotInheritable Class WpfDialoge
     Implements IDialoge
 
     Private ReadOnly _besitzer As Window
+    Private _modell As HauptViewModel
+    Private _speicherung As Speicherstand
 
     Public Sub New(besitzer As Window)
         _besitzer = besitzer
+    End Sub
+
+    ''' <summary>Die Pflegemasken brauchen das Modell (Projekt,
+    ''' Geaendert) und den Speicherstand; beides entsteht nach dem
+    ''' Dialogobjekt. Ohne diese Verdrahtung (Untermasken, die nur
+    ''' Datei- und Frage-Dialoge brauchen) oeffnen die Masken nichts.</summary>
+    Friend Sub Verdrahte(modell As HauptViewModel, speicherung As Speicherstand)
+        _modell = modell
+        _speicherung = speicherung
     End Sub
 
     Private Const Filter As String = "Schulplanungs-Projekt (*.splanx)|*.splanx|Alle Dateien (*.*)|*.*"
@@ -340,5 +351,44 @@ Friend NotInheritable Class WpfDialoge
     Public Function Frage(titel As String, text As String) As Boolean Implements IDialoge.Frage
         Return MessageBox.Show(_besitzer, text, titel, MessageBoxButton.YesNo, MessageBoxImage.Question) = MessageBoxResult.Yes
     End Function
+
+    ' ---------------------------------------------------------------
+    ' Pflegemasken - MODALE Dialoge ueber der Flaeche, "das Dashboard
+    ' bleibt der Anker" (gui-ui-konzept.md 2). Jede Aenderung in einer
+    ' Maske macht das Projekt ungespeichert - Autosave ist ausdruecklich
+    ' abgelehnt (Konzept 7), also muss der Indikator stimmen.
+    ' ---------------------------------------------------------------
+
+    Public Sub StammdatenPflegen() Implements IDialoge.StammdatenPflegen
+        If _modell Is Nothing Then Return
+        Dim f As New StammdatenFenster(_modell.Projekt, New WpfDialoge(_besitzer), _speicherung) With {.Owner = _besitzer}
+        AddHandler f.Geaendert, Sub() _modell.Geaendert = True
+        f.ShowDialog()
+    End Sub
+
+    Public Sub RegelnPflegen() Implements IDialoge.RegelnPflegen
+        If _modell Is Nothing Then Return
+        Dim f As New RegelnFenster(_modell.Projekt, New WpfDialoge(_besitzer), _speicherung) With {.Owner = _besitzer}
+        AddHandler f.Geaendert, Sub() _modell.Geaendert = True
+        f.ShowDialog()
+    End Sub
+
+    ''' <summary>Die Eingaben der Klassenbildung (6.11). Eigenes Fenster,
+    ''' weil die Einschulungsliste ausdruecklich NICHT die Schuelerliste
+    ''' der Stammdaten ist - "die Klassenbildung laeuft VOR der
+    ''' Klassenzuteilung".</summary>
+    Public Sub KlassenbildungPflegen() Implements IDialoge.KlassenbildungPflegen
+        If _modell Is Nothing Then Return
+        Dim f As New KlassenbildungFenster(_modell.Projekt, New WpfDialoge(_besitzer), _speicherung) With {.Owner = _besitzer}
+        AddHandler f.Geaendert, Sub() _modell.Geaendert = True
+        f.ShowDialog()
+    End Sub
+
+    Public Sub SolverEinstellungenPflegen() Implements IDialoge.SolverEinstellungenPflegen
+        If _modell Is Nothing Then Return
+        Dim f As New SolverEinstellungenFenster(_modell.Projekt, New WpfDialoge(_besitzer), _speicherung) With {.Owner = _besitzer}
+        AddHandler f.Geaendert, Sub() _modell.Geaendert = True
+        f.ShowDialog()
+    End Sub
 
 End Class

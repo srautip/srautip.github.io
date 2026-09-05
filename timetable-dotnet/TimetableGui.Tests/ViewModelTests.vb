@@ -104,6 +104,28 @@ Friend NotInheritable Class TestDialoge
         Fragen.Add(text)
         Return FrageAntwort
     End Function
+
+    ''' <summary>Welche Pflegemasken geoeffnet worden waeren, in der
+    ''' Reihenfolge des Aufrufs. Die Attrappe oeffnet nichts - sie
+    ''' belegt nur, dass die Karte oder der Kopf die richtige Maske
+    ''' meint.</summary>
+    Public ReadOnly Property Masken As New List(Of String)
+
+    Public Sub StammdatenPflegen() Implements IDialoge.StammdatenPflegen
+        Masken.Add("Stammdaten")
+    End Sub
+
+    Public Sub RegelnPflegen() Implements IDialoge.RegelnPflegen
+        Masken.Add("Regeln")
+    End Sub
+
+    Public Sub KlassenbildungPflegen() Implements IDialoge.KlassenbildungPflegen
+        Masken.Add("Klassenbildung")
+    End Sub
+
+    Public Sub SolverEinstellungenPflegen() Implements IDialoge.SolverEinstellungenPflegen
+        Masken.Add("Solver")
+    End Sub
 End Class
 
 <TestClass>

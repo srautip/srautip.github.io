@@ -948,6 +948,18 @@ Stand treffen, den DIESE Sicht zeigt. "Der letzte Lauf" waere die
 falsche Antwort, sobald jemand ueber den Bereich *Laeufe* einen aelteren
 Stand geoeffnet hat.
 
+**Vier Bereiche, zwei Rechnungen (Stufe H).** `Bereich` kennt Start, die
+zwei Rechnungen und Laeufe - Stammdaten und Regeln sind keine Bereiche,
+sondern Eingaben des Stundenplans. Das Fenster zeigt je Rechnung einen
+Bereichskopf (Eingabe-Zeilen mit Stand, Rechnen-Knopf, Stand-Wechsler)
+ueber dem Dashboard; hat der Bereich keine Seite (`HatAnzeige`), steht
+statt des WebView2 eine Leerseite mit dem Ablauf der Rechnung. Die
+Startseite besteht aus zwei Karten (`HauptViewModel.Karten`), deren
+Zeilen AKTIONEN tragen statt Bereiche - die Pflegemasken oeffnen dafuer
+ueber `IDialoge`, damit das ViewModel weiterhin kein Fenster kennt. Die
+Seitenleiste haengt zweiseitig an `Bereich` (Konverter `BereichGewaehlt`),
+weil der Wechsel auch vom Modell kommt.
+
 **Wie die Seiten in den Browser kommen.** Das Datenhaltungskonzept ließ
 offen, ob `NavigateToString` oder ein virtuelles Host-Mapping benutzt wird
 (7.6). Beides scheidet aus:

@@ -1,6 +1,6 @@
 ' Code-Behind der Klassenbildungs-Eingaben. Nur Verdrahtung; alle
-' Entscheidungen liegen in KlassenbildungEingabeViewModel und
-' SolverEinstellungenViewModel und sind dort ohne Fenster geprueft.
+' Entscheidungen liegen in KlassenbildungEingabeViewModel und den
+' Regel-ViewModels und sind dort ohne Fenster geprueft.
 Imports System.Windows.Media
 Imports TimetableCore
 Imports TimetableProjekt
@@ -10,7 +10,6 @@ Partial Class KlassenbildungFenster
     Private ReadOnly _projekt As Projekt
     Private ReadOnly _dialoge As IDialoge
     Private ReadOnly _eingabe As KlassenbildungEingabeViewModel
-    Private ReadOnly _solver As SolverEinstellungenViewModel
     Private ReadOnly _gruppen As KbGruppenViewModel
     Private ReadOnly _balance As KbBalanceViewModel
     Private ReadOnly _wuensche As KbWuenscheViewModel
@@ -25,21 +24,18 @@ Partial Class KlassenbildungFenster
         _projekt = projekt
         _dialoge = dialoge
         _eingabe = New KlassenbildungEingabeViewModel(projekt, dialoge)
-        _solver = New SolverEinstellungenViewModel(projekt)
         _gruppen = New KbGruppenViewModel(projekt, dialoge, _eingabe)
         _balance = New KbBalanceViewModel(projekt, dialoge, _eingabe)
         _wuensche = New KbWuenscheViewModel(projekt, dialoge, _eingabe)
         _fixierungen = New KbFixierungenViewModel(projekt, dialoge, _eingabe)
 
         AddHandler _eingabe.Geaendert, Sub() RaiseEvent Geaendert(Me, EventArgs.Empty)
-        AddHandler _solver.Geaendert, Sub() RaiseEvent Geaendert(Me, EventArgs.Empty)
         AddHandler _gruppen.Geaendert, AddressOf AufRegelAenderung
         AddHandler _balance.Geaendert, AddressOf AufRegelAenderung
         AddHandler _wuensche.Geaendert, AddressOf AufRegelAenderung
         AddHandler _fixierungen.Geaendert, AddressOf AufRegelAenderung
 
         Fuellen()
-        ExpertenBauen()
         RegelmaskenFuellen()
         SpeicherungVerdrahten(speicherung)
     End Sub
@@ -56,12 +52,6 @@ Partial Class KlassenbildungFenster
             MaxGroesse.Text = _eingabe.MaxGroesse.ToString()
             Stufe.Text = If(_eingabe.Stufe?.ToString(), "")
             Labels.Text = If(_eingabe.Labels Is Nothing, "", String.Join(", ", _eingabe.Labels))
-
-            Zeitbudget.Text = _solver.ZeitbudgetS.ToString()
-            Loesungen.Text = _solver.MaxSolutions.ToString()
-            Varianten.Text = If(_solver.Varianten?.ToString(), "")
-            Workers.Text = _solver.NumWorkers.ToString()
-            Seed.Text = _solver.Seed.ToString()
 
             KinderFuellen()
             Aktualisieren()
@@ -89,8 +79,7 @@ Partial Class KlassenbildungFenster
         Vorschau.Text = "Klassen: " & _eingabe.LabelVorschau
         Rahmenzeile.Text = _eingabe.RahmenZeile
         Anzahlzeile.Text = $"{_eingabe.Schueler.Count} Kinder"
-        Determinismus.Text = _solver.DeterminismusHinweis
-        Dim n = _eingabe.Pruefe().Count + _solver.Pruefe().Count
+        Dim n = _eingabe.Pruefe().Count
         Statuszeile.Text = If(n = 0, "Prüfung ohne Beanstandung.", $"{n} Hinweis(e) - Prüfen zeigt sie.")
     End Sub
 
@@ -619,65 +608,8 @@ Partial Class KlassenbildungFenster
         If liste.Items.Count > 0 Then liste.SelectedIndex = 0
     End Sub
 
-    ' ===============================================================
-    ' Solver
-    ' ===============================================================
-
-    Private Sub AufSolver(sender As Object, e As RoutedEventArgs)
-        If _fuellt Then Return
-        Dim d As Double
-        If Double.TryParse(Zeitbudget.Text.Trim(), d) Then _solver.ZeitbudgetS = d Else Zeitbudget.Text = _solver.ZeitbudgetS.ToString()
-        _solver.MaxSolutions = Ganz(Loesungen, _solver.MaxSolutions)
-        _solver.NumWorkers = Ganz(Workers, _solver.NumWorkers)
-        _solver.Seed = Ganz(Seed, _solver.Seed)
-        Dim v As Integer
-        _solver.Varianten = If(Integer.TryParse(Varianten.Text.Trim(), v), CType(v, Integer?), Nothing)
-        Aktualisieren()
-    End Sub
-
-    ''' <summary>Abschnittsueberschrift der Expertenliste. Blieb beim
-    ''' Umbau der Regeln (F6) uebrig, weil die Solver-Ansicht sie
-    ''' weiter braucht.</summary>
-    Private Function Ueberschrift(text As String) As UIElement
-        Return New TextBlock With {
-            .Text = text, .FontWeight = FontWeights.SemiBold,
-            .Margin = New Thickness(0, 16, 0, 6), .FontSize = 15}
-    End Function
-
-    Private Sub ExpertenBauen()
-        Experten.Children.Clear()
-        Dim letzteGruppe = ""
-        For Each feld In _solver.Expertenfelder()
-            Dim f = feld
-            If f.Gruppe <> letzteGruppe Then
-                Experten.Children.Add(Ueberschrift(f.Gruppe))
-                letzteGruppe = f.Gruppe
-            End If
-            Dim reihe As New StackPanel With {.Orientation = Orientation.Horizontal, .Margin = New Thickness(0, 2, 0, 2)}
-            reihe.Children.Add(New TextBlock With {
-                .Text = f.Name, .Width = 260, .VerticalAlignment = VerticalAlignment.Center, .FontSize = 12})
-            Dim kasten As New TextBox With {.Text = f.Lesen.Invoke(), .Width = 110}
-            ' Leer heisst "Default des Kerns" - deshalb wird ein leeres
-            ' Feld uebernommen und nicht zurueckgesetzt.
-            AddHandler kasten.LostFocus,
-                Sub()
-                    f.Schreiben.Invoke(kasten.Text)
-                    kasten.Text = f.Lesen.Invoke()
-                    Aktualisieren()
-                End Sub
-            reihe.Children.Add(kasten)
-            If f.Hilfe <> "" Then
-                reihe.Children.Add(New TextBlock With {
-                    .Text = "  " & f.Hilfe, .MaxWidth = 430, .TextWrapping = TextWrapping.Wrap,
-                    .VerticalAlignment = VerticalAlignment.Center, .FontSize = 11,
-                    .Foreground = CType(FindResource("farbe-text-3"), Brush)})
-            End If
-            Experten.Children.Add(reihe)
-        Next
-    End Sub
-
     Private Sub AufPruefen(sender As Object, e As RoutedEventArgs)
-        Dim fehler = _eingabe.Pruefe().Concat(_solver.Pruefe()).ToList()
+        Dim fehler = _eingabe.Pruefe()
         If fehler.Count = 0 Then
             _dialoge.Hinweis("Prüfung", "Keine Beanstandungen.")
         Else

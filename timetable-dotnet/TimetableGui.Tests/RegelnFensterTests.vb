@@ -100,6 +100,22 @@ Public Class RegelnFensterTests
         Public Function Frage(titel As String, text As String) As Boolean Implements IDialoge.Frage
             Throw New InvalidOperationException($"Unerwartete Frage: {titel}")
         End Function
+
+        Public Sub StammdatenPflegen() Implements IDialoge.StammdatenPflegen
+            Throw New InvalidOperationException("unerwartet")
+        End Sub
+
+        Public Sub RegelnPflegen() Implements IDialoge.RegelnPflegen
+            Throw New InvalidOperationException("unerwartet")
+        End Sub
+
+        Public Sub KlassenbildungPflegen() Implements IDialoge.KlassenbildungPflegen
+            Throw New InvalidOperationException("unerwartet")
+        End Sub
+
+        Public Sub SolverEinstellungenPflegen() Implements IDialoge.SolverEinstellungenPflegen
+            Throw New InvalidOperationException("unerwartet")
+        End Sub
     End Class
 
     ''' <summary>Eine Regel ueber die MASKE anlegen, nicht ueber das

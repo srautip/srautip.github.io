@@ -2,7 +2,7 @@
 
 ## Stand
 
-Stand 01.09.2026. Die Nachträge zu den einzelnen Stufen stehen jeweils
+Stand 05.09.2026. Die Nachträge zu den einzelnen Stufen stehen jeweils
 am Ende ihres Abschnitts und halten fest, wo die Umsetzung vom Plan
 abgewichen ist und warum.
 
@@ -15,6 +15,7 @@ abgewichen ist und warum.
 | E | Bridge und U5-Re-Solve | **erledigt** (Klassenbildung; Stundentafel-Bridge in G2) |
 | F | Eingabemasken | **erledigt** – siehe Feinschnitt unten |
 | G | Stundenplan-Dashboard, Im-/Export, Startseite, Freigabe | **teilweise** – G4 offen |
+| H | Hauptfenster nach den zwei Rechnungen: Seitenleiste, Bereichskopf, Leerseite, Startkarten, Menü | **erledigt** |
 
 **Feinschnitt F** (beim Umsetzen entstanden, nicht im ursprünglichen Plan):
 
@@ -36,12 +37,30 @@ abgewichen ist und warum.
 | G3 | Bereich *Läufe*: Stände-Historie, Freigabe, Schutz, Audit | erledigt |
 | G4 | **YAML-Ex-/Import im `tests/<schule>/`-Layout** | **offen** |
 | G5 | CSV-Import mit freier Spalten-Zuordnung §9.1, Klarnamen-Export | erledigt (ohne §9.2, s.u.) |
-| G6 | Startseite als vollständige Schrittleiste §8 | erledigt |
+| G6 | Startseite als vollständige Schrittleiste §8 | erledigt – durch H2 ersetzt (zwei Karten statt einer Leiste) |
+
+**Feinschnitt H** (Nutzerauftrag 05.09.2026: „Menü nicht sauber
+strukturiert, Ablauf zwischen Start und Klassen/Stunden nicht schlüssig“):
+
+| | Inhalt | Stand |
+|---|---|---|
+| H1 | Seitenleiste auf vier Einträge; `IsChecked` zweiseitig an `Bereich` (Fehlerbehebung) | erledigt |
+| H2 | ViewModel: Schritt-Logik je `Rechnungsart`, Startkarten statt Schrittleiste, Pflegemasken hinter `IDialoge` | erledigt |
+| H3 | Bereichskopf (Eingaben, Rechnen, Stand-Wechsler) und Leerseite je Rechnung | erledigt |
+| H4 | Menü mit *Bearbeiten*; `SolverEinstellungenFenster`; *Speichern unter*, *Projekt schließen* | erledigt |
+| H5 | Tests (`StartkartenTests`, Fensteraufbau), Doku | erledigt |
 
 ## Was noch offen ist
 
 Zwei Punkte, beide bewusst zurückgestellt und hier festgehalten, damit
-sie nicht in Commit-Nachrichten verschwinden.
+sie nicht in Commit-Nachrichten verschwinden – und zwei kleine aus
+Stufe H.
+
+**Aus Stufe H, bewusst weggelassen:** *Datei → Zuletzt verwendet* (braucht
+eine Einstellungsdatei außerhalb des Projekts – die gibt es bisher nicht)
+und *Hilfe → Handbuch* (das Handbuch liegt unter `docs/` und wird nicht
+mit der Anwendung ausgeliefert; ein Menüpunkt, der ins Leere zeigt, wäre
+schlimmer als keiner).
 
 **G4 – YAML-Ex-/Import im `tests/<schule>/`-Layout.** Ziel laut Stufe G:
 „der CLI-Kanal bleibt damit vollwertig erhalten." Ein Schulordner soll
@@ -566,6 +585,81 @@ ist aber zugleich der ORDNERNAME im Container (`ergebnisse/<id>/`), zwei
 gleiche Ids überschreiben sich beim Speichern. `Projekt.StandHinzufuegen`
 macht die Id jetzt eindeutig; zwei Tests in `TimetableProjekt.Tests` halten
 das fest, einer davon über Speichern und Laden.
+
+---
+
+## Stufe H — Hauptfenster nach den zwei Rechnungen
+
+Auslöser (05.09.2026): „Das Menü ist nicht sauber strukturiert und der
+Ablauf zwischen den Tabs Start und Klassen/Stunden ist nicht schlüssig.“
+Der Befund dahinter: die Anwendung beantwortet zwei unabhängige Fragen
+(Klassenbildung, Stundenplan) mit je eigenen Eingaben, eigenem Ergebnis
+und eigener Freigabe – das Hauptfenster bildete das nirgends ab.
+
+- Die Seitenleiste mischte drei Dinge: echte Bereiche (Start, Läufe),
+  reine Ergebnis-Sichten (Klassen, Stunden) und Dialog-Starter
+  (Stammdaten, Regeln), die nach dem Schließen auf Start zurücksprangen.
+- Die Eingaben lagen asymmetrisch: Stammdaten und Regeln prominent in der
+  Seitenleiste, die Klassenbildungs-Eingaben unter *Extras* neben
+  „Browserdaten bereinigen“ – und der Solver-Reiter für BEIDE Rechnungen
+  im Klassenbildungsfenster.
+- Klassen/Stunden ohne Ergebnis: ein weißes bzw. auf dem vorigen Inhalt
+  stehengebliebenes WebView2, ohne Hinweis und ohne Weg zu Eingaben oder
+  Rechnen.
+- Die 5er-Schrittleiste zog beide Rechnungen in EINE Kette; „Rechnen“ galt
+  als erledigt, sobald irgendein Lauf da war, und führte in die Historie
+  statt zum Rechnen; „Freigabe“ ebenfalls.
+- Ein echter Fehler: die Seitenleiste hing nur per `Command` am Modell,
+  nicht per `IsChecked`. Nach F5 aus der Startseite, nach „Ansehen“ aus den
+  Läufen oder nach dem Schließen eines Dialogs zeigte die Markierung einen
+  anderen Bereich als der Inhalt.
+
+**Was jetzt gilt.** Seitenleiste `Start · Klassen · Stunden · Läufe`. Jeder
+Rechnungs-Bereich trägt einen **Bereichskopf** über dem Dashboard: die
+Eingabe-Zeilen mit Stand (Stammdaten/Regeln bzw. Kinder & Regeln), der
+Rechnen-Knopf, rechts der Stand-Wechsler. Ohne Ergebnis zeigt der Bereich
+statt des WebView2 eine **Leerseite** mit dem Ablauf der Rechnung. Die
+Startseite besteht aus **zwei Karten**, je Rechnung eine, mit den Zeilen
+Eingaben · Rechnen · Entscheiden · Freigabe; jede Zeile führt eine Aktion
+aus (Maske öffnen, rechnen, Dashboard, Freigabe), nicht in einen Bereich.
+Das Menü hat ein **Bearbeiten** (Stammdaten…, Regeln…, Klassenbildung:
+Kinder & Regeln…, Solver-Einstellungen…); *Extras* behält nur, was keiner
+Rechnung gehört.
+
+**Entscheidungen beim Umsetzen:**
+
+- **Pflegemasken hinter `IDialoge`.** Damit eine Karte „Stammdaten…“
+  anbieten kann, ohne dass das ViewModel ein Fenster kennt, hat `IDialoge`
+  vier Methoden `…Pflegen()` bekommen; `WpfDialoge` öffnet die Masken,
+  `TestDialoge` zählt. Nebeneffekt: nach dem Schließen einer Maske werden
+  die Karten neu bewertet – vorher zeigte die Startseite nach dem Anlegen
+  einer Klasse noch „keine Klasse angelegt“, weil `Geaendert` längst True
+  war und nichts mehr meldete.
+- **Kein Freigeben-Knopf im Bereichskopf.** Den hat die Aktionsleiste im
+  Viewer bereits (G2), und ohne Stand gibt es nichts freizugeben. Die
+  Freigabe-Zeile der Karte gibt den angezeigten Stand frei oder führt in
+  die Läufe, wo man einen wählt.
+- **Bei der Klassenbildung IST die Freigabe die Entscheidung.** Es gibt
+  dort keinen „Arbeitsstand“ wie beim Stundenplan – die Zeile
+  „Entscheiden“ ist Bereit, sobald ein Stand da ist, und Erledigt mit der
+  Freigabe.
+- **`SolverEinstellungenViewModel` unverändert**, nur das Fenster ist
+  neu; der Reiter im Klassenbildungsfenster ist weg. `Feldbeschriftung`
+  liegt jetzt in `Application.xaml` statt als Kopie in zwei Masken.
+- **Der Konverter `BereichGewaehlt`** ist der erste eigene im Projekt.
+  `ConvertBack` liefert bei `False` `Binding.DoNothing` – sonst schriebe
+  der ABGEWÄHLTE Schalter seinen Bereich zurück und überschriebe den neuen.
+
+**Verifikation.** `TimetableGui.Tests` (278 Tests, ~1 min): `StartkartenTests`
+ersetzt `SchrittleisteTests` und prüft je Karte Zustand und Text, die
+Trennung der Rechnungen (ein Stundenplan-Lauf macht die Klassenbildung
+nicht „gerechnet“), die Aktionen der Zeilen gegen die Dialog-Attrappe, den
+Stand-Wechsler und `Schliessen`. Der Fensteraufbau-Test baut `MainWindow`
+auf, wechselt den Bereich AUS DEM MODELL und belegt, dass die Seitenleiste
+folgt und die Leerseite statt des Dashboards steht. Die Designkanon-Wächter
+laufen unverändert mit (neue Schlüssel, keine Farbliterale, keine neuen
+Tokens). Live per UI Automation belegt: Menü, Seitenleiste, Karten,
+Bereichskopf mit Rechnen-Knopf und Stand-Wechsler, Leerseite.
 
 ---
 

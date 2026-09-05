@@ -21,11 +21,6 @@
          Reiter - sonst waere sie achtmal zu pflegen. -->
 
     <Window.Resources>
-        <Style x:Key="Feldbeschriftung" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource farbe-text-2}" />
-            <Setter Property="FontSize" Value="{StaticResource grad-klein}" />
-            <Setter Property="Margin" Value="0,10,0,2" />
-        </Style>
         <Style TargetType="TabItem">
             <Setter Property="Padding" Value="12,6" />
             <Setter Property="FontSize" Value="{StaticResource grad-basis}" />

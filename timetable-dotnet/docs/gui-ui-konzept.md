@@ -58,24 +58,19 @@ Vorab geklärte Nutzerentscheidungen (Dialograunde zu diesem Konzept):
 ┌──────────────────────────────────────────────────────────────────────┐
 │ Datei  Bearbeiten  Planung  Extras  Hilfe                 (Menüzeile)│
 ├────────┬─────────────────────────────────────────────────────────────┤
-│ ⌂      │                                                             │
-│ Start  │                                                             │
+│ ⌂      │ Stundenplan  [✓ Stammdaten] [▶ Regeln] [Rechnen F6]  Stand ▾│
+│ Start  ├─────────────────────────────────────────────────────────────┤
 │ ──     │                                                             │
 │ 🧩     │                                                             │
 │ Klassen│                                                             │
 │ ──     │                WebView2-Dashboard                           │
 │ 📅     │                (randlos, volle Fläche)                      │
 │ Stunden│                                                             │
-│ ──     │                                                             │
-│ 👥     │   Stammdaten/Regeln öffnen als modale WPF-Dialoge           │
-│ Stamm- │   ÜBER dieser Fläche - das Dashboard bleibt der Anker.      │
-│ daten  │                                                             │
-│ ──     │                                                             │
-│ 📏     │                                                             │
-│ Regeln │                                                             │
-│ ──     │                                                             │
-│ ▶      │                                                             │
+│ ──     │   - oder, solange kein Ergebnis da ist, die Leerseite       │
+│ ▶      │     mit dem Ablauf dieser Rechnung -                        │
 │ Läufe  │                                                             │
+│        │   Stammdaten/Regeln öffnen als modale WPF-Dialoge           │
+│        │   ÜBER dieser Fläche - das Dashboard bleibt der Anker.      │
 ├────────┴─────────────────────────────────────────────────────────────┤
 │ GS Musterstadt 2026/27 · gespeichert 14:32 · Lauf: Stundenplan 3/10  │
 │ Lösungen (02:41) ▓▓▓▓░░ [Abbrechen]                     (Statusleiste)│
@@ -83,9 +78,18 @@ Vorab geklärte Nutzerentscheidungen (Dialograunde zu diesem Konzept):
 ```
 
 - **Seitenleiste** (schmal, Icon + Kurzlabel): Start · Klassenbildung ·
-  Stundenplan · Stammdaten · Regeln · Läufe. "Stammdaten" und "Regeln"
-  öffnen Übersichtslisten (WPF), aus denen die Detail-Dialoge starten;
-  die übrigen vier sind Vollflächen-Bereiche.
+  Stundenplan · Läufe - vier Vollflächen-Bereiche. Stammdaten und Regeln
+  sind KEINE Bereiche (Stufe H): sie sind Eingaben des Stundenplans und
+  öffnen als Dialog aus dessen Bereichskopf, aus der Startkarte und aus
+  dem Menü *Bearbeiten*. Die Markierung der Seitenleiste folgt dem
+  Bereich auch dann, wenn das Modell ihn wechselt (F5 von der Startseite,
+  „Ansehen“ aus den Läufen).
+- **Bereichskopf** über jedem Dashboard: die Eingabe-Zeilen dieser
+  Rechnung mit Stand (Zeichen und Farbe), der Rechnen-Knopf, rechts der
+  Stand-Wechsler. Freigeben steht nicht hier - das hat die Aktionsleiste
+  im Viewer (Abschnitt 4/5).
+- **Leerseite**: ein Rechnungs-Bereich ohne Ergebnis zeigt statt eines
+  leeren WebView2 seinen Ablauf - dieselben Zeilen wie die Startkarte.
 - **Menüzeile**: klassisch und schlank (Abschnitt 3) - kein Ribbon,
   keine zweite Toolbar; Aktionen leben kontextnah in den Bereichen.
 - **Statusleiste**: Projektname + Schuljahr, Speicherstatus
@@ -95,15 +99,22 @@ Vorab geklärte Nutzerentscheidungen (Dialograunde zu diesem Konzept):
   ("ich arbeite an diesem Plan") und ersparen Fensterverwaltung -
   bewusste Dialogentscheidung 1.
 
-## 3. Menüstruktur (Vorschlag)
+## 3. Menüstruktur
+
+Stand Stufe H (umgesetzt); in eckigen Klammern, was das ursprüngliche
+Konzept zusätzlich vorsah und noch aussteht.
 
 | Menü | Einträge |
 |---|---|
-| **Datei** | Neues Projekt… (Assistent, 6.1) · Bestehende Schule übernehmen… (Migrations-Einstieg, 9) · Öffnen… · Zuletzt verwendet ▸ · Speichern (Strg+S) · Sicherungskopie erstellen · Importieren ▸ (YAML-Ordner nach `tests/<schule>/`-Layout · CSV/Zwischenablage mit Spalten-Zuordnung, 9.1) · Exportieren ▸ (YAML-Ordner / Viewer-HTML / Berichte md/pdf / **Klassenlisten mit Klarnamen…** [Warndialog + Audit-Eintrag]) · Projekt schließen · Beenden |
-| **Bearbeiten** | Rückgängig/Wiederholen (formularbezogen) · Suchen… (Strg+F: global über Kinder [Klarname+ID], Lehrkräfte, Fächer, Regeln) · Projekt-Passwort ändern… |
-| **Planung** | Klassenbildung rechnen · Lehrereinsatz + Stundenplan rechnen · Lauf abbrechen · Lauf-Monitor anzeigen · Stand als Freigabe markieren… (aktive Bestätigung mit Substanz, Konzept klassenbildung §10) · Lehrkraft fällt länger aus… (geführte Aktion, 10.1, ab V2) · Vertretung planen… (10.2, V3) · Solver-Einstellungen… (6.12) |
-| **Extras** | Regeln aus Freitext… (Chat, **Ausbaustufe 2**; Menüpunkt prüft `LlmExtraction.IsOllamaAvailable` und erklärt bei Fehlen die lokale Ollama-Einrichtung) · Browserdaten bereinigen (WebView2-Profil, Datenhaltung 7.6) · Einstellungen… |
-| **Hilfe** | Handbuch · Feldreferenz (tests/README-Inhalte) · Über |
+| **Datei** | Neues Projekt… (Assistent, 6.1) · Bestehende Schule übernehmen… (Migrations-Einstieg, 9) · Öffnen… · Speichern (Strg+S) · Speichern unter… · Projekt schließen · Beenden [Zuletzt verwendet ▸ · Sicherungskopie · Importieren/Exportieren ▸ (YAML-Ordner, Berichte)] |
+| **Bearbeiten** | Stammdaten… (6.2-6.9) · Regeln… (6.10) · Klassenbildung: Kinder & Regeln… (6.11) · Solver-Einstellungen… (6.12) - die Eingaben beider Rechnungen an einem Ort [Rückgängig/Wiederholen · Suchen… · Projekt-Passwort ändern…] |
+| **Planung** | Klassenbildung rechnen (F5) · Stundenplan rechnen (F6) · Lauf abbrechen · Läufe und Stände [Lehrkraft fällt länger aus… (10.1, V2) · Vertretung planen… (10.2, V3)] |
+| **Extras** | Klarnamen exportieren… (Warndialog + Audit-Eintrag) · Browserdaten bereinigen (WebView2-Profil, Datenhaltung 7.6) [Regeln aus Freitext… (Chat, Ausbaustufe 2) · Einstellungen…] |
+| **Hilfe** | Über [Handbuch · Feldreferenz] |
+
+Die Freigabe ist bewusst KEIN Menüpunkt mehr: sie geschieht aus der
+Sicht (Aktionsleiste im Viewer) oder im Bereich *Läufe*, immer durch
+denselben Dialog.
 
 Nicht als Menüpunkte, sondern kontextnah: Fixieren/Härten (im Board),
 Lösung übernehmen (in der Stundentafel), Anlegen/Löschen (in den
@@ -339,6 +350,9 @@ auf demselben Bestand.
 
 ### 6.12 Solver-Einstellungen
 
+Eigener Dialog unter *Bearbeiten* (Stufe H) - die Einstellungen gelten
+für BEIDE Rechnungen und saßen davor als Reiter im Klassenbildungsfenster,
+wo sie niemand vermutete, der einen Stundenplan rechnen wollte.
 Zweistufig, damit der Standardfall einfach bleibt:
 
 - **Einfach**: Zeitbudget gesamt, Anzahl Lösungen (`max_solutions`),
@@ -394,22 +408,31 @@ Zweistufig, damit der Standardfall einfach bleibt:
 
 ## 8. Geführter Ablauf (Startseite)
 
-Die Startseite übersetzt den Benutzerhandbuch-Workflow in eine
-Schrittleiste mit Status je Schritt (analog zum Fortschritts-Trichter
-U3 des Klassenbildungs-Boards):
+Die Startseite übersetzt den Benutzerhandbuch-Workflow in **zwei
+Karten**, je Rechnung eine, mit Status je Zeile (analog zum
+Fortschritts-Trichter U3 des Klassenbildungs-Boards). Ursprünglich war
+das EINE Leiste über beide Rechnungen; ihr Schritt „Rechnen“ galt als
+erledigt, sobald irgendein Lauf da war - Stufe H hat sie getrennt.
 
 ```
-[1] Stammdaten ✓ 8 Klassen, 12 Lehrkräfte, Prüfung grün
-[2] Regeln     ! 4 Handregeln, 1 Hinweis (Fach ohne Fenster)
-[3] Rechnen    ▶ zuletzt 22.08. 14:32 - 10 Lösungen, beste 198.6
-[4] Entscheiden → Dashboards (2 Fixierungen offen)
-[5] Freigabe & Export  ○ noch nicht freigegeben
+┌ Klassenbildung ─────────────────────┐ ┌ Stundenplan ─────────────────────────┐
+│ [1] Kinder & Regeln ✓ 84 Kinder, 4  │ │ [1] Stammdaten ✓ 8 Klassen, 12 Lehrk.│
+│     Klassen, 3 Regeln - Prüfung grün│ │ [2] Regeln     ! 4 Handregeln, 1 Hinw│
+│ [2] Rechnen   ✓ zuletzt 30.08. 14:32│ │ [3] Rechnen    ▶ noch nicht - F6     │
+│ [3] Entscheiden ▶ am Board, 2 Fix.  │ │ [4] Entscheiden ○ erst rechnen       │
+│ [4] Freigabe  ○ noch nicht          │ │ [5] Freigabe   ○ noch nicht          │
+│                            [Öffnen] │ │                             [Öffnen] │
+└─────────────────────────────────────┘ └──────────────────────────────────────┘
 ```
 
-Jeder Schritt ist klickbar (führt in den Bereich), neue Projekte
-starten bei [1] mit dem Assistenten-Ergebnis. Die Klassenbildung hat
-dieselbe Leiste in ihrer Board-Randleiste (Basis wählen → bulk
-fixieren → Gruppen/Einzelfälle → neu rechnen → Freigabe).
+Jede Zeile führt eine AKTION aus: die Eingabe-Zeilen öffnen ihre Maske,
+„Rechnen“ rechnet, „Entscheiden“ öffnet das Dashboard, „Freigabe“ gibt
+den angezeigten Stand frei oder führt in die Läufe. Neue Projekte
+starten bei [1] mit dem Assistenten-Ergebnis. Dieselben Zeilen stehen
+als Leerseite im Bereich der Rechnung, solange dort kein Ergebnis liegt,
+und die Eingabe-Zeilen im Bereichskopf über dem Dashboard (Abschnitt 2).
+Die Klassenbildung hat dieselbe Leiste in ihrer Board-Randleiste (Basis
+wählen → bulk fixieren → Gruppen/Einzelfälle → neu rechnen → Freigabe).
 
 ## 9. Unterjährige Einführung (Migration aus Bestandssystemen)
 

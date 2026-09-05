@@ -12,16 +12,27 @@ Imports TimetableCore
 Imports TimetableProjekt
 Imports TimetableWorkflow
 
-''' <summary>Die Bereiche der Seitenleiste. Reihenfolge = Reihenfolge im
-''' Konzept (2): Start, Klassenbildung, Stundenplan, Stammdaten, Regeln,
-''' Laeufe.</summary>
+''' <summary>Die Bereiche der Seitenleiste (Stufe H): Start, die zwei
+''' Rechnungen, Laeufe. Stammdaten und Regeln sind KEINE Bereiche mehr -
+''' sie sind Eingaben des Stundenplans und oeffnen als Dialog aus dessen
+''' Bereichskopf, aus der Startkarte und aus dem Menue Bearbeiten. Ein
+''' Seitenleisten-Eintrag, hinter dem nichts liegt, sprang vorher nach
+''' dem Schliessen des Dialogs auf Start zurueck.</summary>
 Public Enum Bereich
     Start
     Klassenbildung
     Stundenplan
-    Stammdaten
-    Regeln
     Laeufe
+End Enum
+
+''' <summary>Die zwei Rechnungen der Anwendung. Jede hat eigene
+''' Eingaben, ein eigenes Ergebnis und eine eigene Freigabe
+''' (Benutzerhandbuch: "Man kann die eine nutzen und die andere nicht") -
+''' die Startseite und die Bereichskoepfe bilden deshalb je Rechnung
+''' einen Ablauf ab, nicht einen fuer beide.</summary>
+Public Enum Rechnungsart
+    Klassenbildung
+    Stundenplan
 End Enum
 
 ''' <summary>Zustand eines Schritts auf der Startseite (gui-ui-konzept.md 8).
@@ -65,6 +76,17 @@ Public Interface IDialoge
     Function DateiSpeichernUnter(titel As String, filter As String, vorschlag As String) As String
     Sub Hinweis(titel As String, text As String)
     Function Frage(titel As String, text As String) As Boolean
+
+    ''' <summary>Die Pflegemasken (Stammdaten 6.2-6.9, Regeln 6.10,
+    ''' Klassenbildung 6.11, Solver 6.12). Sie sind modale Fenster und
+    ''' gehoeren deshalb hierher - so kann eine Startkarte oder ein
+    ''' Bereichskopf "Stammdaten…" anbieten, ohne dass das ViewModel ein
+    ''' Fenster kennt. Die Umsetzung haengt die Geaendert-Meldung der
+    ''' Maske an das Modell; die Attrappe zaehlt nur.</summary>
+    Sub StammdatenPflegen()
+    Sub RegelnPflegen()
+    Sub KlassenbildungPflegen()
+    Sub SolverEinstellungenPflegen()
 End Interface
 
 Public NotInheritable Class HauptViewModel
@@ -90,10 +112,16 @@ Public NotInheritable Class HauptViewModel
         NeuBefehl = New Befehl(Sub() Neu(), Function() Not Monitor.Laeuft)
         OeffnenBefehl = New Befehl(Sub() Oeffnen(), Function() Not Monitor.Laeuft)
         SpeichernBefehl = New Befehl(Sub() Speichern(), Function() ProjektOffen AndAlso Not Monitor.Laeuft)
+        SpeichernUnterBefehl = New Befehl(Sub() SpeichernUnter(), Function() ProjektOffen AndAlso Not Monitor.Laeuft)
+        SchliessenBefehl = New Befehl(Sub() Schliessen(), Function() ProjektOffen AndAlso Not Monitor.Laeuft)
         ImportierenBefehl = New Befehl(Sub() Importieren(), Function() Not Monitor.Laeuft)
         KlassenbildungBefehl = New Befehl(Sub() KlassenbildungRechnenAsync(), Function() KannKlassenbildungRechnen)
         StundenplanBefehl = New Befehl(Sub() StundenplanRechnenAsync(), Function() KannStundenplanRechnen)
         WechsleBefehl = New Befehl(Sub(z) Bereich = CType(z, Bereich))
+        StammdatenBefehl = New Befehl(Sub() StammdatenPflegen(), Function() ProjektOffen AndAlso Not Monitor.Laeuft)
+        RegelnBefehl = New Befehl(Sub() RegelnPflegen(), Function() ProjektOffen AndAlso Not Monitor.Laeuft)
+        KlassenbildungEingabenBefehl = New Befehl(Sub() KlassenbildungPflegen(), Function() ProjektOffen AndAlso Not Monitor.Laeuft)
+        SolverEinstellungenBefehl = New Befehl(Sub() SolverEinstellungenPflegen(), Function() ProjektOffen AndAlso Not Monitor.Laeuft)
     End Sub
 
     Public ReadOnly Property Monitor As LaufMonitorViewModel
@@ -102,10 +130,16 @@ Public NotInheritable Class HauptViewModel
     Public ReadOnly Property NeuBefehl As Befehl
     Public ReadOnly Property OeffnenBefehl As Befehl
     Public ReadOnly Property SpeichernBefehl As Befehl
+    Public ReadOnly Property SpeichernUnterBefehl As Befehl
+    Public ReadOnly Property SchliessenBefehl As Befehl
     Public ReadOnly Property ImportierenBefehl As Befehl
     Public ReadOnly Property KlassenbildungBefehl As Befehl
     Public ReadOnly Property StundenplanBefehl As Befehl
     Public ReadOnly Property WechsleBefehl As Befehl
+    Public ReadOnly Property StammdatenBefehl As Befehl
+    Public ReadOnly Property RegelnBefehl As Befehl
+    Public ReadOnly Property KlassenbildungEingabenBefehl As Befehl
+    Public ReadOnly Property SolverEinstellungenBefehl As Befehl
 
     Public Property Projekt As Projekt
         Get
@@ -150,9 +184,34 @@ Public NotInheritable Class HauptViewModel
             ' Die Seite VOR dem Melden wechseln: das Fenster reagiert auf
             ' die Meldung und zeigt dann schon die richtige an.
             SeiteFuerBereichAusliefern()
+            Melde(NameOf(HatAnzeige))
             Melde(NameOf(Bereich))
         End Set
     End Property
+
+    ''' <summary>Ob der aktive Bereich etwas zu zeigen hat. Ohne Seite
+    ''' zeigt das Fenster die Leerseite mit dem Ablauf der Rechnung -
+    ''' nicht ein leeres WebView2 (das blieb vorher auf dem zuletzt
+    ''' geladenen Inhalt stehen oder war schlicht weiss).</summary>
+    Public ReadOnly Property HatAnzeige As Boolean
+        Get
+            Return _seiten.ContainsKey(_bereich)
+        End Get
+    End Property
+
+    ''' <summary>Welche Rechnung ein Bereich zeigt; Nothing fuer Start und
+    ''' Laeufe.</summary>
+    Public Shared Function ArtDesBereichs(b As Bereich) As Rechnungsart?
+        Select Case b
+            Case Bereich.Klassenbildung : Return Rechnungsart.Klassenbildung
+            Case Bereich.Stundenplan : Return Rechnungsart.Stundenplan
+            Case Else : Return Nothing
+        End Select
+    End Function
+
+    Public Shared Function BereichDerArt(art As Rechnungsart) As Bereich
+        Return If(art = Rechnungsart.Klassenbildung, Bereich.Klassenbildung, Bereich.Stundenplan)
+    End Function
 
     ''' <summary>Zwei Dashboards, aber nur EIN ViewerAuslieferung-Slot.
     ''' Ohne dieses Gedaechtnis zeigte der Wechsel von Klassenbildung auf
@@ -200,6 +259,7 @@ Public NotInheritable Class HauptViewModel
         End If
         If _bereich = zielbereich Then
             Auslieferung.Setze(html)
+            Melde(NameOf(HatAnzeige))
             Melde(AnzeigeAktualisiert)
         End If
     End Sub
@@ -301,46 +361,151 @@ Public NotInheritable Class HauptViewModel
     End Property
 
     ' ---------------------------------------------------------------
-    ' Startseite als Schrittleiste (gui-ui-konzept.md 8) - Stufe G6
+    ' Startseite als zwei Karten (gui-ui-konzept.md 8) - Stufe H2
     ' ---------------------------------------------------------------
     '
-    ' Fuenf Schritte, jeder mit ECHTEM Zustand und einer Zeile Substanz.
-    ' Die Skizze im Konzept ist woertlich gemeint: "[3] Rechnen ▶ zuletzt
-    ' 22.08. 14:32 - 10 Loesungen, beste 198.6". Eine Leiste, die nur
-    ' Ueberschriften zeigt, waere ein Inhaltsverzeichnis - sie soll aber
-    ' sagen, wo man steht.
+    ' Je Rechnung eine Karte mit ihrem Ablauf: Eingaben, Rechnen,
+    ' Entscheiden, Freigabe. Jede Zeile traegt ECHTEN Zustand und eine
+    ' Zeile Substanz - "zuletzt 30.08. 14:32, 3 Loesungen", nicht nur
+    ' eine Ueberschrift. Vorher (G6) war das EINE Leiste ueber beide
+    ' Rechnungen; ihr Schritt "Rechnen" galt als erledigt, sobald
+    ' irgendein Lauf da war, und "Freigabe" fuehrte in die Historie
+    ' statt zur Freigabe.
     '
-    ' Das ANLEGEN eines Projekts ist bewusst kein Schritt: "neue Projekte
-    ' starten bei [1] mit dem Assistenten-Ergebnis" (8), die Leiste setzt
-    ' ein offenes Projekt also voraus. Die Einstiegsknoepfe stehen
-    ' darueber.
+    ' Das ANLEGEN eines Projekts ist keine Zeile: die Karten setzen ein
+    ' offenes Projekt voraus, die Einstiegsknoepfe stehen darueber.
 
-    ''' <summary>Eine Zeile der Leiste - fertig aufbereitet, damit die
-    ''' Ansicht nichts entscheidet.</summary>
+    ''' <summary>Eine Zeile einer Karte - fertig aufbereitet, damit die
+    ''' Ansicht nichts entscheidet. Der Klick fuehrt eine AKTION aus,
+    ''' nicht in einen Bereich: "Stammdaten" oeffnet die Maske, "Rechnen"
+    ''' rechnet. Vorher fuehrte "Rechnen" in die Laeufe-Historie.</summary>
     Public NotInheritable Class Startschritt
         Public Property Nummer As Integer
         Public Property Titel As String = ""
         Public Property Text As String = ""
         Public Property Stand As SchrittStand
-        ''' <summary>Wohin der Klick fuehrt. "Jeder Schritt ist klickbar
-        ''' (fuehrt in den Bereich)" (8).</summary>
-        Public Property Ziel As Bereich
+        Public Property Aktion As Action
+        ''' <summary>Eingabe-Zeilen zeigt der Bereichskopf ueber dem
+        ''' Dashboard; die uebrigen (Rechnen, Entscheiden, Freigabe)
+        ''' sind dort der Rechnen-Knopf, das Dashboard selbst und die
+        ''' Aktionsleiste des Viewers.</summary>
+        Public Property IstEingabe As Boolean
     End Class
 
-    Public Function Schritte() As List(Of Startschritt)
-        Return New List(Of Startschritt) From {
-            New Startschritt With {.Nummer = 1, .Titel = "Stammdaten", .Ziel = Bereich.Stammdaten,
-                                   .Stand = SchrittStammdaten, .Text = SchrittStammdatenText},
-            New Startschritt With {.Nummer = 2, .Titel = "Regeln", .Ziel = Bereich.Regeln,
-                                   .Stand = SchrittRegeln, .Text = SchrittRegelnText},
-            New Startschritt With {.Nummer = 3, .Titel = "Rechnen", .Ziel = Bereich.Laeufe,
-                                   .Stand = SchrittRechnen, .Text = SchrittRechnenText},
-            New Startschritt With {.Nummer = 4, .Titel = "Entscheiden", .Ziel = Entscheidungsbereich(),
-                                   .Stand = SchrittEntscheiden, .Text = SchrittEntscheidenText},
-            New Startschritt With {.Nummer = 5, .Titel = "Freigabe & Export", .Ziel = Bereich.Laeufe,
-                                   .Stand = SchrittFreigabe, .Text = SchrittFreigabeText}
-        }
+    ''' <summary>Eine Karte der Startseite = der Ablauf einer Rechnung.
+    ''' Dieselbe Karte steht auf der Leerseite des Bereichs, solange dort
+    ''' noch kein Ergebnis liegt.</summary>
+    Public NotInheritable Class Startkarte
+        Public Property Art As Rechnungsart
+        Public Property Titel As String = ""
+        Public Property Bereich As Bereich
+        Public Property Zeilen As New List(Of Startschritt)
+    End Class
+
+    Public Function Karten() As List(Of Startkarte)
+        Return New List(Of Startkarte) From {Karte(Rechnungsart.Klassenbildung), Karte(Rechnungsart.Stundenplan)}
     End Function
+
+    Public Function Karte(art As Rechnungsart) As Startkarte
+        Dim k As New Startkarte With {
+            .Art = art, .Bereich = BereichDerArt(art),
+            .Titel = If(art = Rechnungsart.Klassenbildung, "Klassenbildung", "Stundenplan")}
+
+        If art = Rechnungsart.Klassenbildung Then
+            k.Zeilen.Add(New Startschritt With {.Nummer = 1, .Titel = "Kinder & Regeln", .IstEingabe = True,
+                .Stand = SchrittKinder, .Text = SchrittKinderText, .Aktion = AddressOf KlassenbildungPflegen})
+        Else
+            k.Zeilen.Add(New Startschritt With {.Nummer = 1, .Titel = "Stammdaten", .IstEingabe = True,
+                .Stand = SchrittStammdaten, .Text = SchrittStammdatenText, .Aktion = AddressOf StammdatenPflegen})
+            k.Zeilen.Add(New Startschritt With {.Nummer = 2, .Titel = "Regeln", .IstEingabe = True,
+                .Stand = SchrittRegeln, .Text = SchrittRegelnText, .Aktion = AddressOf RegelnPflegen})
+        End If
+
+        Dim n = k.Zeilen.Count
+        k.Zeilen.Add(New Startschritt With {.Nummer = n + 1, .Titel = "Rechnen",
+            .Stand = SchrittRechnen(art), .Text = SchrittRechnenText(art),
+            .Aktion = Sub() Rechnen(art)})
+        k.Zeilen.Add(New Startschritt With {.Nummer = n + 2, .Titel = "Entscheiden",
+            .Stand = SchrittEntscheiden(art), .Text = SchrittEntscheidenText(art),
+            .Aktion = Sub() Bereich = BereichDerArt(art)})
+        k.Zeilen.Add(New Startschritt With {.Nummer = n + 3, .Titel = "Freigabe",
+            .Stand = SchrittFreigabe(art), .Text = SchrittFreigabeText(art),
+            .Aktion = Sub() Freigeben(art)})
+        Return k
+    End Function
+
+    Private Sub Rechnen(art As Rechnungsart)
+        If art = Rechnungsart.Klassenbildung Then
+            KlassenbildungRechnenAsync()
+        Else
+            StundenplanRechnenAsync()
+        End If
+    End Sub
+
+    ''' <summary>Der Bereichskopf: Titel und Eingabe-Zeilen der aktiven
+    ''' Rechnung. Leer fuer Start und Laeufe.</summary>
+    Public ReadOnly Property KopfTitel As String
+        Get
+            Dim art = ArtDesBereichs(_bereich)
+            If Not art.HasValue Then Return ""
+            Return If(art.Value = Rechnungsart.Klassenbildung, "Klassenbildung", "Stundenplan")
+        End Get
+    End Property
+
+    Public Function KopfZeilen() As List(Of Startschritt)
+        Dim art = ArtDesBereichs(_bereich)
+        If Not art.HasValue Then Return New List(Of Startschritt)
+        Return Karte(art.Value).Zeilen.Where(Function(z) z.IstEingabe).ToList()
+    End Function
+
+    ''' <summary>Die Staende der aktiven Rechnung, neueste zuerst - fuer
+    ''' den Stand-Wechsler im Bereichskopf. Derselbe Zeilentyp wie im
+    ''' Bereich Laeufe, damit ein Stand ueberall gleich heisst.</summary>
+    Public Function StaendeDesBereichs() As List(Of Standzeile)
+        Dim art = ArtDesBereichs(_bereich)
+        If Not ProjektOffen OrElse Not art.HasValue Then Return New List(Of Standzeile)
+        Dim name = If(art.Value = Rechnungsart.Klassenbildung, "Klassenbildung", "Stundenplan")
+        Return New LaeufeViewModel(_projekt, _dialoge, _jetzt).Zeilen().
+            Where(Function(z) z.Art = name).ToList()
+    End Function
+
+    ''' <summary>Einen Stand nach Id anzeigen - der Weg des
+    ''' Stand-Wechslers.</summary>
+    Public Sub StandAnzeigen(id As String)
+        If Not ProjektOffen OrElse id Is Nothing Then Return
+        StandAnzeigen(_projekt.Staende.FirstOrDefault(Function(s) s.Id = id))
+    End Sub
+
+    ' --- [1] Kinder & Regeln (Klassenbildung) ------------------------
+
+    ''' <summary>Die Eingaben der Klassenbildung: Rahmen, Kinder und die
+    ''' vier Regelarten (6.11). Ohne Kinder ist die Zeile Bereit, nicht
+    ''' Warnung - ein leeres Projekt ist der Normalzustand vor der
+    ''' Eingabe, kein Fehler.</summary>
+    Public ReadOnly Property SchrittKinder As SchrittStand
+        Get
+            If Not ProjektOffen Then Return SchrittStand.Offen
+            If _projekt.Klassenbildung Is Nothing OrElse _projekt.Klassenbildung.Schueler.Count = 0 Then
+                Return SchrittStand.Bereit
+            End If
+            Return If(KlassenbildungPruefen().Count = 0, SchrittStand.Erledigt, SchrittStand.Warnung)
+        End Get
+    End Property
+
+    Public ReadOnly Property SchrittKinderText As String
+        Get
+            If Not ProjektOffen Then Return "Erst ein Projekt anlegen oder oeffnen."
+            Dim kb = _projekt.Klassenbildung
+            If kb Is Nothing OrElse kb.Schueler.Count = 0 Then
+                Return "Noch keine Kinder - eintragen, einfuegen oder aus einer CSV-Datei uebernehmen."
+            End If
+            Dim regeln = kb.Gruppen.Count + kb.Balance.Count + kb.Wuensche.Count
+            Dim basis = $"{kb.Schueler.Count} Kinder, {kb.Klassen.Anzahl} Klassen, {regeln} Regel(n)"
+            Dim fehler = KlassenbildungPruefen()
+            If fehler.Count = 0 Then Return basis & " - Pruefung gruen."
+            Return $"{basis} - {fehler.Count} offen: {fehler(0)}"
+        End Get
+    End Property
 
     ' --- [2] Regeln -------------------------------------------------
 
@@ -377,125 +542,140 @@ Public NotInheritable Class HauptViewModel
                                            _projekt.Bestand.PeriodsPerDay)
     End Function
 
-    ' --- [3] Rechnen ------------------------------------------------
+    ' --- Rechnen ----------------------------------------------------
 
-    ''' <summary>Die Skizze aus 8: "zuletzt 22.08. 14:32 - 10 Loesungen".
-    ''' Gelesen wird aus den STAENDEN, nicht aus dem Auslieferungs-Slot -
-    ''' ein Lauf bleibt ein Lauf, auch wenn gerade ein anderes Dashboard
-    ''' angezeigt wird.</summary>
-    Public ReadOnly Property SchrittRechnenText As String
-        Get
-            If Not ProjektOffen Then Return "Erst ein Projekt anlegen oder oeffnen."
-            Dim letzter = LetzterStand()
-            If letzter Is Nothing Then
-                Return "Noch nicht gerechnet. Klassenbildung F5, Stundenplan F6."
-            End If
-            Return $"Zuletzt {letzter.Erstellt:dd.MM. HH:mm} - {letzter.Label}. " &
-                   $"{_projekt.Staende.Count} Stand/Staende gesichert."
-        End Get
-    End Property
-
-    Private Function LetzterStand() As ProjektStand
-        If Not ProjektOffen Then Return Nothing
-        Return _projekt.Staende.OrderByDescending(Function(s) s.Erstellt).FirstOrDefault()
+    ''' <summary>Gehoert ein Stand zu dieser Rechnung? Dieselbe
+    ''' Unterscheidung wie Freigabe.ArtVon - ein Stand traegt entweder
+    ''' ein Klassenbildungs- oder ein Stundenplan-Ergebnis.</summary>
+    Private Shared Function IstVon(stand As ProjektStand, art As Rechnungsart) As Boolean
+        If art = Rechnungsart.Klassenbildung Then Return stand.Klassenbildung IsNot Nothing
+        Return stand.Stundenplan IsNot Nothing
     End Function
 
-    ' --- [4] Entscheiden --------------------------------------------
+    ''' <summary>Der juengste Stand DIESER Rechnung. Gelesen aus den
+    ''' Staenden, nicht aus dem Auslieferungs-Slot: ein Lauf bleibt ein
+    ''' Lauf, auch wenn gerade das andere Dashboard offen ist. Und nach
+    ''' Art getrennt: vorher galt "Rechnen" fuer den Stundenplan als
+    ''' erledigt, sobald die Klassenbildung einmal gelaufen war.</summary>
+    Private Function LetzterStand(art As Rechnungsart) As ProjektStand
+        If Not ProjektOffen Then Return Nothing
+        Return _projekt.Staende.Where(Function(s) IstVon(s, art)).
+            OrderByDescending(Function(s) s.Erstellt).FirstOrDefault()
+    End Function
 
-    ''' <summary>Entschieden ist, wenn eine Loesung als Arbeitsstand
-    ''' markiert wurde (5). Ohne Stand gibt es nichts zu entscheiden.</summary>
-    Public ReadOnly Property SchrittEntscheiden As SchrittStand
-        Get
-            If Not ProjektOffen OrElse LetzterStand() Is Nothing Then Return SchrittStand.Offen
-            Return If(Arbeitsstand() IsNot Nothing, SchrittStand.Erledigt, SchrittStand.Bereit)
-        End Get
-    End Property
+    Private Function KannRechnen(art As Rechnungsart) As Boolean
+        Return If(art = Rechnungsart.Klassenbildung, KannKlassenbildungRechnen, KannStundenplanRechnen)
+    End Function
 
-    Public ReadOnly Property SchrittEntscheidenText As String
-        Get
-            If Not ProjektOffen Then Return "Erst ein Projekt anlegen oder oeffnen."
-            If LetzterStand() Is Nothing Then Return "Erst rechnen - dann gibt es etwas zu vergleichen."
-            Dim gewaehlt = Arbeitsstand()
-            Dim offen = _projekt.Klassenbildung.Fixierungen.Count
-            Dim zusatz = If(offen = 0, "", $" {offen} Fixierung(en) gesetzt.")
-            If gewaehlt Is Nothing Then
-                Return "Im Dashboard vergleichen und eine Loesung als Arbeitsstand uebernehmen." & zusatz
+    Public Function SchrittRechnen(art As Rechnungsart) As SchrittStand
+        If Not ProjektOffen Then Return SchrittStand.Offen
+        If LetzterStand(art) IsNot Nothing Then Return SchrittStand.Erledigt
+        Return If(KannRechnen(art), SchrittStand.Bereit, SchrittStand.Offen)
+    End Function
+
+    Public Function SchrittRechnenText(art As Rechnungsart) As String
+        If Not ProjektOffen Then Return "Erst ein Projekt anlegen oder oeffnen."
+        Dim letzter = LetzterStand(art)
+        If letzter Is Nothing Then
+            If Not KannRechnen(art) Then
+                Return If(art = Rechnungsart.Klassenbildung,
+                          "Erst Kinder eintragen.",
+                          "Erst Klassen, Faecher und Lehrkraefte anlegen.")
             End If
-            Return $"Arbeitsstand: {gewaehlt.Label}." & zusatz
-        End Get
-    End Property
+            Return If(art = Rechnungsart.Klassenbildung,
+                      "Noch nicht gerechnet - Klassenbildung rechnen (F5).",
+                      "Noch nicht gerechnet - Stundenplan rechnen (F6).")
+        End If
+        Dim anzahl = _projekt.Staende.Where(Function(s) IstVon(s, art)).Count
+        Return $"Zuletzt {letzter.Erstellt:dd.MM. HH:mm} - {letzter.Label}. " &
+               $"{anzahl} Stand/Staende gesichert."
+    End Function
+
+    ' --- Entscheiden ------------------------------------------------
+
+    ''' <summary>Stundenplan: entschieden ist, wenn eine Loesung als
+    ''' Arbeitsstand markiert wurde (5). Klassenbildung: dort gibt es
+    ''' keine Markierung - entschieden ist, was freigegeben wurde; bis
+    ''' dahin heisst "Bereit": am Board vergleichen und fixieren.</summary>
+    Public Function SchrittEntscheiden(art As Rechnungsart) As SchrittStand
+        If Not ProjektOffen OrElse LetzterStand(art) Is Nothing Then Return SchrittStand.Offen
+        If art = Rechnungsart.Klassenbildung Then
+            Return If(Freigaben(art).Count > 0, SchrittStand.Erledigt, SchrittStand.Bereit)
+        End If
+        Return If(Arbeitsstand() IsNot Nothing, SchrittStand.Erledigt, SchrittStand.Bereit)
+    End Function
+
+    Public Function SchrittEntscheidenText(art As Rechnungsart) As String
+        If Not ProjektOffen Then Return "Erst ein Projekt anlegen oder oeffnen."
+        If LetzterStand(art) Is Nothing Then Return "Erst rechnen - dann gibt es etwas zu vergleichen."
+        If art = Rechnungsart.Klassenbildung Then
+            Dim fix = _projekt.Klassenbildung.Fixierungen.Count
+            Dim zusatz = If(fix = 0, "", $" {fix} Fixierung(en) gesetzt.")
+            Return "Am Board Varianten vergleichen, Kinder anpinnen und neu rechnen." & zusatz
+        End If
+        Dim gewaehlt = Arbeitsstand()
+        If gewaehlt Is Nothing Then
+            Return "Im Dashboard vergleichen und eine Loesung als Arbeitsstand uebernehmen."
+        End If
+        Return $"Arbeitsstand: {gewaehlt.Label}."
+    End Function
 
     ''' <summary>Der Stand, in dem eine Loesung als Arbeitsstand markiert
-    ''' ist (lauf.arbeitsstand, gesetzt aus dem Dashboard).</summary>
+    ''' ist (lauf.arbeitsstand, gesetzt aus dem Stundenplan-Dashboard).</summary>
     Private Function Arbeitsstand() As ProjektStand
         If Not ProjektOffen Then Return Nothing
         Return _projekt.Staende.LastOrDefault(
             Function(s) s.Lauf IsNot Nothing AndAlso s.Lauf.ContainsKey("arbeitsstand"))
     End Function
 
-    ''' <summary>Der Klick auf "Entscheiden" fuehrt in das Dashboard, das
-    ''' tatsaechlich etwas zeigt. "Immer Stundenplan" waere bei einer
-    ''' Schule, die nur die Klassenbildung nutzt, ein Klick ins Leere.</summary>
-    Private Function Entscheidungsbereich() As Bereich
-        Dim letzter = LetzterStand()
-        If letzter IsNot Nothing AndAlso letzter.Klassenbildung IsNot Nothing Then Return Bereich.Klassenbildung
-        Return Bereich.Stundenplan
+    ' --- Freigabe ---------------------------------------------------
+
+    Public Function SchrittFreigabe(art As Rechnungsart) As SchrittStand
+        If Not ProjektOffen Then Return SchrittStand.Offen
+        If Freigaben(art).Count > 0 Then Return SchrittStand.Erledigt
+        If art = Rechnungsart.Klassenbildung Then
+            Return If(LetzterStand(art) IsNot Nothing, SchrittStand.Bereit, SchrittStand.Offen)
+        End If
+        Return If(Arbeitsstand() IsNot Nothing, SchrittStand.Bereit, SchrittStand.Offen)
     End Function
 
-    ' --- [5] Freigabe & Export --------------------------------------
+    Public Function SchrittFreigabeText(art As Rechnungsart) As String
+        If Not ProjektOffen Then Return "Erst ein Projekt anlegen oder oeffnen."
+        Dim frei = Freigaben(art)
+        If frei.Count = 0 Then
+            Return If(SchrittFreigabe(art) = SchrittStand.Bereit,
+                      "Noch nicht freigegeben - aus der Ansicht oder im Bereich Laeufe.",
+                      "Noch nicht freigegeben.")
+        End If
+        Return String.Join("  ·  ", frei.Select(
+            Function(s) $"{Freigabe.ArtVon(s)} freigegeben am {s.Erstellt:dd.MM.yyyy}"))
+    End Function
 
-    Public ReadOnly Property SchrittFreigabe As SchrittStand
-        Get
-            If Not ProjektOffen Then Return SchrittStand.Offen
-            If Freigaben().Count > 0 Then Return SchrittStand.Erledigt
-            Return If(Arbeitsstand() IsNot Nothing, SchrittStand.Bereit, SchrittStand.Offen)
-        End Get
-    End Property
-
-    Public ReadOnly Property SchrittFreigabeText As String
-        Get
-            If Not ProjektOffen Then Return "Erst ein Projekt anlegen oder oeffnen."
-            Dim frei = Freigaben()
-            If frei.Count = 0 Then Return "Noch nicht freigegeben."
-            ' Klassenbildung und Stundenplan sind zwei Entscheidungen mit
-            ' je eigenem Nachweis - beide nennen, nicht nur die letzte.
-            Return String.Join("  ·  ", frei.Select(
-                Function(s) $"{Freigabe.ArtVon(s)} freigegeben am {s.Erstellt:dd.MM.yyyy}"))
-        End Get
-    End Property
-
-    Private Function Freigaben() As List(Of ProjektStand)
+    Private Function Freigaben(art As Rechnungsart) As List(Of ProjektStand)
         If Not ProjektOffen Then Return New List(Of ProjektStand)
-        Return _projekt.Staende.Where(AddressOf LaeufeViewModel.IstFreigabe).ToList()
+        Return _projekt.Staende.Where(
+            Function(s) LaeufeViewModel.IstFreigabe(s) AndAlso IstVon(s, art)).ToList()
     End Function
-    ' ---------------------------------------------------------------
 
-    Public ReadOnly Property SchrittProjekt As SchrittStand
-        Get
-            Return If(ProjektOffen, SchrittStand.Erledigt, SchrittStand.Bereit)
-        End Get
-    End Property
+    ''' <summary>Der Klick auf die Freigabe-Zeile: zeigt das Dashboard
+    ''' dieser Rechnung gerade einen Stand, wird DER freigegeben - sonst
+    ''' fuehrt der Weg in die Historie, wo man einen waehlt. Ohne Stand
+    ''' gibt es nichts freizugeben; das sagt die Zeile selbst.</summary>
+    Private Sub Freigeben(art As Rechnungsart)
+        Dim id As String = Nothing
+        If _standIds.TryGetValue(BereichDerArt(art), id) Then
+            Bereich = BereichDerArt(art)
+            FreigabeAusSicht()
+            Return
+        End If
+        Bereich = Bereich.Laeufe
+    End Sub
+    ' ---------------------------------------------------------------
 
     Public ReadOnly Property SchrittStammdaten As SchrittStand
         Get
             If Not ProjektOffen Then Return SchrittStand.Offen
             Return If(PruefungGruen, SchrittStand.Erledigt, SchrittStand.Warnung)
-        End Get
-    End Property
-
-    ''' <summary>"Erledigt" heisst: es gibt einen gesicherten STAND.
-    '''
-    ''' Frueher hing das am Auslieferungs-Slot ("wird gerade etwas
-    ''' angezeigt?"). Mit zwei Dashboards war das falsch: ein Wechsel
-    ''' auf das leere Board liess einen gerechneten Stundenplan als
-    ''' ungerechnet erscheinen. Ein Lauf bleibt ein Lauf, unabhaengig
-    ''' davon, wohin man gerade schaut.</summary>
-    Public ReadOnly Property SchrittRechnen As SchrittStand
-        Get
-            If Not ProjektOffen Then Return SchrittStand.Offen
-            If _projekt.Staende.Count > 0 Then Return SchrittStand.Erledigt
-            Return If(KannKlassenbildungRechnen OrElse KannStundenplanRechnen,
-                      SchrittStand.Bereit, SchrittStand.Offen)
         End Get
     End Property
 
@@ -515,23 +695,24 @@ Public NotInheritable Class HauptViewModel
         End Get
     End Property
 
-    ''' <summary>Sammelmeldung nach jedem Vorgang, der einen Schritt
+    ''' <summary>Synthetischer PropertyChanged-Name: die Karten sind
+    ''' abgeleitete Werte ohne eigene Eigenschaft, das Fenster baut sie
+    ''' auf dieses Signal hin neu.</summary>
+    Public Const KartenAktualisiert As String = "KartenAktualisiert"
+
+    ''' <summary>Sammelmeldung nach jedem Vorgang, der eine Zeile
     ''' weiterbewegt haben kann. Bewusst an EINER Stelle: sonst
     ''' vergisst der naechste Aufrufer eine der Eigenschaften, und die
-    ''' Leiste zeigt stillschweigend einen alten Stand.</summary>
+    ''' Karte zeigt stillschweigend einen alten Stand.</summary>
     Private Sub MeldeSchritte()
-        Melde(NameOf(SchrittProjekt))
         Melde(NameOf(SchrittStammdaten))
-        Melde(NameOf(SchrittRechnen))
         Melde(NameOf(SchrittStammdatenText))
         Melde(NameOf(SchrittRegeln))
         Melde(NameOf(SchrittRegelnText))
-        Melde(NameOf(SchrittRechnenText))
-        Melde(NameOf(SchrittEntscheiden))
-        Melde(NameOf(SchrittEntscheidenText))
-        Melde(NameOf(SchrittFreigabe))
-        Melde(NameOf(SchrittFreigabeText))
+        Melde(NameOf(SchrittKinder))
+        Melde(NameOf(SchrittKinderText))
         Melde(NameOf(PruefungGruen))
+        Melde(KartenAktualisiert)
     End Sub
 
     ' ---------------------------------------------------------------
@@ -596,6 +777,82 @@ Public NotInheritable Class HauptViewModel
         SpeichereAuf(ziel)
         Meldung = $"Gespeichert: {IO.Path.GetFileName(ziel)}"
     End Sub
+
+    ''' <summary>Unter neuem Namen speichern. Das Passwort bleibt - eine
+    ''' Kopie mit anderem Passwort waere ein eigener Vorgang, kein
+    ''' Nebeneffekt des Speicherns.</summary>
+    Public Sub SpeichernUnter()
+        If Not ProjektOffen Then Return
+        Dim vorschlag = If(_pfad Is Nothing, "Projekt.splanx", IO.Path.GetFileName(_pfad))
+        Dim ziel = _dialoge.ProjektdateiSpeichernUnter(vorschlag)
+        If ziel Is Nothing Then Return
+        SpeichereAuf(ziel)
+        Melde(NameOf(Titel))
+        Meldung = $"Gespeichert: {IO.Path.GetFileName(ziel)}"
+    End Sub
+
+    ''' <summary>Projekt schliessen, zurueck auf die leere Startseite.
+    ''' Fragt bei ungespeicherten Aenderungen - dieselbe Frage wie beim
+    ''' Beenden, denn es geht um dieselben Daten.</summary>
+    Public Sub Schliessen()
+        If Not ProjektOffen Then Return
+        If Geaendert AndAlso Not _dialoge.Frage("Projekt schließen",
+                "Es gibt ungespeicherte Änderungen. Trotzdem schließen?") Then Return
+
+        _seiten.Clear()
+        _standIds.Clear()
+        _pfad = Nothing
+        _passwort = Nothing
+        Geaendert = False
+        Projekt = Nothing
+        Bereich = Bereich.Start
+        SeiteFuerBereichAusliefern()
+        Melde(NameOf(HatAnzeige))
+        Meldung = "Projekt geschlossen."
+    End Sub
+
+    ' ---------------------------------------------------------------
+    ' Pflegemasken
+    ' ---------------------------------------------------------------
+    '
+    ' Ein Weg fuer alle Aufrufer (Menue, Startkarte, Bereichskopf): die
+    ' Maske oeffnen, danach die Karten neu bewerten. Ohne das zweite
+    ' zeigte die Startseite nach dem Anlegen einer Klasse noch "keine
+    ' Klasse angelegt" - Geaendert war laengst True und meldete nichts
+    ' mehr.
+
+    Public Sub StammdatenPflegen()
+        If Not PflegeMoeglich("Stammdaten") Then Return
+        _dialoge.StammdatenPflegen()
+        MeldeSchritte()
+    End Sub
+
+    Public Sub RegelnPflegen()
+        If Not PflegeMoeglich("Regeln") Then Return
+        _dialoge.RegelnPflegen()
+        MeldeSchritte()
+    End Sub
+
+    Public Sub KlassenbildungPflegen()
+        If Not PflegeMoeglich("Klassenbildung") Then Return
+        _dialoge.KlassenbildungPflegen()
+        MeldeSchritte()
+    End Sub
+
+    Public Sub SolverEinstellungenPflegen()
+        If Not PflegeMoeglich("Solver-Einstellungen") Then Return
+        _dialoge.SolverEinstellungenPflegen()
+        MeldeSchritte()
+    End Sub
+
+    ''' <summary>Ohne Projekt gibt es nichts zu pflegen - dann der
+    ''' Hinweis statt eines leeren Fensters, in dem jede Aktion ins
+    ''' Nichts liefe.</summary>
+    Private Function PflegeMoeglich(titel As String) As Boolean
+        If ProjektOffen Then Return True
+        _dialoge.Hinweis(titel, "Erst ein Projekt anlegen, öffnen oder eine Schule übernehmen.")
+        Return False
+    End Function
 
     ''' <summary>Uebernahme eines bestehenden tests/&lt;schule&gt;-Ordners -
     ''' der Einstieg "Bestehende Schule uebernehmen" (Konzept 9).</summary>

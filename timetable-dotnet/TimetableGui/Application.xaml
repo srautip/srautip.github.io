@@ -1,6 +1,7 @@
 <Application x:Class="Application"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:app="clr-namespace:TimetableGui"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <ResourceDictionary>
@@ -18,6 +19,7 @@
             </ResourceDictionary.MergedDictionaries>
 
             <BooleanToVisibilityConverter x:Key="BoolNachSichtbar" />
+            <app:BereichGewaehlt x:Key="BereichGewaehlt" />
 
             <!-- ============ Steuerelemente, minimal-invasiv ============
                  Grundsatz: Setter ja, ControlTemplate nur wo
@@ -205,6 +207,34 @@
                 </Setter>
             </Style>
 
+            <!-- Dieselbe Zeile im Bereichskopf, einzeilig: Zeichen und
+                 Titel nebeneinander, der Text als ToolTip. Der Kopf ist
+                 eine Leiste, keine Liste. -->
+            <Style x:Key="Kopfknopf" TargetType="Button" BasedOn="{StaticResource Schrittknopf}">
+                <Setter Property="Margin" Value="0,0,4,0" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Rahmen" Background="Transparent"
+                                    CornerRadius="{StaticResource radius-m}"
+                                    Padding="6,4">
+                                <ContentPresenter />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Rahmen" Property="Background"
+                                            Value="{StaticResource farbe-flaeche-3}" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Rahmen" Property="Background"
+                                            Value="{StaticResource farbe-flaeche-3}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <Style x:Key="SchrittZeichen" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="{StaticResource schrift-symbole}" />
                 <Setter Property="FontSize" Value="{StaticResource grad-kopf}" />
@@ -245,6 +275,16 @@
             <Style x:Key="Marke" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="{StaticResource grad-titel}" />
                 <Setter Property="Foreground" Value="{StaticResource farbe-text}" />
+            </Style>
+
+            <!-- ============ Masken ============ -->
+            <!-- Beschriftung ueber einem Eingabefeld. Stand vorher als
+                 lokale Kopie in zwei Masken; die dritte (Solver) waere
+                 die Grenze gewesen. -->
+            <Style x:Key="Feldbeschriftung" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource farbe-text-2}" />
+                <Setter Property="FontSize" Value="{StaticResource grad-klein}" />
+                <Setter Property="Margin" Value="0,10,0,2" />
             </Style>
 
         </ResourceDictionary>

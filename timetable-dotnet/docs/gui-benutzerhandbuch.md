@@ -28,16 +28,26 @@ trifft ein Mensch und bestätigt sie namentlich – siehe *Freigabe*.
 
 ## Der Weg durch die Anwendung
 
-Die Startseite ist eine Schrittleiste. Sie zeigt für jeden Schritt, wo
-Sie stehen, und ist anklickbar:
+Links stehen vier Bereiche: **Start**, **Klassen**, **Stunden**, **Läufe**.
+
+Die Startseite zeigt zwei Karten – eine je Rechnung. Jede Zeile sagt, wo
+Sie stehen, und ist anklickbar: die Eingabe-Zeilen öffnen ihre Maske,
+*Rechnen* rechnet, *Entscheiden* öffnet die Ansicht, *Freigabe* gibt frei.
 
 ```
-[1] Stammdaten           ✓  8 Klassen, 12 Lehrkräfte, 14 Fächer – Prüfung grün
-[2] Regeln               ▶  Keine Handregeln – der Plan rechnet allein aus den Stammdaten
-[3] Rechnen              ✓  Zuletzt 30.08. 14:32 – Stundenplan, 3 Lösung(en)
-[4] Entscheiden          ▶  Im Dashboard vergleichen und eine Lösung übernehmen
-[5] Freigabe & Export    ○  Noch nicht freigegeben
+Klassenbildung                          Stundenplan
+[1] Kinder & Regeln  ▶ Noch keine Kinder [1] Stammdaten  ✓ 8 Klassen, 12 Lehrkräfte – Prüfung grün
+[2] Rechnen          ○ Erst Kinder…      [2] Regeln      ▶ Keine Handregeln
+[3] Entscheiden      ○ Erst rechnen      [3] Rechnen     ✓ Zuletzt 30.08. 14:32 – 3 Lösung(en)
+[4] Freigabe         ○ Noch nicht        [4] Entscheiden ▶ Im Dashboard eine Lösung übernehmen
+                                         [5] Freigabe    ○ Noch nicht freigegeben
 ```
+
+In den Bereichen **Klassen** und **Stunden** steht dieselbe Information
+in einer Leiste über der Ansicht: die Eingaben mit ihrem Stand, der
+Rechnen-Knopf und rechts die Auswahl des Standes, den Sie sehen wollen.
+Solange noch nichts gerechnet ist, zeigt der Bereich statt der Ansicht
+seinen Ablauf.
 
 | Zeichen | Bedeutung |
 |---|---|
@@ -84,7 +94,9 @@ Lehrplanzahlen wären schlimmer als etwas Tipparbeit.
 
 ## 2. Stammdaten
 
-*Extras → Stammdaten…* oder Klick auf Schritt [1].
+*Bearbeiten → Stammdaten…*, Klick auf die Zeile *Stammdaten* der
+Stundenplan-Karte oder auf *Stammdaten* in der Leiste des Bereichs
+**Stunden**.
 
 Acht Bereiche, alle nach demselben Muster: **Liste links, Formular
 rechts**, darunter *Neu · Duplizieren · Löschen · Prüfen*.
@@ -122,7 +134,8 @@ oder `● Nicht gespeicherte Änderungen`. Daneben ein **Speichern**-Knopf;
 
 ## 3. Regeln
 
-*Extras → Regeln…* oder Klick auf Schritt [2].
+*Bearbeiten → Regeln…*, Klick auf die Zeile *Regeln* der
+Stundenplan-Karte oder auf *Regeln* in der Leiste des Bereichs **Stunden**.
 
 Regeln sind **optional**. Viele Schulen kommen ohne aus – der Plan
 rechnet dann allein aus Stammdaten und Kontingentstundentafel.
@@ -154,7 +167,9 @@ Zwei Dinge sind bewusst nicht bearbeitbar:
 
 ## 4. Klassenbildung: Kinder, Gruppen, Wünsche
 
-*Extras → Klassenbildung: Eingaben…*
+*Bearbeiten → Klassenbildung: Kinder & Regeln…*, Klick auf die Zeile
+*Kinder & Regeln* der Klassenbildungs-Karte oder in der Leiste des
+Bereichs **Klassen**.
 
 Diese Liste ist **nicht** die Schülerliste der Stammdaten. Die
 Klassenbildung läuft *vor* der Klassenzuteilung; sie hat ihre eigene
@@ -214,9 +229,10 @@ Lösung. *Hart* heißt: ohne sie gibt es keine.
 
 ### Solver
 
-Der letzte Reiter stellt Zeitbudget und Anzahl der Varianten ein. Die
-Vorgaben sind brauchbar; ein Expertenbereich darunter öffnet die
-übrigen Stellschrauben, falls ein Lauf partout nichts findet.
+*Bearbeiten → Solver-Einstellungen…* stellt Zeitbudget, Anzahl der
+Lösungen und der Varianten ein – für beide Rechnungen. Die Vorgaben
+sind brauchbar; ein Expertenbereich darunter öffnet die übrigen
+Stellschrauben, falls ein Lauf partout nichts findet.
 
 ---
 
@@ -224,6 +240,9 @@ Vorgaben sind brauchbar; ein Expertenbereich darunter öffnet die
 
 - **F5** – Klassenbildung
 - **F6** – Stundenplan
+
+Dieselben Knöpfe stehen in der Leiste des jeweiligen Bereichs, in der
+Zeile *Rechnen* der Startkarte und im Menü *Planung*.
 
 Beide laufen im Hintergrund; die Anwendung bleibt bedienbar. Die
 Statuszeile zeigt Stufe, verstrichene Zeit und gefundene Lösungen. Der
@@ -292,8 +311,10 @@ Protokolleintrag.
 
 ## 8. Läufe und Stände
 
-Jeder Lauf hinterlässt einen *Stand*. Der Bereich **Läufe** listet sie,
-neueste zuerst:
+Jeder Lauf hinterlässt einen *Stand*. Der schnellste Weg zu einem
+früheren Stand ist die Auswahl rechts in der Leiste des Bereichs
+**Klassen** bzw. **Stunden** – sie zeigt nur die Stände dieser Rechnung.
+Der Bereich **Läufe** listet alle, neueste zuerst:
 
 - **Ansehen** – zeigt den Stand wieder an, ohne neu zu rechnen
 - **Umbenennen** – außer bei freigegebenen Ständen; deren Label gehört
@@ -341,11 +362,11 @@ Vorname und – falls fixiert – Klasse.
 
 | Beobachtung | wahrscheinliche Ursache |
 |---|---|
-| „Rechnen" bleibt aus | Es fehlen Klassen, Fächer oder Lehrkräfte. Schritt [1] nennt den ersten Befund |
+| „Rechnen" bleibt aus | Es fehlen Klassen, Fächer oder Lehrkräfte. Die Zeile *Stammdaten* der Stundenplan-Karte nennt den ersten Befund |
 | Lauf endet ohne Lösung | Die Regeln lassen keinen Plan zu, oder das Zeitbudget war zu knapp. Die Statuszeile nennt die Stufe |
 | Import legt keine Fixierungen an | Die Klasse-Spalte enthält Namen (`5a`), aber im Rahmen sind keine Klassennamen gesetzt. Erst *Labels* eintragen |
 | Umlaute nach dem Import kaputt | Sehr selten – die Anwendung erkennt UTF-8 und Windows-1252. Speichern Sie die Datei notfalls aus Excel neu als „CSV UTF-8" |
-| Eine Regel wirkt nicht | Sie zeigt womöglich auf einen Slot außerhalb des Rasters. Schritt [2] weist darauf hin |
+| Eine Regel wirkt nicht | Sie zeigt womöglich auf einen Slot außerhalb des Rasters. Die Zeile *Regeln* weist darauf hin |
 
 ---
 
