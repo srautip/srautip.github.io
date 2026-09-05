@@ -8,6 +8,7 @@
   var C = global.BAV.config;
   var X = global.BAV.examples;
   var H = E.helpers;
+  var HILFE = (global.BAV.hilfe && global.BAV.hilfe.STAMMDATEN) || {};
   var SPEICHER = 'bav-va-state-v1';
 
   /* ------------------------------------------------------------------
@@ -221,6 +222,28 @@
   /* ------------------------------------------------------------------
      Formularaufbau
      ------------------------------------------------------------------ */
+  /** Kleiner (i)-Knopf hinter der Feldbeschriftung, sofern eine Erläuterung hinterlegt ist. */
+  function baueInfoKnopf(key) {
+    if (!HILFE[key]) return null;
+    var b = el('button', {
+      type: 'button', class: 'info-btn',
+      'aria-label': 'Erläuterung zu „' + HILFE[key].titel + '“ anzeigen',
+      title: 'Erläuterung anzeigen', text: 'i'
+    });
+    b.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      zeigeHilfe(key);
+    });
+    return b;
+  }
+
+  function baueBeschriftung(id, text, key) {
+    return el('div', { class: 'label-row' }, [
+      el('label', { for: id, text: text }),
+      baueInfoKnopf(key)
+    ]);
+  }
+
   function baueFeld(def, objekt, aufAenderung) {
     var id = 'f-' + def.key + '-' + Math.random().toString(36).slice(2, 7);
     var wrap, input;
@@ -235,7 +258,7 @@
       wrap = el('div', { class: 'field check wide' }, [
         input,
         el('div', { class: 'txt' }, [
-          el('label', { for: id, text: def.label }),
+          baueBeschriftung(id, def.label, def.key),
           def.hint ? el('span', { class: 'hint', text: def.hint }) : null
         ])
       ]);
@@ -280,7 +303,7 @@
     if (def.einheitAbh) unit = einheitSuffix(aktivesAnrecht());
 
     wrap = el('div', { class: 'field' }, [
-      el('label', { for: id, text: def.label + (unit ? ' (' + unit + ')' : '') }),
+      baueBeschriftung(id, def.label + (unit ? ' (' + unit + ')' : ''), def.key),
       input,
       def.hint ? el('span', { class: 'hint', text: def.hint }) : null
     ]);
@@ -378,6 +401,88 @@
     baueFormular('form-extern', F_EXTERN, a, aufAenderung);
     baueFormular('form-config', F_CONFIG, state.cfg, aufAenderung);
     aktualisiereHinweise();
+  }
+
+  /* ------------------------------------------------------------------
+     Infofenster zu einem Eingabefeld
+     ------------------------------------------------------------------ */
+  var dialog = null;
+
+  function baueDialog() {
+    if (dialog) return dialog;
+    dialog = el('dialog', { class: 'info-dialog', id: 'hilfe-dialog' });
+    dialog.appendChild(el('div', { class: 'info-inhalt', id: 'hilfe-inhalt' }));
+    /* Klick auf den Hintergrund schließt das Fenster */
+    dialog.addEventListener('click', function (ev) {
+      if (ev.target === dialog) dialog.close();
+    });
+    document.body.appendChild(dialog);
+    return dialog;
+  }
+
+  function abschnitt(titel, kinder) {
+    if (!kinder || !kinder.length) return null;
+    return el('section', {}, [el('h3', { text: titel })].concat(kinder));
+  }
+
+  function zeigeHilfe(key) {
+    var e = HILFE[key];
+    if (!e) return;
+    var d = baueDialog();
+    var c = d.querySelector('.info-inhalt');
+    c.innerHTML = '';
+
+    var schliessen = el('button', { type: 'button', class: 'info-close', 'aria-label': 'Schließen', text: '×' });
+    schliessen.addEventListener('click', function () { d.close(); });
+
+    c.appendChild(el('header', { class: 'info-head' }, [
+      el('div', {}, [
+        el('h2', { text: e.titel }),
+        e.recht ? el('div', { class: 'legal', text: e.recht }) : null
+      ]),
+      schliessen
+    ]));
+
+    var koerper = el('div', { class: 'info-body' });
+
+    if (e.woher) {
+      koerper.appendChild(el('p', { class: 'woher' }, [
+        el('strong', { text: 'Quelle der Angabe: ' }),
+        el('span', { text: e.woher })
+      ]));
+    }
+    if (e.bedeutung) koerper.appendChild(el('p', { class: 'lead', text: e.bedeutung }));
+
+    if (e.auspraegungen && e.auspraegungen.length) {
+      var dl = el('dl', { class: 'auspraegungen' });
+      e.auspraegungen.forEach(function (a) {
+        dl.appendChild(el('dt', { text: a.name }));
+        dl.appendChild(el('dd', { text: a.text }));
+      });
+      koerper.appendChild(abschnitt('Ausprägungen', [dl]));
+    }
+
+    if (e.wirkung && e.wirkung.length) {
+      var ulW = el('ul', {});
+      e.wirkung.forEach(function (w) { ulW.appendChild(el('li', { text: w })); });
+      koerper.appendChild(abschnitt('Auswirkung auf die Berechnung', [ulW]));
+    }
+
+    if (e.befunde && e.befunde.length) {
+      var ulB = el('ul', { class: 'befund-liste' });
+      e.befunde.forEach(function (b) { ulB.appendChild(el('li', { text: b })); });
+      koerper.appendChild(abschnitt('Betroffene Befunde', [ulB]));
+    }
+
+    if (e.praxis) {
+      koerper.appendChild(abschnitt('Praxishinweis', [el('p', { class: 'praxis', text: e.praxis })]));
+    }
+
+    c.appendChild(koerper);
+
+    if (typeof d.showModal === 'function') d.showModal();
+    else d.setAttribute('open', 'open');
+    schliessen.focus();
   }
 
   /* ------------------------------------------------------------------

@@ -216,6 +216,60 @@
     gleich(JSON.stringify(f.anrecht), kopie, 'Anrecht unverändert');
   });
 
+  /* ---------------- Erläuterungen zu den Stammdaten ---------------- */
+  var HILFE = (global.BAV.hilfe && global.BAV.hilfe.STAMMDATEN) || {};
+
+  /* Muss mit F_STAMM in ui.js übereinstimmen */
+  var STAMMDATEN_FELDER = ['id', 'traeger', 'durchfuehrungsweg', 'zusageart', 'einheit',
+    'bewertung', 'unverfallbar', 'unverfallbar_ab', 'laufende_leistung',
+    'kapitalwahlrecht_ausgeuebt', 'traeger_teilungsordnung_vorhanden'];
+
+  test('Jedes Stammdatenfeld hat eine Erläuterung', function () {
+    STAMMDATEN_FELDER.forEach(function (k) {
+      if (!HILFE[k]) throw new Error('Erläuterung fehlt für Feld ' + k);
+    });
+    Object.keys(HILFE).forEach(function (k) {
+      if (STAMMDATEN_FELDER.indexOf(k) < 0) throw new Error('Erläuterung ohne zugehöriges Feld: ' + k);
+    });
+  });
+
+  test('Jede Erläuterung ist inhaltlich vollständig', function () {
+    Object.keys(HILFE).forEach(function (k) {
+      var e = HILFE[k];
+      if (!e.titel) throw new Error(k + ': Titel fehlt');
+      if (!e.bedeutung || e.bedeutung.length < 40) throw new Error(k + ': Bedeutung fehlt oder ist zu knapp');
+      if (!e.auspraegungen || !e.auspraegungen.length) throw new Error(k + ': keine Ausprägungen');
+      e.auspraegungen.forEach(function (a) {
+        if (!a.name || !a.text) throw new Error(k + ': Ausprägung ohne Bezeichnung oder Erläuterung');
+      });
+      if (!e.wirkung || !e.wirkung.length) throw new Error(k + ': Auswirkung auf die Berechnung fehlt');
+    });
+  });
+
+  test('Ausprägungen der Auswahlfelder decken die Aufzählungstypen exakt ab', function () {
+    [['durchfuehrungsweg', E.DURCHFUEHRUNGSWEG], ['zusageart', E.ZUSAGEART],
+     ['einheit', E.EINHEIT], ['bewertung', E.BEWERTUNG]].forEach(function (paar) {
+      var feld = paar[0], enumWerte = Object.keys(paar[1]);
+      var dokumentiert = HILFE[feld].auspraegungen.map(function (a) { return a.wert; });
+      enumWerte.forEach(function (w) {
+        if (dokumentiert.indexOf(w) < 0) throw new Error(feld + ': Ausprägung ' + w + ' ist nicht erläutert');
+      });
+      dokumentiert.forEach(function (w) {
+        if (enumWerte.indexOf(w) < 0) throw new Error(feld + ': erläuterte Ausprägung ' + w + ' kennt die Engine nicht');
+      });
+    });
+  });
+
+  test('Alle in den Erläuterungen genannten Befundcodes existieren', function () {
+    Object.keys(HILFE).forEach(function (k) {
+      var text = JSON.stringify(HILFE[k]);
+      var codes = text.match(/\b(GD|EA|KW|HT|BG|TA|TK|ER)\d{2}\b/g) || [];
+      codes.forEach(function (code) {
+        if (!E.KATALOG[code]) throw new Error(k + ': unbekannter Befundcode ' + code);
+      });
+    });
+  });
+
   /* ---------------- Ausführung ---------------- */
   function run() {
     return tests.map(function (t) {
