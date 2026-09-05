@@ -376,6 +376,18 @@ Highlight-Mengen, Pin-Export-Inhalt, Live-Bewertung == Bewerte).
     Komfort, kein Nachweis; Staende und Protokoll bleiben unberuehrt.
     Tests: `VerlaufTests` (Host, inkl. echtem Neurechnen mit zwei
     Staenden) und `KlassenbildungBoardTests.UndoUndRedoImDoppelklickBetrieb`.
+  - **Fehler behoben: Freigabe sah die Verschiebungen nicht.** Ein Kind
+    per Pin aus seiner Buendelung in eine andere Klasse - das Board
+    zeigt die zerrissene Gruppe rot, der Freigabe-Dialog sagte "alle
+    Regeln erfuellt", weil er das Solver-Ergebnis des Standes las.
+    `Freigabe.Vorlage(stand, projekt)` bewertet jetzt die ARBEITSSICHT:
+    Basis-Variante aus dem Board-Zustand, Pins darueber, bewertet mit
+    `KlassenbildungQuality.Bewerte` (das VB-Original des JS-Duplikats -
+    dieselbe Rechnung wie im Board). Die freigegebene Zuordnung selbst
+    wandert in den Nachweis (`lauf.freigabe.zuordnung`), denn die Pins
+    im Projekt sind veraenderlich und der Stand kennt sie nicht. Passt
+    ein aelterer Stand nicht zur Kinderliste, gilt das Solver-Ergebnis.
+    Tests: `FreigabeTests.DieFreigabeBewertetDieArbeitssichtMitPins`.
   - **"1 von 100 fixiert" direkt nach dem ersten Lauf** ist kein
     Fehler: die Beispielschule fixiert `S030` in `input/
     klassenbildung.yaml` (Rollstuhl, barrierefreier Raum). Der Zaehler

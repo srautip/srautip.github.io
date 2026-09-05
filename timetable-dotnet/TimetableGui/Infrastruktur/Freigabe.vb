@@ -28,6 +28,14 @@ Public NotInheritable Class Freigabevorlage
     ''' Kann-Regel.</summary>
     Public Property HarteVerstoesse As Integer
     Public Property Kennzahlen As String = ""
+    ''' <summary>Klassenbildung: die freigegebene Zuordnung Kind -> Klasse
+    ''' der ARBEITSSICHT (Variante plus Pins) - sie gehoert in den
+    ''' Nachweis, denn die Pins im Projekt sind veraenderlich, der Stand
+    ''' allein kennt sie nicht. Nothing beim Stundenplan.</summary>
+    Public Property Zuordnung As JsonObject
+    ''' <summary>Wie viele Kinder die Pins gegenueber der Variante
+    ''' verschieben.</summary>
+    Public Property Verschoben As Integer
 
     ''' <summary>Ob eine eigene Begruendung PFLICHT ist. Genau dann,
     ''' wenn es etwas abzuwaegen gibt - ohne Abweichungen waere der
@@ -100,8 +108,14 @@ Public Module Freigabe
     ''' <summary>Baut die Vorlage aus einem Stand. Massgeblich ist die
     ''' MARKIERTE Loesung (siehe `lauf.arbeitsstand`); ohne Markierung
     ''' gilt die erste - dieselbe, die das Dashboard beim Oeffnen
-    ''' zeigt.</summary>
-    Public Function Vorlage(stand As ProjektStand) As Freigabevorlage
+    ''' zeigt.
+    '''
+    ''' Mit `projekt` wird bei der Klassenbildung die ARBEITSSICHT
+    ''' bewertet: die gewaehlte Basis-Variante plus die Pins des Boards
+    ''' (gui-state). Ohne das sagte der Dialog "keine Abweichungen",
+    ''' obwohl eine Verschiebung eine Buendelung zerrissen hatte - der
+    ''' Stand kennt nur das Solver-Ergebnis (live gemeldet 06.09.2026).</summary>
+    Public Function Vorlage(stand As ProjektStand, Optional projekt As Projekt = Nothing) As Freigabevorlage
         If stand Is Nothing Then Return Nothing
         Dim v As New Freigabevorlage With {.StandId = stand.Id, .Label = stand.Label}
 
@@ -109,7 +123,7 @@ Public Module Freigabe
         If v.Art = "Stundenplan" Then
             FuelleStundenplan(v, stand)
         ElseIf v.Art = "Klassenbildung" Then
-            FuelleKlassenbildung(v, stand)
+            FuelleKlassenbildung(v, stand, projekt)
         Else
             ' Ein Stand ohne Ergebnis ist nichts, was man freigeben
             ' koennte - und das ehrlich zu sagen ist besser, als eine
@@ -161,16 +175,47 @@ Public Module Freigabe
                        $"{Ganzzahl(sol, "edge_period_count")} Randstunden."
     End Sub
 
-    Private Sub FuelleKlassenbildung(v As Freigabevorlage, stand As ProjektStand)
+    Private Sub FuelleKlassenbildung(v As Freigabevorlage, stand As ProjektStand, projekt As Projekt)
         Dim varianten = TryCast(stand.Klassenbildung("varianten"), JsonArray)
         If varianten Is Nothing OrElse varianten.Count = 0 Then
             v.Kennzahlen = "Der Stand enthält keine Variante."
             Return
         End If
 
+        ' Die Basis ist die im Board gewaehlte Variante (gui-state
+        ' `basis`, 0-basiert); ohne Board-Zustand die markierte Loesung.
         Dim index = Math.Min(GewaehlteLoesung(stand), varianten.Count) - 1
+        Dim gewaehlteBasis = Basis(projekt)
+        If gewaehlteBasis.HasValue AndAlso gewaehlteBasis.Value >= 0 AndAlso gewaehlteBasis.Value < varianten.Count Then
+            index = gewaehlteBasis.Value
+        End If
         Dim variante = TryCast(varianten(index), JsonObject)
         If variante Is Nothing Then Return
+
+        ' Arbeitssicht: Zuordnung der Variante, ueberlagert mit den Pins -
+        ' dieselbe Rechnung wie im Board (aktuelleSicht), und dieselbe
+        ' Bewertung (KlassenbildungQuality.Bewerte, das VB-Original des
+        ' JS-Duplikats). Nur wenn Eingabe und Stand zusammenpassen; ein
+        ' aelterer Stand mit anderen Kindern faellt auf das Solver-Ergebnis
+        ' zurueck.
+        Dim eingabe = projekt?.Klassenbildung
+        Dim zuordnung = ZuordnungVon(variante)
+        If eingabe IsNot Nothing AndAlso zuordnung.Count > 0 AndAlso Passt(eingabe, zuordnung) Then
+            v.Verschoben = PinsAnwenden(zuordnung, projekt.GuiState, eingabe.Klassen.Anzahl)
+            Dim bewertung = KlassenbildungQuality.Bewerte(eingabe, zuordnung)
+            For Each x In bewertung.Verletzungen
+                If x.Mass <= 0 Then Continue For
+                v.Abweichungen.Add($"{x.RegelTyp} {x.RegelId} ({PrioWort(x.Prio)}) nicht erfuellt, Mass {x.Mass}.")
+            Next
+            Dim zo As New JsonObject()
+            For Each kvp In zuordnung.OrderBy(Function(k) k.Key, StringComparer.Ordinal)
+                zo(kvp.Key) = kvp.Value
+            Next
+            v.Zuordnung = zo
+            v.Kennzahlen = $"Variante {index + 1} von {varianten.Count}" &
+                           If(v.Verschoben > 0, $", {v.Verschoben} Kind(er) per Pin verschoben - Arbeitssicht bewertet.", ", wie gerechnet.")
+            Return
+        End If
 
         ' Der Export fuehrt JEDE Regel mit ihrem Mass - auch die
         ' erfuellten mit mass 0 (Verifier-Prinzip: der Bewertungslauf
@@ -193,6 +238,65 @@ Public Module Freigabe
         End If
         v.Kennzahlen = $"Variante {index + 1} von {varianten.Count}."
     End Sub
+
+    Private Function Basis(projekt As Projekt) As Integer?
+        Dim st = projekt?.GuiState
+        If st Is Nothing OrElse Not st.ContainsKey("basis") OrElse st("basis") Is Nothing Then Return Nothing
+        Try
+            Return st("basis").GetValue(Of Integer)()
+        Catch ex As InvalidOperationException
+            Return Nothing
+        Catch ex As FormatException
+            Return Nothing
+        End Try
+    End Function
+
+    Private Function ZuordnungVon(variante As JsonObject) As Dictionary(Of String, Integer)
+        Dim z As New Dictionary(Of String, Integer)
+        Dim o = TryCast(variante("zuordnung"), JsonObject)
+        If o Is Nothing Then Return z
+        For Each kvp In o
+            Try
+                z(kvp.Key) = kvp.Value.GetValue(Of Integer)()
+            Catch ex As InvalidOperationException
+            Catch ex As FormatException
+            End Try
+        Next
+        Return z
+    End Function
+
+    ''' <summary>Bewerten kann man nur, wenn jedes Kind der Eingabe in der
+    ''' Zuordnung steht - sonst stammt der Stand aus einer anderen Liste.</summary>
+    Private Function Passt(eingabe As KlassenbildungInput, zuordnung As Dictionary(Of String, Integer)) As Boolean
+        If eingabe.Schueler.Count = 0 OrElse eingabe.Klassen Is Nothing OrElse eingabe.Klassen.Anzahl < 1 Then Return False
+        Return eingabe.Schueler.All(Function(s) zuordnung.ContainsKey(s.Id))
+    End Function
+
+    ''' <summary>Pins des Boards (gui-state `pins`: Kind -> Klasse) auf die
+    ''' Zuordnung legen. Liefert die Zahl der Kinder, die dadurch in einer
+    ''' anderen Klasse stehen als in der Variante.</summary>
+    Private Function PinsAnwenden(zuordnung As Dictionary(Of String, Integer), guiState As JsonObject, anzahlKlassen As Integer) As Integer
+        Dim pins = TryCast(guiState?("pins"), JsonObject)
+        If pins Is Nothing Then Return 0
+        Dim verschoben = 0
+        For Each kvp In pins
+            If Not zuordnung.ContainsKey(kvp.Key) Then Continue For
+            Dim klasse As Integer
+            Try
+                klasse = kvp.Value.GetValue(Of Integer)()
+            Catch ex As InvalidOperationException
+                Continue For
+            Catch ex As FormatException
+                Continue For
+            End Try
+            If klasse < 1 OrElse klasse > anzahlKlassen Then Continue For
+            If zuordnung(kvp.Key) <> klasse Then
+                zuordnung(kvp.Key) = klasse
+                verschoben += 1
+            End If
+        Next
+        Return verschoben
+    End Function
 
     ''' <summary>Die Stufen heissen, sie werden nicht nummeriert - im
     ''' YAML ist 3 die hoechste Prio, gelesen wird "kritisch" als Nummer 1

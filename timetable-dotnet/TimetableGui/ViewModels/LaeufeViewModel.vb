@@ -60,7 +60,7 @@ Public NotInheritable Class LaeufeViewModel
     End Function
 
     Private Function Zeile(stand As ProjektStand) As Standzeile
-        Dim v = Freigabe.Vorlage(stand)
+        Dim v = Freigabe.Vorlage(stand, _projekt)
         Return New Standzeile With {
             .Id = stand.Id, .Label = stand.Label, .Art = v.Art,
             .Erstellt = stand.Erstellt, .Geschuetzt = stand.Geschuetzt,
@@ -164,7 +164,7 @@ Public NotInheritable Class LaeufeViewModel
             Return False
         End If
 
-        Dim vorlage = Freigabe.Vorlage(stand)
+        Dim vorlage = Freigabe.Vorlage(stand, _projekt)
         If vorlage.Art = "unbekannt" Then
             _dialoge.Hinweis("Nichts freizugeben", "Dieser Stand enthält kein Ergebnis.")
             Return False
@@ -221,6 +221,12 @@ Public NotInheritable Class LaeufeViewModel
             {"kennzahlen", vorlage.Kennzahlen},
             {"notiz", If(antwort.Notiz, "").Trim()}
         }
+        ' Klassenbildung: die freigegebene Zuordnung selbst gehoert zum
+        ' Nachweis - die Pins im Projekt aendern sich, der Stand kennt
+        ' sie nicht.
+        If vorlage.Zuordnung IsNot Nothing Then
+            stand.Lauf("freigabe")("zuordnung") = vorlage.Zuordnung.DeepClone()
+        End If
         ' Geschuetzt heisst: weder Verdraengung noch Loeschen. Beides
         ' erledigt der Kern (Projekt.StandHinzufuegen/StandLoeschen).
         stand.Geschuetzt = True

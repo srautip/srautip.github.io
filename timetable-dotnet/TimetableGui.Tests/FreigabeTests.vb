@@ -429,6 +429,69 @@ Public Class FreigabeTests
             .Klassenbildung = JsonNode.Parse($"{{""varianten"": [{{""verletzungen"": [{liste}]}}]}}").AsObject()}
     End Function
 
+    ''' <summary>Der zweite Fehler aus dem manuellen Test (06.09.2026):
+    ''' ein Kind per Pin aus seiner Buendelung in eine andere Klasse
+    ''' verschoben - der Dialog sagte "alle Regeln erfuellt", weil er das
+    ''' Solver-Ergebnis las und nicht die Arbeitssicht. Mit Projekt wird
+    ''' die Arbeitssicht bewertet, und die Zuordnung wandert in den Nachweis.</summary>
+    <TestMethod>
+    Public Sub DieFreigabeBewertetDieArbeitssichtMitPins()
+        Dim p As New Projekt()
+        Dim kb = p.Klassenbildung
+        kb.Klassen.Anzahl = 2
+        kb.Klassen.MinGroesse = 1
+        kb.Klassen.MaxGroesse = 10
+        For Each id In {"S001", "S002", "S003", "S004"}
+            kb.Schueler.Add(New KlassenbildungSchueler With {.Id = id})
+        Next
+        kb.Gruppen.Add(New KlassenbildungGruppe With {
+            .Id = "G_kita", .Typ = "buendelung", .Modus = "soft", .Prio = 2,
+            .Mitglieder = New List(Of String) From {"S001", "S002"}})
+        Dim stand As New ProjektStand With {
+            .Id = "kb", .Label = "Klassenbildung", .Erstellt = Jetzt,
+            .Klassenbildung = JsonNode.Parse(
+                "{""varianten"": [{""index"": 1, ""zuordnung"": {""S001"": 1, ""S002"": 1, ""S003"": 2, ""S004"": 2}, ""verletzungen"": []}]}").AsObject()}
+        p.StandHinzufuegen(stand)
+
+        ' Ohne Pins: wie gerechnet, keine Abweichung.
+        Dim ohne = Freigabe.Vorlage(stand, p)
+        Assert.AreEqual(0, ohne.Abweichungen.Count, String.Join(" | ", ohne.Abweichungen))
+        Assert.AreEqual(0, ohne.Verschoben)
+        StringAssert.Contains(ohne.Kennzahlen, "wie gerechnet")
+        Assert.AreEqual(1, ohne.Zuordnung("S002").GetValue(Of Integer)())
+
+        ' S002 per Pin nach Klasse 2: die Buendelung ist zerrissen.
+        p.GuiState = JsonNode.Parse("{""pins"": {""S002"": 2}, ""basis"": 0}").AsObject()
+        Dim mit = Freigabe.Vorlage(stand, p)
+        Assert.AreEqual(1, mit.Verschoben)
+        Assert.AreEqual(1, mit.Abweichungen.Count, String.Join(" | ", mit.Abweichungen))
+        StringAssert.Contains(mit.Abweichungen(0), "G_kita")
+        StringAssert.Contains(mit.Abweichungen(0), "wichtig")
+        Assert.IsTrue(mit.NotizPflicht)
+        Assert.AreEqual(2, mit.Zuordnung("S002").GetValue(Of Integer)(), "die freigegebene Zuordnung muss den Pin tragen")
+        StringAssert.Contains(mit.Kennzahlen, "1 Kind(er) per Pin verschoben")
+
+        ' Und im Nachweis landet die Zuordnung der Arbeitssicht.
+        Dim d As New TestDialoge With {
+            .FreigabeAntwort = New Freigabebestaetigung With {.Person = "Frau Meier", .Bestaetigt = True, .Notiz = "Geschwister wollten es so."}}
+        Dim vm As New LaeufeViewModel(p, d, Function() Jetzt)
+        Assert.IsTrue(vm.Freigeben("kb"))
+        Assert.AreEqual(2, stand.Lauf("freigabe")("zuordnung")("S002").GetValue(Of Integer)())
+        Assert.AreEqual(1, stand.Lauf("freigabe")("abweichungen").AsArray().Count)
+    End Sub
+
+    ''' <summary>Ein Stand aus einer anderen Kinderliste laesst sich nicht
+    ''' live bewerten - dann gilt das Solver-Ergebnis, kein Absturz.</summary>
+    <TestMethod>
+    Public Sub PasstDieEingabeNichtZumStandGiltDasSolverErgebnis()
+        Dim p As New Projekt()
+        p.Klassenbildung.Klassen.Anzahl = 2
+        p.Klassenbildung.Schueler.Add(New KlassenbildungSchueler With {.Id = "S999"})
+        Dim v = Freigabe.Vorlage(Klassen("kb", 0, verletzungen:=1, erfuellte:=3), p)
+        Assert.AreEqual(1, v.Abweichungen.Count)
+        Assert.IsNull(v.Zuordnung)
+    End Sub
+
     ''' <summary>Der Fehler aus dem manuellen Test (Grundschule laden,
     ''' Klassen rechnen, Variante 1 freigeben): 52 "nicht erfuellte"
     ''' Regeln im Dialog, davon 50 mit Mass 0. Abweichung ist nur, was
