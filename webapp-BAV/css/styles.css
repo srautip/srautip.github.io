@@ -391,3 +391,9 @@ footer.app-footer {
 }
 
 @media print { .info-btn { display: none; } }
+
+/* Infoknopf in Schrittkopf, Befund und Statuszeile */
+.step-head .info-btn, .befund .info-btn, .status-line .info-btn { flex: 0 0 auto; }
+.befund .kopf .legal { margin-left: auto; }
+.info-titelzeile { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
+.info-titelzeile h2 { margin: 0; }

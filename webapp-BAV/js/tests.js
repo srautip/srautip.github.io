@@ -216,21 +216,37 @@
     gleich(JSON.stringify(f.anrecht), kopie, 'Anrecht unverändert');
   });
 
-  /* ---------------- Erläuterungen zu den Stammdaten ---------------- */
-  var HILFE = (global.BAV.hilfe && global.BAV.hilfe.STAMMDATEN) || {};
+  /* ---------------- Erläuterungen zu den Eingabefeldern ---------------- */
+  var hilfeModul = global.BAV.hilfe || {};
+  var HILFE = hilfeModul.FELDER || {};
 
-  /* Muss mit F_STAMM in ui.js übereinstimmen */
-  var STAMMDATEN_FELDER = ['id', 'traeger', 'durchfuehrungsweg', 'zusageart', 'einheit',
-    'bewertung', 'unverfallbar', 'unverfallbar_ab', 'laufende_leistung',
-    'kapitalwahlrecht_ausgeuebt', 'traeger_teilungsordnung_vorhanden'];
+  /* Muss mit F_STAMM und F_AUSKUNFT in ui.js übereinstimmen */
+  var GRUPPEN = [
+    { name: 'Stammdaten', quelle: hilfeModul.STAMMDATEN || {},
+      felder: ['id', 'traeger', 'durchfuehrungsweg', 'zusageart', 'einheit', 'bewertung',
+        'unverfallbar', 'unverfallbar_ab', 'laufende_leistung', 'kapitalwahlrecht_ausgeuebt',
+        'traeger_teilungsordnung_vorhanden'] },
+    { name: 'Trägerauskunft', quelle: hilfeModul.TRAEGERAUSKUNFT || {},
+      felder: ['ehezeitanteil', 'ausgleichswert', 'ausgleichswert_kapital', 'korr_kapitalwert',
+        'rechnungszins', 'ehezeit_monate_traeger', 'teilungskosten', 'teilungsart_vorschlag',
+        'auskunftsdatum'] }
+  ];
 
-  test('Jedes Stammdatenfeld hat eine Erläuterung', function () {
-    STAMMDATEN_FELDER.forEach(function (k) {
-      if (!HILFE[k]) throw new Error('Erläuterung fehlt für Feld ' + k);
+  test('Jedes Feld der Stammdaten und der Trägerauskunft hat eine Erläuterung', function () {
+    var alle = [];
+    GRUPPEN.forEach(function (g) {
+      g.felder.forEach(function (k) {
+        alle.push(k);
+        if (!g.quelle[k]) throw new Error(g.name + ': Erläuterung fehlt für Feld ' + k);
+      });
+      Object.keys(g.quelle).forEach(function (k) {
+        if (g.felder.indexOf(k) < 0) throw new Error(g.name + ': Erläuterung ohne zugehöriges Feld: ' + k);
+      });
     });
     Object.keys(HILFE).forEach(function (k) {
-      if (STAMMDATEN_FELDER.indexOf(k) < 0) throw new Error('Erläuterung ohne zugehöriges Feld: ' + k);
+      if (alle.indexOf(k) < 0) throw new Error('Nachschlagewerk enthält unbekanntes Feld: ' + k);
     });
+    gleich(Object.keys(HILFE).length, alle.length, 'Anzahl dokumentierter Felder');
   });
 
   test('Jede Erläuterung ist inhaltlich vollständig', function () {
@@ -248,7 +264,8 @@
 
   test('Ausprägungen der Auswahlfelder decken die Aufzählungstypen exakt ab', function () {
     [['durchfuehrungsweg', E.DURCHFUEHRUNGSWEG], ['zusageart', E.ZUSAGEART],
-     ['einheit', E.EINHEIT], ['bewertung', E.BEWERTUNG]].forEach(function (paar) {
+     ['einheit', E.EINHEIT], ['bewertung', E.BEWERTUNG],
+     ['teilungsart_vorschlag', E.TEILUNGSART]].forEach(function (paar) {
       var feld = paar[0], enumWerte = Object.keys(paar[1]);
       var dokumentiert = HILFE[feld].auspraegungen.map(function (a) { return a.wert; });
       enumWerte.forEach(function (w) {
@@ -267,6 +284,66 @@
       codes.forEach(function (code) {
         if (!E.KATALOG[code]) throw new Error(k + ': unbekannter Befundcode ' + code);
       });
+    });
+  });
+
+  test('Jeder Befund des Katalogs hat Ursachen und Handlungsschritte', function () {
+    var B = hilfeModul.BEFUNDE || {};
+    Object.keys(E.KATALOG).forEach(function (code) {
+      var e = B[code];
+      if (!e) throw new Error('Befund ' + code + ' ist nicht dokumentiert');
+      if (!e.ursachen || !e.ursachen.length) throw new Error(code + ': keine Ursachen hinterlegt');
+      if (!e.massnahmen || !e.massnahmen.length) throw new Error(code + ': keine Handlungsschritte hinterlegt');
+    });
+    Object.keys(B).forEach(function (code) {
+      if (!E.KATALOG[code]) throw new Error('Dokumentierter Befund ' + code + ' existiert im Katalog nicht');
+    });
+    gleich(Object.keys(B).length, Object.keys(E.KATALOG).length, 'Anzahl dokumentierter Befunde');
+  });
+
+  test('Alle acht Prüfschritte sind erläutert', function () {
+    var S = hilfeModul.SCHRITTE || {};
+    for (var nr = 1; nr <= 8; nr++) {
+      var e = S[nr];
+      if (!e) throw new Error('Schritt ' + nr + ' ist nicht erläutert');
+      ['titel', 'recht', 'zweck', 'praxis'].forEach(function (feld) {
+        if (!e[feld]) throw new Error('Schritt ' + nr + ': ' + feld + ' fehlt');
+      });
+      if (!e.prueft || !e.prueft.length) throw new Error('Schritt ' + nr + ': keine Prüfungen genannt');
+      if (!e.ergebnis || !e.ergebnis.length) throw new Error('Schritt ' + nr + ': kein Ausgang beschrieben');
+    }
+    gleich(Object.keys(S).length, 8, 'Anzahl erläuterter Schritte');
+  });
+
+  test('Die Schritte nennen genau die Befunde, die sie erzeugen können', function () {
+    var S = hilfeModul.SCHRITTE || {};
+    var genannt = [];
+    Object.keys(S).forEach(function (nr) {
+      (S[nr].befunde || []).forEach(function (code) {
+        if (!E.KATALOG[code]) throw new Error('Schritt ' + nr + ' nennt unbekannten Befund ' + code);
+        if (genannt.indexOf(code) >= 0) throw new Error('Befund ' + code + ' ist mehreren Schritten zugeordnet');
+        genannt.push(code);
+      });
+    });
+    Object.keys(E.KATALOG).forEach(function (code) {
+      if (genannt.indexOf(code) < 0) throw new Error('Befund ' + code + ' ist keinem Schritt zugeordnet');
+    });
+  });
+
+  test('Befundarten und Ergebnisstatus sind vollständig erläutert', function () {
+    var G = hilfeModul.SCHWEREGRADE;
+    if (!G) throw new Error('Erläuterung zu Befundarten fehlt');
+    gleich(G.arten.length, 3, 'Anzahl Befundarten');
+    ['ERROR', 'WARN', 'INFO'].forEach(function (sev) {
+      if (!G.arten.some(function (a) { return a.name.indexOf(sev) === 0; })) {
+        throw new Error('Befundart ' + sev + ' ist nicht erläutert');
+      }
+    });
+    ['OK', 'FREIGABE_ERFORDERLICH', 'ABBRUCH', 'BAGATELL_VORSCHLAG',
+     'SCHULDRECHTLICH_VORBEHALTEN', 'NICHT_VA_SONDERN_ZUGEWINN'].forEach(function (st) {
+      if (!G.status.some(function (a) { return a.name === st; })) {
+        throw new Error('Status ' + st + ' ist nicht erläutert');
+      }
     });
   });
 
