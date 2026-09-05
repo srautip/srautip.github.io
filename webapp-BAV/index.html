@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Versorgungsausgleich bAV – Prüfung und Berechnung</title>
+<meta name="description" content="Schrittweise Prüfung und Berechnung des Versorgungsausgleichs für Anrechte der betrieblichen Altersversorgung.">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <h1>Versorgungsausgleich – betriebliche Altersversorgung</h1>
+  <p class="sub">Prüfung der Trägerauskunft und Berechnung des Ausgleichswerts je Anrecht, in acht nachvollziehbaren Schritten.</p>
+  <div class="toolbar">
+    <button type="button" class="primary" id="btn-berechnen">Prüfung &amp; Berechnung starten</button>
+    <button type="button" id="btn-alle">Alle Anrechte auswerten</button>
+    <label class="field" style="flex-direction:row;align-items:center;gap:.4rem;">
+      <span style="font-size:.8rem;font-weight:600;">Beispielfall</span>
+      <select id="sel-beispiel" style="font:inherit;font-size:.84rem;padding:.35rem .5rem;border-radius:5px;border:1px solid var(--border-strong);background:var(--bg-card);color:var(--text);">
+        <option value="">– auswählen –</option>
+      </select>
+    </label>
+    <span class="spacer"></span>
+    <button type="button" id="btn-export">JSON exportieren</button>
+    <button type="button" id="btn-import">JSON importieren</button>
+    <button type="button" id="btn-drucken">Drucken</button>
+    <button type="button" id="btn-reset">Zurücksetzen</button>
+    <input type="file" id="file-import" accept="application/json,.json" hidden>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ============================ Eingaben ============================ -->
+  <div class="column-forms">
+
+    <section class="card">
+      <header>
+        <h2>1 · Verfahren und Ehezeit</h2>
+        <span class="legal">§ 3 Abs. 1 VersAusglG</span>
+        <span class="hint">Die Ehezeit beginnt am ersten Tag des Heiratsmonats und endet am letzten Tag des Monats vor Zustellung des Scheidungsantrags.</span>
+      </header>
+      <div class="body">
+        <div class="grid" id="form-ehezeit"></div>
+        <p class="hint" id="ehezeit-hinweis" style="margin:.7rem 0 0;font-size:.78rem;color:var(--text-muted);"></p>
+      </div>
+    </section>
+
+    <section class="card">
+      <header>
+        <h2>2 · Anrechte des Inhabers</h2>
+        <span class="hint">Jedes bAV-Anrecht wird eigenständig geprüft und geteilt.</span>
+      </header>
+      <div class="body">
+        <div class="tabs" id="tabs-anrechte"></div>
+        <div style="display:flex;gap:.5rem;margin-top:.7rem;flex-wrap:wrap;">
+          <button type="button" class="small" id="btn-anrecht-neu">+ Anrecht hinzufügen</button>
+          <button type="button" class="small" id="btn-anrecht-kopie">Aktives duplizieren</button>
+          <button type="button" class="small" id="btn-anrecht-loeschen">Aktives löschen</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header>
+        <h2>3 · Stammdaten des Anrechts</h2>
+        <span class="legal">§§ 45, 19 VersAusglG, § 1b BetrAVG</span>
+        <span class="hint">Durchführungsweg und Bewertungsmethode bestimmen, wie der Ehezeitanteil nachgerechnet wird.</span>
+      </header>
+      <div class="body"><div class="grid" id="form-stamm"></div></div>
+    </section>
+
+    <section class="card">
+      <header>
+        <h2>4 · Angaben der Trägerauskunft</h2>
+        <span class="legal">§§ 5, 13, 47 VersAusglG</span>
+        <span class="hint">Werte genau so eintragen, wie der Versorgungsträger sie mitgeteilt hat – die Prüfung rechnet sie gegen.</span>
+      </header>
+      <div class="body"><div class="grid" id="form-auskunft"></div></div>
+    </section>
+
+    <section class="card" id="card-zeitratierlich">
+      <header>
+        <h2>5 · Zeitratierliche Bewertung (m/n)</h2>
+        <span class="legal">§ 2 Abs. 1 BetrAVG</span>
+        <span class="hint">Nur für Direktzusage und Unterstützungskasse: Gesamtanrecht × Ehezeitmonate / mögliche Betriebszugehörigkeit.</span>
+      </header>
+      <div class="body"><div class="grid" id="form-zeitratierlich"></div></div>
+    </section>
+
+    <section class="card" id="card-unmittelbar">
+      <header>
+        <h2>6 · Unmittelbare Bewertung (Deckungskapital)</h2>
+        <span class="legal">§ 46 VersAusglG, § 4 Abs. 5 BetrAVG</span>
+        <span class="hint">Für versicherungsförmige Wege: Der Zuwachs des Deckungskapitals in der Ehezeit ist der Ehezeitanteil.</span>
+      </header>
+      <div class="body"><div class="grid" id="form-unmittelbar"></div></div>
+    </section>
+
+    <section class="card">
+      <header>
+        <h2>7 · Externe Teilung und Transferverlust</h2>
+        <span class="legal">§§ 14–17 VersAusglG, BVerfG 26.05.2020 – 1 BvL 5/18</span>
+        <span class="hint">Nur auszufüllen, wenn eine externe Teilung in Betracht kommt.</span>
+      </header>
+      <div class="body"><div class="grid" id="form-extern"></div></div>
+    </section>
+
+    <details class="card" id="card-config">
+      <summary>8 · Konfiguration und Prüfgrenzen</summary>
+      <div class="body">
+        <div class="notice plain" id="config-hinweis"></div>
+        <div class="grid" id="form-config"></div>
+        <div style="margin-top:.8rem;">
+          <button type="button" class="small" id="btn-config-reset">Werte des Jahres neu laden</button>
+        </div>
+      </div>
+    </details>
+
+  </div>
+
+  <!-- ============================ Ergebnis ============================ -->
+  <div class="column-results">
+    <section class="card" id="ergebnis-karte">
+      <header>
+        <h2>Prüfung und Berechnung</h2>
+        <span class="legal" id="ergebnis-anrecht"></span>
+      </header>
+      <div id="ergebnis-inhalt">
+        <p class="placeholder">Eingaben erfassen oder einen Beispielfall laden und anschließend
+          „Prüfung &amp; Berechnung starten“ wählen.</p>
+      </div>
+    </section>
+
+    <section class="card" id="uebersicht-karte" hidden>
+      <header><h2>Übersicht aller Anrechte</h2></header>
+      <div class="body" id="uebersicht-inhalt"></div>
+    </section>
+  </div>
+
+</main>
+
+<footer class="app-footer">
+  <p><strong>Hinweis:</strong> Diese Anwendung unterstützt die fachliche Vorprüfung von Trägerauskünften.
+  Sie ersetzt keine rechtliche Beratung und keine gerichtliche Entscheidung. Der Näherungsbarwert (Befund KW04)
+  beruht auf einer vereinfachten Sterblichkeitsannahme und ersetzt nicht die Sterbetafel des Versorgungsträgers.
+  Alle Rechen- und Prüfschritte laufen ausschließlich im Browser; es werden keine Daten übertragen.</p>
+  <p>Bezugsgröße und Beitragsbemessungsgrenze sind vorbelegt, aber in Abschnitt 8 überschreibbar – vor dem
+  Einsatz bitte gegen die amtlichen Werte des jeweiligen Jahres prüfen.</p>
+</footer>
+
+<script src="js/engine.js"></script>
+<script src="js/config.js"></script>
+<script src="js/examples.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
