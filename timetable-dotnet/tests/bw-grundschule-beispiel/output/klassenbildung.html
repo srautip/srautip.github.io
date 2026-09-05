@@ -303,16 +303,21 @@
     background: var(--farbe-akzent-hover);
   }
 
-  /* ---- Fortschrittsleiste (U3): der Trichter als sichtbarer Prozess */
+  /* ---- Kopfbereich (U6/D): Fortschritt, Varianten, Filter als EIN
+     Kasten. Vorher drei getrennte Kaesten mit eigenem Rand und Abstand
+     (~200 px); die Fortschrittsleiste war eine Textzeile "[1] ... [5]"
+     ohne Balken. Jetzt: Balken mit Anteilen (fixiert / offen mit
+     Diskussionsbedarf / offen ruhig), daneben die zwei Bulk-Knoepfe. */
   #prozess {
     display: flex;
     align-items: center;
-    gap: var(--mass-2);
+    gap: var(--mass-3);
     flex-wrap: wrap;
     border: 1px solid var(--farbe-linie);
-    border-radius: var(--radius-l);
-    padding: var(--mass-2) var(--mass-3);
-    margin-bottom: var(--mass-3);
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
+    padding: var(--mass-1) var(--mass-3);
+    min-height: var(--dichte-zeile);
+    box-sizing: border-box;
     font-size: var(--t-klein);
     background: var(--farbe-flaeche-2);
   }
@@ -321,12 +326,24 @@
     white-space: nowrap;
   }
   #prozess .schritt b { color: var(--farbe-text); }
+  #prozess .fortschritt {
+    flex: 0 0 10rem;
+    display: flex;
+    height: 10px;
+    border-radius: var(--radius-s);
+    overflow: hidden;
+    background: var(--farbe-linie-stark);
+  }
+  #prozess .fortschritt i { display: block; height: 100%; }
+  #prozess .fortschritt i.fixiert { background: var(--farbe-akzent); }
   #prozess .zaehler {
-    margin-left: auto;
     font-weight: 600;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
+  #prozess .knoepfe { margin-left: auto; display: flex; gap: var(--mass-2); align-items: center; flex-wrap: wrap; }
+  #prozess .knoepfe .trenner { width: 1px; height: 1.4em; background: var(--farbe-linie-stark); margin: 0 var(--mass-1); }
+  #prozess button { padding: var(--mass-05) var(--mass-2); min-height: 0; }
 
   /* ---- Scorecard-Leiste (U6): eine Zeile je Variante ----
      Vorher drei fast gleiche Textkacheln, deren einzige Unterschiede
@@ -339,11 +356,22 @@
     display: flex;
     flex-direction: column;
     border: 1px solid var(--farbe-linie);
-    border-radius: var(--radius-l);
-    margin-bottom: var(--mass-3);
+    border-top: none;
+    margin-bottom: 0;
     font-size: var(--t-klein);
     overflow: hidden;
     background: var(--farbe-flaeche);
+  }
+  /* Die Filterzeile ist der Fuss des Kastens. Spezifischere Regel statt
+     einer zweiten `#controls`-Deklaration - die Basis bleibt die eine
+     Quelle (DesignTokenTests.DieBasisStehtVorDenEigenenRegeln). */
+  #controls.kopf-fuss {
+    border: 1px solid var(--farbe-linie);
+    border-top: none;
+    border-radius: 0 0 var(--radius-l) var(--radius-l);
+    padding: var(--mass-1) var(--mass-3);
+    background: var(--farbe-flaeche-2);
+    margin-bottom: var(--mass-3);
   }
   .variante-kachel, .arbeits-zeile, #varianten .kopfzeile {
     display: grid;
@@ -844,11 +872,13 @@
   <h1 id="titel">Klassenbildung</h1>
   <div id="meta"></div>
 
+  <!-- Kopfbereich (U6/D): Fortschritt, Varianten und Filter sind EIN
+       Kasten mit drei Zeilen; das Warnbanner steht darunter, damit es
+       den Kasten nicht aufreisst. -->
   <div id="prozess"></div>
-  <div id="warnung"></div>
   <div id="varianten"></div>
 
-  <div id="controls">
+  <div id="controls" class="kopf-fuss">
     <label><input type="checkbox" id="filter-kritisch">nur Diskussionsbedarf (gelb/rot)</label>
     <label><input type="checkbox" id="filter-offene">nur offene (nicht fixierte) Kinder</label>
     <label><input type="checkbox" id="filter-wuensche">alle Wuensche einzeln</label>
@@ -856,6 +886,7 @@
     <span id="compare-info"></span>
     <span class="legende" id="legende"></span>
   </div>
+  <div id="warnung"></div>
 
   <div id="haupt">
     <div id="panel"></div>
@@ -1066,6 +1097,44 @@
         s.textContent = status === 'frei' ? '' : chipSymbol[status];
         s.title = titel || statusName[status];
         return s;
+      }
+      // F3/F5: Ziel-Modus einer Regel fuer den naechsten Lauf. Eine
+      // weiche Regel laesst sich haerten, eine harte aufweichen - beides
+      // nur als Export-Direktive (Wert 'hard' oder 'soft'; true aus
+      // aelteren Zustaenden heisst 'hard'). Ohne die Gegenrichtung war
+      // eine per Schloss gehaertete und neu gerechnete Regel im Viewer
+      // nicht mehr zu loesen (live gemeldet 05.09.2026).
+      function zielModus(basisModus, direktive) {
+        if (direktive === 'soft') return 'soft';
+        if (direktive) return 'hard';
+        return basisModus;
+      }
+      function modusKnopf(basisModus, direktive, was, setze) {
+        var b = document.createElement('button');
+        b.className = 'fixieren';
+        var ziel = zielModus(basisModus, direktive);
+        b.innerHTML = ikone(ziel === 'hard' ? 'i-schloss-zu' : 'i-schloss-auf');
+        if (direktive) {
+          b.title = (ziel === 'hard' ? 'Haertung' : 'Aufweichung') + ' zuruecknehmen (' + was + ')';
+        } else if (basisModus === 'hard') {
+          b.title = was + ': Regel aufweichen (modus: soft) - erscheint als Diff-Hinweis im Export';
+        } else {
+          b.title = was + ': Regel hart stellen (modus: hard) - erscheint als Diff-Hinweis im Export';
+        }
+        b.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (direktive) setze(null);
+          else setze(basisModus === 'hard' ? 'soft' : 'hard');
+          speicherePins();
+          render();
+        });
+        return b;
+      }
+      function setzeGruppenModus(gid) {
+        return function (m) { if (m) haertungen.gruppen[gid] = m; else delete haertungen.gruppen[gid]; };
+      }
+      function setzeWunschModus(index) {
+        return function (m) { if (m) haertungen.wuensche[index] = m; else delete haertungen.wuensche[index]; };
       }
       // Gruppen-Id ohne das technische Praefix - das Kuerzel steht
       // daneben, der volle Name im Tooltip.
@@ -1399,30 +1468,100 @@
           p.appendChild(s);
         }
         var nVerschoben = liveFaehig ? verschobene().length : 0;
-        schritt('[1] Basis: <b>Variante ' + v.index + '</b>' +
+        schritt('Basis: <b>Variante ' + v.index + '</b>' +
           (nVerschoben > 0 ? ' <b>+ ' + nVerschoben + ' verschoben</b>' : ''));
-        schritt('→ [2]');
-        var offeneKonsens = (data.konsens_kern || []).filter(function (id) { return !istFixiert(id); }).length;
-        var bKonsens = document.createElement('button');
-        bKonsens.className = 'primaer';
-        bKonsens.id = 'btn-konsens';
-        bKonsens.textContent = 'Konsens-Kern fixieren (' + offeneKonsens + ')';
-        bKonsens.disabled = offeneKonsens === 0;
-        bKonsens.addEventListener('click', konsensFixieren);
-        p.appendChild(bKonsens);
-        var bUnkrit = document.createElement('button');
-        bUnkrit.id = 'btn-unkritisch';
-        bUnkrit.textContent = 'Alle unkritischen fixieren';
-        bUnkrit.addEventListener('click', unkritischeFixieren);
-        p.appendChild(bUnkrit);
-        schritt('→ [3] Gruppen fixieren (Panel links)');
-        schritt('→ [4] Einzelfaelle: <b>' + offenKritisch + '</b> gelb/rot offen');
-        schritt('→ [5] Export unten & Re-Solve');
+
+        // Der Trichter als Balken (D): fixiert gegen offen - mehr sagt
+        // der Balken nicht, die Ampel steht in der Scorecard.
+        var fix = fixierteAnzahl();
+        var balken = document.createElement('span');
+        balken.className = 'fortschritt';
+        var segFix = document.createElement('i');
+        segFix.className = 'fixiert';
+        segFix.style.width = (fix / alleKinder.length * 100) + '%';
+        balken.appendChild(segFix);
+        balken.title = fix + ' fixiert, ' + (alleKinder.length - fix) + ' offen';
+        p.appendChild(balken);
+
         var zaehler = document.createElement('span');
         zaehler.className = 'zaehler';
         zaehler.id = 'fix-zaehler';
-        zaehler.textContent = fixierteAnzahl() + ' von ' + alleKinder.length + ' Kindern fixiert';
+        // Fixierungen aus der Eingabe (YAML bzw. Projekt) zaehlen mit -
+        // und werden benannt, sonst wirkt "1 fixiert" direkt nach dem
+        // ersten Lauf wie ein Versehen (Nutzerfrage 05.09.2026).
+        var nBestand = Object.keys(bestandVon).length;
+        zaehler.textContent = fix + ' von ' + alleKinder.length + ' Kindern fixiert' +
+          (nBestand > 0 ? ' (' + nBestand + ' aus der Eingabe)' : '');
+        zaehler.title = nBestand > 0
+          ? nBestand + ' Fixierung(en) stammen aus den Eingaben der Klassenbildung (fixierungen:) und sind im Viewer nicht loesbar'
+          : 'Im Viewer gesetzte Pins';
         p.appendChild(zaehler);
+        schritt('<b>' + offenKritisch + '</b> gelb/rot offen');
+
+        // Alle Aktionen des Boards an EINER Stelle: Bulk-Fixieren, Pins
+        // loesen und - im GUI-Betrieb - Neu rechnen und Freigeben. Die
+        // beiden letzten sassen bisher unten im Fixierungen-Block, wo
+        // man sie nach dem Scrollen erst suchen musste.
+        var knoepfe = document.createElement('span');
+        knoepfe.className = 'knoepfe';
+        var offeneKonsens = (data.konsens_kern || []).filter(function (id) { return !istFixiert(id); }).length;
+        var bKonsens = document.createElement('button');
+        bKonsens.className = brueckeAktiv ? '' : 'primaer';
+        bKonsens.id = 'btn-konsens';
+        bKonsens.textContent = 'Konsens-Kern fixieren (' + offeneKonsens + ')';
+        bKonsens.title = 'Alle Kinder fixieren, die in jeder Variante in derselben Klasse stehen';
+        bKonsens.disabled = offeneKonsens === 0;
+        bKonsens.addEventListener('click', konsensFixieren);
+        knoepfe.appendChild(bKonsens);
+        var bUnkrit = document.createElement('button');
+        bUnkrit.id = 'btn-unkritisch';
+        bUnkrit.textContent = 'Alle unkritischen fixieren';
+        bUnkrit.title = 'Alle gruenen Kinder und Kinder ohne Regel fixieren';
+        bUnkrit.addEventListener('click', unkritischeFixieren);
+        knoepfe.appendChild(bUnkrit);
+        var bLoesen = document.createElement('button');
+        bLoesen.id = 'btn-pins-loesen';
+        bLoesen.textContent = 'Alle Pins loesen';
+        bLoesen.title = 'Alle im Viewer gesetzten Pins zuruecknehmen (YAML-Fixierungen bleiben)';
+        bLoesen.disabled = Object.keys(pins).length + Object.keys(notPins).length === 0;
+        bLoesen.addEventListener('click', allePinsLoesen);
+        knoepfe.appendChild(bLoesen);
+
+        // U5 im GUI-Betrieb: der Export-Umweg entfaellt. Bewusst NUR
+        // dieser Teil - Board, Bewertung und Trichter bleiben unveraendert
+        // (gui-ui-konzept.md 4: "ersetzt NUR den Export-Teil").
+        if (brueckeAktiv) {
+          var trenner = document.createElement('span');
+          trenner.className = 'trenner';
+          knoepfe.appendChild(trenner);
+          var rechnen = document.createElement('button');
+          rechnen.id = 'neu-rechnen';
+          rechnen.className = 'primaer';
+          rechnen.textContent = 'Neu rechnen';
+          rechnen.title = 'Fixierungen und Haertungen uebernehmen und den Solver neu starten';
+          rechnen.addEventListener('click', function () {
+            sende('neu-rechnen', { fixierungen: fixierungsListe(), haertungen: haertungen });
+          });
+          knoepfe.appendChild(rechnen);
+          // Freigabe direkt aus dem Board (Nutzerwunsch 26.08.2026).
+          // Sie sitzt NEBEN "Neu rechnen", weil beides denselben Stand
+          // meint: den, der gerade angezeigt wird. Das Board entscheidet
+          // nichts - Abweichungen, Begruendungspflicht und Nachweis
+          // liegen im Host.
+          var frei = document.createElement('button');
+          frei.id = 'freigeben';
+          var bereitsFrei = window.__freigabe;
+          frei.textContent = bereitsFrei ? 'Erneut freigeben…' : 'Freigeben…';
+          if (bereitsFrei) {
+            frei.title = 'Freigegeben von ' + (bereitsFrei.person || '?') +
+                         ' am ' + (bereitsFrei.zeitpunkt || '').slice(0, 10);
+          }
+          frei.addEventListener('click', function () {
+            sende('freigabe', {});
+          });
+          knoepfe.appendChild(frei);
+        }
+        p.appendChild(knoepfe);
       }
 
       // ---- Scorecard-Leiste (U6, vorher Varianten-Kacheln U2) -------
@@ -1655,21 +1794,7 @@
             paar[w.kinder[0]] = true;
             paar[w.kinder[1]] = true;
             hoverZeile(zeile, paar);
-            if (w.modus === 'soft') {
-              var haertW = document.createElement('button');
-              haertW.className = 'fixieren';
-              haertW.innerHTML = ikone(haertungen.wuensche[w.index] ? 'i-schloss-zu' : 'i-schloss-auf');
-              haertW.title = haertungen.wuensche[w.index]
-                ? 'Haertung zuruecknehmen (F3)'
-                : 'F3: Wunsch hart stellen (modus: hard) - erscheint als Diff-Hinweis im Export';
-              haertW.addEventListener('click', function () {
-                if (haertungen.wuensche[w.index]) delete haertungen.wuensche[w.index];
-                else haertungen.wuensche[w.index] = true;
-                speicherePins();
-                render();
-              });
-              zeile.appendChild(haertW);
-            }
+            zeile.appendChild(modusKnopf(w.modus, haertungen.wuensche[w.index], 'F3', setzeWunschModus(w.index)));
             blockW.appendChild(zeile);
           });
           panel.appendChild(blockW);
@@ -1728,25 +1853,10 @@
           gruppeFixieren(g);
         });
         zeile.appendChild(fixBtn);
-        // F5 (U4): Gruppe hart stellen - reine Export-Direktive fuer
-        // den naechsten Lauf (modus: hard), aendert die Live-Bewertung
-        // bewusst NICHT (der Solver entscheidet harte Regeln).
-        if (g.modus === 'soft') {
-          var haert = document.createElement('button');
-          haert.className = 'fixieren';
-          haert.innerHTML = ikone(haertungen.gruppen[g.id] ? 'i-schloss-zu' : 'i-schloss-auf');
-          haert.title = haertungen.gruppen[g.id]
-            ? 'Haertung zuruecknehmen (F5)'
-            : 'F5: Gruppe hart stellen (modus: hard) - erscheint als Diff-Hinweis im Export';
-          haert.addEventListener('click', function (e) {
-            e.stopPropagation();
-            if (haertungen.gruppen[g.id]) delete haertungen.gruppen[g.id];
-            else haertungen.gruppen[g.id] = true;
-            speicherePins();
-            render();
-          });
-          zeile.appendChild(haert);
-        }
+        // F5 (U4): Gruppe hart stellen oder aufweichen - reine
+        // Export-Direktive fuer den naechsten Lauf, aendert die
+        // Live-Bewertung bewusst NICHT (der Solver entscheidet harte Regeln).
+        zeile.appendChild(modusKnopf(g.modus, haertungen.gruppen[g.id], 'F5', setzeGruppenModus(g.id)));
         zeile.addEventListener('click', function () {
           if (highlights[g.id]) delete highlights[g.id];
           else highlights[g.id] = true;
@@ -1893,25 +2003,15 @@
           });
           aktionen.appendChild(nicht);
         }
-        // F3 (U4): Wuensche dieses Kindes hart stellen - wie F5 eine
-        // reine Export-Direktive (modus: hard im naechsten Lauf).
+        // F3 (U4): Wuensche dieses Kindes hart stellen oder aufweichen -
+        // wie F5 eine reine Export-Direktive fuer den naechsten Lauf.
         (wuenscheVonKind[id] || []).forEach(function (w) {
-          if (w.modus !== 'soft') return;
           var partner = w.kinder[0] === id ? w.kinder[1] : w.kinder[0];
-          var b = document.createElement('button');
-          b.innerHTML = ikone(haertungen.wuensche[w.index] ? 'i-schloss-zu' : 'i-schloss-auf') + ' ';
-          b.appendChild(document.createTextNode(
-            (w.typ === 'zusammen' ? 'zusammen mit ' : 'getrennt von ') + partner + ' hart'));
-          b.title = haertungen.wuensche[w.index]
-            ? 'Haertung zuruecknehmen (F3)'
-            : 'F3: Wunsch hart stellen (modus: hard) - erscheint als Diff-Hinweis im Export';
-          b.addEventListener('click', function () {
-            if (haertungen.wuensche[w.index]) delete haertungen.wuensche[w.index];
-            else haertungen.wuensche[w.index] = true;
-            speicherePins();
-            schliessePopover();
-            render();
-          });
+          var b = modusKnopf(w.modus, haertungen.wuensche[w.index], 'F3', setzeWunschModus(w.index));
+          b.className = '';
+          b.appendChild(document.createTextNode(' ' +
+            (w.typ === 'zusammen' ? 'zusammen mit ' : 'getrennt von ') + partner + ' ' +
+            (zielModus(w.modus, haertungen.wuensche[w.index]) === 'hard' ? 'hart' : 'weich')));
           aktionen.appendChild(b);
         });
         popover.appendChild(aktionen);
@@ -2299,7 +2399,7 @@
         var nHart = Object.keys(haertungen.gruppen).length + Object.keys(haertungen.wuensche).length;
         kopf.textContent = 'Fixierungen fuer den naechsten Lauf (' +
           (bestandsFixierungen.length + pinListe.length + notListe.length) + ')' +
-          (nHart > 0 ? ' + ' + nHart + ' Haertung' + (nHart > 1 ? 'en' : '') + ' (F3/F5)' : '');
+          (nHart > 0 ? ' + ' + nHart + ' Regelaenderung' + (nHart > 1 ? 'en' : '') + ' (F3/F5)' : '');
         c.appendChild(kopf);
         var hinweis = document.createElement('div');
         hinweis.className = 'hinweis';
@@ -2311,51 +2411,15 @@
             'Pins ueberleben Reloads nur als Browser-Komfort.';
         c.appendChild(hinweis);
 
-        // U5 im GUI-Betrieb: der Export-Umweg entfaellt. Bewusst NUR
-        // dieser Teil - Board, Bewertung und Trichter bleiben unveraendert
-        // (gui-ui-konzept.md 4: "ersetzt NUR den Export-Teil").
+        // GUI-Betrieb: die Knoepfe "Neu rechnen" und "Freigeben" stehen
+        // im Kopfkasten (renderProzess); hier bleibt die Zusammenfassung.
         if (brueckeAktiv) {
           var zus = document.createElement('div');
           zus.className = 'hinweis';
           zus.textContent = (bestandsFixierungen.length + pinListe.length + notListe.length) +
-            ' Fixierungen' + (nHart > 0 ? ', ' + nHart + ' Haertung' + (nHart > 1 ? 'en' : '') : '') +
-            ' -> neu rechnen';
+            ' Fixierungen' + (nHart > 0 ? ', ' + nHart + ' Regelaenderung' + (nHart > 1 ? 'en' : '') : '') +
+            ' -> "Neu rechnen" oben im Kopfkasten';
           c.appendChild(zus);
-
-          var rechnen = document.createElement('button');
-          rechnen.id = 'neu-rechnen';
-          rechnen.className = 'primaer';
-          rechnen.textContent = 'Neu rechnen';
-          rechnen.addEventListener('click', function () {
-            sende('neu-rechnen', { fixierungen: fixierungsListe(), haertungen: haertungen });
-          });
-          c.appendChild(rechnen);
-
-          var reset2 = document.createElement('button');
-          reset2.style.marginLeft = '0.6rem';
-          reset2.textContent = 'Alle Pins loesen';
-          reset2.addEventListener('click', allePinsLoesen);
-          c.appendChild(reset2);
-
-          // Freigabe direkt aus dem Board (Nutzerwunsch 26.08.2026).
-          // Sie sitzt NEBEN "Neu rechnen", weil beides denselben Stand
-          // meint: den, der gerade angezeigt wird. Das Board entscheidet
-          // nichts - Abweichungen, Begruendungspflicht und Nachweis
-          // liegen im Host.
-          var frei = document.createElement('button');
-          frei.id = 'freigeben';
-          frei.style.marginLeft = '0.6rem';
-          var bereitsFrei = window.__freigabe;
-          frei.textContent = bereitsFrei ? 'Erneut freigeben\u2026' : 'Freigeben\u2026';
-          if (bereitsFrei) {
-            frei.title = 'Freigegeben von ' + (bereitsFrei.person || '?') +
-                         ' am ' + (bereitsFrei.zeitpunkt || '').slice(0, 10);
-          }
-          frei.addEventListener('click', function () {
-            sende('freigabe', {});
-          });
-          c.appendChild(frei);
-
           return;
         }
 
@@ -2381,20 +2445,20 @@
           zeilen.push('  - {kind: ' + e.kind + ', nicht_klasse: ' + e.klasse + '}   # nicht ' +
             labelVon(e.klasse) + ' - manuell (F2)');
         });
-        // U4: Haertungen (F3/F5) als modus-hard-Diff-Hinweis - kein
+        // U4: Regelaenderungen (F3/F5) als modus-Diff-Hinweis - kein
         // fixierungen-Eintrag, sondern eine Aenderung an der Regel
-        // selbst in input/klassenbildung.yaml.
+        // selbst in input/klassenbildung.yaml (hart ODER weich).
         var gruppenHart = Object.keys(haertungen.gruppen).sort();
         var wuenscheHart = Object.keys(haertungen.wuensche).map(Number).sort(function (a, b) { return a - b; });
         if (gruppenHart.length + wuenscheHart.length > 0) {
-          zeilen.push('# Haertungen: bei diesen Regeln in input/klassenbildung.yaml modus: hard setzen');
+          zeilen.push('# Regelaenderungen: bei diesen Regeln in input/klassenbildung.yaml den modus setzen');
           gruppenHart.forEach(function (gid) {
-            zeilen.push('#   gruppe ' + gid + ' -> modus: hard   # F5');
+            zeilen.push('#   gruppe ' + gid + ' -> modus: ' + zielModus('soft', haertungen.gruppen[gid]) + '   # F5');
           });
           wuenscheHart.forEach(function (wi) {
             var w = wuensche[wi];
             zeilen.push('#   wunsch[' + wi + '] (' + w.kinder[0] + ' + ' + w.kinder[1] + ' ' + w.typ +
-              ') -> modus: hard   # F3');
+              ') -> modus: ' + zielModus('soft', haertungen.wuensche[wi]) + '   # F3');
           });
         }
         var ta = document.createElement('textarea');
@@ -2406,11 +2470,6 @@
         cli.className = 'cli';
         cli.textContent = 'dotnet run --project SchoolTestRunner -- klassen ' + data.schule;
         c.appendChild(cli);
-        var reset = document.createElement('button');
-        reset.style.marginLeft = '0.6rem';
-        reset.textContent = 'Alle Pins loesen';
-        reset.addEventListener('click', allePinsLoesen);
-        c.appendChild(reset);
       }
 
       render();

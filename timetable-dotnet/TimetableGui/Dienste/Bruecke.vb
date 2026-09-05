@@ -115,8 +115,9 @@ Public Module Bruecke
         If gruppen IsNot Nothing Then
             For Each kvp In gruppen
                 Dim g = eingabe.Gruppen.FirstOrDefault(Function(x) x.Id = kvp.Key)
-                If g IsNot Nothing AndAlso g.Modus <> "hard" Then
-                    g.Modus = "hard"
+                Dim ziel = ZielModus(kvp.Value)
+                If g IsNot Nothing AndAlso g.Modus <> ziel Then
+                    g.Modus = ziel
                     geaendert += 1
                 End If
             Next
@@ -128,14 +129,28 @@ Public Module Bruecke
                 Dim index As Integer
                 If Not Integer.TryParse(kvp.Key, index) Then Continue For
                 If index < 0 OrElse index >= eingabe.Wuensche.Count Then Continue For
-                If eingabe.Wuensche(index).Modus <> "hard" Then
-                    eingabe.Wuensche(index).Modus = "hard"
+                Dim ziel = ZielModus(kvp.Value)
+                If eingabe.Wuensche(index).Modus <> ziel Then
+                    eingabe.Wuensche(index).Modus = ziel
                     geaendert += 1
                 End If
             Next
         End If
 
         Return geaendert
+    End Function
+
+    ''' <summary>Der Ziel-Modus einer Direktive: "soft" weicht auf, alles
+    ''' andere (true oder "hard") haertet. Die Gegenrichtung fehlte - eine
+    ''' per Schloss gehaertete und neu gerechnete Regel war im Viewer
+    ''' nicht mehr zu loesen (live gemeldet 05.09.2026).</summary>
+    Private Function ZielModus(wert As JsonNode) As String
+        Dim s = TryCast(wert, JsonValue)
+        If s IsNot Nothing Then
+            Dim text As String = Nothing
+            If s.TryGetValue(text) AndAlso text = "soft" Then Return "soft"
+        End If
+        Return "hard"
     End Function
 
 

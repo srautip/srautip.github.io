@@ -172,21 +172,39 @@ Public Module Freigabe
         Dim variante = TryCast(varianten(index), JsonObject)
         If variante Is Nothing Then Return
 
+        ' Der Export fuehrt JEDE Regel mit ihrem Mass - auch die
+        ' erfuellten mit mass 0 (Verifier-Prinzip: der Bewertungslauf
+        ' reproduziert die Solver-Verletzungen vollstaendig). Abweichung
+        ' ist nur, was ein Mass > 0 hat; sonst standen 50 erfuellte
+        ' Regeln als "nicht erfuellt" im Nachweis (live gemeldet 05.09.2026).
         Dim verletzungen = TryCast(variante("verletzungen"), JsonArray)
         If verletzungen IsNot Nothing Then
             For Each eintrag In verletzungen
                 Dim o = TryCast(eintrag, JsonObject)
                 If o Is Nothing Then Continue For
+                Dim mass = Ganzzahl(o, "mass")
+                If mass <= 0 Then Continue For
                 Dim id = Zeichenkette(o, "regel_id")
                 Dim typ = Zeichenkette(o, "regel_typ")
-                Dim prio = Ganzzahl(o, "prio")
                 ' Die Regel-ID ist ein Pseudonym (G_kita_sonnenblume_1),
                 ' kein Personenbezug - sie darf hier stehen.
-                v.Abweichungen.Add($"{typ} {id} (Prioritaet {prio}) nicht erfuellt.")
+                v.Abweichungen.Add($"{typ} {id} ({PrioWort(Ganzzahl(o, "prio"))}) nicht erfuellt, Mass {mass}.")
             Next
         End If
         v.Kennzahlen = $"Variante {index + 1} von {varianten.Count}."
     End Sub
+
+    ''' <summary>Die Stufen heissen, sie werden nicht nummeriert - im
+    ''' YAML ist 3 die hoechste Prio, gelesen wird "kritisch" als Nummer 1
+    ''' (dieselbe Entscheidung wie im Viewer, U6).</summary>
+    Private Function PrioWort(prio As Integer) As String
+        Select Case prio
+            Case 3 : Return "kritisch"
+            Case 2 : Return "wichtig"
+            Case 1 : Return "wenn moeglich"
+            Case Else : Return $"Prio {prio}"
+        End Select
+    End Function
 
     Private Function Ganzzahl(o As JsonObject, schluessel As String) As Integer
         If o Is Nothing OrElse Not o.ContainsKey(schluessel) OrElse o(schluessel) Is Nothing Then Return 0

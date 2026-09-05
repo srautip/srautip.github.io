@@ -166,6 +166,25 @@ Public Class BrueckeTests
         Assert.AreEqual("hard", eingabe.Wuensche(1).Modus)
     End Sub
 
+    ''' <summary>Die Gegenrichtung: "soft" weicht eine harte Regel auf.
+    ''' Ohne sie war eine per Schloss gehaertete und neu gerechnete Regel
+    ''' im Viewer nicht mehr zu loesen (live gemeldet 05.09.2026).</summary>
+    <TestMethod>
+    Public Sub AufweichungSetztModusAufSoft()
+        Dim eingabe As New KlassenbildungInput()
+        eingabe.Gruppen.Add(New KlassenbildungGruppe With {.Id = "G_nord", .Typ = "buendelung", .Modus = "hard"})
+        eingabe.Gruppen.Add(New KlassenbildungGruppe With {.Id = "G_soz", .Typ = "verteilung", .Modus = "soft"})
+        eingabe.Wuensche.Add(New KlassenbildungWunsch With {.Typ = "zusammen", .Modus = "hard"})
+
+        Dim nutzlast = JsonNode.Parse("{""haertungen"": {""gruppen"": {""G_nord"": ""soft"", ""G_soz"": ""hard""}, ""wuensche"": {""0"": ""soft""}}}").AsObject()
+        Dim geaendert = Bruecke.WendeHaertungenAn(nutzlast, eingabe)
+
+        Assert.AreEqual(3, geaendert)
+        Assert.AreEqual("soft", eingabe.Gruppen(0).Modus, "die harte Gruppe wurde nicht aufgeweicht")
+        Assert.AreEqual("hard", eingabe.Gruppen(1).Modus, "'hard' als Zeichenkette muss wie true wirken")
+        Assert.AreEqual("soft", eingabe.Wuensche(0).Modus)
+    End Sub
+
     ''' <summary>Ein Index ausserhalb der Wunschliste oder eine unbekannte
     ''' Gruppen-Id darf nicht werfen - die Seite koennte aus einem
     ''' aelteren Stand stammen.</summary>

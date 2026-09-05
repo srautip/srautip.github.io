@@ -220,6 +220,35 @@ Public Class KlassenbildungBoardTests
         Assert.IsTrue(offen > 0, "der Klick auf den Kopf hat nicht aufgeklappt")
     End Function
 
+    ''' <summary>Eine HARTE Regel laesst sich aufweichen (Direktive
+    ''' 'soft'), eine weiche haerten ('hard'), und beides ist wieder
+    ''' zuruecknehmbar. Vorher gab es das Schloss nur an weichen Regeln -
+    ''' eine gehaertete und neu gerechnete Regel war nicht mehr zu loesen.</summary>
+    <TestMethod>
+    Public Async Function HarteRegelnLassenSichAufweichen() As Task
+        Await SeiteOeffnenAsync(KlassenbildungSeite())
+
+        Dim harte = Await Seite.EvaluateAsync(Of String)("() => {
+            const data = JSON.parse(document.getElementById('klassenbildung-data').textContent);
+            const g = data.gruppen.find(x => x.modus === 'hard');
+            return g ? g.id : null;
+        }")
+        Assert.IsNotNull(harte, "Testgrundlage: das Beispiel braucht eine harte Gruppe")
+
+        Dim zeile = Seite.Locator($".gruppe-zeile[data-gruppe='{harte}']")
+        Dim schloesser = zeile.Locator("button.fixieren")
+        Assert.AreEqual(2, Await schloesser.CountAsync(), "Pin und Schloss auch an der harten Regel")
+
+        Await schloesser.Nth(1).ClickAsync()
+        Dim direktive = Await Seite.EvaluateAsync(Of String)("(id) => window.__kbTest.haertungen().gruppen[id] || null", harte)
+        Assert.AreEqual("soft", direktive, "das Schloss an einer harten Regel muss aufweichen")
+        StringAssert.Contains(Await Seite.Locator("#yaml-export").InputValueAsync(), harte & " -> modus: soft")
+
+        Await Seite.Locator($".gruppe-zeile[data-gruppe='{harte}'] button.fixieren").Nth(1).ClickAsync()
+        Dim zurueck = Await Seite.EvaluateAsync(Of Boolean)("(id) => !window.__kbTest.haertungen().gruppen.hasOwnProperty(id)", harte)
+        Assert.IsTrue(zurueck, "die Aufweichung muss sich zuruecknehmen lassen")
+    End Function
+
     ''' <summary>Eine Ampel-Sprache: Legende mit vier Punkten, jede Karte
     ''' traegt genau einen Worst-of-Punkt, jede Panelzeile einen.</summary>
     <TestMethod>

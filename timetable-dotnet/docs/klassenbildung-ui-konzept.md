@@ -328,6 +328,40 @@ Highlight-Mengen, Pin-Export-Inhalt, Live-Bewertung == Bewerte).
     GUI-Masken und Beispiele - bewusst nicht Teil von U6.
   - Kein Eingriff in `bewerte()` und die Chip-Texte (Zeichengleichheit
     zum Kern bleibt getestet).
+  - **Kopfbereich als ein Kasten** (Schritt D): Fortschritt,
+    Scorecard und Filterzeile sind drei Zeilen desselben Rahmens, das
+    Warnbanner steht darunter. Die Fortschrittsleiste ist ein kurzer
+    Balken (fixiert gegen offen - die Ampel steht in der Scorecard)
+    mit Zaehler; rechts ALLE Aktionen des Boards: Konsens-Kern
+    fixieren, alle unkritischen fixieren, alle Pins loesen und im
+    GUI-Betrieb "Neu rechnen" und "Freigeben" - die sassen bisher
+    unten im Fixierungen-Block, wo man sie nach dem Scrollen erst
+    suchen musste. Die Schrittfolge "[1] ... [5]" als Text entfaellt -
+    sie war Erklaerung, keine Standortbestimmung. Die Ueberschreibung der Basis-Regel `#controls`
+    laeuft ueber `#controls.kopf-fuss`, weil der Waechter eine zweite
+    `#controls`-Deklaration verbietet. Kopf von ~200 auf ~150 px.
+  - **Fehler behoben: Haertung ohne Rueckweg.** Das Schloss (F3/F5)
+    gab es nur an weichen Regeln; die Bruecke setzte beim Neurechnen
+    `modus: hard` ins Projekt - danach war die Regel im Viewer nicht
+    mehr zu loesen. Die Direktive traegt jetzt eine Richtung
+    (`'hard'`/`'soft'`, `true` aus aelteren Zustaenden heisst hard),
+    das Schloss steht an jeder Regel (Panelzeile, Wunschliste,
+    Karten-Popover), der Export schreibt `modus: hard` oder `soft`, und
+    `Bruecke.WendeHaertungenAn` wendet beide Richtungen an. Tests:
+    `BrueckeTests.AufweichungSetztModusAufSoft`,
+    `KlassenbildungBoardTests.HarteRegelnLassenSichAufweichen`.
+  - **Fehler behoben: Freigabe zaehlte erfuellte Regeln als
+    Abweichung.** Der Export fuehrt in `verletzungen` JEDE Regel mit
+    ihrem Mass (Verifier-Prinzip), erfuellte mit `mass: 0`;
+    `Freigabe.FuelleKlassenbildung` listete alle 52 als "nicht
+    erfuellt" - und erzwang damit eine Begruendung fuer 50 Regeln, die
+    gehalten haben. Jetzt zaehlt nur `mass > 0`, die Zeile nennt Prio
+    in Worten und das Mass (`FreigabeTests.ErfuellteRegelnSindKeineAbweichung`).
+  - **"1 von 100 fixiert" direkt nach dem ersten Lauf** ist kein
+    Fehler: die Beispielschule fixiert `S030` in `input/
+    klassenbildung.yaml` (Rollstuhl, barrierefreier Raum). Der Zaehler
+    nennt solche Bestandsfixierungen jetzt ausdruecklich
+    ("(1 aus der Eingabe)") und erklaert sie im Tooltip.
   Verifikation: vier neue Playwright-Faelle in
   `KlassenbildungBoardTests` (Scorecard-Segmente summieren sich zu
   100 %, Vergleichshaken, Wunsch-Badges <= verletzte + 1, eingeklappte

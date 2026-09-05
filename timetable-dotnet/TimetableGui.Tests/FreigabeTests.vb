@@ -415,14 +415,38 @@ Public Class FreigabeTests
     ''' <summary>Ein Klassenbildungs-Stand mit erfundenem, aber
     ''' formgleichem Viewer-JSON.</summary>
     Private Shared Function Klassen(id As String, minuten As Integer,
-                                    Optional verletzungen As Integer = 0) As ProjektStand
+                                    Optional verletzungen As Integer = 0,
+                                    Optional erfuellte As Integer = 0) As ProjektStand
+        ' Der echte Export fuehrt JEDE Regel mit ihrem Mass - erfuellte
+        ' mit 0. Der Helfer bildet beides nach.
         Dim liste = String.Join(",", Enumerable.Range(1, verletzungen).Select(
-            Function(i) $"{{""regel_id"": ""G_{i}"", ""regel_typ"": ""buendelung"", ""prio"": 2}}"))
+            Function(i) $"{{""regel_id"": ""G_{i}"", ""regel_typ"": ""buendelung"", ""prio"": 3, ""mass"": {i}}}").Concat(
+            Enumerable.Range(1, erfuellte).Select(
+            Function(i) $"{{""regel_id"": ""G_ok_{i}"", ""regel_typ"": ""verteilung"", ""prio"": 2, ""mass"": 0}}")))
         Return New ProjektStand With {
             .Id = id, .Label = "Klassenbildung " & id,
             .Erstellt = Jetzt.AddMinutes(minuten),
             .Klassenbildung = JsonNode.Parse($"{{""varianten"": [{{""verletzungen"": [{liste}]}}]}}").AsObject()}
     End Function
+
+    ''' <summary>Der Fehler aus dem manuellen Test (Grundschule laden,
+    ''' Klassen rechnen, Variante 1 freigeben): 52 "nicht erfuellte"
+    ''' Regeln im Dialog, davon 50 mit Mass 0. Abweichung ist nur, was
+    ''' ein Mass hat - und die Zeile nennt die Prio in Worten.</summary>
+    <TestMethod>
+    Public Sub ErfuellteRegelnSindKeineAbweichung()
+        Dim v = Freigabe.Vorlage(Klassen("kb", 0, verletzungen:=2, erfuellte:=50))
+        Assert.AreEqual(2, v.Abweichungen.Count, String.Join(" | ", v.Abweichungen))
+        StringAssert.Contains(v.Abweichungen(0), "G_1")
+        StringAssert.Contains(v.Abweichungen(0), "kritisch")
+        StringAssert.Contains(v.Abweichungen(0), "Mass 1")
+        Assert.IsFalse(v.Abweichungen.Any(Function(a) a.Contains("G_ok_")), "erfuellte Regeln stehen im Nachweis")
+        Assert.IsTrue(v.NotizPflicht)
+
+        Dim sauber = Freigabe.Vorlage(Klassen("kb2", 0, verletzungen:=0, erfuellte:=50))
+        Assert.AreEqual(0, sauber.Abweichungen.Count)
+        Assert.IsFalse(sauber.NotizPflicht, "ohne echte Abweichung keine Begruendungspflicht")
+    End Sub
 
     ''' <summary>Der Fehler, den der manuelle Test gefunden hat: die
     ''' Freigabe eines Stundenplans meldete, die Klassenbildung sei
