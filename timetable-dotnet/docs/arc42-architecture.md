@@ -934,6 +934,20 @@ Sie sind fertig, per Interaktionstest verifiziert (8.10) und in XAML
 nachzubauen hieße, ihre Logik ein zweites Mal zu schreiben. WPF liefert
 Rahmen, Navigation und Formulare.
 
+**Zwei Dashboards, ein Auslieferungs-Slot.** Seit Stufe G hostet die
+Anwendung beide Viewer. Der Slot ist aber einer - dieselbe synthetische
+URL. Ohne Gedaechtnis zeigte der Wechsel von der Klassenbildung auf den
+Stundenplan weiter das Board: gleiche Adresse, alter Inhalt, und nichts
+daran aeusserlich falsch. Das `HauptViewModel` haelt deshalb je Bereich
+eine Seite UND die Id des Standes, aus dem sie stammt; beim
+Bereichswechsel wird die passende ausgeliefert.
+
+Die Stand-Id wird dabei gebraucht, nicht nur mitgefuehrt: die Freigabe
+ist auch aus dem Dashboard heraus moeglich (8.19), und sie muss den
+Stand treffen, den DIESE Sicht zeigt. "Der letzte Lauf" waere die
+falsche Antwort, sobald jemand ueber den Bereich *Laeufe* einen aelteren
+Stand geoeffnet hat.
+
 **Wie die Seiten in den Browser kommen.** Das Datenhaltungskonzept ließ
 offen, ob `NavigateToString` oder ein virtuelles Host-Mapping benutzt wird
 (7.6). Beides scheidet aus:
@@ -1185,6 +1199,160 @@ Eigenschaft des Bildschirms, an dem jemand sitzt, nicht des Plans — und
 funktioniert dadurch in beiden Betriebsarten gleich, denn auch der
 WebView2-Host liefert unter einer echten Herkunft aus.
 
+### 8.17 Eingabemasken: ein Grundmuster, sechzehn Dialoge
+
+Das UI-Konzept (§6) verlangt für alle Stammdaten- und Regeldialoge
+dasselbe: „Liste links (sortier-/filterbar), Detailformular rechts,
+Aktionen Neu · Duplizieren · Löschen · Prüfen". Umgesetzt ist das
+**einmal**, in `ListenViewModel(Of T)`, nicht sechzehnmal in den Masken —
+sonst driften Filter, Löschverhalten und Prüfung zwischen den Dialogen
+auseinander, und genau solche Unterschiede fallen niemandem auf, bis sie
+stören.
+
+Drei Entwurfsentscheidungen tragen das:
+
+**Kein `ICollectionView`.** Die naheliegende WPF-Lösung für gefilterte
+Listen ist `CollectionViewSource`. Sie ist ein `DispatcherObject` und
+hätte `TimetableGui.Tests` an einen UI-Thread gebunden. Die gefilterte
+Sicht ist deshalb eine schlichte abgeleitete Sammlung; damit bleibt jede
+Maske ohne Fenster prüfbar — was der Stufenplan für F ausdrücklich
+verlangt („je Maske ein Test, der über das ViewModel schreibt").
+
+**Eine nicht-generische Schnittstelle `IListenMaske`.** Das
+Stammdatenfenster hält acht Masken verschiedenen Typs in *einer*
+Aktionsleiste. Ohne diese Schnittstelle bliebe nur Reflexion — und die
+verschiebt jeden Tippfehler von der Übersetzung in die Laufzeit. Der
+erste Entwurf nutzte tatsächlich Reflexion und wurde verworfen.
+
+**Referenzfelder sind immer Auswahllisten aus dem Bestand, nie
+Freitext.** Damit können unbekannte Referenzen — der klassische
+Validierungsfehler aus 8.1 — in der Oberfläche gar nicht erst entstehen.
+Dieselbe Regel gilt beim Import: Attribut und Wert einer Balance-Regel
+stammen aus dem Vokabular der Einschulungsliste, weil eine Balance auf
+ein Attribut, das kein Kind trägt, unbemerkt wirkungslos bliebe.
+
+Die Masken schreiben **direkt in den Bestand**, ohne Zwischenstand. Das
+ist die Voraussetzung für den Grundsatz „Speichern ist immer möglich,
+Rechnen nur bei grüner Prüfung" (Konzept §1): ein Formular mit
+OK/Abbrechen-Semantik müsste bei jedem Teilzustand entscheiden, ob er
+gültig genug zum Behalten ist.
+
+Sichtbar ist dieser Zeitpunkt seit einem Nutzerbefund: Textfelder
+übernehmen bei `LostFocus`, Auswahllisten und Häkchen sofort. Ein Feld,
+das bei jedem Tastendruck übernimmt, sortierte die Liste nach jedem
+Buchstaben neu und ließe die Auswahl wegspringen — richtig, aber
+unsichtbar. Jede Maske trägt deshalb eine Fußzeile mit dem
+Speicherzustand, einen Speichern-Knopf und Strg+S. Letzteres war keine
+Bequemlichkeit, sondern eine Lücke: die Masken sind **modale** Fenster,
+sie verdecken den Ungespeichert-Indikator im Titel des Hauptfensters,
+und Strg+S hing ausschließlich dort — man musste die Maske schließen, um
+überhaupt speichern zu können.
+
+### 8.18 Masken aus Daten statt aus XAML
+
+Zwei Dialoge bauen ihre Formulare zur Laufzeit auf, statt sie
+auszuschreiben: die acht Regeltypen des Stundenplans (`Regeltypen.vb`)
+und die Spalten-Zuordnung des Imports.
+
+Der Grund ist in beiden Fällen derselbe: Die Regeltypen unterscheiden
+sich in **Feldern und Geltungsbereichen, nicht in ihrer Mechanik**. Acht
+handgeschriebene Formulare wären acht Stellen, an denen
+Pflichtfeldprüfung, Prio-Vorgabe und Grund-Feld auseinanderlaufen
+können. Die Feldnamen sind dabei das Wire-Format (8.7) und keine
+.NET-Namen — die Maske schreibt rohe `JsonObject`, die unverändert durch
+Validation und Solver laufen; eine Übersetzungstabelle dazwischen wäre
+eine zweite Wahrheit.
+
+Die Grenze ist bewusst gezogen: Die vier Regelmasken der Klassenbildung
+(Gruppen, Balance, Wünsche, Fixierungen) sind **nicht** datengetrieben.
+Sie sind vier deutlich verschiedene Formulare; ein Erbauer hätte dort
+mehr Fallunterscheidungen enthalten als gespartes XAML.
+
+Datengetriebene Masken verlagern eine Fehlerklasse von der Übersetzung
+in die Laufzeit — siehe 8.20.
+
+### 8.19 Freigabe als Nachweis (Art. 22 DSGVO)
+
+Die Freigabe ist die einzige Stelle der Anwendung, deren Zweck ein
+**rechtlicher Nachweis** ist. Art. 22 DSGVO verbietet Entscheidungen mit
+erheblicher Wirkung, die ausschließlich auf automatisierter Verarbeitung
+beruhen; das Klassenbildungs-Konzept (§10) leitet daraus ab, dass die
+Software nicht nur menschliche Eingriffe *ermöglichen*, sondern
+*nachweisbar machen* muss, dass eine echte Prüfung stattgefunden hat.
+
+Daraus folgt die Bauform, die sonst willkürlich wirkte:
+
+- **Der Dialog zeigt die verbleibenden Abweichungen im Wortlaut, nicht
+  als Zahl.** Ein bloßer OK-Klick ohne angezeigte Abweichungen wäre als
+  „menschliche Beteiligung" angreifbar (Stichwort *rubber-stamping*).
+- **Fester Bestätigungssatz UND eigene Begründung.** Der Satz trägt die
+  Pflichtbestandteile — Bezug auf die geprüften Abweichungen und „in
+  eigener Verantwortung"; ein Freitext allein könnte beides weglassen
+  und wäre ein *schwächerer* Nachweis. Die Notiz wiederum ist der Beleg
+  der tatsächlichen Befassung: wer die Abweichungen in eigenen Worten
+  abwägt, hat sie gelesen — das lässt sich nicht mechanisch erzeugen,
+  ein Häkchen schon. Pflicht ist sie nur bei verbleibenden Abweichungen;
+  ohne etwas abzuwägen wäre der Zwang zur Notiz selbst wieder Theater.
+- **Gespeichert wird der Bericht, wie er angezeigt wurde** — nicht ein
+  Verweis, aus dem man ihn später neu berechnen könnte. Freigegeben
+  wurde, was auf dem Bildschirm stand.
+- **Lücken und Randstunden zählen nicht als Abweichung.** Sie sind
+  Qualitätsmerkmale, keine Regelverletzungen; sie mitzuzählen blähte den
+  Bestätigungssatz mit Dingen auf, die niemand versprochen hat.
+
+Der Nachweis liegt im freien `lauf`-Objekt des Standes
+(`ProjektStand.Lauf`), das bereits round-trip-sicher gespeichert wird —
+das Dateiformat brauchte dafür keine neue Zusage.
+
+**Die Regel gilt je Entscheidungsart, nicht global.** Klassenbildung und
+Stundenplan sind zwei verschiedene Entscheidungen mit je eigenem
+Nachweis: welches Kind in welche Klasse kommt, ist etwas anderes als
+wann welche Stunde liegt, und beides wird von verschiedenen Personen zu
+verschiedenen Zeitpunkten verantwortet. Innerhalb *einer* Art ersetzt
+eine neue Freigabe die alte sichtbar, mit Frage und Protokollzeile —
+zwei gültige Freigaben derselben Art nebeneinander wären genau die
+Unklarheit, die der Nachweis ausschließen soll.
+
+Der geschützte Stand ist gegen Löschen **und** gegen Verdrängung durch
+die Stände-Obergrenze gesichert; beides erledigt bereits der Kern
+(`Projekt.StandHinzufuegen`/`StandLoeschen`), die Freigabe setzt nur die
+Marke.
+
+Ein zweiter, gekennzeichneter Sonderfall steht daneben: der
+**Klarnamen-Export**. Überall sonst verlässt nur die pseudonyme Id das
+Projekt. Hier nicht — deshalb Warndialog *und* Audit-Eintrag. Der
+Eintrag ist der wichtigere von beiden: ein Dialog sorgt nur dafür, dass
+die Entscheidung bewusst fällt, nachvollziehbar wird sie erst im
+Protokoll.
+
+### 8.20 Der Fensteraufbau als eigener Testfall
+
+`TimetableGui.Tests` läuft headless und erzeugt bewusst keine
+WPF-Steuerelemente (siehe 8.9). Damit bleibt eine Fehlerklasse
+unsichtbar, die kein Compiler sieht:
+
+- ein `StaticResource`-Schlüssel, den es nicht gibt,
+- ein `FindResource` im Code-Behind auf einen fehlenden Schlüssel,
+- eine Feldart, für die ein datengetriebener Erbauer kein Steuerelement
+  kennt.
+
+Alle drei knallen erst beim **Aufbau des Fensters**. Mit Stufe F/G, in
+der Masken sich selbst bauen (8.18), wiegt das schwer genug für ein
+eigenes Werkzeug: `Fensterprobe.vb` führt einen Testkörper auf einem
+eigenen STA-Thread aus, lädt das Application-Dictionary einmal und
+reicht eine dort aufgetretene Ausnahme an den Test zurück. Ohne dieses
+Weiterreichen würde der Test grün, während der Thread still stirbt.
+
+Das Testprojekt bleibt für alles übrige headless — nur dieser eine
+Thread kennt WPF.
+
+Der Nutzen hat sich sofort gezeigt: `schrift-mono` stand in der
+Fenstervorlage, aber nicht in `Tokens.xaml`; später fehlte
+`farbe-krit-rand` im Freigabe-Dialog. Beides hätte erst der Nutzer
+bemerkt. **Ehrliche Grenze:** die Probe hilft nur, wenn das Projekt noch
+übersetzt — ein Fehler, der schon den Build bricht, verhindert auch den
+Test.
+
 ## 9. Architekturentscheidungen
 
 Ausgewählte, besonders folgenreiche Entscheidungen (ausführliche
@@ -1206,6 +1374,12 @@ Begründungen jeweils in den referenzierten `docs/phase2-*.md`-Berichten):
 | Diversitäts-Cuts der Mehr-Zuteilungs-Enumeration auf Namens-Ebene, Orbit-Eindeutigkeit allein per Lex-Symmetriebrechung | Diversitäts-Cut auf der Äquivalenzklassen-Projektion ("dieselbe Klasse übernimmt dieselben Einheiten") | Beim Umsetzen selbst erkannt: die Projektion ist zu grob und hätte strukturell verschiedene Zuteilungen (z.B. "A übernimmt beide Klassen" vs. Aufteilung innerhalb derselben Äquivalenzklasse) als Duplikat verboten. Symmetrie und Vielfalt sind getrennte Anliegen mit getrennten Mechanismen (siehe 8.8). |
 | Klassenbildung als vollständig entkoppeltes Modul mit eigener Testsuite und eigenen Prio-Gewichten 1000/50/1 (statt der Konzept-Vorgabe 10000/100/1) | (1) Integration in die `Solver.Solve()`-Pipeline via synthetisches Szenario; (2) Konzept-Gewichte unverändert übernehmen | (1) Die Klassenbildung teilt KEINE Fachlichkeit mit der Stundenplanung (keine Tage/Perioden/Sessions) - ein synthetisches Szenario hätte nur Ballast importiert; als eigenes Modell bleibt sie in Sekunden lösbar und in <1s testbar (siehe 8.9). (2) 1000/50/1 hält die Stufen-Trennung (keine realistische Zahl von Prio-2-Verletzungen wiegt eine Prio-3-Verletzung auf), bleibt aber im `Int64`-sicheren Bereich auch für große Jahrgänge; per `config.yaml` überschreibbar. |
 | Viewer-Interaktivität durch bewusste, kommentierte JS-Formel-Duplikate des VB-Kerns | (1) Kein Was-wäre-wenn im Viewer (nur statische Anzeige); (2) ein Backend-/Server-Prozess für Neuberechnung | (1) verfehlt den Zweck des Arbeitsbretts (Konzept 9.2 Phase 3: reine Bewertung in Millisekunden, ohne Solver-Lauf); (2) bräche das Self-contained-Prinzip (Doppelklick, offline). Das Risiko der Duplikation (Divergenz) wird nicht geleugnet, sondern verifiziert: seit Stufe E prüft `TimetableViewer.Tests` (Playwright, headless) die JS-Kopie bei jedem Testlauf zeichengleich gegen den VB-Export, die Ground Truth bleibt der nächste CLI-Lauf (siehe 8.10). |
+| Freigabe verlangt einen festen Bestätigungssatz **und** eine selbstformulierte Begründung (letztere nur bei verbleibenden Abweichungen) | (1) Nur der feste Satz mit Häkchen; (2) nur ein Freitextfeld | (1) ist das klassische Rubber-Stamping-Muster: der Klick beweist, dass geklickt wurde, nicht dass geprüft wurde. (2) wäre ein *schwächerer* Nachweis, weil ein Freitext die Pflichtbestandteile (Bezug auf die Abweichungen, „in eigener Verantwortung") weglassen kann. Beides zusammen: der Satz verankert juristisch, die Notiz belegt die Befassung — wer die Abweichungen in eigenen Worten abwägt, hat sie gelesen. Ohne Abweichungen entfällt der Zwang, sonst wäre er selbst wieder Theater (8.19). |
+| Die Regel „es gibt nur eine Freigabe" gilt je **Entscheidungsart**, nicht global | Eine einzige Freigabe je Projekt | Live im manuellen Test gefunden: die Freigabe eines Stundenplans meldete, die Klassenbildung sei bereits freigegeben — und hätte deren Nachweis zurückgezogen. Klassenbildung und Stundenplan sind zwei Entscheidungen mit je eigenem Art.-22-Nachweis, von verschiedenen Personen zu verschiedenen Zeitpunkten verantwortet. |
+| Beim Import ist die Vorgabe je Spalte **verwerfen**, und Attribute stehen namentlich in der Rollenliste | (1) Alles außer Nachname/Vorname wird automatisch Attribut (Stand bis G5); (2) ein Sammeleintrag „Attribut" plus zweites Auswahlfeld für den Namen | (1) ist das Gegenteil von Datenminimierung: eine Klassenliste aus dem Sekretariat trägt Telefonnummern und Geburtsdaten, die ungefragt ins Projekt gewandert wären (Konzept 9.1 verlangt ausdrücklich „nicht zugeordnete Spalten werden verworfen, mit Hinweis"). (2) war der erste Versuch und im manuellen Test als umständlich verworfen — zwei Listen für eine Entscheidung. Nebeneffekt der namentlichen Liste: deckt sich der Spaltenname mit einem vorhandenen Attribut bis auf die Schreibweise (`Geschlecht` neben `geschlecht`), erscheint er nicht zusätzlich — die stille Dublette, an der bestehende Balance-Regeln vorbeigegriffen hätten, ist über die Oberfläche nicht mehr erzeugbar. |
+| Die acht Regeltypen des Stundenplans und die Spalten-Zuordnung bauen ihre Masken aus DATEN; die vier Regelmasken der Klassenbildung nicht | Durchgängig handgeschriebenes XAML, oder durchgängig datengetrieben | Die acht Regeltypen unterscheiden sich in Feldern, nicht in Mechanik — acht Formulare wären acht Stellen, an denen Pflichtfeldprüfung und Prio-Vorgabe auseinanderlaufen. Gruppen, Balance, Wünsche und Fixierungen sind dagegen vier deutlich verschiedene Formulare; ein Erbauer enthielte dort mehr Fallunterscheidungen als gespartes XAML (8.18). Der Preis der datengetriebenen Variante — Fehler erst beim Fensteraufbau — wird durch 8.20 bezahlt. |
+| `ListenViewModel` ohne `ICollectionView`/`CollectionViewSource` | Die WPF-übliche `CollectionViewSource` für Filter und Sortierung | `CollectionViewSource` ist ein `DispatcherObject` und hätte `TimetableGui.Tests` an einen UI-Thread gebunden. Der Stufenplan verlangt für F „je Maske ein Test, der über das ViewModel schreibt" — eine schlichte abgeleitete Sammlung erfüllt das und kostet nur wenige Zeilen (8.17). |
+| Die Stand-Id wird beim Anhängen eindeutig gemacht (`Projekt.StandHinzufuegen`) | Die Aufrufer bilden sie sekundengenau aus dem Zeitstempel und verlassen sich darauf | Live gefunden, weil ein Negativtest grün blieb: zwei Läufe in derselben Sekunde erhielten dieselbe Id. Die Id ist zugleich der Ordnername im Container (`ergebnisse/<id>/`) — zwei gleiche Ids überschreiben sich beim Speichern, ein Lauf wäre spurlos weg. |
 
 ## 10. Qualitätsanforderungen
 
