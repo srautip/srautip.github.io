@@ -271,3 +271,67 @@ Highlight-Mengen, Pin-Export-Inhalt, Live-Bewertung == Bewerte).
   der Kanal dafuer ist inzwischen konkretisiert: die geplante WPF-GUI
   hostet das Board in WebView2 und ersetzt den Export+CLI-Umweg durch
   eine "Neu rechnen"-Bridge (docs/gui-ui-konzept.md Abschnitt 4).
+- **U6 umgesetzt - Board-Verdichtung** (Nutzerauftrag 05.09.2026:
+  "kompakte Uebersicht, moeglichst viele Informationen; kompaktere
+  Varianten; bessere Zuordnung rot/gelb/gruen/frei zu Kindern und
+  Regeln"). Befund am Vollbild: drei fast gleiche Varianten-Kacheln
+  mit den Unterschieden als Fliesstext und einem getrennten
+  Vergleichs-Dropdown; die Ampel dreimal verschieden kodiert (Rand,
+  blasses Zeichen AUF der Gruppenfarbe, Text im Panel); Hoehe verloren
+  an `W+ ✓`-Badges fuer erfuellte Wuensche, zweizeilige Stapelkoepfe
+  mit vollem Namen und drei Balance-Textzeilen je Spaltenkopf.
+  Entscheidungen:
+  - **Scorecard-Leiste**: eine Zeile je Variante mit Basis (Radio),
+    Vergleich (Haken - ersetzt das Dropdown), Zielwert, Diff,
+    Ampelbalken (vier Segmente) und Verstoessen je Prio (aus
+    `verletzungen[].prio`, vorher nirgends sichtbar); darunter eine
+    Zeile "Arbeitsstand", sobald Pins die Basis veraendern.
+  - **Ein Statuszeichen ueberall** (`.status-punkt`, Vollton mit
+    ✓/!/✗): vor der Kind-Id (Worst-of), im Badge als kleiner Punkt
+    statt blassem Zeichen, in der Panelzeile, im Stapelkopf und in
+    einer Legende. "frei" heisst nach aussen **"ohne Regel"** und ist
+    ein hohler Kreis - kein Status, sondern dessen Abwesenheit; der
+    JS-Schluessel `frei` bleibt. Mini-Balken im Panel in Ampelfarbe
+    (zerrissene Buendelung: alle belegten Segmente rot).
+  - **Kreuzbezug in beide Richtungen**: Zeigen auf eine Gruppe dimmt
+    die Nicht-Mitglieder im Board; Zeigen auf eine Karte hebt ihre
+    Panelzeilen hervor.
+  - **Erfuellte Wuensche eines Kindes sind EIN Badge** `W n`;
+    verletzte bleiben einzeln und rot. Schalter "alle Wuensche
+    einzeln" stellt die Einzelansicht her.
+  - **Stapel einklappen**: vollstaendig in der Spalte UND ohne
+    Diskussionsbedarf (alle Mitglieder gruen/ohne Regel) - dann Karten
+    nebeneinander mit Punkt und Id, Kopf `[Kuerzel] ● x/y`, Klick
+    klappt auf. Die Karten bleiben echte `.karte` (fokussierbar,
+    pinnbar, ziehbar); Stapel mit gelb/rot sind nie zu.
+  - **Spaltenkopf**: Balance je Regel als Balken mit Zielband
+    (Ist-Balken endet im Band = erfuellt, am Rand = knapp, ausserhalb
+    = verletzt; Zahlen im Tooltip). **Panel** 21 -> 17 rem, Namen ohne
+    `G_`-Praefix, Pin/Schloss erst bei Hover/Fokus.
+  - **Gelb ist Gelb** (Nutzerrueckmeldung nach der ersten Sicht): das
+    bisherige Braun `#8a5a00` fuer "knapp" las sich wie ein Alarm. Die
+    Warn-Familie ist jetzt gelb-gruen - Text olive `#6f7400`, Rand
+    `#d6d45c`, Flaeche `#f9f9e0` - und fuer FLAECHEN (Punkt, Balken,
+    Kartenkante) gibt es die neue Rolle `--farbe-warn-marke` `#d9cf00`
+    mit dunklem Zeichen darauf: ein echtes Gelb als Text waere
+    unlesbar. Kanon in `design-tokens.css`, beide Vorlagen-Kopien und
+    `Tokens.xaml` (per `tools/design-einsetzen.pl`).
+  - **Zeigen hebt bei JEDER Regel hervor**: auch Balance-Zeilen
+    (Treffer der Regel) und verletzte Wuensche (das Paar) dimmen die
+    uebrigen Karten - dieselbe Mechanik wie bei Gruppen
+    (`hoverKinder`), in Akzentfarbe statt Gruppenfarbe.
+  - **Prio-Stufen ohne Nummer**: die Sektionen heissen KRITISCH /
+    WICHTIG / WENN MOEGLICH. Die Zahl im YAML (3 = hoechste, das
+    Gewicht im Solver) und die Lesart "kritisch = Nummer 1"
+    widersprechen sich; beide nebeneinander zu zeigen verwirrt. Eine
+    Umkehr der YAML-Semantik waere ein Eingriff in Kern, YAML-Schema,
+    GUI-Masken und Beispiele - bewusst nicht Teil von U6.
+  - Kein Eingriff in `bewerte()` und die Chip-Texte (Zeichengleichheit
+    zum Kern bleibt getestet).
+  Verifikation: vier neue Playwright-Faelle in
+  `KlassenbildungBoardTests` (Scorecard-Segmente summieren sich zu
+  100 %, Vergleichshaken, Wunsch-Badges <= verletzte + 1, eingeklappte
+  Stapel ohne gelb/rot und mit bedienbaren Karten, Legende und genau
+  ein Punkt je Karte/Panelzeile), bestehende 33 unveraendert gruen,
+  DesignTokenTests, Smoke, Vollbild per headless Edge (Rezept in
+  CLAUDE.md): Spaltenhoehe im Grundschul-Beispiel von ~1300 auf ~980 px.

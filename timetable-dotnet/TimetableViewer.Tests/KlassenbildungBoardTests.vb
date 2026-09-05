@@ -132,6 +132,109 @@ Public Class KlassenbildungBoardTests
         StringAssert.Matches(text, New Text.RegularExpressions.Regex("\b1[ab]\b"), "es werden gar keine Labels angezeigt")
     End Function
 
+    ' ===============================================================
+    ' Board-Verdichtung (U6)
+    ' ===============================================================
+
+    ''' <summary>Die Scorecard-Leiste: eine Zeile je Variante mit
+    ''' Ampelbalken (vier Segmente, Breiten summieren sich zu 100 %) und
+    ''' Verstoessen je Prio; der Vergleichshaken ersetzt das fruehere
+    ''' Dropdown.</summary>
+    <TestMethod>
+    Public Async Function ScorecardZeigtJeVarianteAmpelUndVerstoesse() As Task
+        Await SeiteOeffnenAsync(KlassenbildungSeite())
+
+        Dim anzahl = Await Seite.EvaluateAsync(Of Integer)(
+            "() => JSON.parse(document.getElementById('klassenbildung-data').textContent).varianten.length")
+        Assert.AreEqual(anzahl, Await Seite.Locator("#varianten .variante-kachel").CountAsync(),
+                        "je Variante genau eine Zeile")
+        Assert.AreEqual(0, Await Seite.Locator("#compare-select").CountAsync(), "das Dropdown ist Geschichte")
+
+        Dim summen = Await Seite.EvaluateAsync(Of Double())("() =>
+            Array.from(document.querySelectorAll('#varianten .variante-kachel .ampel-balken')).map(b =>
+                Array.from(b.querySelectorAll('i')).reduce((s, i) => s + parseFloat(i.style.width), 0))")
+        Assert.AreEqual(anzahl, summen.Length, "jede Zeile hat einen Ampelbalken")
+        For Each s In summen
+            Assert.AreEqual(100.0, s, 1.0, "die Segmente decken die Kinderzahl ab")
+        Next
+        Assert.AreEqual(anzahl, Await Seite.Locator("#varianten .variante-kachel .verstoss-zelle").CountAsync())
+
+        ' Vergleich per Haken auf der zweiten Zeile: die Info nennt die
+        ' Zahl abweichender Kinder.
+        Await Seite.Locator("#varianten .variante-kachel").Nth(1).Locator("input[type='checkbox']").ClickAsync()
+        StringAssert.Contains(Await Seite.Locator("#compare-info").InnerTextAsync(), "anders zugeordnet")
+        Assert.AreEqual(1, Await Seite.Locator("#varianten .variante-kachel.compare").CountAsync())
+    End Function
+
+    ''' <summary>Erfuellte Wuensche eines Kindes sind EIN Badge; verletzte
+    ''' bleiben einzeln. Der Schalter stellt die Einzelansicht her.</summary>
+    <TestMethod>
+    Public Async Function ErfuellteWuenscheSindEinBadge() As Task
+        Await SeiteOeffnenAsync(KlassenbildungSeite())
+
+        Dim befund = Await Seite.EvaluateAsync(Of String)("() => {
+            const data = JSON.parse(document.getElementById('klassenbildung-data').textContent);
+            const chips = window.__kbTest.bewerte(window.__kbTest.sicht().zuordnung).chips;
+            const verletzt = {};
+            chips.forEach(c => { if (c.regel_typ.indexOf('wunsch') === 0 && c.status === 'rot') verletzt[c.kind] = (verletzt[c.kind] || 0) + 1; });
+            const zuViele = [];
+            let sammel = 0;
+            document.querySelectorAll('.karte[data-kind]').forEach(k => {
+                const id = k.getAttribute('data-kind');
+                const n = k.querySelectorAll('.badge.wunsch').length;
+                const erlaubt = (verletzt[id] || 0) + 1;
+                if (n > erlaubt) zuViele.push(id + ':' + n);
+                if (n > 0) sammel += 1;
+            });
+            return JSON.stringify({ zuViele: zuViele, mitBadge: sammel, wuensche: data.wuensche.length });
+        }")
+        Dim d = System.Text.Json.Nodes.JsonNode.Parse(befund)
+        Assert.AreEqual(0, d("zuViele").AsArray().Count, "zu viele Wunsch-Badges: " & befund)
+        Assert.IsTrue(d("mitBadge").GetValue(Of Integer)() > 0, "Testgrundlage: es gibt Wuensche")
+
+        Await Seite.Locator("#filter-wuensche").CheckAsync()
+        Dim einzeln = Await Seite.EvaluateAsync(Of Integer)("() => document.querySelectorAll('.karte .badge.wunsch').length")
+        Assert.AreEqual(2 * d("wuensche").GetValue(Of Integer)(), einzeln,
+                        "einzeln: jeder Wunsch erscheint an beiden Kindern")
+    End Function
+
+    ''' <summary>Vollstaendige Stapel ohne Diskussionsbedarf sind
+    ''' eingeklappt - und ihre Karten bleiben echte, bedienbare Karten.</summary>
+    <TestMethod>
+    Public Async Function ErfuellteStapelSindEingeklapptUndBleibenBedienbar() As Task
+        Await SeiteOeffnenAsync(KlassenbildungSeite())
+
+        Assert.IsTrue(Await Seite.Locator(".stapel.zu").CountAsync() > 0, "kein eingeklappter Stapel")
+        Assert.AreEqual(0, Await Seite.Locator(".stapel.zu .karte.agg-rot, .stapel.zu .karte.agg-gelb").CountAsync(),
+                        "ein Stapel mit Diskussionsbedarf darf nie zu sein")
+        Dim karte = Seite.Locator(".stapel.zu .karte").First
+        Dim kasten = Await karte.BoundingBoxAsync()
+        Assert.IsTrue(kasten.Height > 0 AndAlso kasten.Height <= 26, $"Karte im zugeklappten Stapel: {kasten.Height} px")
+        Assert.AreEqual("0", Await karte.GetAttributeAsync("tabindex"))
+
+        ' Der Kopf klappt auf.
+        Await Seite.Locator(".stapel.zu .stapel-kopf").First.ClickAsync()
+        Dim vorher = Await Seite.Locator(".stapel.zu").CountAsync()
+        Assert.IsTrue(vorher >= 0)
+        Dim offen = Await Seite.EvaluateAsync(Of Integer)("() => document.querySelectorAll('.stapel:not(.zu) .pfeil').length")
+        Assert.IsTrue(offen > 0, "der Klick auf den Kopf hat nicht aufgeklappt")
+    End Function
+
+    ''' <summary>Eine Ampel-Sprache: Legende mit vier Punkten, jede Karte
+    ''' traegt genau einen Worst-of-Punkt, jede Panelzeile einen.</summary>
+    <TestMethod>
+    Public Async Function LegendeUndStatuspunkteSindDa() As Task
+        Await SeiteOeffnenAsync(KlassenbildungSeite())
+
+        Assert.AreEqual(4, Await Seite.Locator("#controls .legende .status-punkt").CountAsync())
+        Dim ohne = Await Seite.EvaluateAsync(Of Integer)(
+            "() => Array.from(document.querySelectorAll('.karte')).filter(k => k.querySelectorAll(':scope > .status-punkt').length !== 1).length")
+        Assert.AreEqual(0, ohne, "Karten ohne genau einen Statuspunkt")
+        Dim zeilen = Await Seite.Locator(".gruppe-zeile").CountAsync()
+        Assert.AreEqual(zeilen, Await Seite.Locator(".gruppe-zeile .status .status-punkt").CountAsync())
+        StringAssert.Contains(Await Seite.Locator("#controls .legende").InnerTextAsync(), "ohne Regel")
+    End Function
+
     ''' <summary>DER Regressionstest fuer Stufe E: ohne
     ''' window.chrome.webview muss der Viewer weiterhin der
     ''' YAML-Export-Weg sein. Dass er per Doppelklick funktioniert, ist

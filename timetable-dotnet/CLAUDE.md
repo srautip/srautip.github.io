@@ -105,8 +105,14 @@ pauschal die volle Suite zu fahren:
      prueft VERHALTEN (Drag & Drop, Pins, beide Betriebsarten der
      Bruecke), nicht nur "laeuft das JS".
   4. Headless-Browser-Smoke gegen die generierten Seiten. Unter Windows:
-     `powershell -File tools\viewer-smoke.ps1` (nutzt Edge, prueft alle
-     Viewer-Seiten unter `tests/`). Unter Linux liegt Chromium unter
+     `powershell -ExecutionPolicy Bypass -File tools\viewer-smoke.ps1`
+     (nutzt Edge, prueft alle Viewer-Seiten unter `tests/`).
+  5. SICHTPRUEFUNG einer Viewer-Seite in voller Hoehe - der In-App-Browser
+     laeuft bei diesen Seiten in ein Render-Timeout, headless Edge nicht:
+     `msedge --headless=new --disable-gpu --hide-scrollbars --window-size=1600,2400 --virtual-time-budget=8000 --screenshot=<png> file:///C:/.../tests/<schule>/output/klassenbildung.html`
+     (Pfad `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`),
+     danach das PNG mit `Read` ansehen. Den Ausschnitt oben links per
+     System.Drawing zuschneiden, wenn Details zaehlen. Unter Linux liegt Chromium unter
      `/opt/pw-browsers/`; in beiden Faellen fuehrt `--headless --dump-dom
      --virtual-time-budget=...` das Inline-JS aus. Fuer Interaktionstests
      ein kleines Skript vor `</body>` injizieren, das Events dispatcht und

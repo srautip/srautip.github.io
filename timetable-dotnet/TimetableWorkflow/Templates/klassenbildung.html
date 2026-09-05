@@ -35,7 +35,12 @@
          unmoeglich. Die Symbole bleiben Text - die Doppelkodierung
          ist laut klassenbildung-konzept.md:419 Pflicht. --- */
   --farbe-ok-text:#0f7938;    --farbe-ok-rand:#86c9a4;    --farbe-ok-flaeche:#e9f6ef;
-  --farbe-warn-text:#8a5a00;  --farbe-warn-rand:#ddb45f;  --farbe-warn-flaeche:#fdf3e4;
+  --farbe-warn-text:#6f7400;  --farbe-warn-rand:#d6d45c;  --farbe-warn-flaeche:#f9f9e0;
+  /* Gelb als FLAECHE (Punkt, Balken, Kante): ein echtes, leicht
+     gruenliches Gelb - "knapp" ist kein Alarm, und das fruehere Braun
+     las sich wie einer. Als Text waere es unlesbar; deshalb eine eigene
+     Rolle neben dem olivfarbenen Text. */
+  --farbe-warn-marke:#d9cf00;
   --farbe-krit-text:#b3261e;  --farbe-krit-rand:#eaa6a1;  --farbe-krit-flaeche:#fcecea;
   /* "frei" hat bewusst KEINE eigene Flaeche: sie waere wertgleich mit
      --farbe-flaeche-3 und damit eine zweite Wahrheit fuer denselben Ton. */
@@ -323,37 +328,108 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* ---- Varianten-Kacheln (U2) ---- */
+  /* ---- Scorecard-Leiste (U6): eine Zeile je Variante ----
+     Vorher drei fast gleiche Textkacheln, deren einzige Unterschiede
+     (Diff, Ampel) in der dritten Zeile als Fliesstext standen, und ein
+     getrenntes Vergleichs-Dropdown fuer dieselben Varianten. Jetzt eine
+     Tabelle: Basis (Radio) und Vergleich (Haken) sind Spalten derselben
+     Zeile, die Ampel ist ein Balken, und die Verstoesse je Prio - die
+     der Export schon immer trug - werden erstmals sichtbar. */
   #varianten {
     display: flex;
-    gap: var(--mass-2);
-    flex-wrap: wrap;
-    margin-bottom: var(--mass-3);
-  }
-  .variante-kachel {
+    flex-direction: column;
     border: 1px solid var(--farbe-linie);
     border-radius: var(--radius-l);
-    padding: var(--mass-2) var(--mass-3);
-    cursor: pointer;
+    margin-bottom: var(--mass-3);
     font-size: var(--t-klein);
-    min-width: 11rem;
+    overflow: hidden;
     background: var(--farbe-flaeche);
-    transition: background var(--uebergang), border-color var(--uebergang);
   }
+  .variante-kachel, .arbeits-zeile, #varianten .kopfzeile {
+    display: grid;
+    grid-template-columns: 2.6rem 2.2rem 8rem 4.5rem 4.5rem minmax(12rem, 1fr) 16rem;
+    align-items: center;
+    gap: var(--mass-2);
+    padding: var(--mass-05) var(--mass-3);
+    min-height: var(--dichte-zeile);
+    box-sizing: border-box;
+  }
+  #varianten .kopfzeile {
+    font-size: var(--t-mikro);
+    color: var(--farbe-text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: var(--farbe-flaeche-2);
+    border-bottom: 1px solid var(--farbe-linie);
+    min-height: 0;
+  }
+  .variante-kachel {
+    cursor: pointer;
+    transition: background var(--uebergang);
+  }
+  .variante-kachel + .variante-kachel, .arbeits-zeile { border-top: 1px solid var(--farbe-linie); }
   .variante-kachel:hover { background: var(--zustand-hover); }
-  .variante-kachel.active {
-    border-color: var(--farbe-akzent);
-    background: var(--farbe-akzent-flaeche);
-  }
-  /* Auswahl und Vergleich waren bisher unterschiedlich stark markiert
-     (Auswahl mit Rahmen UND Flaeche, Vergleich nur mit Flaeche) -
-     jetzt beide gleich stark, nur in ihrer eigenen Rolle. */
-  .variante-kachel.compare {
-    border-color: var(--farbe-diff);
-    background: var(--farbe-vergleich-flaeche);
-  }
+  .variante-kachel.active { background: var(--farbe-akzent-flaeche); }
+  /* Auswahl und Vergleich gleich stark, jede in ihrer eigenen Rolle. */
+  .variante-kachel.compare { background: var(--farbe-vergleich-flaeche); }
   .variante-kachel .kopf { font-weight: 600; }
-  .variante-kachel .zeile { color: var(--farbe-text-2); font-variant-numeric: tabular-nums; }
+  .variante-kachel .zeile, .arbeits-zeile .zeile { color: var(--farbe-text-2); font-variant-numeric: tabular-nums; }
+  .variante-kachel input, .arbeits-zeile input { margin: 0; cursor: pointer; }
+  .arbeits-zeile .kopf { font-weight: 600; color: var(--farbe-akzent); }
+  .ampel-zelle { display: flex; align-items: center; gap: var(--mass-2); min-width: 0; }
+  .ampel-balken {
+    flex: 1 1 auto;
+    display: flex;
+    height: 10px;
+    border-radius: var(--radius-s);
+    overflow: hidden;
+    background: var(--farbe-flaeche-3);
+  }
+  .ampel-balken i { display: block; height: 100%; }
+  .ampel-balken i.rot { background: var(--farbe-krit-text); }
+  .ampel-balken i.gelb { background: var(--farbe-warn-marke); }
+  .ampel-balken i.gruen { background: var(--farbe-ok-text); }
+  .ampel-balken i.frei { background: var(--farbe-frei-rand); }
+  .ampel-zelle .zahlen { font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
+  .ampel-zelle .zahlen .rot { color: var(--farbe-krit-text); font-weight: 600; }
+  .ampel-zelle .zahlen .gelb { color: var(--farbe-warn-text); font-weight: 600; }
+  .ampel-zelle .zahlen .gruen { color: var(--farbe-ok-text); }
+  .ampel-zelle .zahlen .frei { color: var(--farbe-text-3); }
+  .verstoss-zelle { font-variant-numeric: tabular-nums; color: var(--farbe-text-2); white-space: nowrap; }
+  .verstoss-zelle b { color: var(--farbe-krit-text); }
+
+  /* ---- Ampel-Sprache (U6): EIN Statuszeichen ueberall ----
+     Vorher war der Status dreimal verschieden kodiert: Kartenrand,
+     blasses ✓/!/✗ in der Rand-Tonstufe AUF der Gruppenfarbe (kaum
+     lesbar), Text im Panel. Jetzt derselbe Volltonpunkt an Karte,
+     Badge, Panelzeile, Stapelkopf und in der Legende. "ohne Regel"
+     ist ein hohler Kreis - kein Status, sondern dessen Abwesenheit. */
+  .status-punkt {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex: none;
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 700;
+    color: var(--farbe-flaeche);
+    background: var(--farbe-frei-rand);
+    box-sizing: border-box;
+  }
+  .status-punkt.rot { background: var(--farbe-krit-text); }
+  .status-punkt.gelb { background: var(--farbe-warn-marke); color: var(--farbe-text); }
+  .status-punkt.gruen { background: var(--farbe-ok-text); }
+  .status-punkt.frei { background: transparent; border: 1px solid var(--farbe-frei-rand); }
+  .legende {
+    margin-left: auto;
+    display: flex;
+    gap: var(--mass-3);
+    color: var(--farbe-text-2);
+  }
+  .legende span { display: inline-flex; align-items: center; gap: var(--mass-05); }
   #controls label {
     display: flex;
     align-items: center;
@@ -367,7 +443,7 @@
     align-items: flex-start;
   }
   #panel {
-    flex: 0 0 21rem;
+    flex: 0 0 17rem;
     border: 1px solid var(--farbe-linie);
     border-radius: var(--radius-l);
     font-size: var(--t-basis);
@@ -398,7 +474,7 @@
     transition: background var(--uebergang);
   }
   .gruppe-zeile:hover { background: var(--zustand-hover); }
-  .gruppe-zeile.aktiv { background: var(--farbe-akzent-flaeche); }
+  .gruppe-zeile.aktiv, .gruppe-zeile.hl { background: var(--farbe-akzent-flaeche); }
   .gruppe-zeile .kuerzel {
     flex: 0 0 auto;
     min-width: 2.4rem;
@@ -410,7 +486,7 @@
     color: var(--farbe-flaeche);
   }
   .gruppe-zeile .typ { color: var(--farbe-text-2); flex: 0 0 auto; }
-  .gruppe-zeile .status { flex: 0 0 auto; font-size: var(--t-klein); }
+  .gruppe-zeile .status { flex: 0 0 auto; font-size: var(--t-klein); display: inline-flex; align-items: center; gap: var(--mass-05); }
   .status.s-verletzt { color: var(--farbe-krit-text); font-weight: 600; }
   .status.s-knapp { color: var(--farbe-warn-text); font-weight: 600; }
   .status.s-ok { color: var(--farbe-ok-text); }
@@ -429,20 +505,37 @@
     gap: 1px;
     height: 14px;
   }
+  /* Segmente in Ampelfarbe (U6): erfuellt gruen, Kappe voll gelb, ueber
+     der Kappe oder zerrissen rot, leere Klasse neutral - dieselbe
+     Sprache wie die Punkte, nicht mehr nur Hoehe. */
   .mini-balken i {
     display: block;
     width: 5px;
-    background: var(--farbe-frei-text);
+    background: var(--farbe-ok-text);
     border-radius: 1px 1px 0 0;
   }
   .mini-balken i.ueber { background: var(--farbe-krit-text); }
-  .mini-balken i.voll { background: var(--farbe-warn-text); }
-  .gruppe-zeile .fixieren { flex: 0 0 auto; padding: 0 var(--mass-1); }
+  .mini-balken i.voll { background: var(--farbe-warn-marke); }
+  .mini-balken i.leer { background: var(--farbe-frei-rand); }
+  /* Pin und Schloss erscheinen erst beim Zeigen oder Fokussieren -
+     zwei Knoepfe je Zeile waren mehr Rahmen als Inhalt. focus-within
+     haelt sie fuer die Tastatur erreichbar. */
+  .gruppe-zeile .fixieren { flex: 0 0 auto; padding: 0 var(--mass-1); opacity: 0; transition: opacity var(--uebergang); }
+  .gruppe-zeile:hover .fixieren, .gruppe-zeile:focus-within .fixieren { opacity: 1; }
   #panel .block {
     padding: var(--mass-1) var(--mass-3) var(--mass-2);
     color: var(--farbe-text-2);
   }
   #panel .block .zeile { padding: var(--mass-05) 0; display: flex; gap: var(--mass-2); align-items: center; }
+  /* Balance- und Wunschzeilen, die Kinder hervorheben, reagieren wie
+     Gruppenzeilen: Zeiger und Hintergrund ueber die volle Breite. */
+  #panel .block .zeile[tabindex] {
+    cursor: pointer;
+    margin: 0 calc(-1 * var(--mass-3));
+    padding: var(--mass-05) var(--mass-3);
+    transition: background var(--uebergang);
+  }
+  #panel .block .zeile[tabindex]:hover, #panel .block .zeile[tabindex]:focus { background: var(--zustand-hover); }
 
   /* ---- Board (U1/U2) ---- */
   #board {
@@ -486,14 +579,31 @@
     background: var(--farbe-akzent);
   }
   .kapazitaet.ausserhalb i { background: var(--farbe-krit-text); }
+  /* Balance je Regel als Balken mit Zielband (U6) statt drei Textzeilen:
+     der Balken endet im Band = erfuellt, am Rand = knapp, ausserhalb =
+     verletzt. Die Zahlen stehen im Tooltip. */
   .klasse-kopf .kennzahl {
     font-size: var(--t-mikro);
     color: var(--farbe-text-2);
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 4.5rem 1.4rem;
     align-items: center;
     gap: var(--mass-1);
   }
   .klasse-kopf .kennzahl.verletzt { color: var(--farbe-krit-text); font-weight: 600; }
+  .klasse-kopf .kennzahl .kz-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .klasse-kopf .kennzahl .kz-wert { text-align: right; font-variant-numeric: tabular-nums; }
+  .kz-balken {
+    position: relative;
+    height: 8px;
+    background: var(--farbe-flaeche-3);
+    border-radius: var(--radius-s);
+    overflow: hidden;
+  }
+  .kz-balken .band { position: absolute; top: 0; bottom: 0; background: var(--farbe-ok-rand); }
+  .kz-balken .ist { position: absolute; top: 2px; bottom: 2px; left: 0; background: var(--farbe-ok-text); border-radius: 1px; }
+  .kz-balken .ist.gelb { background: var(--farbe-warn-marke); }
+  .kz-balken .ist.rot { background: var(--farbe-krit-text); }
   .karten {
     padding: var(--mass-2);
     display: flex;
@@ -506,17 +616,37 @@
     border-radius: var(--radius-m);
     padding: var(--mass-1);
   }
+  /* Stapelkopf einzeilig (U6): Kuerzel, Statuspunkt, x/y - der Name
+     steht im Tooltip, das Kuerzel traegt ihn bereits. */
   .stapel .stapel-kopf {
     font-size: var(--t-mikro);
     font-weight: 700;
     padding: 0 var(--mass-05) var(--mass-05);
+    display: flex;
+    align-items: center;
+    gap: var(--mass-1);
+    cursor: pointer;
   }
+  .stapel .stapel-kopf .kuerzel {
+    border-radius: var(--radius-s);
+    padding: 0 var(--mass-1);
+    color: var(--farbe-flaeche);
+  }
+  .stapel .stapel-kopf .anzahl { font-weight: 400; color: var(--farbe-text-2); font-variant-numeric: tabular-nums; }
   .stapel .stapel-kopf .zerrissen { color: var(--farbe-krit-text); }
+  .stapel .stapel-kopf .pfeil { margin-left: auto; color: var(--farbe-text-3); font-weight: 400; }
   .stapel .karten-innen {
     display: flex;
     flex-direction: column;
     gap: var(--dichte-gap);
   }
+  /* Eingeklappter Stapel (U6): vollstaendig hier und ohne
+     Diskussionsbedarf - dann reichen Punkt und Id, nebeneinander. Die
+     Karten bleiben echte Karten (fokussierbar, pinnbar, ziehbar). */
+  .stapel.zu .karten-innen { flex-direction: row; flex-wrap: wrap; }
+  .stapel.zu .karte { flex: 0 0 auto; }
+  .stapel.zu .karte .badges, .stapel.zu .karte .pin { display: none; }
+  .stapel.zu .karte .kind-id { min-width: 0; }
   /* Enge Zeilenhoehe: die Karte ist eine Datenzeile, keine Textzeile.
      Mit --lh-basis (1,4) wuchs sie von 24 auf 28 px - der Umbau haette
      jedem, der heute kompakt arbeitet, Flaeche weggenommen. */
@@ -535,13 +665,17 @@
     font-size: var(--t-basis);
     line-height: var(--lh-eng);
     position: relative;
-    transition: background var(--uebergang), box-shadow var(--uebergang);
+    transition: background var(--uebergang), box-shadow var(--uebergang), opacity var(--uebergang);
   }
   /* Die Karte ist das Hauptobjekt des Boards und reagierte bisher
      ueberhaupt nicht auf den Zeiger. */
   .karte:hover { background: var(--zustand-hover); }
+  /* Kreuzbezug (U6): waehrend eine Gruppe gezeigt wird, treten die
+     Nicht-Mitglieder zurueck - der Blick findet die Mitglieder, statt
+     Umrandungen zwischen hundert Karten zu suchen. */
+  #board.gedimmt .karte:not(.hl) { opacity: 0.35; }
   .karte.agg-gruen { border-left-color: var(--farbe-ok-text); }
-  .karte.agg-gelb  { border-left-color: var(--farbe-warn-text); }
+  .karte.agg-gelb  { border-left-color: var(--farbe-warn-marke); }
   .karte.agg-rot   { border-left-color: var(--farbe-krit-text); }
   .karte.diff { outline: 3px solid var(--farbe-diff); outline-offset: -3px; }
   .karte.hl { box-shadow: 0 0 0 2px var(--hl, var(--farbe-akzent)); }
@@ -573,10 +707,24 @@
     cursor: pointer;
     line-height: 1.45;
   }
-  .badge .st { font-weight: 400; }
-  .badge .st.gruen { color: var(--farbe-ok-rand); }
-  .badge .st.gelb  { color: var(--farbe-warn-rand); }
-  .badge .st.rot   { color: var(--farbe-krit-rand); }
+  /* Der Status im Badge ist ein kleiner Volltonpunkt (U6): Gruppenfarbe
+     und Ampel bleiben getrennt lesbar, statt dass ein blasses Zeichen
+     auf einer gedeckten Flaeche verschwindet. */
+  .badge .st {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    font-size: 8px;
+    line-height: 1;
+    font-weight: 700;
+    color: var(--farbe-flaeche);
+  }
+  .badge .st.gruen { background: var(--farbe-ok-text); }
+  .badge .st.gelb  { background: var(--farbe-warn-marke); color: var(--farbe-text); }
+  .badge .st.rot   { background: var(--farbe-krit-text); }
   .badge.wunsch { background: var(--farbe-frei-text); }
 
   /* ---- Karten-Popover (U3: F1/F2) ---- */
@@ -701,11 +849,12 @@
   <div id="varianten"></div>
 
   <div id="controls">
-    <label for="compare-select">Vergleichen mit: <select id="compare-select"></select></label>
     <label><input type="checkbox" id="filter-kritisch">nur Diskussionsbedarf (gelb/rot)</label>
     <label><input type="checkbox" id="filter-offene">nur offene (nicht fixierte) Kinder</label>
+    <label><input type="checkbox" id="filter-wuensche">alle Wuensche einzeln</label>
     <label><input type="checkbox" id="konsens-toggle" checked>Konsens-Kern markieren (&#9679;)</label>
     <span id="compare-info"></span>
+    <span class="legende" id="legende"></span>
   </div>
 
   <div id="haupt">
@@ -741,6 +890,7 @@
       var aktuelleVariante = 0;       // Arbeitsstand (U2)
       var compareIndex = null;
       var highlights = {};            // gruppen-id -> true (Mehrfach-Highlight, U1)
+      var stapelOffen = {};           // gruppen-id -> true/false: vom Nutzer auf-/zugeklappt (U6)
       var pins = {};                  // kind -> klasse (F1, U3; ein Pin auf eine ANDERE
                                       // Klasse als in der Basis-Variante IST die Verschiebung, U4)
       var notPins = {};               // kind -> {klasse: true} (F2)
@@ -868,6 +1018,8 @@
         // gar keine Gruppenidentitaet.
         return p.length ? p : ['#528099'];
       })();
+      // Hervorhebungsfarbe fuer Regeln ohne Gruppenfarbe (Balance, Wunsch).
+      var akzentFarbe = getComputedStyle(document.documentElement).getPropertyValue('--farbe-akzent').trim() || '#0f6cbd';
       var farbeVon = {};
       var kuerzelVon = {};
       var gruppeVon = {};             // id -> gruppe
@@ -895,7 +1047,40 @@
 
       var statusRang = { gruen: 0, gelb: 1, rot: 2 };
       var chipSymbol = { gruen: '✓', gelb: '!', rot: '✗' };
-      var prioName = { 3: 'KRITISCH (Prio 3)', 2: 'WICHTIG (Prio 2)', 1: 'WENN MOEGLICH (Prio 1)' };
+      // Die Stufen heissen, sie werden nicht nummeriert: im YAML ist
+      // 3 die hoechste Prio (Gewicht im Solver), gelesen wird "kritisch"
+      // aber als Nummer 1 - beide Zahlen nebeneinander verwirren nur.
+      var prioName = { 3: 'KRITISCH', 2: 'WICHTIG', 1: 'WENN MOEGLICH' };
+      var prioWort = { 3: 'kritisch', 2: 'wichtig', 1: 'wenn moeglich' };
+      var prioKurz = { 3: 'krit', 2: 'wichtig', 1: 'wenn mgl.' };
+      // Die Ampel in Worten - fuer Legende und Tooltips. 'frei' bleibt
+      // der interne Schluessel (aggregat), heisst nach aussen aber
+      // "ohne Regel": es ist kein Status, sondern dessen Abwesenheit.
+      var statusName = { gruen: 'erfuellt', gelb: 'knapp', rot: 'verletzt', frei: 'ohne Regel' };
+
+      // EIN Statuszeichen ueberall (U6): Karte, Badge, Panelzeile,
+      // Stapelkopf, Legende - siehe CSS .status-punkt.
+      function statusPunkt(status, titel) {
+        var s = document.createElement('span');
+        s.className = 'status-punkt ' + status;
+        s.textContent = status === 'frei' ? '' : chipSymbol[status];
+        s.title = titel || statusName[status];
+        return s;
+      }
+      // Gruppen-Id ohne das technische Praefix - das Kuerzel steht
+      // daneben, der volle Name im Tooltip.
+      function kurzName(id) {
+        return id.replace(/^G_/, '');
+      }
+      // Verstoesse je Prio-Stufe: Regeln mit Mass > 0 (aus dem Export,
+      // bisher nirgends sichtbar).
+      function verstoesseJePrio(v) {
+        var z = { 3: 0, 2: 0, 1: 0 };
+        (v.verletzungen || []).forEach(function (x) {
+          if (x.mass > 0 && z.hasOwnProperty(x.prio)) z[x.prio] += 1;
+        });
+        return z;
+      }
 
       function chipsJeKind(v) {
         var map = {};
@@ -1240,18 +1425,96 @@
         p.appendChild(zaehler);
       }
 
-      // ---- Varianten-Kacheln (U2) ----------------------------------
+      // ---- Scorecard-Leiste (U6, vorher Varianten-Kacheln U2) -------
+      // Eine Zeile je Variante: Basis (Radio), Vergleich (Haken),
+      // Zielwert, Diff, Ampelbalken, Verstoesse je Prio. Darunter der
+      // Arbeitsstand, sobald Pins die Basis veraendern - so ist sichtbar,
+      // was das Verschieben gebracht hat.
+      function ampelZelle(z, gesamt) {
+        var zelle = document.createElement('div');
+        zelle.className = 'ampel-zelle';
+        var balken = document.createElement('div');
+        balken.className = 'ampel-balken';
+        var zahlen = document.createElement('span');
+        zahlen.className = 'zahlen';
+        ['rot', 'gelb', 'gruen', 'frei'].forEach(function (s, k) {
+          if (z[s] > 0) {
+            var seg = document.createElement('i');
+            seg.className = s;
+            seg.style.width = (z[s] / gesamt * 100) + '%';
+            seg.title = z[s] + ' ' + statusName[s];
+            balken.appendChild(seg);
+          }
+          var n = document.createElement('span');
+          n.className = s;
+          n.textContent = (k > 0 ? ' · ' : '') + z[s];
+          n.title = statusName[s];
+          zahlen.appendChild(n);
+        });
+        balken.title = z.rot + ' verletzt, ' + z.gelb + ' knapp, ' + z.gruen + ' erfuellt, ' + z.frei + ' ohne Regel';
+        zelle.appendChild(balken);
+        zelle.appendChild(zahlen);
+        return zelle;
+      }
+      function verstossZelle(v) {
+        var z = verstoesseJePrio(v);
+        var zelle = document.createElement('div');
+        zelle.className = 'verstoss-zelle';
+        [3, 2, 1].forEach(function (p, k) {
+          if (k > 0) zelle.appendChild(document.createTextNode(' · '));
+          var wert = document.createElement(z[p] > 0 ? 'b' : 'span');
+          wert.textContent = prioKurz[p] + ' ' + z[p];
+          wert.title = prioName[p] + ': ' + z[p] + ' Regel(n) verletzt';
+          zelle.appendChild(wert);
+        });
+        return zelle;
+      }
+      function scorecardZeile(klasse, spalten) {
+        var zeile = document.createElement('div');
+        zeile.className = klasse;
+        spalten.forEach(function (s) {
+          if (typeof s === 'string') {
+            var d = document.createElement('div');
+            d.className = 'zeile';
+            d.textContent = s;
+            zeile.appendChild(d);
+          } else {
+            zeile.appendChild(s);
+          }
+        });
+        return zeile;
+      }
       function renderVarianten() {
         var c = document.getElementById('varianten');
         c.innerHTML = '';
+        var kopf = scorecardZeile('kopfzeile', ['Basis', 'Vgl.', 'Variante', 'Zielwert', 'Diff V1', 'Schueler: verletzt · knapp · erfuellt · ohne Regel', 'Verstoesse je Prio']);
+        kopf.querySelectorAll('.zeile').forEach(function (d) { d.className = ''; });
+        c.appendChild(kopf);
+
         varianten.forEach(function (v, i) {
-          var k = document.createElement('div');
-          k.className = 'variante-kachel' + (i === aktuelleVariante ? ' active' :
-            (compareIndex === i ? ' compare' : ''));
-          var z = ampelZaehler(v);
-          k.innerHTML = '<div class="kopf">Variante ' + v.index + ' (' + v.status + ')</div>' +
-            '<div class="zeile">Zielwert ' + v.objective + ' | Diff zu V1: ' + v.diff_zu_v1 + '</div>' +
-            '<div class="zeile">' + z.rot + ' rot / ' + z.gelb + ' gelb / ' + z.gruen + ' gruen / ' + z.frei + ' frei</div>';
+          var basis = document.createElement('input');
+          basis.type = 'radio';
+          basis.name = 'basis';
+          basis.checked = (i === aktuelleVariante);
+          basis.title = 'Variante ' + v.index + ' als Arbeitsstand uebernehmen';
+          basis.tabIndex = -1;
+          var vgl = document.createElement('input');
+          vgl.type = 'checkbox';
+          vgl.checked = (compareIndex === i);
+          vgl.disabled = (i === aktuelleVariante);
+          vgl.title = i === aktuelleVariante ? 'Die Basis vergleicht sich nicht mit sich selbst'
+                                             : 'Mit Variante ' + v.index + ' vergleichen (abweichende Karten werden markiert)';
+          vgl.tabIndex = -1;
+          vgl.addEventListener('click', function (e) {
+            e.stopPropagation();
+            compareIndex = (compareIndex === i) ? null : i;
+            render();
+          });
+          var name = document.createElement('div');
+          name.className = 'kopf';
+          name.textContent = 'Variante ' + v.index + ' · ' + v.status;
+          var k = scorecardZeile('variante-kachel' + (i === aktuelleVariante ? ' active' : (compareIndex === i ? ' compare' : '')),
+            [basis, vgl, name, String(v.objective), String(v.diff_zu_v1), ampelZelle(ampelZaehler(v), alleKinder.length), verstossZelle(v)]);
           k.title = 'Als Arbeitsstand uebernehmen';
           bedienbar(k, 'Variante ' + v.index + ' uebernehmen');
           k.addEventListener('click', function () {
@@ -1260,24 +1523,31 @@
           });
           c.appendChild(k);
         });
+
+        var nVerschoben = liveFaehig ? verschobene().length : 0;
+        if (nVerschoben > 0) {
+          var s = aktuelleSicht();
+          var nameA = document.createElement('div');
+          nameA.className = 'kopf';
+          nameA.textContent = 'Arbeitsstand';
+          var leer1 = document.createElement('span');
+          var leer2 = document.createElement('span');
+          var a = scorecardZeile('arbeits-zeile',
+            [leer1, leer2, nameA, '', nVerschoben + ' versch.', ampelZelle(ampelZaehler(s), alleKinder.length), verstossZelle(s)]);
+          a.title = 'Basis Variante ' + s.index + ' mit ' + nVerschoben + ' verschobenen Kindern - live bewertet';
+          c.appendChild(a);
+        }
       }
 
-      // ---- Vergleich -----------------------------------------------
-      var compareSelect = document.getElementById('compare-select');
+      // ---- Legende (U6): dieselben Punkte wie ueberall --------------
       (function () {
-        var none = document.createElement('option');
-        none.value = '';
-        none.textContent = '- kein Vergleich -';
-        compareSelect.appendChild(none);
-        varianten.forEach(function (v, i) {
-          var opt = document.createElement('option');
-          opt.value = i;
-          opt.textContent = 'Variante ' + v.index;
-          compareSelect.appendChild(opt);
-        });
-        compareSelect.addEventListener('change', function () {
-          compareIndex = compareSelect.value === '' ? null : parseInt(compareSelect.value, 10);
-          render();
+        var l = document.getElementById('legende');
+        if (!l) return;
+        ['rot', 'gelb', 'gruen', 'frei'].forEach(function (s) {
+          var e = document.createElement('span');
+          e.appendChild(statusPunkt(s));
+          e.appendChild(document.createTextNode(statusName[s]));
+          l.appendChild(e);
         });
       })();
       function updateCompareInfo() {
@@ -1295,6 +1565,7 @@
 
       document.getElementById('filter-kritisch').addEventListener('change', render);
       document.getElementById('filter-offene').addEventListener('change', render);
+      document.getElementById('filter-wuensche').addEventListener('change', render);
       document.getElementById('konsens-toggle').addEventListener('change', render);
 
       // ---- Panel-Seitenleiste (U1): Prio-Sektionen -----------------
@@ -1340,6 +1611,14 @@
             text.textContent = b.regel_id + ' (Ziel ' + b.ziel + ' ± ' + b.toleranz + ')';
             zeile.appendChild(balken);
             zeile.appendChild(text);
+            // Zeigen hebt die Treffer der Regel hervor - wie bei Gruppen.
+            var treffer = (data.balance || []).filter(function (x) { return x.regel_id === b.regel_id; })[0];
+            if (treffer) {
+              var menge = {};
+              treffer.treffer.forEach(function (id) { menge[id] = true; });
+              zeile.title = treffer.treffer.length + ' Kinder mit ' + b.regel_id;
+              hoverZeile(zeile, menge);
+            }
             blockB.appendChild(zeile);
           });
           panel.appendChild(blockB);
@@ -1372,6 +1651,10 @@
             zeile.className = 'zeile status s-verletzt';
             zeile.textContent = '✗ ' + w.kinder[0] + ' + ' + w.kinder[1] + ' ' +
               (w.typ === 'zusammen' ? 'zusammen' : 'getrennt') + ' nicht erfuellt';
+            var paar = {};
+            paar[w.kinder[0]] = true;
+            paar[w.kinder[1]] = true;
+            hoverZeile(zeile, paar);
             if (w.modus === 'soft') {
               var haertW = document.createElement('button');
               haertW.className = 'fixieren';
@@ -1396,6 +1679,7 @@
       function baueGruppenZeile(v, g, st) {
         var zeile = document.createElement('div');
         zeile.className = 'gruppe-zeile' + (highlights[g.id] ? ' aktiv' : '');
+        zeile.setAttribute('data-gruppe', g.id);
         var kuerzel = document.createElement('span');
         kuerzel.className = 'kuerzel';
         kuerzel.style.background = farbeVon[g.id];
@@ -1408,20 +1692,29 @@
         typ.title = g.typ + (g.modus === 'hard' ? ' (hart)' : '') +
           (g.max_pro_klasse ? ', max ' + g.max_pro_klasse + '/Klasse' : '');
         zeile.appendChild(typ);
+        // Status als Punkt (U6) plus kurzer Text: das Mass bei Verstoss,
+        // "hart" bei harten Regeln - beides, was der Punkt nicht sagt.
         var status = document.createElement('span');
         status.className = 'status ' + st.klasse;
-        status.textContent = st.text;
+        var punktStatus = st.klasse === 's-verletzt' ? 'rot' : (st.klasse === 's-knapp' ? 'gelb' : 'gruen');
+        status.appendChild(statusPunkt(punktStatus, st.text));
+        var statusText = st.text.replace(/^[✓✗!]\s*/, '');
+        if (statusText && statusText !== 'knapp') status.appendChild(document.createTextNode(statusText));
         zeile.appendChild(status);
         var name = document.createElement('span');
         name.className = 'name';
-        name.textContent = g.id + ' (' + g.mitglieder.length + ')';
+        name.textContent = kurzName(g.id) + ' (' + g.mitglieder.length + ')';
         name.title = g.id;
         zeile.appendChild(name);
-        // Ist-Verteilung als Mini-Balken.
+        // Ist-Verteilung als Mini-Balken in Ampelfarbe: eine Buendelung
+        // ueber mehr als eine Klasse ist zerrissen - alle belegten
+        // Segmente rot, nicht nur hoch.
         var counts = [];
         for (var c = 1; c <= data.klassen_anzahl; c++) counts.push(0);
         g.mitglieder.forEach(function (id) { counts[v.zuordnung[id] - 1] += 1; });
+        var belegt = counts.filter(function (n) { return n > 0; }).length;
         zeile.appendChild(baueMiniBalken(counts, function (count) {
+          if (g.typ === 'buendelung') return (count > 0 && belegt > 1) ? 'ueber' : '';
           if (g.max_pro_klasse && count > g.max_pro_klasse) return 'ueber';
           if (g.max_pro_klasse && count === g.max_pro_klasse) return 'voll';
           return '';
@@ -1477,7 +1770,7 @@
         counts.forEach(function (count, idx) {
           var i = document.createElement('i');
           i.style.height = Math.max(2, Math.round(count / max * 14)) + 'px';
-          i.className = klasseFuer(count);
+          i.className = count === 0 ? 'leer' : klasseFuer(count);
           i.title = titleFuer(count, idx);
           b.appendChild(i);
         });
@@ -1487,14 +1780,23 @@
       // Fluechtiges Hover-Highlight (U1): Mitglieder-Karten in der
       // Gruppenfarbe umranden, ohne den Klick-Zustand zu aendern.
       function hoverGruppe(gruppenId, an) {
+        hoverKinder(mitgliedVon[gruppenId], farbeVon[gruppenId], an);
+      }
+      // Dieselbe Hervorhebung fuer JEDE Regel, die Kinder betrifft (U6):
+      // Gruppen in ihrer Farbe, Balance-Regeln und Wuensche im Akzent.
+      // `betroffen` ist eine Menge {kind: true}.
+      function hoverKinder(betroffen, farbe, an) {
+        // Nicht-Betroffene treten zurueck (CSS #board.gedimmt).
+        var board = document.getElementById('board');
+        if (an) board.classList.add('gedimmt'); else board.classList.remove('gedimmt');
         var karten = document.querySelectorAll('.karte');
         for (var i = 0; i < karten.length; i++) {
           var k = karten[i];
           var id = k.getAttribute('data-kind');
-          if (!mitgliedVon[gruppenId][id]) continue;
+          if (!betroffen[id]) continue;
           if (an) {
             k.classList.add('hl');
-            k.style.setProperty('--hl', farbeVon[gruppenId]);
+            k.style.setProperty('--hl', farbe);
           } else if (dauerhaftesHighlight(id)) {
             anwendenDauerHighlight(k, id);
           } else {
@@ -1502,6 +1804,23 @@
             k.style.removeProperty('--hl');
           }
         }
+      }
+      // Hover/Fokus auf einer Panelzeile ohne Gruppe (Balance, Wunsch).
+      function hoverZeile(zeile, betroffen) {
+        zeile.addEventListener('mouseenter', function () { hoverKinder(betroffen, akzentFarbe, true); });
+        zeile.addEventListener('mouseleave', function () { hoverKinder(betroffen, akzentFarbe, false); });
+        zeile.addEventListener('focus', function () { hoverKinder(betroffen, akzentFarbe, true); });
+        zeile.addEventListener('blur', function () { hoverKinder(betroffen, akzentFarbe, false); });
+        zeile.tabIndex = 0;
+      }
+      // Gegenrichtung des Kreuzbezugs (U6): Panelzeilen der Gruppen
+      // eines Kindes hervorheben, solange man auf die Karte zeigt.
+      function panelZeilen(gruppenIds, an) {
+        gruppenIds.forEach(function (gid) {
+          var z = document.querySelector('.gruppe-zeile[data-gruppe="' + gid + '"]');
+          if (!z) return;
+          if (an) z.classList.add('hl'); else z.classList.remove('hl');
+        });
       }
       function dauerhaftesHighlight(kindId) {
         for (var gid in highlights) {
@@ -1544,7 +1863,7 @@
         });
         if (!liste.hasChildNodes()) {
           var li = document.createElement('li');
-          li.textContent = 'Von keinem Kriterium betroffen (freies Kind).';
+          li.textContent = 'Von keinem Kriterium betroffen (ohne Regel).';
           liste.appendChild(li);
         }
         popover.appendChild(liste);
@@ -1687,12 +2006,38 @@
         kap.appendChild(fuellung);
         kopf.appendChild(kap);
 
+        // Balance je Regel als Balken mit Zielband (U6). Dieselbe
+        // Stufung wie bewerte(): ausserhalb rot, am Rand gelb, sonst gruen.
         (v.balance_kennzahlen || []).forEach(function (b) {
           var count = b.counts[klasse - 1];
           var dev = Math.abs(count - b.ziel);
+          var status = dev > b.toleranz ? 'rot' : (dev === b.toleranz && b.toleranz > 0 ? 'gelb' : 'gruen');
           var k = document.createElement('div');
-          k.className = 'kennzahl' + (dev > b.toleranz ? ' verletzt' : '');
-          k.textContent = b.regel_id + ': ' + count + ' (Ziel ' + b.ziel + ' ± ' + b.toleranz + ')';
+          k.className = 'kennzahl' + (status === 'rot' ? ' verletzt' : '');
+          k.title = b.regel_id + ': ' + count + ' (Ziel ' + b.ziel + ' ± ' + b.toleranz + ')';
+          var label = document.createElement('span');
+          label.className = 'kz-label';
+          label.textContent = b.regel_id;
+          var balken = document.createElement('span');
+          balken.className = 'kz-balken';
+          var skala = Math.max(count, b.ziel + b.toleranz) + 1;
+          var bandVon = Math.max(0, b.ziel - b.toleranz);
+          var bandBis = b.ziel + b.toleranz;
+          var band = document.createElement('i');
+          band.className = 'band';
+          band.style.left = (bandVon / skala * 100) + '%';
+          band.style.width = (Math.max(bandBis - bandVon, 0.5) / skala * 100) + '%';
+          var ist = document.createElement('i');
+          ist.className = 'ist ' + status;
+          ist.style.width = (count / skala * 100) + '%';
+          balken.appendChild(band);
+          balken.appendChild(ist);
+          var wert = document.createElement('span');
+          wert.className = 'kz-wert';
+          wert.textContent = count;
+          k.appendChild(label);
+          k.appendChild(balken);
+          k.appendChild(wert);
           kopf.appendChild(k);
         });
         spalte.appendChild(kopf);
@@ -1725,17 +2070,50 @@
           var stapel = document.createElement('div');
           stapel.className = 'stapel';
           stapel.style.borderColor = farbeVon[gid];
+          var gesamt = g.mitglieder.length;
+          var hierGesamt = g.mitglieder.filter(function (id) { return v.zuordnung[id] === klasse; }).length;
+          var vollstaendig = hierGesamt === gesamt;
+          // Einklappen (U6): vollstaendig hier UND ohne Diskussionsbedarf -
+          // dann tragen Punkt und Id alles, was zu sagen ist. Der Nutzer
+          // kann auf- und zuklappen; Stapel mit gelb/rot sind nie zu.
+          var ruhig = vollstaendig && hier.every(function (id) {
+            var agg = aggregat(chipMap[id]);
+            return agg === 'gruen' || agg === 'frei';
+          });
+          var zu = ruhig && (stapelOffen.hasOwnProperty(gid) ? !stapelOffen[gid] : true);
+          if (zu) stapel.classList.add('zu');
+
+          // Kopf einzeilig (U6): Kuerzel, Statuspunkt, x/y - Name im Tooltip.
           var kopfS = document.createElement('div');
           kopfS.className = 'stapel-kopf';
           kopfS.style.color = farbeVon[gid];
-          var gesamt = g.mitglieder.length;
-          var hierGesamt = g.mitglieder.filter(function (id) { return v.zuordnung[id] === klasse; }).length;
-          kopfS.innerHTML = '[' + kuerzelVon[gid] + '] ' + g.id + ' - ' +
-            (hierGesamt === gesamt ? gesamt + '/' + gesamt + ' hier'
-                                   : '<span class="zerrissen">' + hierGesamt + '/' + gesamt + ' hier</span>');
-          kopfS.title = 'Buendelung ' + g.id + (g.modus === 'hard' ? ' (hart)' : '') + ', Prio ' + g.prio;
+          var kz = document.createElement('span');
+          kz.className = 'kuerzel';
+          kz.style.background = farbeVon[gid];
+          kz.textContent = kuerzelVon[gid];
+          kopfS.appendChild(kz);
+          kopfS.appendChild(statusPunkt(vollstaendig ? 'gruen' : 'rot',
+            vollstaendig ? 'Buendelung vollstaendig in ' + labelVon(klasse) : 'Buendelung zerrissen'));
+          var anzahl = document.createElement('span');
+          anzahl.className = 'anzahl' + (vollstaendig ? '' : ' zerrissen');
+          anzahl.textContent = hierGesamt + '/' + gesamt;
+          kopfS.appendChild(anzahl);
+          if (ruhig) {
+            var pfeil = document.createElement('span');
+            pfeil.className = 'pfeil';
+            pfeil.textContent = zu ? '▸' : '▾';
+            kopfS.appendChild(pfeil);
+          }
+          kopfS.title = 'Buendelung ' + g.id + (g.modus === 'hard' ? ' (hart)' : '') + ', ' + prioWort[g.prio] +
+            ' - ' + hierGesamt + ' von ' + gesamt + ' hier' + (ruhig ? ' (Klick klappt auf/zu)' : '');
           kopfS.addEventListener('mouseenter', function () { hoverGruppe(gid, true); });
           kopfS.addEventListener('mouseleave', function () { hoverGruppe(gid, false); });
+          kopfS.addEventListener('click', function () {
+            if (!ruhig) return;
+            stapelOffen[gid] = zu;
+            hoverGruppe(gid, false);
+            render();
+          });
           stapel.appendChild(kopfS);
           var innen = document.createElement('div');
           innen.className = 'karten-innen';
@@ -1776,6 +2154,16 @@
         if (cmp && cmp.zuordnung[id] !== klasse) {
           karte.classList.add('diff');
           karte.title = 'In Variante ' + cmp.index + ': ' + labelVon(cmp.zuordnung[id]);
+        }
+        // Worst-of als Punkt VOR der Id (U6) - der Rand bleibt, aber ein
+        // 4-px-Streifen traegt kein Zeichen.
+        karte.appendChild(statusPunkt(agg, 'Kind ' + id + ': ' + statusName[agg]));
+        // Kreuzbezug (U6): Zeigen auf die Karte hebt ihre Gruppen im
+        // Panel hervor - die Gegenrichtung zu hoverGruppe.
+        var meineGruppen = (gruppenVonKind[id] || []).map(function (g) { return g.id; });
+        if (meineGruppen.length > 0) {
+          karte.addEventListener('mouseenter', function () { panelZeilen(meineGruppen, true); });
+          karte.addEventListener('mouseleave', function () { panelZeilen(meineGruppen, false); });
         }
         var kindId = document.createElement('span');
         kindId.className = 'kind-id';
@@ -1818,18 +2206,34 @@
           });
           badges.appendChild(badge);
         });
+        // Wuensche (U6): verletzte einzeln und rot; alle erfuellten eines
+        // Kindes als EIN Badge mit Anzahl - "W+ ✓ W+ ✓" auf jeder zweiten
+        // Karte war Rauschen. Der Schalter stellt die Einzelansicht her.
+        var einzeln = document.getElementById('filter-wuensche').checked;
+        var erfuellte = [];
         (wuenscheVonKind[id] || []).forEach(function (w) {
           var c = chipStatusVon(v, id, w.regel_id);
+          var status = c ? c.status : 'gruen';
+          var partner = w.kinder[0] === id ? w.kinder[1] : w.kinder[0];
+          var text = (w.typ === 'zusammen' ? 'zusammen mit ' : 'getrennt von ') + partner;
+          if (status !== 'rot' && !einzeln) {
+            erfuellte.push(text);
+            return;
+          }
           var badge = document.createElement('span');
           badge.className = 'badge wunsch';
-          var status = c ? c.status : 'gruen';
           badge.innerHTML = (w.typ === 'zusammen' ? 'W+' : 'W−') +
             '<span class="st ' + status + '">' + chipSymbol[status] + '</span>';
-          var partner = w.kinder[0] === id ? w.kinder[1] : w.kinder[0];
-          badge.title = (w.typ === 'zusammen' ? 'zusammen mit ' : 'getrennt von ') + partner +
-            (c && c.status === 'rot' ? ' - nicht erfuellt' : ' - erfuellt');
+          badge.title = text + (status === 'rot' ? ' - nicht erfuellt' : ' - erfuellt');
           badges.appendChild(badge);
         });
+        if (erfuellte.length > 0) {
+          var sammel = document.createElement('span');
+          sammel.className = 'badge wunsch';
+          sammel.innerHTML = 'W<span class="st gruen">' + erfuellte.length + '</span>';
+          sammel.title = erfuellte.length + ' Wunsch/Wuensche erfuellt: ' + erfuellte.join(', ');
+          badges.appendChild(sammel);
+        }
         karte.appendChild(badges);
         // Pin (F1): Toggle auf die aktuelle Klasse.
         var pin = document.createElement('span');

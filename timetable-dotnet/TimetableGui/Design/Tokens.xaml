@@ -38,9 +38,10 @@
 
     <!-- ===== Kanon: Status ===== -->
     <SolidColorBrush x:Key="farbe-ok-text" Color="#0F7938" />
-    <SolidColorBrush x:Key="farbe-warn-text" Color="#8A5A00" />
-    <SolidColorBrush x:Key="farbe-warn-rand" Color="#DDB45F" />
-    <SolidColorBrush x:Key="farbe-warn-flaeche" Color="#FDF3E4" />
+    <SolidColorBrush x:Key="farbe-warn-text" Color="#6F7400" />
+    <SolidColorBrush x:Key="farbe-warn-rand" Color="#D6D45C" />
+    <SolidColorBrush x:Key="farbe-warn-flaeche" Color="#F9F9E0" />
+    <SolidColorBrush x:Key="farbe-warn-marke" Color="#D9CF00" />
     <SolidColorBrush x:Key="farbe-krit-text" Color="#B3261E" />
     <SolidColorBrush x:Key="farbe-krit-rand" Color="#EAA6A1" />
     <SolidColorBrush x:Key="farbe-frei-text" Color="#626B76" />
