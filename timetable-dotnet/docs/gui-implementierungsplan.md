@@ -2,15 +2,80 @@
 
 ## Stand
 
+Stand 01.09.2026. Die Nachträge zu den einzelnen Stufen stehen jeweils
+am Ende ihres Abschnitts und halten fest, wo die Umsetzung vom Plan
+abgewichen ist und warum.
+
 | Stufe | Inhalt | Stand |
 |---|---|---|
 | A | Unterbau-Umbau (`TimetableYaml`, `TimetableWorkflow`) | **erledigt** |
 | B | YAML-Schreiber, Klassenbildungs-JSON öffentlich, Pipeline als Dienst | **erledigt** |
 | C | Projektablage `.splanx` | **erledigt** |
 | D | GUI-Durchstich (Klassenbildung) | **erledigt** |
-| E | Bridge und U5-Re-Solve | **erledigt** (Klassenbildung; Stundentafel-Bridge in G) |
-| F | Eingabemasken | **teilweise** — Querschnitt (Umbenennen/Löschen/Prüfen) erledigt, Masken offen |
-| G | Stundenplan-Dashboard, Im-/Export, Startseite, Freigabe | offen |
+| E | Bridge und U5-Re-Solve | **erledigt** (Klassenbildung; Stundentafel-Bridge in G2) |
+| F | Eingabemasken | **erledigt** – siehe Feinschnitt unten |
+| G | Stundenplan-Dashboard, Im-/Export, Startseite, Freigabe | **teilweise** – G4 offen |
+
+**Feinschnitt F** (beim Umsetzen entstanden, nicht im ursprünglichen Plan):
+
+| | Inhalt | Stand |
+|---|---|---|
+| F1 | Querschnitt: Umbenennen kaskadiert, Löschen zeigt Folgen, Rasterpicker | erledigt |
+| F2 | Stammdaten-Masken §6.2–6.9 | erledigt |
+| F3 | Regeln §6.10: acht Masken, generierte read-only, YAML-Expertenmodus | erledigt |
+| F4 | Klassenbildungs-Eingaben §6.11 (Rahmen, Kinder, Zwischenablage), Solver §6.12 | erledigt |
+| F5 | Projekt-Assistent §6.1 | erledigt |
+| F6 | Gruppen, Balance, Wünsche, Fixierungen – der in F4 offengebliebene Teil von §6.11 | erledigt |
+
+**Feinschnitt G:**
+
+| | Inhalt | Stand |
+|---|---|---|
+| G1 | Stundenplan rechnen und anzeigen (zweites Dashboard) | erledigt |
+| G2 | Brücke im Stundentafel-Viewer (Lösung übernehmen, neu rechnen) | erledigt |
+| G3 | Bereich *Läufe*: Stände-Historie, Freigabe, Schutz, Audit | erledigt |
+| G4 | **YAML-Ex-/Import im `tests/<schule>/`-Layout** | **offen** |
+| G5 | CSV-Import mit freier Spalten-Zuordnung §9.1, Klarnamen-Export | erledigt (ohne §9.2, s.u.) |
+| G6 | Startseite als vollständige Schrittleiste §8 | erledigt |
+
+## Was noch offen ist
+
+Zwei Punkte, beide bewusst zurückgestellt und hier festgehalten, damit
+sie nicht in Commit-Nachrichten verschwinden.
+
+**G4 – YAML-Ex-/Import im `tests/<schule>/`-Layout.** Ziel laut Stufe G:
+„der CLI-Kanal bleibt damit vollwertig erhalten." Ein Schulordner soll
+sich als Projekt einlesen *und* ein Projekt als Schulordner
+zurückschreiben lassen, sodass beide Wege dieselbe Schule bearbeiten
+können.
+
+Der Import-Weg existiert (*Datei → Bestehende Schule übernehmen…*,
+`ProjektOrdner.Importieren`); **es fehlt der Export.** Die YAML-Schreiber
+selbst gibt es seit Stufe B – `YamlStammdaten.SaveStammdatenYaml` und
+die beiden Geschwister für Constraints und Klassenbildung –, die GUI
+ruft nur keinen davon auf. Ohne den Export ist der Kanal einseitig: man
+kommt von der Kommandozeile in die Oberfläche, aber nicht zurück.
+
+Offen ist dabei auch eine Entscheidung: Was geschieht mit dem
+**Klarnamen-Mapping** beim Export? Es gehört nicht in einen
+Schulordner (dort liegen pseudonyme Fixtures), darf aber auch nicht
+stillschweigend verlorengehen.
+
+**§9.2 – bestehenden Lehrereinsatz per CSV übernehmen.** Die gelebte
+Lehrer-Klasse-Fach-Zuteilung als `feste_zuordnungen`, „derselbe
+CSV-/Einfüge-Weg mit Spalten Lehrkraft/Klasse/Fach". In G5 ausgelassen,
+weil es ein anderer Zielbereich ist – Stammdaten statt Klassenbildung,
+eigene Spalten, eigene Prüfung. Es hätte G5 verdoppelt, ohne etwas zu
+teilen außer dem Wort „CSV": `Spaltenzuordnung.vb` ist auf Kinder
+zugeschnitten (eine Zeile = ein Kind, Rollen für Name/Attribut/Gruppe)
+und wäre für Zuordnungs-Tripel neu zu denken.
+
+**Nicht offen, sondern außerhalb dieses Plans:** §9.3 (Bestandsplan
+einfrieren) und alles unter „Nicht Teil dieses Plans" am Ende. Von §9.3
+ist die eine Hälfte beiläufig entstanden – eine Klasse-Spalte im
+CSV-Import erzeugt Fixierungen (G5) –, die andere fehlt: der
+`required_slot`-Weg, mit dem ein erfasster Stundenplan zum Startpunkt
+wird.
 
 ## Context
 
