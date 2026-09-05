@@ -421,13 +421,15 @@ erledigt, sobald irgendein Lauf da war - Stufe H hat sie getrennt.
 │ [2] Rechnen   ✓ zuletzt 30.08. 14:32│ │ [3] Rechnen    ▶ noch nicht - F6     │
 │ [3] Entscheiden ▶ am Board, 2 Fix.  │ │ [4] Entscheiden ○ erst rechnen       │
 │ [4] Freigabe  ○ noch nicht          │ │ [5] Freigabe   ○ noch nicht          │
-│                            [Öffnen] │ │                             [Öffnen] │
 └─────────────────────────────────────┘ └──────────────────────────────────────┘
 ```
 
 Jede Zeile führt eine AKTION aus: die Eingabe-Zeilen öffnen ihre Maske,
 „Rechnen“ rechnet, „Entscheiden“ öffnet das Dashboard, „Freigabe“ gibt
-den angezeigten Stand frei oder führt in die Läufe. Neue Projekte
+den angezeigten Stand frei oder führt in die Läufe. Einen eigenen
+„Öffnen“-Knopf hat die Karte bewusst nicht: er stünde direkt unter
+*Öffnen…* (Datei) und täte etwas anderes; in den Bereich führen die
+Zeile „Entscheiden“ und die Seitenleiste. Neue Projekte
 starten bei [1] mit dem Assistenten-Ergebnis. Dieselben Zeilen stehen
 als Leerseite im Bereich der Rechnung, solange dort kein Ergebnis liegt,
 und die Eingabe-Zeilen im Bereichskopf über dem Dashboard (Abschnitt 2).

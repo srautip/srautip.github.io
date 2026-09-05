@@ -991,9 +991,14 @@ laufende Fenster ist also nicht beobachtbar. Deshalb liegen Zustand und
 Ablauf in ViewModels, Datei- und Passwortabfragen hinter `IDialoge`, und
 die Auslieferung in einer Klasse, die WebView2 gar nicht kennt.
 `TimetableGui.Tests` fährt gegen genau diese Teile - ohne Fenster, ohne
-Browser. Was dadurch **nicht** abgedeckt ist und ehrlich offen bleibt: das
-tatsächliche Rendern in WebView2 und das Verhalten der XAML-Bindungen zur
-Laufzeit. Beides ist nur am laufenden Fenster zu sehen.
+Browser. Was dadurch **nicht** abgedeckt ist: das tatsächliche Rendern in
+WebView2 und das Verhalten der XAML-Bindungen zur Laufzeit. Dafür gibt es
+seit Stufe H die **Bildprobe** (`--bildprobe <ordner>`, siehe CLAUDE.md):
+die Anwendung rendert sich selbst per `RenderTargetBitmap`, blendet das
+WebView2-Bild (`CapturePreviewAsync`) an seiner Stelle ein und schreibt je
+Sicht ein PNG - denn von aussen ist ein WPF-Fenster nicht fotografierbar
+(DirectX; GDI-Captures liefern Weiss). Was auch die Bildprobe nicht
+belegt: Bedienung mit Maus und Tastatur.
 
 ### 8.14 Die Brücke: ein Kanal, zwei Betriebsarten
 

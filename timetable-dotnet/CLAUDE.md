@@ -43,6 +43,25 @@ pauschal die volle Suite zu fahren:
   manuellen Start zu verlassen. (Live belegt: `schrift-mono` stand in
   der Vorlage, aber nicht in `Tokens.xaml`.)
 
+- **Sichtpruefung der GUI ohne Bildschirm: die Bildprobe.** Ein laufendes
+  WPF-Fenster laesst sich von aussen NICHT fotografieren (DirectX -
+  `CopyFromScreen`/`PrintWindow` liefern Weiss; live erlebt 05.09.2026).
+  Stattdessen rendert die Anwendung sich selbst:
+
+  ```bash
+  dotnet run --project TimetableGui -- --bildprobe "$TEMP/bildproben" --schule tests/bw-grundschule-beispiel --masken
+  ```
+
+  schreibt `01-start-ohne-projekt.png`, `02-start.png`, `03-klassenbildung.png`
+  (Board eingeblendet), `04-stundenplan.png`, `05-laeufe.png` und mit
+  `--masken` die vier Pflegemasken, beendet sich dann (Exitcode 0; bei
+  Fehler `fehler.txt` im Ordner, Exitcode 1). `--schule` haengt die
+  `output/*.json` der Beispielschule als Staende ein - beide Dashboards
+  ohne Solver-Lauf. `--projekt <datei.splanx>` mit Passwort aus
+  `SCHULPLANUNG_PASSWORT`; `--rechnen stundenplan|klassenbildung` rechnet
+  vorher wirklich. Die PNGs mit `Read` ansehen. Eine laufende Instanz
+  sperrt `bin/` - vor dem Build pruefen (`Get-Process TimetableGui`).
+
 - **Aenderungen an `TimetableWorkflow/Templates/design-tokens.css` oder
   `design-basis.css`** (Designsystem-Quellen, arc42 8.16): beide Dateien
   werden NICHT zur Laufzeit injiziert - die zwei Viewer-Vorlagen und

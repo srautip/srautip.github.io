@@ -28,6 +28,17 @@ Public NotInheritable Class ViewerHost
     Private ReadOnly _startSkript As Func(Of String)
     Private _bereit As Boolean
     Private _skriptId As String
+    Private _geladen As TaskCompletionSource
+
+    ''' <summary>Erfuellt, sobald die zuletzt angestossene Anzeige
+    ''' geladen ist (NavigationCompleted). Fuer die Bildprobe - sie darf
+    ''' erst fotografieren, wenn die Seite steht. Ohne angestossene
+    ''' Anzeige sofort erfuellt.</summary>
+    Public ReadOnly Property SeiteGeladen As Task
+        Get
+            Return If(_geladen?.Task, Task.CompletedTask)
+        End Get
+    End Property
 
     Public Sub New(sicht As WebView2, auslieferung As ViewerAuslieferung,
                     Optional aufNachricht As Action(Of String) = Nothing,
@@ -67,6 +78,8 @@ Public NotInheritable Class ViewerHost
                     e.Cancel = True
                 End If
             End Sub
+        AddHandler kern.NavigationCompleted,
+            Sub(s, e) _geladen?.TrySetResult()
 
         ' Die Bruecke (U5): Nachrichten der Seite entgegennehmen. Der
         ' Handler laeuft auf dem UI-Thread, weil WebView2 seine Ereignisse
@@ -118,6 +131,9 @@ Public NotInheritable Class ViewerHost
     ''' Navigation auf dieselbe Adresse fuer ueberfluessig und der neue
     ''' Lauf waere unsichtbar.</summary>
     Public Async Function AnzeigenAsync() As Task
+        ' VOR dem ersten Await: wer unmittelbar nach dem Anstoss auf
+        ' SeiteGeladen wartet, soll DIESE Navigation erwischen.
+        _geladen = New TaskCompletionSource()
         Await VorbereitenAsync()
         Await ZustandVorbereitenAsync()
         Dim ziel = _auslieferung.SeitenUrl

@@ -184,10 +184,32 @@ Public NotInheritable Class HauptViewModel
             ' Die Seite VOR dem Melden wechseln: das Fenster reagiert auf
             ' die Meldung und zeigt dann schon die richtige an.
             SeiteFuerBereichAusliefern()
+            LetztenStandVormerken()
             Melde(NameOf(HatAnzeige))
             Melde(NameOf(Bereich))
         End Set
     End Property
+
+    ''' <summary>Betritt man eine Rechnung, deren Dashboard noch leer ist,
+    ''' obwohl es Staende gibt (Projekt geoeffnet, noch nichts angesehen),
+    ''' wird der juengste vorgemerkt - die Leerseite waere sonst eine
+    ''' Luege ("Noch kein Ergebnis"). Bewusst OHNE AnzeigeAktualisiert:
+    ''' die folgende Bereich-Meldung loest die Anzeige aus, ein zweites
+    ''' Signal wuerde doppelt navigieren.</summary>
+    Private Sub LetztenStandVormerken()
+        If HatAnzeige OrElse Not ProjektOffen Then Return
+        Dim art = ArtDesBereichs(_bereich)
+        If Not art.HasValue Then Return
+        Dim stand = LetzterStand(art.Value)
+        If stand Is Nothing Then Return
+        Dim istKlassenbildung = art.Value = Rechnungsart.Klassenbildung
+        Dim seite = ViewerInhalt.AusGespeichertemJson(
+            If(istKlassenbildung, stand.Klassenbildung, stand.Stundenplan), istKlassenbildung)
+        If seite Is Nothing Then Return
+        _seiten(_bereich) = seite
+        _standIds(_bereich) = stand.Id
+        Auslieferung.Setze(seite)
+    End Sub
 
     ''' <summary>Ob der aktive Bereich etwas zu zeigen hat. Ohne Seite
     ''' zeigt das Fenster die Leerseite mit dem Ablauf der Rechnung -
@@ -755,7 +777,12 @@ Public NotInheritable Class HauptViewModel
         End If
         Dim passwort = _dialoge.PasswortAbfragen("Passwort", bestaetigen:=False)
         If passwort Is Nothing Then Return
+        OeffneDatei(pfad, passwort)
+    End Sub
 
+    ''' <summary>Eine Projektdatei mit bekanntem Passwort oeffnen - der
+    ''' dialogfreie Teil von Oeffnen, auch fuer die Bildprobe.</summary>
+    Public Sub OeffneDatei(pfad As String, passwort As String)
         Try
             Uebernehme(ProjektDatei.Laden(pfad, passwort), pfad, passwort)
             Geaendert = False
@@ -765,6 +792,13 @@ Public NotInheritable Class HauptViewModel
         Catch ex As ProjektFormatException
             _dialoge.Hinweis("Oeffnen fehlgeschlagen", ex.Message)
         End Try
+    End Sub
+
+    ''' <summary>Ein Projekt ohne Datei uebernehmen (Bildprobe aus einem
+    ''' Schulordner). Ungespeichert, ohne Pfad - Speichern fragt dann
+    ''' nach einem.</summary>
+    Friend Sub UebernimmProjekt(p As Projekt)
+        Uebernehme(p, Nothing, Nothing)
     End Sub
 
     Public Sub Speichern()

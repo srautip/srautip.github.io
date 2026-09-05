@@ -47,7 +47,11 @@
             </Button>
         </DataTemplate>
 
-        <!-- Eine Karte der Startseite: der Ablauf einer Rechnung. -->
+        <!-- Eine Karte der Startseite: der Ablauf einer Rechnung. Bewusst
+             OHNE eigenen Knopf in den Bereich - die Zeile "Entscheiden"
+             fuehrt dorthin, die Seitenleiste ebenfalls; ein dritter Weg
+             hiess "Oeffnen" und stand direkt unter "Oeffnen…" (Datei),
+             das etwas ganz anderes tut. -->
         <DataTemplate x:Key="Kartenvorlage">
             <Border Background="{StaticResource farbe-flaeche-2}"
                     BorderBrush="{StaticResource farbe-linie}" BorderThickness="1"
@@ -57,8 +61,6 @@
                     <TextBlock DockPanel.Dock="Top" Text="{Binding Titel}"
                                FontSize="{StaticResource grad-titel}" FontWeight="SemiBold"
                                Margin="0,0,0,12" />
-                    <Button DockPanel.Dock="Bottom" Content="Öffnen" HorizontalAlignment="Left"
-                            Margin="0,12,0,0" Click="AufKarteOeffnen" Tag="{Binding Bereich}" />
                     <ItemsControl ItemsSource="{Binding Zeilen}" ItemTemplate="{StaticResource SchrittZeile}" />
                 </DockPanel>
             </Border>

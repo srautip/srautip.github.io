@@ -143,12 +143,6 @@ Class MainWindow
         zeile?.Aktion?.Invoke()
     End Sub
 
-    Private Sub AufKarteOeffnen(sender As Object, e As RoutedEventArgs)
-        Dim knopf = TryCast(sender, Button)
-        If knopf Is Nothing OrElse Not TypeOf knopf.Tag Is Bereich Then Return
-        _modell.Bereich = CType(knopf.Tag, Bereich)
-    End Sub
-
     Private Sub AufKlarnamenExport(sender As Object, e As RoutedEventArgs)
         _modell.KlarnamenExportieren()
     End Sub
@@ -176,11 +170,106 @@ Class MainWindow
     End Sub
 
     Private Sub AufSchliessen(sender As Object, e As CancelEventArgs) Handles Me.Closing
+        If Bildprobe.Auftrag IsNot Nothing Then Return
         If Not _modell.Geaendert Then Return
         Dim antwort = MessageBox.Show("Es gibt ungespeicherte Änderungen. Trotzdem beenden?",
                                       "Schulplanung", MessageBoxButton.YesNo, MessageBoxImage.Warning)
         If antwort <> MessageBoxResult.Yes Then e.Cancel = True
     End Sub
+
+
+    ' ===============================================================
+    ' Bildprobe (siehe Infrastruktur/Bildprobe.vb)
+    ' ===============================================================
+
+    Private Async Sub AufGeladen(sender As Object, e As RoutedEventArgs) Handles Me.Loaded
+        Dim auftrag = Bildprobe.Auftrag
+        If auftrag Is Nothing Then Return
+        Dim code = 0
+        Try
+            Await BildprobenAufnehmenAsync(auftrag)
+        Catch ex As Exception
+            IO.Directory.CreateDirectory(auftrag.Ordner)
+            IO.File.WriteAllText(IO.Path.Combine(auftrag.Ordner, "fehler.txt"), ex.ToString())
+            code = 1
+        End Try
+        Application.Current.Shutdown(code)
+    End Sub
+
+    ''' <summary>Der Ablauf: leere Startseite, Projekt laden, optional
+    ''' rechnen, dann jeder Bereich der Seitenleiste, optional jede
+    ''' Maske. Die Bilder sind durchnummeriert, damit die Reihenfolge
+    ''' auch im Dateisystem erkennbar bleibt.</summary>
+    ''' <summary>Laufende Nummer der Bilder. Ein Feld, kein ByRef-Parameter:
+    ''' Async-Methoden duerfen keinen haben.</summary>
+    Private _bildNummer As Integer
+
+    Private Async Function BildprobenAufnehmenAsync(auftrag As BildprobeAuftrag) As Task
+        IO.Directory.CreateDirectory(auftrag.Ordner)
+        _bildNummer = 0
+
+        Await BildAufnehmenAsync(auftrag, "start-ohne-projekt")
+
+        If auftrag.Schule IsNot Nothing Then
+            _modell.UebernimmProjekt(Bildprobe.ProjektAusSchulordner(auftrag.Schule, DateTimeOffset.Now))
+        ElseIf auftrag.Projekt IsNot Nothing Then
+            _modell.OeffneDatei(auftrag.Projekt, If(Environment.GetEnvironmentVariable("SCHULPLANUNG_PASSWORT"), ""))
+        End If
+        If Not _modell.ProjektOffen Then Return
+
+        If auftrag.Rechnen = "stundenplan" Then
+            Await _modell.StundenplanRechnenAsync()
+        ElseIf auftrag.Rechnen = "klassenbildung" Then
+            Await _modell.KlassenbildungRechnenAsync()
+        End If
+
+        For Each b In {Bereich.Start, Bereich.Klassenbildung, Bereich.Stundenplan, Bereich.Laeufe}
+            _modell.Bereich = b
+            Await BildAufnehmenAsync(auftrag, b.ToString().ToLowerInvariant())
+        Next
+
+        If auftrag.Masken Then
+            Dim dialoge As New WpfDialoge(Me)
+            Await MaskeAufnehmenAsync(auftrag, "stammdaten",
+                New StammdatenFenster(_modell.Projekt, dialoge, _speicherung))
+            Await MaskeAufnehmenAsync(auftrag, "regeln",
+                New RegelnFenster(_modell.Projekt, dialoge, _speicherung))
+            Await MaskeAufnehmenAsync(auftrag, "klassenbildung-eingaben",
+                New KlassenbildungFenster(_modell.Projekt, dialoge, _speicherung))
+            Await MaskeAufnehmenAsync(auftrag, "solver-einstellungen",
+                New SolverEinstellungenFenster(_modell.Projekt, dialoge, _speicherung))
+        End If
+    End Function
+
+    ''' <summary>Das Hauptfenster fotografieren. Zeigt der Bereich ein
+    ''' Dashboard, wird auf die Seite gewartet und ihr Bild an der Stelle
+    ''' des WebView2 eingeblendet - WPF selbst kann es nicht zeichnen.</summary>
+    Private Async Function BildAufnehmenAsync(auftrag As BildprobeAuftrag, name As String) As Task
+        Dim web As System.Windows.Media.Imaging.BitmapSource = Nothing
+        If Dashboard.Visibility = Visibility.Visible AndAlso _modell.HatAnzeige Then
+            Await _host.SeiteGeladen
+            ' Die Seite baut sich per Inline-JS auf; NavigationCompleted
+            ' kommt vor dem letzten Layout.
+            Await Task.Delay(800)
+            Using strom As New IO.MemoryStream()
+                Await Dashboard.CoreWebView2.CapturePreviewAsync(
+                    Microsoft.Web.WebView2.Core.CoreWebView2CapturePreviewImageFormat.Png, strom)
+                web = Bildprobe.BildAus(strom)
+            End Using
+        End If
+        Await System.Windows.Threading.Dispatcher.Yield(DispatcherPriority.Background)
+        _bildNummer += 1
+        Bildprobe.Speichern(Me, IO.Path.Combine(auftrag.Ordner, $"{_bildNummer:00}-{name}.png"), Dashboard, web)
+    End Function
+
+    Private Async Function MaskeAufnehmenAsync(auftrag As BildprobeAuftrag, name As String, maske As Window) As Task
+        maske.Owner = Me
+        maske.Show()
+        Await System.Windows.Threading.Dispatcher.Yield(DispatcherPriority.Background)
+        _bildNummer += 1
+        Bildprobe.Speichern(maske, IO.Path.Combine(auftrag.Ordner, $"{_bildNummer:00}-maske-{name}.png"))
+        maske.Close()
+    End Function
 
 
     ' ===============================================================

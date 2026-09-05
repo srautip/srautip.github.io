@@ -49,6 +49,7 @@ strukturiert, Ablauf zwischen Start und Klassen/Stunden nicht schlüssig“):
 | H3 | Bereichskopf (Eingaben, Rechnen, Stand-Wechsler) und Leerseite je Rechnung | erledigt |
 | H4 | Menü mit *Bearbeiten*; `SolverEinstellungenFenster`; *Speichern unter*, *Projekt schließen* | erledigt |
 | H5 | Tests (`StartkartenTests`, Fensteraufbau), Doku | erledigt |
+| H6 | Bildprobe: `--bildprobe <ordner>` rendert alle Sichten als PNG (CLAUDE.md) | erledigt |
 
 ## Was noch offen ist
 
@@ -660,6 +661,30 @@ folgt und die Leerseite statt des Dashboards steht. Die Designkanon-Wächter
 laufen unverändert mit (neue Schlüssel, keine Farbliterale, keine neuen
 Tokens). Live per UI Automation belegt: Menü, Seitenleiste, Karten,
 Bereichskopf mit Rechnen-Knopf und Stand-Wechsler, Leerseite.
+
+**Nachtrag H6 (Bildprobe).** Die Sichtprüfung von H1–H5 scheiterte
+zunächst daran, dass sich ein laufendes WPF-Fenster von außen nicht
+fotografieren lässt: WPF zeichnet per DirectX, `CopyFromScreen` und
+`PrintWindow` liefern eine weiße Fläche. Die Anwendung rendert sich
+deshalb selbst – `--bildprobe <ordner>` läuft durch alle Bereiche,
+rendert das Fenster per `RenderTargetBitmap`, blendet das WebView2-Bild
+(`CapturePreviewAsync`) an seiner Stelle ein, schreibt PNGs und endet.
+`--schule tests/<schule>` hängt die `output/*.json` als Stände ein, so
+zeigen beide Dashboards ohne Solver-Lauf etwas; `--masken` fotografiert
+die vier Pflegemasken. Aufruf und Ausgabe stehen in `CLAUDE.md`.
+
+Zwei Dinge fielen dabei sofort auf – genau die Fehlerklasse, die der
+Fensteraufbau-Test nicht sieht:
+
+- **Der Bereich zeigte die Leerseite, obwohl Stände da waren.** Wer ein
+  Projekt öffnet und auf *Stunden* klickt, sah „Noch kein Ergebnis“
+  neben einem Stand-Wechsler voller Stände. Beim Betreten wird jetzt der
+  jüngste Stand der Rechnung vorgemerkt (`LetztenStandVormerken`) –
+  ohne `AnzeigeAktualisiert`, weil die folgende Bereich-Meldung die
+  Anzeige ohnehin auslöst.
+- **Das Bild einer Maske war um den Rand beschnitten.** `Window.Content`
+  rendert an seiner eigenen Position, samt `pad-platte`; gerendert wird
+  deshalb die Wurzel der Fenstervorlage.
 
 ---
 

@@ -435,14 +435,21 @@ Public Class StartkartenTests
     End Sub
 
     ''' <summary>Ohne Ergebnis hat der Bereich keine Anzeige - das Fenster
-    ''' zeigt dann die Leerseite. Ein angezeigter Stand aendert das.</summary>
+    ''' zeigt dann die Leerseite. Gibt es Staende, wird beim Betreten der
+    ''' juengste vorgemerkt: "Noch kein Ergebnis" neben einem Stand-Wechsler
+    ''' voller Staende waere eine Luege (Bildprobe, 05.09.2026).</summary>
     <TestMethod>
-    Public Sub OhneErgebnisGibtEsKeineAnzeige()
-        Dim m = MitStand()
+    Public Sub BeimBetretenWirdDerLetzteStandAngezeigt()
+        Dim m = MitSchule()
         m.Bereich = Bereich.Stundenplan
-        Assert.IsFalse(m.HatAnzeige)
+        Assert.IsFalse(m.HatAnzeige, "ohne Stand bleibt es leer")
+        Assert.IsNull(m.AngezeigterStand())
 
-        m.StandAnzeigen("s1")
+        m.Bereich = Bereich.Start
+        m.Projekt.StandHinzufuegen(New ProjektStand With {
+            .Id = "s1", .Label = "Stundenplan, 1 Loesung(en)", .Erstellt = Jetzt,
+            .Stundenplan = JsonNode.Parse("{""solutions"": [{""muss_violation_count"": 0}]}").AsObject()})
+        m.Bereich = Bereich.Stundenplan
         Assert.IsTrue(m.HatAnzeige)
         Assert.AreEqual("s1", m.AngezeigterStand().Id)
 
