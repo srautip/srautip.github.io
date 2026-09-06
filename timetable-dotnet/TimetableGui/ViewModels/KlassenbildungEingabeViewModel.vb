@@ -10,6 +10,7 @@
 ' unten trennt beides beim Anlegen.
 Imports TimetableCore
 Imports TimetableProjekt
+Imports TimetableWorkflow
 
 Public NotInheritable Class KlassenbildungEingabeViewModel
     Inherits Beobachtbar
@@ -139,6 +140,71 @@ Public NotInheritable Class KlassenbildungEingabeViewModel
         End Get
     End Property
 
+    ''' <summary>Was der Vorschlag fuer den Klassenrahmen gesetzt hat.
+    ''' Nothing je Feld heisst: es war schon gesetzt und blieb.</summary>
+    Public NotInheritable Class Rahmenvorschlag
+        Public Property Klassenteiler As Integer
+        Public Property Anzahl As Integer?
+        Public Property MinGroesse As Integer?
+        Public Property MaxGroesse As Integer?
+
+        Public ReadOnly Property Leer As Boolean
+            Get
+                Return Not (Anzahl.HasValue OrElse MinGroesse.HasValue OrElse MaxGroesse.HasValue)
+            End Get
+        End Property
+
+        Public Function Hinweistext(schulart As String, bundesland As String) As String
+            Dim teile As New List(Of String)
+            If Anzahl.HasValue Then teile.Add($"Klassenanzahl {Anzahl.Value}")
+            If MinGroesse.HasValue Then teile.Add($"Mindestgröße {MinGroesse.Value}")
+            If MaxGroesse.HasValue Then teile.Add($"Höchstgröße {MaxGroesse.Value}")
+            Dim quelle = If(String.IsNullOrWhiteSpace(schulart), "ohne Schulart", schulart) & "/" &
+                         If(String.IsNullOrWhiteSpace(bundesland), "?", bundesland)
+            Return $"Klassenrahmen vorgeschlagen (Klassenteiler {quelle}: {Klassenteiler}): " &
+                   String.Join(", ", teile) &
+                   " – nur leere Felder wurden gefüllt; änderbar unter „Kinder & Rahmen""."
+        End Function
+    End Class
+
+    ''' <summary>Rechnet den Vorschlag, rein und ohne Bestand. Die
+    ''' Hoechstgroesse ist der Klassenteiler, die Anzahl die kleinste,
+    ''' bei der alle Platz haben. Die Mindestgroesse liegt sechs unter
+    ''' dem wirksamen Maximum, aber nie ueber dem Durchschnitt - so gilt
+    ''' immer anzahl*min &lt;= kinder und min &lt;= max, und der Rahmen
+    ''' ist auf Anhieb rechenbar. Nur Felder mit 0 werden vorgeschlagen;
+    ''' ein gesetztes Feld geht in die uebrigen ein (eine gesetzte Anzahl
+    ''' bestimmt den Durchschnitt).</summary>
+    Public Shared Function RahmenBerechnen(kinderzahl As Integer, teiler As Integer,
+                                           anzahlVorhanden As Integer, minVorhanden As Integer,
+                                           maxVorhanden As Integer) As Rahmenvorschlag
+        Dim v As New Rahmenvorschlag With {.Klassenteiler = teiler}
+        If kinderzahl < 1 OrElse teiler < 1 Then Return v
+        Dim klassenzahl = If(anzahlVorhanden > 0, anzahlVorhanden, Math.Max(1, (kinderzahl + teiler - 1) \ teiler))
+        Dim obere = If(maxVorhanden > 0, maxVorhanden, teiler)
+        If anzahlVorhanden < 1 Then v.Anzahl = klassenzahl
+        If maxVorhanden < 1 Then v.MaxGroesse = obere
+        If minVorhanden < 1 Then v.MinGroesse = Math.Max(1, Math.Min(kinderzahl \ klassenzahl, obere - 6))
+        Return v
+    End Function
+
+    ''' <summary>Schreibt den Vorschlag in die noch leeren Rahmenfelder.
+    ''' Nothing, wenn es keine Kinder gibt oder nichts leer war - dann
+    ''' hat sich auch nichts geaendert.</summary>
+    Public Function RahmenVorschlagen() As Rahmenvorschlag
+        Dim teiler = Templates.Klassenteiler(_projekt.Bestand.Bundesland, _projekt.Bestand.Schulart)
+        Dim v = RahmenBerechnen(Eingabe.Schueler.Count, teiler, Anzahl, MinGroesse, MaxGroesse)
+        If v.Leer Then Return Nothing
+        If v.Anzahl.HasValue Then Eingabe.Klassen.Anzahl = v.Anzahl.Value
+        If v.MinGroesse.HasValue Then Eingabe.Klassen.MinGroesse = v.MinGroesse.Value
+        If v.MaxGroesse.HasValue Then Eingabe.Klassen.MaxGroesse = v.MaxGroesse.Value
+        Melde(NameOf(Anzahl))
+        Melde(NameOf(MinGroesse))
+        Melde(NameOf(MaxGroesse))
+        MeldeAenderung()
+        Return v
+    End Function
+
     ' ===============================================================
     ' Einschulungsliste
     ' ===============================================================
@@ -206,19 +272,57 @@ Public NotInheritable Class KlassenbildungEingabeViewModel
     End Function
 
     Public Sub Entfernen(id As String)
-        Dim kind = Eingabe.Schueler.FirstOrDefault(Function(s) s.Id = id)
-        If kind Is Nothing Then Return
-        Eingabe.Schueler.Remove(kind)
-        ' Mitgliedschaften und Wuensche mitnehmen - sonst zeigen sie auf
-        ' ein Kind, das es nicht mehr gibt.
+        Entfernen({id})
+    End Sub
+
+    ''' <summary>Mehrere Kinder auf einmal - mit EINER Meldung, nicht
+    ''' einer je Kind. Mitgliedschaften, Wuensche, Fixierungen und
+    ''' Klarnamen gehen mit - sonst zeigen sie auf ein Kind, das es
+    ''' nicht mehr gibt.</summary>
+    Public Sub Entfernen(ids As IEnumerable(Of String))
+        Dim menge = ids.Where(Function(x) x IsNot Nothing).ToHashSet(StringComparer.Ordinal)
+        If Eingabe.Schueler.RemoveAll(Function(s) menge.Contains(s.Id)) = 0 Then Return
         For Each g In Eingabe.Gruppen
-            g.Mitglieder.Remove(id)
+            g.Mitglieder.RemoveAll(Function(m) menge.Contains(m))
         Next
-        Eingabe.Wuensche.RemoveAll(Function(w) w.Kinder.Contains(id))
-        Eingabe.Fixierungen.RemoveAll(Function(f) f.Kind = id)
-        _projekt.Mapping.RemoveAll(Function(m) m.Id = id)
+        Eingabe.Wuensche.RemoveAll(Function(w) w.Kinder.Any(Function(k) menge.Contains(k)))
+        Eingabe.Fixierungen.RemoveAll(Function(f) menge.Contains(f.Kind))
+        _projekt.Mapping.RemoveAll(Function(m) menge.Contains(m.Id))
         MeldeAenderung()
     End Sub
+
+    Public Sub AlleEntfernen()
+        Entfernen(Eingabe.Schueler.Select(Function(s) s.Id).ToList())
+    End Sub
+
+    ''' <summary>Regeln, die kein Kind mehr betreffen: Gruppen ohne
+    ''' Mitglied, Balancen auf einen Wert, den niemand traegt. Sie
+    ''' bleiben nach dem Entfernen stehen, bis der Nutzer entscheidet -
+    ''' der Kern lehnt sie beim Rechnen ab, still verschwinden sollen sie
+    ''' aber nicht.</summary>
+    Public Function LeereRegeln() As List(Of String)
+        Dim liste As New List(Of String)
+        For Each g In Eingabe.Gruppen.Where(Function(x) x.Mitglieder.Count = 0)
+            liste.Add($"Gruppe „{g.Id}"": kein Mitglied mehr")
+        Next
+        For Each b In Eingabe.Balance.Where(Function(x) Not HatTraeger(x))
+            liste.Add($"Balance „{b.Attribut} = {b.Wert}"": kein Kind trägt diesen Wert mehr")
+        Next
+        Return liste
+    End Function
+
+    Public Function LeereRegelnEntfernen() As Integer
+        Dim n = Eingabe.Gruppen.RemoveAll(Function(g) g.Mitglieder.Count = 0) +
+                Eingabe.Balance.RemoveAll(Function(b) Not HatTraeger(b))
+        If n > 0 Then MeldeAenderung()
+        Return n
+    End Function
+
+    Private Function HatTraeger(b As KlassenbildungBalance) As Boolean
+        If b.Attribut Is Nothing OrElse b.Wert Is Nothing Then Return False
+        Return Eingabe.Schueler.Any(
+            Function(s) s.Attribute.ContainsKey(b.Attribut) AndAlso s.Attribute(b.Attribut) = b.Wert)
+    End Function
 
     ''' <summary>Anzeigename fuer die Liste: "Mia Muster (S001)" bzw. nur
     ''' die ID. "Klarnamen nur in der Anzeigeschicht" (Konzept 1) - die
@@ -272,6 +376,13 @@ Public NotInheritable Class KlassenbildungEingabeViewModel
         Dim bericht = Spaltenzuordnung.Uebernehmen(
             _projekt, zeilen, wahlen,
             Function(nach, vor, attribute) Hinzufuegen(nach, vor, attribute))
+        ' Ein frisches Projekt steht auf 0/0/0 - nach dem Import ist die
+        ' Kinderzahl bekannt, also gibt es keinen Grund, den Rahmen raten
+        ' zu lassen. Gesetzte Felder bleiben unangetastet.
+        Dim vorschlag = RahmenVorschlagen()
+        If vorschlag IsNot Nothing Then
+            bericht.Hinweise.Add(vorschlag.Hinweistext(_projekt.Bestand.Schulart, _projekt.Bestand.Bundesland))
+        End If
         MeldeAenderung()
         Return bericht
     End Function
@@ -315,6 +426,8 @@ Public NotInheritable Class KlassenbildungEingabeViewModel
             If Not vokabular.Contains(If(b.Attribut, "")) Then
                 ' Genau der Fall, den die Auswahlliste verhindern soll.
                 fehler.Add($"Balance auf „{b.Attribut}"": dieses Attribut traegt kein Kind.")
+            ElseIf Not HatTraeger(b) Then
+                fehler.Add($"Balance auf „{b.Attribut} = {b.Wert}"": kein Kind traegt diesen Wert - die Regel bliebe wirkungslos.")
             End If
         Next
 

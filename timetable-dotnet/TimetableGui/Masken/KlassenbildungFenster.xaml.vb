@@ -61,7 +61,7 @@ Partial Class KlassenbildungFenster
     End Sub
 
     Private Sub KinderFuellen()
-        Dim gewaehlt = TryCast(Kinder.SelectedItem, String)
+        Dim gewaehlte = GewaehlteKinder().Select(Function(k) k.Id).ToHashSet(StringComparer.Ordinal)
         Kinder.Items.Clear()
         For Each k In _eingabe.Schueler
             ' Klarname NUR in der Anzeige (Konzept 1) - die Liste selbst
@@ -70,10 +70,22 @@ Partial Class KlassenbildungFenster
             If k.Attribute.Count > 0 Then
                 beschreibung &= "   " & String.Join(", ", k.Attribute.Select(Function(a) $"{a.Key}={a.Value}"))
             End If
-            Kinder.Items.Add(beschreibung)
+            Kinder.Items.Add(New Zeilenpaar(k, beschreibung))
         Next
-        If gewaehlt IsNot Nothing AndAlso Kinder.Items.Contains(gewaehlt) Then Kinder.SelectedItem = gewaehlt
+        ' Die Auswahl ueber die Ids zurueckholen, nicht ueber den Helfer
+        ' Auswahl(): der springt ohne Treffer auf Index 0, und der
+        ' naechste Klick auf Entfernen traefe ein nie gewaehltes Kind.
+        For Each paar As Zeilenpaar In Kinder.Items
+            Dim kind = TryCast(paar.Eintrag, KlassenbildungSchueler)
+            If kind IsNot Nothing AndAlso gewaehlte.Contains(kind.Id) Then Kinder.SelectedItems.Add(paar)
+        Next
     End Sub
+
+    Private Function GewaehlteKinder() As List(Of KlassenbildungSchueler)
+        Return Kinder.SelectedItems.OfType(Of Zeilenpaar)().
+            Select(Function(p) TryCast(p.Eintrag, KlassenbildungSchueler)).
+            Where(Function(k) k IsNot Nothing).ToList()
+    End Function
 
     Private Sub Aktualisieren()
         Vorschau.Text = "Klassen: " & _eingabe.LabelVorschau
@@ -174,11 +186,19 @@ Partial Class KlassenbildungFenster
         Dim d As New ImportDialog(v, _dialoge, AddressOf _eingabe.ImportPruefen,
                                   _eingabe.Attributnamen) With {.Owner = Me}
         If d.ShowDialog() <> True Then Return
+        ImportAbschliessen(d.Vorschau, d.Wahlen)
+    End Sub
 
-        Dim bericht = _eingabe.ImportUebernehmen(d.Vorschau, d.Wahlen)
-        KinderFuellen()
+    ''' <summary>Der Teil nach dem Dialog - Friend, damit der Test ihn
+    ''' ohne modales Fenster geht. Fuellen() statt KinderFuellen(): der
+    ''' Import kann den Klassenrahmen vorschlagen, und die Rahmenfelder
+    ''' werden sonst nur beim Aufbau geschrieben - der naechste
+    ''' Feldwechsel truege die alte 0 zurueck in den Bestand.</summary>
+    Friend Sub ImportAbschliessen(v As KlassenbildungEingabeViewModel.ImportVorschau,
+                                  wahlen As List(Of Spaltenwahl))
+        Dim bericht = _eingabe.ImportUebernehmen(v, wahlen)
+        Fuellen()
         RegelmaskenFuellen()
-        Aktualisieren()
         ' Der Bericht im Klartext, nicht nur eine Zahl: ein Import, der
         ' still Spalten verwirft und Gruppen anlegt, ist sonst nicht
         ' nachvollziehbar.
@@ -186,14 +206,44 @@ Partial Class KlassenbildungFenster
     End Sub
 
     Private Sub AufEntfernen(sender As Object, e As RoutedEventArgs)
-        Dim i = Kinder.SelectedIndex
-        If i < 0 OrElse i >= _eingabe.Schueler.Count Then Return
-        Dim kind = _eingabe.Schueler(i)
-        If Not _dialoge.Frage("Entfernen",
-            $"„{_eingabe.Anzeigename(kind.Id)}"" entfernen? Gruppenmitgliedschaften, Wünsche und Fixierungen dieses Kindes verschwinden mit.") Then Return
-        _eingabe.Entfernen(kind.Id)
+        Dim gewaehlte = GewaehlteKinder()
+        If gewaehlte.Count = 0 Then Return
+        Dim wortlaut = If(gewaehlte.Count = 1,
+            $"„{_eingabe.Anzeigename(gewaehlte(0).Id)}"" entfernen? Gruppenmitgliedschaften, Wünsche und Fixierungen dieses Kindes verschwinden mit.",
+            $"{gewaehlte.Count} Kinder entfernen? Gruppenmitgliedschaften, Wünsche und Fixierungen dieser Kinder verschwinden mit.")
+        If Not _dialoge.Frage("Entfernen", wortlaut) Then Return
+        KinderEntfernen(gewaehlte.Select(Function(k) k.Id).ToList())
+    End Sub
+
+    Private Sub AufAlleEntfernen(sender As Object, e As RoutedEventArgs)
+        Dim n = _eingabe.Schueler.Count
+        If n = 0 Then Return
+        If Not _dialoge.Frage("Alle entfernen",
+            $"Alle {n} Kinder entfernen? Gruppenmitgliedschaften, Wünsche und Fixierungen aller Kinder verschwinden mit, ebenso ihre Klarnamen-Zuordnung.") Then Return
+        KinderEntfernen(_eingabe.Schueler.Select(Function(s) s.Id).ToList())
+    End Sub
+
+    Private Sub KinderEntfernen(ids As List(Of String))
+        _eingabe.Entfernen(ids)
+        LeereRegelnAnbieten()
         KinderFuellen()
+        ' Auch die Regelmasken: Wunsch-Kindlisten, Attribut-Vokabular und
+        ' Mitgliederzahlen der Gruppen haengen an den Kindern.
+        RegelmaskenFuellen()
         Aktualisieren()
+    End Sub
+
+    ''' <summary>Regeln, die nach dem Entfernen niemanden mehr betreffen,
+    ''' verschwinden nicht still - der Nutzer entscheidet (Nutzerwunsch
+    ''' 06.09.2026). Die Frage nennt sie, damit die Entscheidung eine ist.</summary>
+    Private Sub LeereRegelnAnbieten()
+        Dim leere = _eingabe.LeereRegeln()
+        If leere.Count = 0 Then Return
+        Dim zeilen = String.Join(vbLf, leere.Take(10)) & If(leere.Count > 10, vbLf & "…", "")
+        If _dialoge.Frage("Leere Regeln",
+            $"{leere.Count} Regel(n) haben kein Kind mehr und blieben wirkungslos:{vbLf}{zeilen}{vbLf}{vbLf}Diese Regeln ebenfalls entfernen?") Then
+            _eingabe.LeereRegelnEntfernen()
+        End If
     End Sub
 
     ' ===============================================================

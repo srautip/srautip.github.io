@@ -68,6 +68,21 @@ Public Module Templates
         End Select
     End Function
 
+    ''' <summary>Klassenteiler nach dem Organisationserlass des KM
+    ''' Baden-Wuerttemberg: Grundschule und Gemeinschaftsschule 28,
+    ''' Werkrealschule/Realschule/Gymnasium 30. Anders als TemplateFuer
+    ''' wirft die Funktion NIE - sie liefert einen VORSCHLAG fuer den
+    ''' Klassenrahmen, und ein unbekanntes Bundesland oder eine leere
+    ''' Schulart bekommt den Grundschulwert statt einer Fehlermeldung.</summary>
+    Public Function Klassenteiler(bundesland As String, schulart As String) As Integer
+        Select Case If(schulart, "").Trim()
+            Case "Werkrealschule", "Hauptschule", "Realschule", "Gymnasium"
+                Return 30
+            Case Else
+                Return 28
+        End Select
+    End Function
+
     Private Function Fach(name As String, wochenstunden As Integer, Optional maxProTag As Integer? = Nothing, Optional blockLength As Integer? = Nothing) As TemplateFach
         Return New TemplateFach With {.Name = name, .WochenstundenSoll = wochenstunden, .MaxProTag = maxProTag, .BlockLength = blockLength}
     End Function

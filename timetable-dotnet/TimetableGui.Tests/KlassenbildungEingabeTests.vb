@@ -258,6 +258,150 @@ Public Class KlassenbildungEingabeTests
     End Sub
 
     ' ===============================================================
+    ' Mehrere Kinder entfernen, leere Regeln
+    ' ===============================================================
+
+    ''' <summary>Drei Kinder auf einmal weg - mit EINER Meldung. Eine je
+    ''' Kind liesse das Fenster dreimal neu zeichnen und speichern.</summary>
+    <TestMethod>
+    Public Sub MehrereKinderVerschwindenMitEinerMeldung()
+        Dim p = LeeresProjekt()
+        Dim vm As New KlassenbildungEingabeViewModel(p, New TestDialoge())
+        Dim a = vm.Hinzufuegen("Meier", "Anna", Nothing)
+        Dim b = vm.Hinzufuegen("Schulz", "Ben", Nothing)
+        Dim c = vm.Hinzufuegen("Braun", "Cem", Nothing)
+        Dim meldungen = 0
+        AddHandler vm.Geaendert, Sub() meldungen += 1
+
+        vm.Entfernen({a, b})
+
+        Assert.AreEqual(1, meldungen)
+        CollectionAssert.AreEqual(New List(Of String) From {c}, p.Klassenbildung.Schueler.Select(Function(s) s.Id).ToList())
+        Assert.AreEqual(1, p.Mapping.Count, "die Klarnamen der beiden gehen mit")
+        Assert.AreEqual(c, p.Mapping(0).Id)
+
+        vm.AlleEntfernen()
+        Assert.AreEqual(0, p.Klassenbildung.Schueler.Count)
+        Assert.AreEqual(0, p.Mapping.Count)
+        Assert.AreEqual(2, meldungen)
+
+        vm.Entfernen({"S999"})
+        Assert.AreEqual(2, meldungen, "ein unbekanntes Kind aendert nichts und meldet nichts")
+    End Sub
+
+    ''' <summary>Regeln ohne Kind werden ERKANNT, aber nur auf Wunsch
+    ''' entfernt - eine Gruppe mit verbliebenem Mitglied bleibt.</summary>
+    <TestMethod>
+    Public Sub LeereRegelnWerdenErkanntUndNurAufWunschEntfernt()
+        Dim p = LeeresProjekt()
+        Dim vm As New KlassenbildungEingabeViewModel(p, New TestDialoge())
+        Dim a = vm.Hinzufuegen("Meier", "Anna", New Dictionary(Of String, String) From {{"foe", "ja"}, {"geschlecht", "w"}})
+        Dim b = vm.Hinzufuegen("Schulz", "Ben", New Dictionary(Of String, String) From {{"geschlecht", "m"}})
+        Dim c = vm.Hinzufuegen("Braun", "Cem", New Dictionary(Of String, String) From {{"geschlecht", "m"}})
+        p.Klassenbildung.Gruppen.Add(New KlassenbildungGruppe With {
+            .Id = "K1", .Typ = "buendelung", .Mitglieder = New List(Of String) From {a, b}})
+        p.Klassenbildung.Gruppen.Add(New KlassenbildungGruppe With {
+            .Id = "K2", .Typ = "buendelung", .Mitglieder = New List(Of String) From {c}})
+        p.Klassenbildung.Balance.Add(New KlassenbildungBalance With {.Attribut = "foe", .Wert = "ja"})
+        p.Klassenbildung.Balance.Add(New KlassenbildungBalance With {.Attribut = "geschlecht", .Wert = "w"})
+        p.Klassenbildung.Balance.Add(New KlassenbildungBalance With {.Attribut = "geschlecht", .Wert = "m"})
+        Assert.AreEqual(0, vm.LeereRegeln().Count)
+
+        vm.Entfernen({a, b})
+
+        Dim leere = vm.LeereRegeln()
+        Assert.AreEqual(3, leere.Count, String.Join(" | ", leere))
+        Assert.IsTrue(leere.Any(Function(l) l.Contains("K1") AndAlso l.Contains("kein Mitglied")))
+        Assert.IsTrue(leere.Any(Function(l) l.Contains("foe = ja")))
+        Assert.IsTrue(leere.Any(Function(l) l.Contains("geschlecht = w")))
+        Assert.IsFalse(leere.Any(Function(l) l.Contains("K2")), "K2 hat noch ein Mitglied")
+        Assert.IsTrue(vm.Pruefe().Any(Function(f) f.Contains("geschlecht = w") AndAlso f.Contains("wirkungslos")),
+                      "die Pruefung nennt die verwaiste Balance")
+        ' Nichts ist ohne Entscheidung verschwunden.
+        Assert.AreEqual(2, p.Klassenbildung.Gruppen.Count)
+        Assert.AreEqual(3, p.Klassenbildung.Balance.Count)
+
+        Assert.AreEqual(3, vm.LeereRegelnEntfernen())
+        Assert.AreEqual("K2", p.Klassenbildung.Gruppen.Single().Id)
+        Assert.AreEqual("m", p.Klassenbildung.Balance.Single().Wert)
+        Assert.AreEqual(0, vm.LeereRegelnEntfernen(), "ein zweiter Aufruf findet nichts mehr")
+    End Sub
+
+    ' ===============================================================
+    ' Rahmenvorschlag nach dem Import
+    ' ===============================================================
+
+    ''' <summary>Die vier Beispiele aus dem Plan: Hoechstgroesse ist der
+    ''' Klassenteiler, die Anzahl die kleinste mit Platz, die Mindestgroesse
+    ''' sechs darunter, aber nie ueber dem Durchschnitt.</summary>
+    <TestMethod>
+    Public Sub DerRahmenvorschlagKenntDieVierBeispiele()
+        For Each fall In {(100, 4, 22), (116, 5, 22), (57, 3, 19), (30, 2, 15)}
+            Dim v = KlassenbildungEingabeViewModel.RahmenBerechnen(fall.Item1, 28, 0, 0, 0)
+            Assert.AreEqual(fall.Item2, v.Anzahl.Value, $"Anzahl bei {fall.Item1}")
+            Assert.AreEqual(fall.Item3, v.MinGroesse.Value, $"Min bei {fall.Item1}")
+            Assert.AreEqual(28, v.MaxGroesse.Value)
+            ' Der Rahmen ist auf Anhieb rechenbar.
+            Assert.IsTrue(v.Anzahl.Value * v.MinGroesse.Value <= fall.Item1)
+            Assert.IsTrue(v.Anzahl.Value * v.MaxGroesse.Value >= fall.Item1)
+        Next
+        Assert.IsTrue(KlassenbildungEingabeViewModel.RahmenBerechnen(0, 28, 0, 0, 0).Leer)
+    End Sub
+
+    ''' <summary>Nur leere Felder werden gefuellt; ein gesetztes geht in
+    ''' die uebrigen ein - eine Anzahl von 5 bestimmt den Durchschnitt.</summary>
+    <TestMethod>
+    Public Sub DerRahmenvorschlagFuelltNurLeereFelder()
+        Dim p As New Projekt()
+        p.Klassenbildung.Klassen.Anzahl = 5
+        Dim vm As New KlassenbildungEingabeViewModel(p, New TestDialoge())
+        For i = 1 To 100
+            vm.Hinzufuegen("", "", Nothing)
+        Next
+
+        Dim v = vm.RahmenVorschlagen()
+
+        Assert.IsFalse(v.Anzahl.HasValue, "die gesetzte Anzahl bleibt")
+        Assert.AreEqual(5, p.Klassenbildung.Klassen.Anzahl)
+        Assert.AreEqual(20, p.Klassenbildung.Klassen.MinGroesse, "100/5 = 20 liegt unter 28-6")
+        Assert.AreEqual(28, p.Klassenbildung.Klassen.MaxGroesse)
+        StringAssert.Contains(v.Hinweistext("Grundschule", "BW"), "Klassenteiler Grundschule/BW: 28")
+        StringAssert.Contains(v.Hinweistext("Grundschule", "BW"), "Mindestgröße 20")
+        Assert.IsFalse(v.Hinweistext("Grundschule", "BW").Contains("Klassenanzahl"), "nur Gesetztes wird genannt")
+
+        Assert.IsNull(vm.RahmenVorschlagen(), "alles gesetzt: nichts mehr vorzuschlagen")
+
+        Dim leer As New Projekt()
+        Assert.IsNull(New KlassenbildungEingabeViewModel(leer, New TestDialoge()).RahmenVorschlagen(),
+                      "ohne Kinder kein Vorschlag")
+        Assert.AreEqual(0, leer.Klassenbildung.Klassen.Anzahl)
+    End Sub
+
+    ''' <summary>Der Import eines frischen Projekts nennt den Vorschlag im
+    ''' Bericht; ein zweiter Import findet nichts Leeres mehr.</summary>
+    <TestMethod>
+    Public Sub DerImportberichtNenntDenRahmenvorschlag()
+        Dim p As New Projekt()
+        p.Bestand.Schulart = "Gemeinschaftsschule"
+        Dim vm As New KlassenbildungEingabeViewModel(p, New TestDialoge())
+        Dim text = "Nachname;Vorname" & vbLf & "Meier;Anna" & vbLf & "Schulz;Ben" & vbLf & "Braun;Cem"
+
+        Dim v1 = vm.ImportPruefen(text)
+        Dim bericht = vm.ImportUebernehmen(v1, Spaltenzuordnung.Vorschlag(v1.Spalten))
+
+        StringAssert.Contains(bericht.Klartext(), "Klassenteiler Gemeinschaftsschule/BW: 28")
+        StringAssert.Contains(bericht.Klartext(), "Klassenanzahl 1")
+        StringAssert.Contains(bericht.Klartext(), "Höchstgröße 28")
+        Assert.AreEqual(1, p.Klassenbildung.Klassen.Anzahl)
+        Assert.AreEqual(3, p.Klassenbildung.Klassen.MinGroesse, "3/1 = 3 liegt unter 22")
+
+        Dim v2 = vm.ImportPruefen(text)
+        Dim zweiter = vm.ImportUebernehmen(v2, Spaltenzuordnung.Vorschlag(v2.Spalten))
+        Assert.IsFalse(zweiter.Klartext().Contains("Klassenrahmen"), "nichts mehr leer, nichts vorgeschlagen")
+        Assert.AreEqual(1, p.Klassenbildung.Klassen.Anzahl, "der gesetzte Rahmen bleibt, auch wenn er nun zu klein ist")
+    End Sub
+
+    ' ===============================================================
     ' Pruefung
     ' ===============================================================
 

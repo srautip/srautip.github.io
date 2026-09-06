@@ -389,6 +389,11 @@ Public Class ImportZuordnungTests
     <TestMethod>
     Public Sub DieBestehendeEinteilungDerGmsWirdZuFixierungen()
         Dim p As New Projekt()
+        ' Der Rahmen ist gesetzt - sonst schluege der Import einen vor,
+        ' und der Bericht traege einen Hinweis, um den es hier nicht geht.
+        p.Klassenbildung.Klassen.Anzahl = 4
+        p.Klassenbildung.Klassen.MinGroesse = 25
+        p.Klassenbildung.Klassen.MaxGroesse = 30
         p.Klassenbildung.Klassen.Labels = New List(Of String) From {"5a", "5b", "5c", "5d"}
         Dim m = Modell(p)
         Dim text = ImportDialog.DateiLesen(

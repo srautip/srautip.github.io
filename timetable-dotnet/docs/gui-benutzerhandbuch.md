@@ -183,6 +183,24 @@ eigene Klassennamen (`5a, 5b, 5c, 5d`).
 Die Kinder tragen Sie ein, fügen sie aus der Zwischenablage ein oder
 lesen sie aus einer CSV-Datei.
 
+**Kinder entfernen:** In der Liste lassen sich mehrere Kinder mit *Strg*
+oder *Umschalt* markieren; „Kind entfernen“ nimmt alle markierten auf
+einmal, „Alle entfernen“ die ganze Liste. Beides fragt vorher nach und
+nennt, was mitgeht: Gruppenmitgliedschaften, Wünsche, Fixierungen und
+die Klarnamen. Bleiben danach Regeln ohne Kind übrig – eine Gruppe ohne
+Mitglied, eine Balance auf einen Wert, den niemand mehr trägt –, fragt
+die Maske ein zweites Mal, ob diese Regeln ebenfalls verschwinden
+sollen. Nichts davon geschieht still.
+
+**Rahmenvorschlag nach dem Import:** Stehen Klassenanzahl, Mindest- und
+Höchstgröße noch auf 0, füllt der Import sie aus der Kinderzahl:
+Höchstgröße = Klassenteiler des Kultusministeriums BW (Grundschule und
+Gemeinschaftsschule 28, Werkrealschule/Realschule/Gymnasium 30),
+Klassenanzahl = so viele, dass alle Platz haben, Mindestgröße = sechs
+unter der Höchstgröße, aber nie über dem Durchschnitt. 100 Kinder
+ergeben so 4 Klassen zu 22–28. Bereits gesetzte Felder bleiben; der
+Import-Bericht nennt, was vorgeschlagen wurde.
+
 ### Kinder aus einer Datei übernehmen
 
 **„Aus CSV-Datei…"** – eine Semikolon- oder Tabulator-getrennte Datei,

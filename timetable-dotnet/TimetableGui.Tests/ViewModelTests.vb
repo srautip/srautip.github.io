@@ -100,8 +100,14 @@ Friend NotInheritable Class TestDialoge
     ''' wirklich nichts aendert.</summary>
     Public Property FrageAntwort As Boolean = True
 
+    ''' <summary>Antworten der Reihe nach, wenn ein Ablauf MEHRERE
+    ''' Fragen stellt ("Kinder entfernen: ja - leere Regeln mit: nein").
+    ''' Leer heisst: FrageAntwort gilt fuer alle.</summary>
+    Public ReadOnly Property FrageAntworten As New Queue(Of Boolean)
+
     Public Function Frage(titel As String, text As String) As Boolean Implements IDialoge.Frage
         Fragen.Add(text)
+        If FrageAntworten.Count > 0 Then Return FrageAntworten.Dequeue()
         Return FrageAntwort
     End Function
 

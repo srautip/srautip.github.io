@@ -402,6 +402,145 @@ Public Class KlassenbildungFensterTests
             Select(Function(o) o.ToString()).ToList()
     End Function
 
+    ' ===============================================================
+    ' Kinderliste: Mehrfachauswahl, Alle entfernen, leere Regeln,
+    ' Rahmenvorschlag nach dem Import
+    ' ===============================================================
+
+    ''' <summary>Zwei Kinder markieren, ein Klick, eine Frage - und die
+    ''' Wunschmaske zieht nach, deren Kindlisten bisher veraltet
+    ''' stehenblieben. `SelectedItems.Add` wirft bei Einzelauswahl; der
+    ''' Test belegt damit zugleich das XAML-Attribut.</summary>
+    <TestMethod>
+    Public Sub MehrereKinderLassenSichAufEinmalEntfernen()
+        AufSta(Sub()
+                   RessourcenSicherstellen()
+                   Dim p = Projekt()
+                   Dim d As New TestDialoge()
+                   Dim f As New KlassenbildungFenster(p, d)
+                   Assert.AreEqual(SelectionMode.Extended, f.Kinder.SelectionMode)
+                   Assert.AreEqual(6, f.Kinder.Items.Count)
+
+                   Klick(f.EntfernenKnopf)
+                   Assert.AreEqual(0, d.Fragen.Count, "ohne Auswahl gibt es nichts zu fragen")
+
+                   f.Kinder.SelectedItems.Add(f.Kinder.Items(0))
+                   f.Kinder.SelectedItems.Add(f.Kinder.Items(1))
+                   Klick(f.EntfernenKnopf)
+
+                   Assert.AreEqual(4, p.Klassenbildung.Schueler.Count)
+                   Assert.AreEqual(1, d.Fragen.Count)
+                   StringAssert.Contains(d.Fragen(0), "2 Kinder")
+                   StringAssert.Contains(d.Fragen(0), "Wünsche")
+                   Assert.AreEqual(4, f.Kinder.Items.Count)
+                   Assert.AreEqual(5, f.WunschKindA.Items.Count, "4 Kinder plus (keins) - die Wunschmaske zieht nach")
+                   Assert.AreEqual("4 Kinder", f.Anzahlzeile.Text)
+               End Sub)
+    End Sub
+
+    <TestMethod>
+    Public Sub AlleEntfernenFragtUndLeertDieListe()
+        AufSta(Sub()
+                   RessourcenSicherstellen()
+                   Dim nein As New TestDialoge With {.FrageAntwort = False}
+                   Dim p1 = Projekt()
+                   Dim f1 As New KlassenbildungFenster(p1, nein)
+                   Klick(f1.AlleEntfernenKnopf)
+                   Assert.AreEqual(6, p1.Klassenbildung.Schueler.Count, "Nein aendert nichts")
+                   Assert.AreEqual(1, nein.Fragen.Count)
+                   StringAssert.Contains(nein.Fragen(0), "Alle 6 Kinder")
+                   StringAssert.Contains(nein.Fragen(0), "Klarnamen")
+
+                   Dim ja As New TestDialoge()
+                   Dim p2 = Projekt()
+                   Dim f2 As New KlassenbildungFenster(p2, ja)
+                   Klick(f2.AlleEntfernenKnopf)
+                   Assert.AreEqual(0, p2.Klassenbildung.Schueler.Count)
+                   Assert.AreEqual(0, f2.Kinder.Items.Count)
+                   Assert.AreEqual("0 Kinder", f2.Anzahlzeile.Text)
+                   Assert.AreEqual(1, ja.Fragen.Count, "ohne Regeln keine zweite Frage")
+                   Klick(f2.AlleEntfernenKnopf)
+                   Assert.AreEqual(1, ja.Fragen.Count, "leere Liste: nichts zu fragen")
+               End Sub)
+    End Sub
+
+    ''' <summary>Regeln, die nach dem Entfernen niemanden mehr betreffen,
+    ''' werden ANGEBOTEN - Nein laesst sie stehen, Ja nimmt sie mit; eine
+    ''' Balance mit verbliebenem Traeger ist nie dabei.</summary>
+    <TestMethod>
+    Public Sub LeereRegelnWerdenNachDemEntfernenAngeboten()
+        AufSta(Sub()
+                   RessourcenSicherstellen()
+                   Dim mitRegeln =
+                       Function() As Projekt
+                           Dim p = Projekt()
+                           p.Klassenbildung.Gruppen.Add(New KlassenbildungGruppe With {
+                               .Id = "K1", .Typ = "buendelung", .Mitglieder = New List(Of String) From {"S001"}})
+                           p.Klassenbildung.Balance.Add(New KlassenbildungBalance With {.Attribut = "GESCHLECHT", .Wert = "w"})
+                           Return p
+                       End Function
+
+                   ' Alle weg, Regeln behalten: Kinder ja, Regeln nein.
+                   Dim p1 = mitRegeln()
+                   Dim d1 As New TestDialoge()
+                   d1.FrageAntworten.Enqueue(True)
+                   d1.FrageAntworten.Enqueue(False)
+                   Dim f1 As New KlassenbildungFenster(p1, d1)
+                   Klick(f1.AlleEntfernenKnopf)
+                   Assert.AreEqual(0, p1.Klassenbildung.Schueler.Count)
+                   Assert.AreEqual(2, d1.Fragen.Count)
+                   StringAssert.Contains(d1.Fragen(1), "2 Regel(n)")
+                   StringAssert.Contains(d1.Fragen(1), "K1")
+                   StringAssert.Contains(d1.Fragen(1), "GESCHLECHT = w")
+                   Assert.AreEqual(1, p1.Klassenbildung.Gruppen.Count, "Nein: die Gruppe bleibt")
+                   Assert.AreEqual(1, p1.Klassenbildung.Balance.Count)
+
+                   ' Nur S001 weg: K1 wird leer, die Balance hat mit S002 noch Traeger.
+                   Dim p2 = mitRegeln()
+                   Dim d2 As New TestDialoge()
+                   Dim f2 As New KlassenbildungFenster(p2, d2)
+                   f2.Kinder.SelectedItems.Add(f2.Kinder.Items(0))
+                   Klick(f2.EntfernenKnopf)
+                   Assert.AreEqual(2, d2.Fragen.Count)
+                   StringAssert.Contains(d2.Fragen(1), "1 Regel(n)")
+                   Assert.IsFalse(d2.Fragen(1).Contains("GESCHLECHT"), "die Balance hat noch Traeger")
+                   Assert.AreEqual(0, p2.Klassenbildung.Gruppen.Count, "Ja: die leere Gruppe geht")
+                   Assert.AreEqual(1, p2.Klassenbildung.Balance.Count)
+                   Assert.AreEqual(0, f2.GruppenListe.Items.Count, "die Gruppenmaske zieht nach")
+               End Sub)
+    End Sub
+
+    ''' <summary>Ein frisches Projekt steht auf 0/0/0. Nach dem Import
+    ''' stehen die Vorschlaege in den FELDERN - und der naechste
+    ''' Feldwechsel schreibt keine 0 zurueck (vorher wurden die
+    ''' Rahmenfelder nur beim Aufbau befuellt).</summary>
+    <TestMethod>
+    Public Sub DerImportSchreibtDenRahmenvorschlagInDieFelder()
+        AufSta(Sub()
+                   RessourcenSicherstellen()
+                   Dim p As New Projekt()
+                   Dim d As New TestDialoge()
+                   Dim f As New KlassenbildungFenster(p, d)
+                   Assert.AreEqual("0", f.Anzahl.Text)
+
+                   Dim m As New KlassenbildungEingabeViewModel(p, d)
+                   Dim zeilen = Enumerable.Range(1, 30).Select(Function(i) $"Name{i};V{i}")
+                   Dim v = m.ImportPruefen("Nachname;Vorname" & vbLf & String.Join(vbLf, zeilen))
+                   f.ImportAbschliessen(v, Spaltenzuordnung.Vorschlag(v.Spalten))
+
+                   Assert.AreEqual(30, f.Kinder.Items.Count)
+                   Assert.AreEqual("2", f.Anzahl.Text)
+                   Assert.AreEqual("15", f.MinGroesse.Text)
+                   Assert.AreEqual("28", f.MaxGroesse.Text)
+                   Assert.IsTrue(d.Hinweise.Any(Function(h) h.Contains("Klassenteiler")), String.Join(" | ", d.Hinweise))
+                   StringAssert.Contains(f.Rahmenzeile.Text, "30 Kinder auf 2 Klassen")
+
+                   Tippe(f.Stufe, "1")
+                   Assert.AreEqual(2, p.Klassenbildung.Klassen.Anzahl)
+                   Assert.AreEqual(28, p.Klassenbildung.Klassen.MaxGroesse, "der Feldwechsel darf keine 0 zurueckschreiben")
+               End Sub)
+    End Sub
+
 End Class
 
 

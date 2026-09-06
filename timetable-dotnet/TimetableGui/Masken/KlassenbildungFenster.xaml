@@ -84,12 +84,14 @@
                             <Button Content="Aus Zwischenablage einfügen…" Click="AufEinfuegen" />
                             <Button x:Name="CsvKnopf" Content="Aus CSV-Datei…" Margin="8,0,0,0"
                                     Click="AufCsvDatei" />
-                            <Button Content="Kind entfernen" Margin="8,0,0,0" Click="AufEntfernen" />
+                            <Button x:Name="EntfernenKnopf" Content="Kind entfernen" Margin="8,0,0,0" Click="AufEntfernen"
+                                    ToolTip="Mehrere Kinder mit Strg oder Umschalt wählen" />
+                            <Button x:Name="AlleEntfernenKnopf" Content="Alle entfernen" Margin="8,0,0,0" Click="AufAlleEntfernen" />
                             <TextBlock x:Name="Anzahlzeile" VerticalAlignment="Center" Margin="12,0,0,0"
                                        FontSize="{StaticResource grad-klein}"
                                        Foreground="{StaticResource farbe-text-2}" />
                         </StackPanel>
-                        <ListBox x:Name="Kinder"
+                        <ListBox x:Name="Kinder" SelectionMode="Extended"
                                  BorderBrush="{StaticResource farbe-linie}" BorderThickness="1" />
                     </DockPanel>
                 </Grid>
