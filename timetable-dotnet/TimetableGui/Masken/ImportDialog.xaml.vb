@@ -147,15 +147,43 @@ Partial Class ImportDialog
             typwahl.Items.Add("buendelung")
             typwahl.SelectedItem = wahl.Gruppentyp
 
+            ' Zu einem Attribut die passende Regel gleich mit: der Haken
+            ' sagt, WAS entstuende - eine Balance oder n Buendelungen -,
+            ' damit niemand erst nach dem Uebernehmen sieht, was die
+            ' Werte hergaben. Vorgabe ist an: wer ein Merkmal uebernimmt,
+            ' will in aller Regel danach einteilen.
+            Dim spaltenindex = i
+            Dim ableiten As New CheckBox With {
+                .Margin = New Thickness(8, 0, 0, 0), .VerticalAlignment = VerticalAlignment.Center,
+                .Visibility = If(wahl.Rolle = Spaltenrolle.Attribut, Visibility.Visible, Visibility.Hidden)}
+            Dim ableitungZeigen =
+                Sub()
+                    Dim a = Spaltenzuordnung.Ableitung(Spaltenwerte(spaltenindex))
+                    ableiten.Content = "Regel ableiten: " & a.Beschreibung()
+                    ableiten.IsEnabled = a.Art <> "keine"
+                    If Not ableiten.IsEnabled Then wahl.RegelAbleiten = False
+                    ableiten.IsChecked = wahl.RegelAbleiten
+                End Sub
+            If wahl.Rolle = Spaltenrolle.Attribut Then ableitungZeigen()
+
             AddHandler rollenwahl.SelectionChanged,
                 Sub()
                     If _fuellt Then Return
                     Dim e = TryCast(rollenwahl.SelectedItem, Rolleneintrag)
                     If e Is Nothing Then Return
+                    Dim warAttribut = wahl.Rolle = Spaltenrolle.Attribut
                     wahl.Rolle = e.Rolle
                     wahl.Zielname = e.Zielname
                     typwahl.Visibility = If(wahl.Rolle = Spaltenrolle.Gruppe,
                                             Visibility.Visible, Visibility.Hidden)
+                    If wahl.Rolle = Spaltenrolle.Attribut Then
+                        If Not warAttribut Then wahl.RegelAbleiten = True
+                        ableitungZeigen()
+                        ableiten.Visibility = Visibility.Visible
+                    Else
+                        wahl.RegelAbleiten = False
+                        ableiten.Visibility = Visibility.Hidden
+                    End If
                     Zeichnen()
                     Pruefen()
                 End Sub
@@ -164,12 +192,26 @@ Partial Class ImportDialog
                     If _fuellt Then Return
                     wahl.Gruppentyp = CStr(If(typwahl.SelectedItem, "verteilung"))
                 End Sub
+            AddHandler ableiten.Click,
+                Sub()
+                    If _fuellt Then Return
+                    wahl.RegelAbleiten = ableiten.IsChecked = True
+                End Sub
 
             zeile.Children.Add(rollenwahl)
             zeile.Children.Add(typwahl)
+            zeile.Children.Add(ableiten)
             Zuordnung.Children.Add(zeile)
         Next
     End Sub
+
+    ''' <summary>Die Werte EINER Spalte ueber alle Datenzeilen - nicht nur
+    ''' die zehn der Vorschau, sonst hielte der Dialog eine Kita-Spalte
+    ''' mit zwei sichtbaren Namen fuer binaer.</summary>
+    Private Function Spaltenwerte(spalte As Integer) As List(Of String)
+        Return _vorschau.Zeilen.Skip(If(_vorschau.Kopfzeile, 1, 0)).
+            Select(Function(z) If(spalte < z.Length, z(spalte), "")).ToList()
+    End Function
 
     Private Sub Pruefen()
         Dim einwaende = Spaltenzuordnung.Einwaende(_wahlen, _vokabular)

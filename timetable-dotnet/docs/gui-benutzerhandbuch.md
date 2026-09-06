@@ -200,6 +200,19 @@ Danach ordnen Sie **jede Spalte** zu:
 | Gruppe | je vorkommendem Wert eine Gruppe (Spalte *Religion* mit ev/kath/ethik ergibt drei) |
 | Klasse (als Fixierung) | eine bestehende Einteilung übernehmen |
 
+Zu einem **Attribut** steht daneben **„Regel ableiten“** – angehakt, mit
+dem, was aus den Werten der Spalte folgt:
+
+| Werte in der Spalte | Was entsteht |
+|---|---|
+| zwei Ausprägungen (*ja/nein*, *m/w*) oder nur *ja* neben Leerfeldern | **eine Balance-Regel** auf dem Attribut, Toleranz 1. Sie zielt auf das „ja“ – sonst auf den selteneren Wert; das ist der, dessen Verteilung man steuert |
+| eine Werteliste (*Kita*, *Wohngebiet*) | **je Wert eine Bündelung** `Attribut_Wert`, etwa `Kita_Sonnenblume` |
+| alle gleich oder leer | nichts – das Feld ist abgeschaltet |
+
+Das Merkmal bleibt in jedem Fall am Kind. Eine Regel, die es schon gibt,
+wird nicht ein zweites Mal angelegt; der Bericht nennt sie. Wer die
+Regeln lieber selbst setzt, nimmt den Haken weg.
+
 > **Warum nichts automatisch übernommen wird:** Eine Klassenliste aus
 > dem Sekretariat enthält oft Telefonnummern und Geburtsdaten. Was
 > niemand ausdrücklich haben will, kommt nicht herein. Die Vorschau

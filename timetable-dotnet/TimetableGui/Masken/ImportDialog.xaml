@@ -44,7 +44,7 @@
             <TextBlock TextWrapping="Wrap" MaxWidth="860" HorizontalAlignment="Left" Margin="0,0,0,8"
                        FontSize="{StaticResource grad-klein}"
                        Foreground="{StaticResource farbe-text-3}"
-                       Text="Nicht zugeordnete Spalten werden verworfen – das ist die Vorgabe. Attribute stehen namentlich in der Liste; führt das Projekt schon eines, wählt man es dort und legt kein zweites an. „Gruppe“ legt je vorkommendem Wert eine Gruppe an (Spalte „Religion“ mit ev/kath/ethik ergibt drei). „Klasse“ übernimmt eine bestehende Einteilung als Fixierung." />
+                       Text="Nicht zugeordnete Spalten werden verworfen – das ist die Vorgabe. Attribute stehen namentlich in der Liste; führt das Projekt schon eines, wählt man es dort und legt kein zweites an. Zu einem Attribut kann gleich die passende Regel entstehen: bei zwei Ausprägungen (ja/nein, m/w) eine Balance, bei einer Werteliste (Kitas) je Wert eine Bündelung „Attribut_Wert“. „Gruppe“ legt je vorkommendem Wert eine Verteilungsgruppe an (Spalte „Religion“ mit ev/kath/ethik ergibt drei). „Klasse“ übernimmt eine bestehende Einteilung als Fixierung." />
             <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto">
                 <StackPanel x:Name="Zuordnung" />
             </ScrollViewer>

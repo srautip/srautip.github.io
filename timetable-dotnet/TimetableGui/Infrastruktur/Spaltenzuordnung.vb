@@ -58,6 +58,37 @@ Public NotInheritable Class Spaltenwahl
             Return If(String.IsNullOrWhiteSpace(Zielname), Name, Zielname.Trim())
         End Get
     End Property
+
+    ''' <summary>Nur bei `Attribut`: aus den Werten der Spalte zusaetzlich
+    ''' eine Regel ableiten - eine Balance bei zwei Auspraegungen (ja/nein,
+    ''' m/w), Buendelungsgruppen bei einer Werteliste (Kitas). Was genau,
+    ''' entscheidet `Spaltenzuordnung.Ableitung` aus den Werten; der
+    ''' Dialog zeigt es vorher an.</summary>
+    Public Property RegelAbleiten As Boolean = False
+End Class
+
+''' <summary>Was aus den Werten einer Attributspalte an Regeln folgt.
+''' `Art` ist "balance", "buendelung" oder "keine".</summary>
+Public NotInheritable Class Regelableitung
+    Public Property Art As String = "keine"
+    ''' <summary>Die verschiedenen, nicht-leeren Werte, haeufigster zuerst.</summary>
+    Public Property Werte As New List(Of String)
+    ''' <summary>Bei "balance": der Wert, dessen Traeger gleichmaessig
+    ''' verteilt werden.</summary>
+    Public Property BalanceWert As String = ""
+
+    ''' <summary>Ein Satz fuer den Dialog - was der Haken bewirkt.</summary>
+    Public Function Beschreibung() As String
+        Select Case Art
+            Case "balance"
+                Return $"Balance auf „{BalanceWert}"""
+            Case "buendelung"
+                Dim probe = String.Join(", ", Werte.Take(4)) & If(Werte.Count > 4, ", …", "")
+                Return $"{Werte.Count} Bündelungen ({probe})"
+            Case Else
+                Return "keine Regel ableitbar"
+        End Select
+    End Function
 End Class
 
 ''' <summary>Was der Import getan hat - im Klartext, weil ein Import,
@@ -65,6 +96,8 @@ End Class
 Public NotInheritable Class Importbericht
     Public Property Kinder As Integer
     Public Property Gruppen As New List(Of String)
+    ''' <summary>Abgeleitete Balance-Regeln als "attribut = wert".</summary>
+    Public Property Balance As New List(Of String)
     Public Property Fixierungen As Integer
     Public Property Verworfen As New List(Of String)
     Public Property Hinweise As New List(Of String)
@@ -72,6 +105,7 @@ Public NotInheritable Class Importbericht
     Public Function Klartext() As String
         Dim zeilen As New List(Of String) From {$"{Kinder} Kind(er) übernommen."}
         If Gruppen.Count > 0 Then zeilen.Add($"{Gruppen.Count} Gruppe(n) angelegt: {String.Join(", ", Gruppen)}.")
+        If Balance.Count > 0 Then zeilen.Add($"{Balance.Count} Balance-Regel(n) angelegt: {String.Join(", ", Balance)}.")
         If Fixierungen > 0 Then zeilen.Add($"{Fixierungen} Fixierung(en) aus der bestehenden Einteilung.")
         If Verworfen.Count > 0 Then
             zeilen.Add($"Nicht übernommen: {String.Join(", ", Verworfen)}.")
@@ -157,6 +191,46 @@ Public Module Spaltenzuordnung
         Return fehler
     End Function
 
+    ''' <summary>Werte, die "ja" heissen - bei einer Balance auf ja/nein
+    ''' sind die Ja-Kinder die, die man verteilen will, egal ob sie die
+    ''' Mehrheit stellen.</summary>
+    Private ReadOnly JaWerte As New HashSet(Of String)(
+        {"ja", "j", "yes", "y", "x", "true", "wahr", "1"}, StringComparer.OrdinalIgnoreCase)
+
+    ''' <summary>Leitet aus den Werten einer Attributspalte ab, welche
+    ''' Regel dazu passt. Ein Wert je Kind; leere Werte zaehlen als
+    ''' "Kind traegt das Attribut nicht" - so, wie der Import sie auch
+    ''' nicht speichert.
+    '''
+    ''' Zwei Auspraegungen oder weniger (ja/nein, m/w, oder nur "ja" neben
+    ''' Leerfeldern) sind typisch binaer: EINE Balance-Regel, auf dem
+    ''' Ja-Wert, sonst auf dem selteneren - der ist der, dessen Verteilung
+    ''' man steuert; die Gegenseite folgt aus der Klassengroesse. Drei und
+    ''' mehr sind eine Werteliste (Kitas, Wohngebiete): je Wert eine
+    ''' Buendelung. Tragen ALLE Kinder denselben einen Wert, ist nichts zu
+    ''' balancieren.</summary>
+    Public Function Ableitung(werte As IEnumerable(Of String)) As Regelableitung
+        Dim alle = If(werte, Enumerable.Empty(Of String)()).Select(Function(w) If(w, "").Trim()).ToList()
+        Dim haeufigkeit = alle.Where(Function(w) w <> "").
+            GroupBy(Function(w) w, StringComparer.Ordinal).
+            OrderByDescending(Function(g) g.Count()).
+            ThenBy(Function(g) g.Key, StringComparer.CurrentCultureIgnoreCase).
+            ToList()
+        Dim a As New Regelableitung With {.Werte = haeufigkeit.Select(Function(g) g.Key).ToList()}
+
+        If haeufigkeit.Count = 0 Then Return a
+        If haeufigkeit.Count >= 3 Then
+            a.Art = "buendelung"
+            Return a
+        End If
+        If haeufigkeit.Count = 1 AndAlso haeufigkeit(0).Count() = alle.Count Then Return a
+
+        Dim ja = haeufigkeit.FirstOrDefault(Function(g) JaWerte.Contains(g.Key))
+        a.BalanceWert = If(ja IsNot Nothing, ja.Key, haeufigkeit.Last().Key)
+        a.Art = "balance"
+        Return a
+    End Function
+
     ''' <summary>Fuehrt den Import aus. `zeilen` enthaelt die Kopfzeile
     ''' NICHT mehr.
     '''
@@ -182,6 +256,13 @@ Public Module Spaltenzuordnung
         Dim gruppentypen As New Dictionary(Of String, String)(StringComparer.CurrentCultureIgnoreCase)
         Dim ohneKlassenzahl = 0
 
+        ' Attributspalten mit Regelableitung: je Spalte die Werte aller
+        ' Kinder mit deren Id - erst am Ende zur Regel gemacht, weil die
+        ' Ableitung die ganze Spalte sehen muss, nicht eine Zeile.
+        Dim abzuleiten = wahlen.Where(Function(w) w.Rolle = Spaltenrolle.Attribut AndAlso w.RegelAbleiten).ToList()
+        Dim spaltenwerte = abzuleiten.ToDictionary(
+            Function(w) w.Schluessel, Function(w) New List(Of (Id As String, Wert As String)), StringComparer.Ordinal)
+
         For Each zeile In zeilen
             Dim attribute As New Dictionary(Of String, String)(StringComparer.Ordinal)
             For i = 0 To Math.Min(zeile.Length, wahlen.Count) - 1
@@ -197,6 +278,13 @@ Public Module Spaltenzuordnung
 
             Dim id = neuesKind(nach, vor, attribute)
             bericht.Kinder += 1
+
+            For Each w In abzuleiten
+                Dim wert As String = Nothing
+                ' Getrimmt wie beim Anlegen des Kindes - die Balance
+                ' vergleicht spaeter mit dem gespeicherten Wert.
+                spaltenwerte(w.Schluessel).Add((id, If(attribute.TryGetValue(w.Schluessel, wert), wert.Trim(), "")))
+            Next
 
             For i = 0 To Math.Min(zeile.Length, wahlen.Count) - 1
                 If wahlen(i).Rolle <> Spaltenrolle.Gruppe OrElse zeile(i) = "" Then Continue For
@@ -231,6 +319,10 @@ Public Module Spaltenzuordnung
             bericht.Gruppen.Add(paar.Key)
         Next
 
+        For Each w In abzuleiten
+            RegelUmsetzen(projekt,w.Schluessel, spaltenwerte(w.Schluessel), bericht)
+        Next
+
         If ohneKlassenzahl > 0 Then
             ' Nicht still schlucken: eine Klasse, die weder Zahl noch
             ' Label ist, kommt vor - und wer es nicht erfaehrt, sucht
@@ -240,6 +332,47 @@ Public Module Spaltenzuordnung
         End If
         Return bericht
     End Function
+
+    ''' <summary>Setzt die Ableitung fuer eine Spalte um. Eine Regel, die
+    ''' es schon gibt, wird nicht ein zweites Mal angelegt - der Bericht
+    ''' nennt sie stattdessen; sonst laege nach zwei Importen derselben
+    ''' Liste alles doppelt. Buendelungen heissen `attribut_wert`.</summary>
+    Private Sub RegelUmsetzen(projekt As Projekt, attribut As String,
+                              kinder As List(Of (Id As String, Wert As String)),
+                              bericht As Importbericht)
+        Dim a = Ableitung(kinder.Select(Function(k) k.Wert))
+        Dim kb = projekt.Klassenbildung
+        Select Case a.Art
+            Case "balance"
+                Dim schonDa = kb.Balance.Any(
+                    Function(b) String.Equals(b.Attribut, attribut, StringComparison.Ordinal) AndAlso
+                                String.Equals(b.Wert, a.BalanceWert, StringComparison.Ordinal))
+                If schonDa Then
+                    bericht.Hinweise.Add($"Balance {attribut} = {a.BalanceWert} gab es schon – nicht erneut angelegt.")
+                Else
+                    kb.Balance.Add(New KlassenbildungBalance With {
+                        .Attribut = attribut, .Wert = a.BalanceWert, .Toleranz = 1,
+                        .Modus = "soft", .Prio = 2})
+                    bericht.Balance.Add($"{attribut} = {a.BalanceWert}")
+                End If
+            Case "buendelung"
+                For Each wert In a.Werte
+                    Dim name = $"{attribut}_{wert}"
+                    If kb.Gruppen.Any(Function(g) String.Equals(g.Id, name, StringComparison.CurrentCultureIgnoreCase)) Then
+                        bericht.Hinweise.Add($"Gruppe {name} gab es schon – nicht erneut angelegt.")
+                        Continue For
+                    End If
+                    Dim w = wert
+                    kb.Gruppen.Add(New KlassenbildungGruppe With {
+                        .Id = name, .Typ = "buendelung", .Modus = "soft", .Prio = 2,
+                        .Mitglieder = kinder.Where(Function(k) k.Wert = w).Select(Function(k) k.Id).ToList()})
+                    bericht.Gruppen.Add(name)
+                Next
+            Case Else
+                bericht.Hinweise.Add($"Aus {attribut} ließ sich keine Regel ableiten – " &
+                                     If(a.Werte.Count = 0, "die Spalte ist leer.", "alle Kinder tragen denselben Wert."))
+        End Select
+    End Sub
 
     ''' <summary>Die Klassennummer aus einer Zellenangabe. Echte Listen
     ''' schreiben nicht 1, sondern 5a - deshalb wird auch gegen die

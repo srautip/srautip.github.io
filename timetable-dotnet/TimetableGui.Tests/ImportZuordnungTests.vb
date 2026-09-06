@@ -499,6 +499,196 @@ Public Class ImportZuordnungTests
                                        p.Klassenbildung.Gruppen.Select(Function(g) g.Id).ToList())
     End Sub
 
+    ' ===============================================================
+    ' Regeln aus einer Attributspalte ableiten
+    ' ===============================================================
+
+    ''' <summary>ja/nein ist binaer: EINE Balance, und zwar auf "ja" -
+    ''' auch wenn die Ja-Kinder die Mehrheit stellen. Wer Ganztag
+    ''' importiert, will die Ganztagskinder verteilen, nicht die anderen.</summary>
+    <TestMethod>
+    Public Sub JaNeinErgibtEineBalanceAufJa()
+        Dim a = Spaltenzuordnung.Ableitung({"ja", "ja", "ja", "nein", "ja"})
+        Assert.AreEqual("balance", a.Art)
+        Assert.AreEqual("ja", a.BalanceWert)
+    End Sub
+
+    ''' <summary>Ohne ein erkennbares Ja gilt der SELTENERE Wert: dessen
+    ''' Verteilung steuert man, die Gegenseite folgt aus der
+    ''' Klassengroesse.</summary>
+    <TestMethod>
+    Public Sub ZweiWerteOhneJaBalancierenDenSelteneren()
+        Dim a = Spaltenzuordnung.Ableitung({"m", "w", "m", "m", "w"})
+        Assert.AreEqual("balance", a.Art)
+        Assert.AreEqual("w", a.BalanceWert)
+        Assert.AreEqual("m", Spaltenzuordnung.Ableitung({"w", "w", "m"}).BalanceWert)
+    End Sub
+
+    ''' <summary>Eine Markierungsspalte - "ja" oder leer - ist ebenfalls
+    ''' binaer; die Leerfelder sind die Kinder ohne das Attribut.</summary>
+    <TestMethod>
+    Public Sub EinWertNebenLeerfeldernIstBinaer()
+        Dim a = Spaltenzuordnung.Ableitung({"", "ja", "", "", "ja"})
+        Assert.AreEqual("balance", a.Art)
+        Assert.AreEqual("ja", a.BalanceWert)
+        Assert.AreEqual("x", Spaltenzuordnung.Ableitung({"x", "", " ", "x"}).BalanceWert,
+                        "Leerraum zaehlt als leer")
+    End Sub
+
+    <TestMethod>
+    Public Sub DreiUndMehrWerteErgebenBuendelungen()
+        Dim a = Spaltenzuordnung.Ableitung({"Sonne", "Mond", "Sonne", "Stern", "Sonne", "Mond"})
+        Assert.AreEqual("buendelung", a.Art)
+        CollectionAssert.AreEqual(New List(Of String) From {"Sonne", "Mond", "Stern"}, a.Werte,
+                                  "haeufigster Wert zuerst")
+    End Sub
+
+    ''' <summary>Tragen alle denselben Wert oder keiner einen, gibt es
+    ''' nichts zu balancieren - und keine Regel, die dann ein stiller
+    ''' No-Op waere.</summary>
+    <TestMethod>
+    Public Sub OhneUnterschiedGibtEsKeineRegel()
+        Assert.AreEqual("keine", Spaltenzuordnung.Ableitung({"ja", "ja", "ja"}).Art)
+        Assert.AreEqual("keine", Spaltenzuordnung.Ableitung({"", "", ""}).Art)
+        Assert.AreEqual("keine", Spaltenzuordnung.Ableitung(New String() {}).Art)
+        Assert.AreEqual("keine Regel ableitbar", Spaltenzuordnung.Ableitung({"ja"}).Beschreibung())
+    End Sub
+
+    ''' <summary>Der Durchstich: das Attribut bleibt am Kind, UND die
+    ''' Regel entsteht - eine Balance auf ja, Buendelungen je Kita mit
+    ''' der Konvention attribut_wert.</summary>
+    <TestMethod>
+    Public Sub AbleitungLegtBalanceUndBuendelungenAn()
+        Dim p As New Projekt()
+        Dim m = Modell(p)
+        Dim v = m.ImportPruefen(
+            "Nachname;Betreuung;Kita" & vbLf &
+            "Meier;ja;Sonne" & vbLf & "Schulz;;Mond" & vbLf & "Braun;ja;Sonne" & vbLf &
+            "Klein;;Stern" & vbLf & "Wolf;nein;Mond")
+        Dim w = Spaltenzuordnung.Vorschlag(v.Spalten)
+        w(1).Rolle = Spaltenrolle.Attribut : w(1).RegelAbleiten = True
+        w(2).Rolle = Spaltenrolle.Attribut : w(2).RegelAbleiten = True
+
+        Dim bericht = m.ImportUebernehmen(v, w)
+
+        Assert.AreEqual("ja", p.Klassenbildung.Schueler(0).Attribute("Betreuung"))
+        Assert.AreEqual("Sonne", p.Klassenbildung.Schueler(0).Attribute("Kita"), "das Attribut bleibt am Kind")
+
+        Dim b = p.Klassenbildung.Balance.Single()
+        Assert.AreEqual("Betreuung", b.Attribut)
+        Assert.AreEqual("ja", b.Wert)
+        Assert.AreEqual(1, b.Toleranz)
+        Assert.AreEqual("soft", b.Modus)
+        Assert.AreEqual(2, b.Prio)
+        CollectionAssert.AreEqual(New List(Of String) From {"Betreuung = ja"}, bericht.Balance)
+
+        CollectionAssert.AreEquivalent(New List(Of String) From {"Kita_Sonne", "Kita_Mond", "Kita_Stern"},
+                                       p.Klassenbildung.Gruppen.Select(Function(g) g.Id).ToList())
+        Dim sonne = p.Klassenbildung.Gruppen.Single(Function(g) g.Id = "Kita_Sonne")
+        Assert.AreEqual("buendelung", sonne.Typ)
+        Assert.AreEqual(2, sonne.Mitglieder.Count)
+        CollectionAssert.AreEquivalent(
+            p.Klassenbildung.Schueler.Where(Function(s) s.Attribute("Kita") = "Sonne").Select(Function(s) s.Id).ToList(),
+            sonne.Mitglieder)
+        StringAssert.Contains(bericht.Klartext(), "Balance-Regel(n) angelegt: Betreuung = ja")
+        StringAssert.Contains(bericht.Klartext(), "Kita_Sonne")
+    End Sub
+
+    ''' <summary>Ohne den Haken passiert nichts Neues - der Import legt
+    ''' Regeln nur an, wenn es jemand gesagt hat.</summary>
+    <TestMethod>
+    Public Sub OhneHakenEntstehtKeineRegel()
+        Dim p As New Projekt()
+        Dim m = Modell(p)
+        Dim v = m.ImportPruefen("Nachname;Betreuung" & vbLf & "Meier;ja" & vbLf & "Schulz;nein")
+        Dim w = Spaltenzuordnung.Vorschlag(v.Spalten)
+        w(1).Rolle = Spaltenrolle.Attribut
+
+        m.ImportUebernehmen(v, w)
+
+        Assert.AreEqual(0, p.Klassenbildung.Balance.Count)
+        Assert.AreEqual(0, p.Klassenbildung.Gruppen.Count)
+    End Sub
+
+    ''' <summary>Dieselbe Liste ein zweites Mal: die Regel gibt es schon,
+    ''' sie wird NICHT verdoppelt - und der Bericht sagt das.</summary>
+    <TestMethod>
+    Public Sub EineVorhandeneRegelWirdNichtVerdoppelt()
+        Dim p As New Projekt()
+        Dim m = Modell(p)
+        Dim text = "Nachname;Betreuung;Kita" & vbLf & "Meier;ja;A" & vbLf & "Schulz;nein;B" & vbLf & "Braun;ja;C"
+        Dim wahl =
+            Function(v As KlassenbildungEingabeViewModel.ImportVorschau) As List(Of Spaltenwahl)
+                Dim w = Spaltenzuordnung.Vorschlag(v.Spalten)
+                w(1).Rolle = Spaltenrolle.Attribut : w(1).RegelAbleiten = True
+                w(2).Rolle = Spaltenrolle.Attribut : w(2).RegelAbleiten = True
+                Return w
+            End Function
+        Dim v1 = m.ImportPruefen(text)
+        m.ImportUebernehmen(v1, wahl(v1))
+        Dim v2 = m.ImportPruefen(text)
+        Dim bericht = m.ImportUebernehmen(v2, wahl(v2))
+
+        Assert.AreEqual(1, p.Klassenbildung.Balance.Count)
+        Assert.AreEqual(3, p.Klassenbildung.Gruppen.Count)
+        Assert.AreEqual(0, bericht.Balance.Count)
+        Assert.IsTrue(bericht.Hinweise.Any(Function(h) h.Contains("Betreuung = ja") AndAlso h.Contains("gab es schon")))
+        Assert.IsTrue(bericht.Hinweise.Any(Function(h) h.Contains("Kita_A") AndAlso h.Contains("gab es schon")))
+    End Sub
+
+    ''' <summary>Eine Spalte, aus der nichts folgt, bleibt Attribut - und
+    ''' der Bericht sagt, warum keine Regel entstand.</summary>
+    <TestMethod>
+    Public Sub EineEinheitlicheSpalteErgibtEinenHinweis()
+        Dim p As New Projekt()
+        Dim m = Modell(p)
+        Dim v = m.ImportPruefen("Nachname;Stufe" & vbLf & "Meier;1" & vbLf & "Schulz;1")
+        Dim w = Spaltenzuordnung.Vorschlag(v.Spalten)
+        w(1).Rolle = Spaltenrolle.Attribut : w(1).RegelAbleiten = True
+
+        Dim bericht = m.ImportUebernehmen(v, w)
+
+        Assert.AreEqual("1", p.Klassenbildung.Schueler(0).Attribute("Stufe"))
+        Assert.AreEqual(0, p.Klassenbildung.Balance.Count)
+        Assert.IsTrue(bericht.Hinweise.Any(Function(h) h.Contains("Stufe") AndAlso h.Contains("denselben Wert")))
+    End Sub
+
+    ''' <summary>Die Einschulungsliste mit Ableitung auf allen vier
+    ''' Merkmalen: drei binaere ergeben drei Balancen, das Wohngebiet
+    ''' Buendelungen - und der KERN nimmt das Ergebnis ohne Einwand an.
+    ''' Eine abgeleitete Regel, die der Validator ablehnt, waere ein
+    ''' Import, der das Rechnen kaputt macht.</summary>
+    <TestMethod>
+    Public Sub DieAbgeleitetenRegelnDerEinschulungslisteBestehenDenKern()
+        Dim p As New Projekt()
+        p.Klassenbildung.Klassen.Anzahl = 4
+        p.Klassenbildung.Klassen.MinGroesse = 20
+        p.Klassenbildung.Klassen.MaxGroesse = 30
+        Dim m = Modell(p)
+        Dim v = m.ImportPruefen(ImportDialog.DateiLesen(
+            Beispieldatei("bw-grundschule-beispiel", "einschulungsliste.csv")))
+        Dim w = Spaltenzuordnung.Vorschlag(v.Spalten)
+        For Each name In {"Geschlecht", "Sprachfoerderung", "Kann-Kind", "Wohngebiet"}
+            Dim x = w.Single(Function(s) s.Name = name)
+            x.Rolle = Spaltenrolle.Attribut
+            x.RegelAbleiten = True
+        Next
+
+        Dim bericht = m.ImportUebernehmen(v, w)
+
+        CollectionAssert.AreEquivalent(
+            New List(Of String) From {"Geschlecht = w", "Sprachfoerderung = ja", "Kann-Kind = ja"},
+            bericht.Balance)
+        Assert.IsTrue(bericht.Gruppen.Count >= 3, "das Wohngebiet ist eine Werteliste")
+        Assert.IsTrue(bericht.Gruppen.All(Function(g) g.StartsWith("Wohngebiet_")))
+        Assert.IsTrue(p.Klassenbildung.Gruppen.All(Function(g) g.Typ = "buendelung"))
+        Assert.AreEqual(100, p.Klassenbildung.Gruppen.Sum(Function(g) g.Mitglieder.Count),
+                        "jedes Kind in genau einer Wohngebiets-Buendelung")
+
+        Dim einwaende = Klassenbildung.ValidateKlassenbildung(p.Klassenbildung)
+        Assert.AreEqual(0, einwaende.Count, String.Join(" | ", einwaende))
+    End Sub
+
 End Class
 
 

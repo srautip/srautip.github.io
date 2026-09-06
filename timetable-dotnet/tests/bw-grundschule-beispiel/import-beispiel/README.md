@@ -25,6 +25,13 @@ verwerfen.** Eine Klassenliste trägt Daten, die im Projekt nichts zu
 suchen haben, und der Import soll sie nicht ungefragt mitnehmen. Nach
 dem Übernehmen nennt der Bericht sie namentlich.
 
+Mit **„Regel ableiten“** an den vier Attributen entstehen zugleich die
+Regeln, die das Konzept für diese Schule vorsieht: drei Balancen
+(`Geschlecht = w`, `Sprachfoerderung = ja`, `Kann-Kind = ja`) und fünf
+Bündelungen `Wohngebiet_Mitte` … `Wohngebiet_West`. Geprüft von
+`DieAbgeleitetenRegelnDerEinschulungslisteBestehenDenKern` – der Kern
+nimmt das Ergebnis ohne Einwand an.
+
 Das Vokabular entspricht dem der mitgelieferten
 `input/klassenbildung.yaml` (`geschlecht`, `sprachfoerderung`,
 `kann_kind`) — die importierten Kinder lassen sich also mit denselben
