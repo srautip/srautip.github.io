@@ -119,7 +119,7 @@
                             <TextBox x:Name="GruppeKuerzel" Width="120" HorizontalAlignment="Left" LostFocus="AufGruppeFeld" />
                             <TextBlock Text="Typ" Style="{StaticResource Feldbeschriftung}" />
                             <ComboBox x:Name="GruppeTyp" Width="200" HorizontalAlignment="Left" SelectionChanged="AufGruppeFeld" />
-                            <TextBlock Text="Höchstens je Klasse (leer = ohne Grenze)" Style="{StaticResource Feldbeschriftung}" />
+                            <TextBlock Text="Höchstens je Klasse (nur Verteilung; leer = ohne Grenze)" Style="{StaticResource Feldbeschriftung}" />
                             <TextBox x:Name="GruppeMax" Width="90" HorizontalAlignment="Left" LostFocus="AufGruppeFeld" />
                             <StackPanel Orientation="Horizontal">
                                 <StackPanel>

@@ -79,7 +79,7 @@ Partial Class KlassenbildungFenster
         Vorschau.Text = "Klassen: " & _eingabe.LabelVorschau
         Rahmenzeile.Text = _eingabe.RahmenZeile
         Anzahlzeile.Text = $"{_eingabe.Schueler.Count} Kinder"
-        Dim n = _eingabe.Pruefe().Count
+        Dim n = Pruefbefunde().Count
         Statuszeile.Text = If(n = 0, "Prüfung ohne Beanstandung.", $"{n} Hinweis(e) - Prüfen zeigt sie.")
     End Sub
 
@@ -273,7 +273,11 @@ Partial Class KlassenbildungFenster
 
     Private Sub GruppenListeFuellen()
         _gruppen.Aktualisiere()
-        Dim vorher = TryCast(GruppenListe.SelectedItem, KlassenbildungGruppe)
+        ' Die Auswahl VOR dem Neufuellen merken - ueber Gewaehlt, nicht
+        ' per TryCast des Listeneintrags: der ist ein Zeilenpaar, der Cast
+        ' ergab immer Nothing, und die Liste sprang nach jedem Haken auf
+        ' die erste Gruppe zurueck (live gemeldet 06.09.2026).
+        Dim vorher = Gewaehlt(Of KlassenbildungGruppe)(GruppenListe)
         GruppenListe.ItemsSource = _gruppen.Eintraege.
             Select(Function(g) New Zeilenpaar(g, _gruppen.Zeilentext(g))).ToList()
         Auswahl(GruppenListe, vorher)
@@ -289,6 +293,10 @@ Partial Class KlassenbildungFenster
             GruppeKuerzel.Text = If(g?.Kuerzel, "")
             GruppeTyp.SelectedItem = If(g?.Typ, "buendelung")
             GruppeMax.Text = If(g?.MaxProKlasse?.ToString(), "")
+            ' Die Kappe gehoert nur zur Verteilung - bei einer Buendelung
+            ' lehnt der Kern sie ab. Das Feld ist dann gar nicht erst
+            ' bedienbar.
+            GruppeMax.IsEnabled = (g?.Typ = "verteilung")
             GruppeModus.SelectedItem = If(g?.Modus, "soft")
             GruppePrio.SelectedItem = If(g Is Nothing, "2", g.Prio.ToString())
         Finally
@@ -368,7 +376,15 @@ Partial Class KlassenbildungFenster
         g.Kuerzel = If(GruppeKuerzel.Text.Trim() = "", Nothing, GruppeKuerzel.Text.Trim())
         g.Typ = CStr(If(GruppeTyp.SelectedItem, "buendelung"))
         Dim n As Integer
-        g.MaxProKlasse = If(Integer.TryParse(GruppeMax.Text.Trim(), n), CType(n, Integer?), Nothing)
+        If g.Typ = "buendelung" Then
+            ' Wechsel auf Buendelung raeumt eine frueher gesetzte Kappe weg -
+            ' sonst bliebe sie unsichtbar stehen und bricht das Rechnen.
+            g.MaxProKlasse = Nothing
+            GruppeMax.Text = ""
+        Else
+            g.MaxProKlasse = If(Integer.TryParse(GruppeMax.Text.Trim(), n), CType(n, Integer?), Nothing)
+        End If
+        GruppeMax.IsEnabled = (g.Typ = "verteilung")
         g.Modus = CStr(If(GruppeModus.SelectedItem, "soft"))
         g.Prio = Integer.Parse(CStr(If(GruppePrio.SelectedItem, "2")))
         GruppenListeFuellen()
@@ -381,7 +397,7 @@ Partial Class KlassenbildungFenster
 
     Private Sub BalanceListeFuellen()
         _balance.Aktualisiere()
-        Dim vorher = TryCast(BalanceListe.SelectedItem, KlassenbildungBalance)
+        Dim vorher = Gewaehlt(Of KlassenbildungBalance)(BalanceListe)
         BalanceListe.ItemsSource = _balance.Eintraege.
             Select(Function(b) New Zeilenpaar(b, _balance.Zeilentext(b))).ToList()
         Auswahl(BalanceListe, vorher)
@@ -485,7 +501,7 @@ Partial Class KlassenbildungFenster
 
     Private Sub WunschListeFuellen()
         _wuensche.Aktualisiere()
-        Dim vorher = TryCast(WunschListe.SelectedItem, KlassenbildungWunsch)
+        Dim vorher = Gewaehlt(Of KlassenbildungWunsch)(WunschListe)
         WunschListe.ItemsSource = _wuensche.Eintraege.
             Select(Function(w) New Zeilenpaar(w, _wuensche.Zeilentext(w))).ToList()
         Auswahl(WunschListe, vorher)
@@ -608,8 +624,17 @@ Partial Class KlassenbildungFenster
         If liste.Items.Count > 0 Then liste.SelectedIndex = 0
     End Sub
 
+    ''' <summary>Rahmen/Kinder UND die Regelpruefung des Kerns
+    ''' (ValidateKlassenbildung ueber das Gruppen-ViewModel) - dieselbe
+    ''' Pruefung, an der spaeter das Rechnen scheitert. Vorher fragte die
+    ''' Maske nur den Rahmen und sagte "ohne Beanstandung", waehrend
+    ''' "Rechnen" die Gruppe ablehnte (live gemeldet 06.09.2026).</summary>
+    Private Function Pruefbefunde() As List(Of String)
+        Return _eingabe.Pruefe().Concat(_gruppen.Pruefe()).Distinct().ToList()
+    End Function
+
     Private Sub AufPruefen(sender As Object, e As RoutedEventArgs)
-        Dim fehler = _eingabe.Pruefe()
+        Dim fehler = Pruefbefunde()
         If fehler.Count = 0 Then
             _dialoge.Hinweis("Prüfung", "Keine Beanstandungen.")
         Else

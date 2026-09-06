@@ -104,6 +104,72 @@ Public Class KlassenbildungFensterTests
                End Sub)
     End Sub
 
+    ''' <summary>Der Fehler aus dem manuellen Test (06.09.2026): zweite
+    ''' Gruppe angelegt, erstes Mitglied angehakt - und die Liste sprang
+    ''' auf die erste Gruppe zurueck. Ursache: die Auswahl wurde vor dem
+    ''' Neufuellen per TryCast auf den Listeneintrag gelesen, der aber ein
+    ''' Zeilenpaar ist; der Cast ergab immer Nothing.</summary>
+    <TestMethod>
+    Public Sub EinHakenWechseltNichtDieGewaehlteGruppe()
+        AufSta(Sub()
+                   RessourcenSicherstellen()
+                   Dim p = Projekt()
+                   Dim f As New KlassenbildungFenster(p, New TestDialoge())
+
+                   Klick(f.GruppeNeuKnopf)
+                   Tippe(f.GruppeId, "G_erste")
+                   Klick(f.GruppeNeuKnopf)
+                   Tippe(f.GruppeId, "G_zweite")
+                   Assert.AreEqual(2, f.GruppenListe.Items.Count)
+                   Dim zweite = p.Klassenbildung.Gruppen.Single(Function(g) g.Id = "G_zweite")
+                   Assert.AreSame(zweite, CType(f.GruppenListe.SelectedItem, KlassenbildungFenster.Zeilenpaar).Eintrag,
+                                  "Testgrundlage: die neue Gruppe ist gewaehlt")
+
+                   Dim haken = f.GruppeMitglieder.Children.OfType(Of CheckBox)().First()
+                   haken.IsChecked = True
+                   haken.RaiseEvent(New RoutedEventArgs(ButtonBase.ClickEvent))
+
+                   Assert.AreEqual(1, zweite.Mitglieder.Count, "der Haken gehoert zur zweiten Gruppe")
+                   Assert.AreSame(zweite, CType(f.GruppenListe.SelectedItem, KlassenbildungFenster.Zeilenpaar).Eintrag,
+                                  "nach dem Haken muss die zweite Gruppe gewaehlt bleiben")
+                   Assert.AreEqual("G_zweite", f.GruppeId.Text, "das Formular zeigt weiter die zweite Gruppe")
+               End Sub)
+    End Sub
+
+    ''' <summary>Der zweite Fehler aus dem manuellen Test (06.09.2026):
+    ''' eine Buendelung mit "Hoechstens je Klasse" - die Maske sagte
+    ''' "ohne Beanstandung", das Rechnen lehnte ab. Jetzt prueft die Maske
+    ''' mit dem Kern, und die Kappe ist bei einer Buendelung gar nicht
+    ''' bedienbar.</summary>
+    <TestMethod>
+    Public Sub DieMaskePrueftWieDerKernUndKappeGiltNurFuerVerteilung()
+        AufSta(Sub()
+                   RessourcenSicherstellen()
+                   Dim p = Projekt()
+                   ' Der kaputte Zustand, wie er aus einer aelteren Eingabe kommen kann.
+                   p.Klassenbildung.Gruppen.Add(New KlassenbildungGruppe With {
+                       .Id = "G_kaputt", .Typ = "buendelung", .Modus = "soft", .Prio = 2, .MaxProKlasse = 3,
+                       .Mitglieder = New List(Of String) From {"S001", "S002"}})
+                   Dim d As New TestDialoge()
+                   Dim f As New KlassenbildungFenster(p, d)
+
+                   StringAssert.Contains(f.Statuszeile.Text, "Hinweis", "die Statuszeile muss den Kernbefund zeigen")
+                   Assert.IsFalse(f.GruppeMax.IsEnabled, "bei einer Buendelung ist die Kappe nicht bedienbar")
+
+                   ' Wechsel auf Verteilung: Kappe bedienbar, Befund bleibt bis sie stimmt.
+                   f.GruppeTyp.SelectedItem = "verteilung"
+                   Assert.IsTrue(f.GruppeMax.IsEnabled)
+                   Assert.AreEqual(3, p.Klassenbildung.Gruppen(0).MaxProKlasse)
+                   StringAssert.Contains(f.Statuszeile.Text, "ohne Beanstandung")
+
+                   ' Zurueck auf Buendelung: die Kappe wird weggeraeumt, nicht versteckt.
+                   f.GruppeTyp.SelectedItem = "buendelung"
+                   Assert.IsFalse(p.Klassenbildung.Gruppen(0).MaxProKlasse.HasValue)
+                   Assert.AreEqual("", f.GruppeMax.Text)
+                   StringAssert.Contains(f.Statuszeile.Text, "ohne Beanstandung")
+               End Sub)
+    End Sub
+
     ''' <summary>Ein leeres Feld ist keine Ausnahme: `max_pro_klasse`
     ''' heisst dann "ohne Grenze", nicht 0.</summary>
     <TestMethod>
@@ -114,6 +180,8 @@ Public Class KlassenbildungFensterTests
                    Dim f As New KlassenbildungFenster(p, New TestDialoge())
                    Klick(f.GruppeNeuKnopf)
                    Dim g = p.Klassenbildung.Gruppen.Single()
+                   ' Die Kappe gibt es nur bei einer Verteilung.
+                   f.GruppeTyp.SelectedItem = "verteilung"
 
                    Tippe(f.GruppeMax, "2")
                    Assert.AreEqual(2, g.MaxProKlasse)

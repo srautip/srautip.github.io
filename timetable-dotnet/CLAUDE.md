@@ -201,6 +201,13 @@ Wert danach - oder benennt den Parameter von vornherein anders.
 EIGENSCHAFT und verschattet die LINQ-Ueberladung `Count(predicate)`.
 Statt `liste.Count(Function(x) ...)` also `liste.Where(...).Count`.
 
+**Stiller TryCast auf Listeneintraege:** die ListBoxen der Masken
+tragen `Zeilenpaar`-Eintraege (Text + Objekt), nicht die Fachobjekte.
+`TryCast(liste.SelectedItem, KlassenbildungGruppe)` ist deshalb IMMER
+Nothing - kein Compilerfehler, kein Absturz, nur eine Auswahl, die nach
+jedem Neufuellen auf Index 0 springt (live gemeldet 06.09.2026). Die
+Auswahl immer ueber `Gewaehlt(Of T)(liste)` lesen.
+
 ## Viewer-Artifacts (der Vorschau-Kanal)
 
 Seit GitHub Pages nicht mehr gepflegt wird, sind die Claude-Artifacts
