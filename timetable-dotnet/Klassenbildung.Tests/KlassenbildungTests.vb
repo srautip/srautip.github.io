@@ -242,6 +242,90 @@ Public Class KlassenbildungTests
         Assert.IsFalse(bewertung.Chips.Any(Function(c) c.KindId = "S4" AndAlso c.RegelTyp <> "balance"))
     End Sub
 
+    ' ===============================================================
+    ' Buendelung mit Mindestzahl (Konzept 3.2a, min_pro_klasse)
+    ' ===============================================================
+
+    ''' <summary>Die Mindestzahl gehoert nur zur Buendelung und muss
+    ''' erfuellbar sein - beides Fail-Fast, kein stiller No-Op.</summary>
+    <TestMethod>
+    Public Sub ValidationPruefsMinProKlasse()
+        Dim input = Basis(4, 2, 1, 4)
+        input.Gruppen.Add(New KlassenbildungGruppe With {.Id = "V", .Typ = "verteilung", .MaxProKlasse = 2, .MinProKlasse = 1, .Mitglieder = New List(Of String) From {"S1", "S2"}})
+        input.Gruppen.Add(New KlassenbildungGruppe With {.Id = "B", .Typ = "buendelung", .MinProKlasse = 3, .Mitglieder = New List(Of String) From {"S3", "S4"}})
+        input.Gruppen.Add(New KlassenbildungGruppe With {.Id = "N", .Typ = "buendelung", .MinProKlasse = 0, .Mitglieder = New List(Of String) From {"S1", "S3"}})
+        Dim alle = String.Join(vbLf, Klassenbildung.ValidateKlassenbildung(input))
+        StringAssert.Contains(alle, "min_pro_klasse gehoert nicht zu einer verteilung")
+        StringAssert.Contains(alle, "min_pro_klasse=3 > 2 mitglieder - unerfuellbar")
+        StringAssert.Contains(alle, "min_pro_klasse=0 muss >= 1 sein")
+
+        Dim ok = Basis(4, 2, 1, 4)
+        ok.Gruppen.Add(New KlassenbildungGruppe With {.Id = "B", .Typ = "buendelung", .MinProKlasse = 2, .Mitglieder = New List(Of String) From {"S1", "S2", "S3", "S4"}})
+        Assert.AreEqual(0, Klassenbildung.ValidateKlassenbildung(ok).Count, String.Join(vbLf, Klassenbildung.ValidateKlassenbildung(ok)))
+    End Sub
+
+    ''' <summary>Hart: 4 Mitglieder, S1 und S2 in verschiedene Klassen
+    ''' fixiert, Mindestzahl 2 - jede belegte Klasse bekommt genau 2.
+    ''' Weich: 3 Mitglieder, S1/S2 getrennt fixiert, Mindestzahl 2 -
+    ''' eine Klasse bleibt bei 1, Mass 1, Strafe 50 (Prio 2). Ohne die
+    ''' Fixierungen waere "alle in eine Klasse" ebenfalls erfuellt - die
+    ''' Streuung ist mit Mindestzahl keine Verletzung mehr.</summary>
+    <TestMethod>
+    Public Sub MinProKlasseHartUndWeich()
+        Dim hart = Basis(4, 2, 1, 4)
+        hart.Gruppen.Add(New KlassenbildungGruppe With {.Id = "B", .Typ = "buendelung", .Modus = "hard", .MinProKlasse = 2, .Mitglieder = New List(Of String) From {"S1", "S2", "S3", "S4"}})
+        hart.Fixierungen.Add(New KlassenbildungFixierung With {.Kind = "S1", .Klasse = 1})
+        hart.Fixierungen.Add(New KlassenbildungFixierung With {.Kind = "S2", .Klasse = 2})
+        Dim hartResult = Klassenbildung.SolveKlassenbildung(hart, zeitlimitS:=10)
+        Assert.IsTrue(IstGeloest(hartResult))
+        For klasse = 1 To 2
+            Assert.AreEqual(2, {"S1", "S2", "S3", "S4"}.Count(Function(s) hartResult.Zuordnung(s) = klasse),
+                            $"Klasse {klasse} muss genau die Mindestzahl 2 tragen")
+        Next
+
+        Dim weich = Basis(4, 2, 1, 4)
+        weich.Gruppen.Add(New KlassenbildungGruppe With {.Id = "B", .Typ = "buendelung", .Modus = "soft", .Prio = 2, .MinProKlasse = 2, .Mitglieder = New List(Of String) From {"S1", "S2", "S3"}})
+        weich.Fixierungen.Add(New KlassenbildungFixierung With {.Kind = "S1", .Klasse = 1})
+        weich.Fixierungen.Add(New KlassenbildungFixierung With {.Kind = "S2", .Klasse = 2})
+        Dim weichResult = Klassenbildung.SolveKlassenbildung(weich, zeitlimitS:=10)
+        Assert.AreEqual(CpSolverStatus.Optimal, weichResult.Status)
+        Assert.AreEqual(50.0, weichResult.Objective, 0.001, "genau eine Klasse bleibt eins unter der Mindestzahl")
+        Assert.AreEqual(1L, weichResult.Verletzungen.Single(Function(x) x.RegelId = "B").Mass)
+
+        ' Ohne Fixierungen: alle drei zusammen ODER 2+1? Nur 3 in einer
+        ' Klasse erfuellt die Mindestzahl ueberall - Mass 0.
+        Dim frei = Basis(4, 2, 1, 4)
+        frei.Gruppen.Add(New KlassenbildungGruppe With {.Id = "B", .Typ = "buendelung", .Modus = "soft", .Prio = 2, .MinProKlasse = 2, .Mitglieder = New List(Of String) From {"S1", "S2", "S3"}})
+        Dim freiResult = Klassenbildung.SolveKlassenbildung(frei, zeitlimitS:=10)
+        Assert.AreEqual(0.0, freiResult.Objective, 0.001)
+        Dim bewertung = KlassenbildungQuality.Bewerte(frei, freiResult.Zuordnung)
+        Assert.AreEqual(0L, bewertung.Verletzungen.Single(Function(v) v.RegelId = "B").Mass,
+                        "Verifier und Solver muessen die Mindestzahl gleich zaehlen")
+    End Sub
+
+    ''' <summary>Chips der Mindestzahl (Konzept 11.1): unter der Zahl rot,
+    ''' genau darauf gelb, darueber gruen; eine Klasse ohne Mitglied
+    ''' zaehlt nicht.</summary>
+    <TestMethod>
+    Public Sub ChipsDerMindestzahl()
+        Dim input = Basis(6, 3, 1, 6)
+        input.Gruppen.Add(New KlassenbildungGruppe With {.Id = "B", .Typ = "buendelung", .MinProKlasse = 2, .Mitglieder = New List(Of String) From {"S1", "S2", "S3", "S4", "S5", "S6"}})
+        ' Klasse 1: S1,S2,S3 (3 > 2 gruen), Klasse 2: S4,S5 (= 2 gelb), Klasse 3: S6 (1 < 2 rot).
+        Dim zuordnung As New Dictionary(Of String, Integer) From {
+            {"S1", 1}, {"S2", 1}, {"S3", 1}, {"S4", 2}, {"S5", 2}, {"S6", 3}}
+        Dim bewertung = KlassenbildungQuality.Bewerte(input, zuordnung)
+        Assert.AreEqual("gruen", bewertung.Chips.Single(Function(c) c.KindId = "S1").Status)
+        Assert.AreEqual("gelb", bewertung.Chips.Single(Function(c) c.KindId = "S4").Status)
+        Assert.AreEqual("rot", bewertung.Chips.Single(Function(c) c.KindId = "S6").Status)
+        StringAssert.Contains(bewertung.Chips.Single(Function(c) c.KindId = "S6").Text, "1/2 in dieser Klasse - Mindestzahl unterschritten")
+        StringAssert.Contains(bewertung.Chips.Single(Function(c) c.KindId = "S4").Text, "Mindestzahl gerade erreicht")
+        Assert.AreEqual(1L, bewertung.Verletzungen.Single(Function(v) v.RegelId = "B").Mass)
+
+        ' Alle in Klasse 1, Klassen 2/3 leer: Mass 0 - leere Klassen zaehlen nicht.
+        Dim zusammen = zuordnung.Keys.ToDictionary(Function(k) k, Function(k) 1)
+        Assert.AreEqual(0L, KlassenbildungQuality.Bewerte(input, zusammen).Verletzungen.Single(Function(v) v.RegelId = "B").Mass)
+    End Sub
+
     ''' <summary>K3, Varianten-Schleife (Konzept 8): liefert n paarweise
     ''' um mindestens min_distanz verschiedene Varianten; mit aktiver
     ''' Symmetriebrechung ist keine davon eine blosse

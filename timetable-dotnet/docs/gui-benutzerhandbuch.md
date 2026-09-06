@@ -219,7 +219,7 @@ Erklärung.
 
 | Reiter | Bedeutung | Vorgabe |
 |---|---|---|
-| **Gruppen** | Kinder, die zusammengehören (*Bündelung*) oder verteilt werden sollen (*Verteilung*) | weich, Priorität 2 |
+| **Gruppen** | Kinder, die zusammengehören (*Bündelung*) oder verteilt werden sollen (*Verteilung*, mit „Höchstens je Klasse“). Eine große Bündelung darf mit „Mindestens je Klasse“ in Grüppchen sitzen: wo die Gruppe in einer Klasse vorkommt, mindestens so viele – niemand allein | weich, Priorität 2 |
 | **Balance** | ein Merkmal gleichmäßig über die Klassen verteilen, mit Toleranz | weich, Priorität 2 |
 | **Wünsche** | zwei Kinder zusammen oder getrennt | weich, Priorität 1 |
 | **Fixierungen** | ein Kind fest in eine Klasse | entstehen meist am Board |

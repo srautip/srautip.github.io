@@ -87,7 +87,7 @@ Public NotInheritable Class KbGruppenViewModel
 
     Protected Overrides Function Kopiere(vorlage As KlassenbildungGruppe) As KlassenbildungGruppe
         Return New KlassenbildungGruppe With {
-            .Typ = vorlage.Typ, .MaxProKlasse = vorlage.MaxProKlasse,
+            .Typ = vorlage.Typ, .MaxProKlasse = vorlage.MaxProKlasse, .MinProKlasse = vorlage.MinProKlasse,
             .Modus = vorlage.Modus, .Prio = vorlage.Prio, .Kuerzel = vorlage.Kuerzel,
             .Mitglieder = New List(Of String)(vorlage.Mitglieder)}
     End Function
@@ -107,7 +107,9 @@ Public NotInheritable Class KbGruppenViewModel
     Public Function Zeilentext(g As KlassenbildungGruppe) As String
         If g Is Nothing Then Return ""
         Return $"{If(g.Kuerzel, g.Id)} · {g.Typ} · {g.Modus}/P{g.Prio} · " &
-               $"{g.Mitglieder.Count} Kind(er)"
+               $"{g.Mitglieder.Count} Kind(er)" &
+               If(g.MaxProKlasse.HasValue, $" · max {g.MaxProKlasse.Value}", "") &
+               If(g.MinProKlasse.HasValue, $" · min {g.MinProKlasse.Value}", "")
     End Function
 
     Public Function IstMitglied(g As KlassenbildungGruppe, id As String) As Boolean

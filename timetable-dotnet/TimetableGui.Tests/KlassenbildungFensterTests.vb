@@ -170,6 +170,36 @@ Public Class KlassenbildungFensterTests
                End Sub)
     End Sub
 
+    ''' <summary>Die Mindestzahl (min_pro_klasse) ist das Pendant der Kappe:
+    ''' nur bei einer Buendelung bedienbar, ein Wechsel auf Verteilung
+    ''' raeumt sie weg, und Duplizieren nimmt sie mit.</summary>
+    <TestMethod>
+    Public Sub MindestzahlGiltNurFuerBuendelungUndWirdKopiert()
+        AufSta(Sub()
+                   RessourcenSicherstellen()
+                   Dim p = Projekt()
+                   Dim f As New KlassenbildungFenster(p, New TestDialoge())
+                   Klick(f.GruppeNeuKnopf)
+                   Dim g = p.Klassenbildung.Gruppen.Single()
+                   Assert.IsTrue(f.GruppeMin.IsEnabled, "eine neue Gruppe ist eine Buendelung")
+                   Assert.IsFalse(f.GruppeMax.IsEnabled)
+
+                   Tippe(f.GruppeMin, "2")
+                   Assert.AreEqual(2, g.MinProKlasse.Value)
+                   StringAssert.Contains(CType(f.GruppenListe.SelectedItem, KlassenbildungFenster.Zeilenpaar).Text, "min 2")
+
+                   Klick(f.GruppeDuplKnopf)
+                   Assert.AreEqual(2, p.Klassenbildung.Gruppen.Count)
+                   Assert.AreEqual(2, p.Klassenbildung.Gruppen(1).MinProKlasse.Value, "Duplizieren muss die Mindestzahl mitnehmen")
+
+                   f.GruppeTyp.SelectedItem = "verteilung"
+                   Dim kopie = p.Klassenbildung.Gruppen(1)
+                   Assert.IsFalse(kopie.MinProKlasse.HasValue, "eine Verteilung kennt keine Mindestzahl")
+                   Assert.IsFalse(f.GruppeMin.IsEnabled)
+                   Assert.AreEqual("", f.GruppeMin.Text)
+               End Sub)
+    End Sub
+
     ''' <summary>Ein leeres Feld ist keine Ausnahme: `max_pro_klasse`
     ''' heisst dann "ohne Grenze", nicht 0.</summary>
     <TestMethod>

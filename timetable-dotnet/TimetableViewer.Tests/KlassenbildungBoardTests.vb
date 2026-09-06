@@ -5,6 +5,7 @@
 ' Vorlage fuer die Bridge angefasst wird, muss belegbar bleiben, dass der
 ' bestehende Doppelklick-Betrieb unveraendert funktioniert (arc42 8.10 -
 ' "der Viewer bleibt eine Doppelklick-Datei ohne Server").
+Imports System.Text.Json.Nodes
 Imports System.Threading.Tasks
 Imports Microsoft.Playwright
 Imports Microsoft.VisualStudio.TestTools.UnitTesting
@@ -277,6 +278,83 @@ Public Class KlassenbildungBoardTests
         Await Seite.Keyboard.PressAsync("Control+z")
         Assert.AreEqual(1, Await Seite.EvaluateAsync(Of Integer)("() => Object.keys(window.__kbTest.pins()).length"),
                         "Strg+Z muss den ganzen Bulk zuruecknehmen")
+    End Function
+
+    ''' <summary>Buendelung mit Mindestzahl (min_pro_klasse, Konzept 3.2a):
+    ''' die Beispielschule hat keine, also eine synthetische Seite - die
+    ''' Chips kommen aus dem VB-Kern, das JS muss sie zeichengleich
+    ''' nachrechnen, und der Stapelkopf sagt "erfuellt" statt
+    ''' "zerrissen", wenn die Mindestzahl steht.</summary>
+    <TestMethod>
+    Public Async Function MinBuendelungWirdImBrowserWieImKernBewertet() As Task
+        Dim input As New KlassenbildungInput()
+        input.Klassen.Anzahl = 2
+        input.Klassen.MinGroesse = 1
+        input.Klassen.MaxGroesse = 9
+        input.Klassen.Labels = New List(Of String) From {"1a", "1b"}
+        For i = 1 To 6
+            input.Schueler.Add(New KlassenbildungSchueler With {.Id = $"S{i:000}"})
+        Next
+        input.Gruppen.Add(New KlassenbildungGruppe With {
+            .Id = "G_nord", .Kuerzel = "NOR", .Typ = "buendelung", .Modus = "soft", .Prio = 2, .MinProKlasse = 2,
+            .Mitglieder = New List(Of String) From {"S001", "S002", "S003", "S004", "S005"}})
+        ' 1a: S001,S002,S003 (3 >= 2), 1b: S004,S005 (= 2, knapp), S006 frei in 1b.
+        Dim zuordnung As New Dictionary(Of String, Integer) From {
+            {"S001", 1}, {"S002", 1}, {"S003", 1}, {"S004", 2}, {"S005", 2}, {"S006", 2}}
+        Dim bewertung = KlassenbildungQuality.Bewerte(input, zuordnung)
+
+        Dim chips As New JsonArray()
+        For Each c In bewertung.Chips
+            chips.Add(New JsonObject From {{"kind", c.KindId}, {"regel_id", c.RegelId}, {"regel_typ", c.RegelTyp}, {"status", c.Status}, {"text", c.Text}})
+        Next
+        Dim verletzungen As New JsonArray()
+        For Each x In bewertung.Verletzungen
+            verletzungen.Add(New JsonObject From {{"regel_id", x.RegelId}, {"regel_typ", x.RegelTyp}, {"prio", x.Prio}, {"mass", x.Mass}})
+        Next
+        Dim zo As New JsonObject()
+        For Each kvp In zuordnung
+            zo(kvp.Key) = kvp.Value
+        Next
+        Dim json As New JsonObject From {
+            {"schule", "synthetisch"}, {"schueler_anzahl", 6}, {"klassen_anzahl", 2}, {"min_groesse", 1}, {"max_groesse", 9},
+            {"klassen_labels", New JsonArray("1a", "1b")},
+            {"gruppen", KlassenbildungBericht.BaueGruppenJson(input)},
+            {"balance", New JsonArray()}, {"wuensche", New JsonArray()}, {"fixierungen", New JsonArray()},
+            {"parameter", New JsonObject From {{"zeitlimit_s", 10}, {"epsilon", 0.05}, {"min_distanz", 1}}},
+            {"konsens_kern", New JsonArray()},
+            {"varianten", New JsonArray(New JsonObject From {
+                {"index", 1}, {"status", "Optimal"}, {"objective", 0}, {"diff_zu_v1", 0},
+                {"zuordnung", zo}, {"balance_kennzahlen", New JsonArray()},
+                {"verletzungen", verletzungen}, {"chips", chips}})}}
+        Await SeiteOeffnenAsync(KlassenbildungHtml.BuildKlassenbildungHtml(json.ToJsonString()))
+
+        Dim abweichungen = Await Seite.EvaluateAsync(Of String())("() => {
+            const data = JSON.parse(document.getElementById('klassenbildung-data').textContent);
+            const v = data.varianten[0];
+            const js = window.__kbTest.bewerte(v.zuordnung).chips;
+            const schluessel = c => c.kind + '|' + c.regel_id + '|' + c.regel_typ;
+            const vonVb = new Map(v.chips.map(c => [schluessel(c), c]));
+            const abw = [];
+            js.forEach(c => {
+                const k = schluessel(c);
+                const b = vonVb.get(k);
+                if (!b) { abw.push('nur im Browser: ' + k); return; }
+                if (b.text !== c.text) abw.push(k + ' | Kern: ' + b.text + ' | Browser: ' + c.text);
+                if (b.status !== c.status) abw.push(k + ' | Status Kern: ' + b.status + ' | Browser: ' + c.status);
+                vonVb.delete(k);
+            });
+            vonVb.forEach((_, k) => abw.push('nur im Kern: ' + k));
+            const m = window.__kbTest.bewerte(v.zuordnung).verletzungen.find(x => x.regel_id === 'G_nord');
+            if (!m || m.mass !== 0) abw.push('Mass im Browser: ' + (m ? m.mass : 'fehlt'));
+            return abw;
+        }")
+        Assert.AreEqual(0, abweichungen.Length, "Mindestzahl-Bewertung weicht vom Kern ab:" & vbLf & String.Join(vbLf, abweichungen))
+
+        ' Beide Stapel der Gruppe sind erfuellt - keiner "zerrissen".
+        Assert.AreEqual(2, Await Seite.Locator(".stapel").CountAsync())
+        Assert.AreEqual(0, Await Seite.Locator(".stapel .anzahl.zerrissen").CountAsync(), "die Mindestzahl steht, nichts ist zerrissen")
+        StringAssert.Contains(Await Seite.Locator(".stapel .anzahl").First.InnerTextAsync(), "(min 2)")
+        Assert.AreEqual("gelb", Await Seite.EvaluateAsync(Of String)("() => window.__kbTest.bewerte(window.__kbTest.sicht().zuordnung).chips.find(c => c.kind === 'S004').status"))
     End Function
 
     ''' <summary>Eine Ampel-Sprache: Legende mit vier Punkten, jede Karte

@@ -21,6 +21,7 @@ Public Module KlassenbildungBericht
         Return New JsonArray(input.Gruppen.Select(Function(g) CType(New JsonObject From {
             {"id", g.Id}, {"kuerzel", kuerzel(g.Id)}, {"typ", g.Typ}, {"modus", g.Modus}, {"prio", g.Prio},
             {"max_pro_klasse", If(g.MaxProKlasse.HasValue, CType(g.MaxProKlasse.Value, JsonNode), Nothing)},
+            {"min_pro_klasse", If(g.MinProKlasse.HasValue, CType(g.MinProKlasse.Value, JsonNode), Nothing)},
             {"mitglieder", New JsonArray(g.Mitglieder.Select(Function(m) CType(m, JsonNode)).ToArray())}
         }, JsonNode)).ToArray())
     End Function

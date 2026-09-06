@@ -14,7 +14,7 @@ Public Module YamlKlassenbildung
         Build()
 
     ''' <summary>OmitNull statt aller Defaults: `Nothing` heisst bei den
-    ''' Optional-Feldern (MaxProKlasse, Stufe, Klasse/NichtKlasse) "nicht
+    ''' Optional-Feldern (MaxProKlasse, MinProKlasse, Stufe, Klasse/NichtKlasse) "nicht
     ''' gesetzt", und genau diese Bedeutung geht verloren, wenn sie als
     ''' `null` in die Datei geschrieben werden. Nicht-nullable Felder mit
     ''' Default (Modus "soft", Prio 2/1) werden dagegen bewusst

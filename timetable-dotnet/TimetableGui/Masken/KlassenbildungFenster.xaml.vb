@@ -293,10 +293,12 @@ Partial Class KlassenbildungFenster
             GruppeKuerzel.Text = If(g?.Kuerzel, "")
             GruppeTyp.SelectedItem = If(g?.Typ, "buendelung")
             GruppeMax.Text = If(g?.MaxProKlasse?.ToString(), "")
-            ' Die Kappe gehoert nur zur Verteilung - bei einer Buendelung
-            ' lehnt der Kern sie ab. Das Feld ist dann gar nicht erst
-            ' bedienbar.
+            GruppeMin.Text = If(g?.MinProKlasse?.ToString(), "")
+            ' Die Kappe gehoert nur zur Verteilung, die Mindestzahl nur
+            ' zur Buendelung - der Kern lehnt das jeweils andere ab. Das
+            ' Feld ist dann gar nicht erst bedienbar.
             GruppeMax.IsEnabled = (g?.Typ = "verteilung")
+            GruppeMin.IsEnabled = (g?.Typ = "buendelung")
             GruppeModus.SelectedItem = If(g?.Modus, "soft")
             GruppePrio.SelectedItem = If(g Is Nothing, "2", g.Prio.ToString())
         Finally
@@ -381,10 +383,16 @@ Partial Class KlassenbildungFenster
             ' sonst bliebe sie unsichtbar stehen und bricht das Rechnen.
             g.MaxProKlasse = Nothing
             GruppeMax.Text = ""
+            Dim mindest As Integer
+            g.MinProKlasse = If(Integer.TryParse(GruppeMin.Text.Trim(), mindest), CType(mindest, Integer?), Nothing)
         Else
             g.MaxProKlasse = If(Integer.TryParse(GruppeMax.Text.Trim(), n), CType(n, Integer?), Nothing)
+            ' Dasselbe umgekehrt: eine Verteilung kennt keine Mindestzahl.
+            g.MinProKlasse = Nothing
+            GruppeMin.Text = ""
         End If
         GruppeMax.IsEnabled = (g.Typ = "verteilung")
+        GruppeMin.IsEnabled = (g.Typ = "buendelung")
         g.Modus = CStr(If(GruppeModus.SelectedItem, "soft"))
         g.Prio = Integer.Parse(CStr(If(GruppePrio.SelectedItem, "2")))
         GruppenListeFuellen()

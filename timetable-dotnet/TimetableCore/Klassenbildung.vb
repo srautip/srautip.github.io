@@ -43,13 +43,17 @@ End Class
 ''' <summary>Buendelungs- oder Verteilungsgruppe (Konzept 3.2/3.3).
 ''' `Typ` = "buendelung" (Mitglieder in moeglichst wenige/genau eine
 ''' Klasse) oder "verteilung" (max. MaxProKlasse Mitglieder je Klasse).
-''' Ein Kind darf in mehreren Gruppen sein - Konflikte loest die
-''' Priorisierung.</summary>
+''' Eine Buendelung MIT MinProKlasse (Konzept 3.2a) meint "in
+''' Gruppchen": wo die Gruppe in einer Klasse vorkommt, sitzen
+''' mindestens MinProKlasse Mitglieder - Klassen ohne Mitglied sind
+''' erlaubt, die Streuung wird nicht bestraft. Ein Kind darf in
+''' mehreren Gruppen sein - Konflikte loest die Priorisierung.</summary>
 Public NotInheritable Class KlassenbildungGruppe
     Public Property Id As String
     Public Property Typ As String
     Public Property Mitglieder As New List(Of String)
     Public Property MaxProKlasse As Integer?
+    Public Property MinProKlasse As Integer?
     Public Property Modus As String = "soft"
     Public Property Prio As Integer = 2
     ''' <summary>UI-Konzept U1: optionales Anzeige-Kuerzel (2-3 Zeichen)
@@ -292,8 +296,22 @@ Public Module Klassenbildung
                 ElseIf g.MaxProKlasse.Value < 1 Then
                     errors.Add($"{kontext}: max_pro_klasse={g.MaxProKlasse.Value} muss >= 1 sein")
                 End If
-            ElseIf g.Typ = "buendelung" AndAlso g.MaxProKlasse.HasValue Then
-                errors.Add($"{kontext}: max_pro_klasse gehoert nicht zu einer buendelung")
+                If g.MinProKlasse.HasValue Then
+                    errors.Add($"{kontext}: min_pro_klasse gehoert nicht zu einer verteilung")
+                End If
+            ElseIf g.Typ = "buendelung" Then
+                If g.MaxProKlasse.HasValue Then
+                    errors.Add($"{kontext}: max_pro_klasse gehoert nicht zu einer buendelung")
+                End If
+                If g.MinProKlasse.HasValue Then
+                    If g.MinProKlasse.Value < 1 Then
+                        errors.Add($"{kontext}: min_pro_klasse={g.MinProKlasse.Value} muss >= 1 sein")
+                    ElseIf g.MinProKlasse.Value > g.Mitglieder.Count Then
+                        ' Unerfuellbar, nie stiller No-Op: mehr je Klasse
+                        ' verlangen, als die Gruppe Mitglieder hat.
+                        errors.Add($"{kontext}: min_pro_klasse={g.MinProKlasse.Value} > {g.Mitglieder.Count} mitglieder - unerfuellbar")
+                    End If
+                End If
             End If
             pruefeModusPrio(kontext, g.Modus, g.Prio)
         Next
@@ -557,7 +575,35 @@ Public Module Klassenbildung
 
         ' --- Buendelungs-/Verteilungsgruppen (Konzept 3.2/3.3) ---
         For Each g In input.Gruppen
-            If g.Typ = "buendelung" Then
+            If g.Typ = "buendelung" AndAlso g.MinProKlasse.HasValue Then
+                ' Buendelung in Gruppchen (Konzept 3.2a): wo die Gruppe
+                ' sitzt, sitzen mindestens N. `used` ist hier ein ECHTER
+                ' Belegungsindikator mit beiden Richtungen - die einseitige
+                ' Schranke der Streuungsvariante unten reichte nicht, der
+                ' Solver setzte used auf 0 und die Mindestzahl liefe leer.
+                ' Keine Streuungsstrafe: verteilt zu sein ist hier gewollt.
+                Dim mindest = CLng(g.MinProKlasse.Value)
+                Dim fehlList As New List(Of IntVar)
+                For c = 0 To anzahl - 1
+                    Dim cc = c
+                    Dim belegung As LinearExpr = LinearExpr.Sum(g.Mitglieder.Select(Function(m) x((m, cc))))
+                    Dim used = model.NewBoolVar($"used[{g.Id},{c}]")
+                    For Each m In g.Mitglieder
+                        model.Add(used >= x((m, cc)))
+                    Next
+                    model.Add(belegung >= used)
+                    If g.Modus = "hard" Then
+                        model.Add(belegung >= LinearExpr.Term(used, mindest))
+                    Else
+                        Dim fehl = model.NewIntVar(0L, mindest, $"fehl[{g.Id},{c}]")
+                        model.Add(fehl >= LinearExpr.Term(used, mindest) - belegung)
+                        fehlList.Add(fehl)
+                    End If
+                Next
+                If fehlList.Count > 0 Then
+                    strafen.Add((g.Id, "buendelung", g.Prio, LinearExpr.Sum(fehlList), gewichte(g.Prio)))
+                End If
+            ElseIf g.Typ = "buendelung" Then
                 If g.Modus = "hard" Then
                     Dim y = Enumerable.Range(0, anzahl).Select(Function(c) model.NewBoolVar($"y[{g.Id},{c}]")).ToList()
                     model.Add(LinearExpr.Sum(y) = 1L)

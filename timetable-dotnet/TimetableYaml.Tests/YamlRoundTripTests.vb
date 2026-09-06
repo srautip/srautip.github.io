@@ -129,6 +129,29 @@ Public Class YamlRoundTripTests
     ' klassenbildung.yaml
     ' ---------------------------------------------------------------
 
+    ''' <summary>`min_pro_klasse` (Buendelung in Gruppchen) faehrt ueber
+    ''' die Underscore-Konvention ohne eigenen Code - und bleibt weg,
+    ''' wenn es nicht gesetzt ist (OmitNull).</summary>
+    <TestMethod>
+    Public Sub MinProKlasseUeberlebtDenRoundTripUndBleibtSonstWeg()
+        Dim input = YamlKlassenbildung.DeserializeKlassenbildungYaml(
+            "klassen: {anzahl: 2, min_groesse: 1, max_groesse: 9}" & vbLf &
+            "schueler: [{id: S1}, {id: S2}, {id: S3}]" & vbLf &
+            "gruppen:" & vbLf &
+            "  - {id: G_a, typ: buendelung, mitglieder: [S1, S2, S3], min_pro_klasse: 2}" & vbLf &
+            "  - {id: G_b, typ: buendelung, mitglieder: [S1, S2]}" & vbLf)
+        Assert.AreEqual(2, input.Gruppen(0).MinProKlasse)
+        Assert.IsFalse(input.Gruppen(1).MinProKlasse.HasValue)
+
+        Dim yaml = YamlKlassenbildung.SerializeKlassenbildungYaml(input)
+        StringAssert.Contains(yaml, "min_pro_klasse: 2")
+        Assert.AreEqual(1, yaml.Split({"min_pro_klasse"}, StringSplitOptions.None).Length - 1,
+                        "eine nicht gesetzte Mindestzahl darf nicht als null erscheinen")
+        Dim erneut = YamlKlassenbildung.DeserializeKlassenbildungYaml(yaml)
+        Assert.AreEqual(2, erneut.Gruppen(0).MinProKlasse)
+        Assert.IsFalse(erneut.Gruppen(1).MinProKlasse.HasValue)
+    End Sub
+
     <TestMethod>
     Public Sub KlassenbildungRoundTripPreservesInput()
         Dim pfad = InputPfad("bw-grundschule-beispiel", "klassenbildung.yaml")
@@ -157,6 +180,8 @@ Public Class YamlRoundTripTests
             Assert.AreEqual(original.Gruppen(i).Prio, erneut.Gruppen(i).Prio, $"Gruppe {i} Prio")
             Assert.AreEqual(original.Gruppen(i).MaxProKlasse, erneut.Gruppen(i).MaxProKlasse,
                             $"Gruppe {i} MaxProKlasse (Nullable!)")
+            Assert.AreEqual(original.Gruppen(i).MinProKlasse, erneut.Gruppen(i).MinProKlasse,
+                            $"Gruppe {i} MinProKlasse (Nullable!)")
             CollectionAssert.AreEqual(original.Gruppen(i).Mitglieder, erneut.Gruppen(i).Mitglieder,
                                       $"Gruppe {i} Mitglieder")
         Next

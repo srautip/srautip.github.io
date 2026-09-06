@@ -640,7 +640,10 @@ Alternativen (siehe Abschnitt "Stundentafel-Visualisierung" unten).
 **Klassenbildung** (docs/klassenbildung-konzept.md + -plan.md) aus
 `input/klassenbildung.yaml`: Schüler mit Pseudonym-IDs und
 Attribut-Tags, Klassenrahmen, Bündelungs-/Verteilungsgruppen
-(`modus: hard|soft`, `prio: 1..3`), Balance-Kriterien,
+(`modus: hard|soft`, `prio: 1..3`; Verteilung mit `max_pro_klasse`,
+Bündelung wahlweise mit `min_pro_klasse` = „in Grüppchen“: wo die
+Gruppe in einer Klasse sitzt, mindestens N, leere Klassen erlaubt),
+Balance-Kriterien,
 Zusammen-/Getrennt-Wünsche und Fixierungen (`klasse` = F1,
 `nicht_klasse` = F2). Parameter über den `klassenbildung:`-Block der
 config.yaml (`zeitlimit_s`, `n_varianten`, `epsilon`, `min_distanz`,

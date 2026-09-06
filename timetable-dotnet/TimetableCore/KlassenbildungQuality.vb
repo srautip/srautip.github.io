@@ -50,7 +50,25 @@ Public Module KlassenbildungQuality
         For Each g In input.Gruppen
             Dim proKlasse = g.Mitglieder.GroupBy(Function(m) zuordnung(m)).
                 ToDictionary(Function(grp) grp.Key, Function(grp) grp.Count())
-            If g.Typ = "buendelung" Then
+            If g.Typ = "buendelung" AndAlso g.MinProKlasse.HasValue Then
+                ' Buendelung in Gruppchen (Konzept 3.2a): Mass = fehlende
+                ' Kinder bis zur Mindestzahl, ueber die BELEGTEN Klassen -
+                ' proKlasse enthaelt genau die.
+                Dim mindest = g.MinProKlasse.Value
+                Dim mass = CLng(proKlasse.Values.Sum(Function(cnt) Math.Max(mindest - cnt, 0)))
+                If g.Modus = "soft" Then
+                    verletzungen.Add(New KlassenbildungVerletzung With {
+                        .RegelId = g.Id, .RegelTyp = "buendelung", .Prio = g.Prio, .Mass = mass})
+                End If
+                For Each m In g.Mitglieder
+                    Dim cnt = proKlasse(zuordnung(m))
+                    chips.Add(New KlassenbildungChip With {
+                        .KindId = m, .RegelId = g.Id, .RegelTyp = "buendelung",
+                        .Status = If(cnt < mindest, "rot", If(cnt = mindest, "gelb", "gruen")),
+                        .Text = $"Buendelung {g.Id}: {cnt}/{mindest} in dieser Klasse" &
+                                If(cnt < mindest, " - Mindestzahl unterschritten", If(cnt = mindest, " - Mindestzahl gerade erreicht", ""))})
+                Next
+            ElseIf g.Typ = "buendelung" Then
                 Dim spread = proKlasse.Count
                 Dim mass = CLng(spread - 1)
                 If g.Modus = "soft" Then

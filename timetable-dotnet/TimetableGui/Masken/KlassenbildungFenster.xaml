@@ -105,7 +105,7 @@
                     <DockPanel Grid.Column="0">
                         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
                             <Button x:Name="GruppeNeuKnopf" Content="Neu" Click="AufGruppeNeu" />
-                            <Button Content="Duplizieren" Margin="6,0,0,0" Click="AufGruppeDupl" />
+                            <Button x:Name="GruppeDuplKnopf" Content="Duplizieren" Margin="6,0,0,0" Click="AufGruppeDupl" />
                             <Button Content="Löschen" Margin="6,0,0,0" Click="AufGruppeWeg" />
                         </StackPanel>
                         <ListBox x:Name="GruppenListe" SelectionChanged="AufGruppeAuswahl"
@@ -121,6 +121,9 @@
                             <ComboBox x:Name="GruppeTyp" Width="200" HorizontalAlignment="Left" SelectionChanged="AufGruppeFeld" />
                             <TextBlock Text="Höchstens je Klasse (nur Verteilung; leer = ohne Grenze)" Style="{StaticResource Feldbeschriftung}" />
                             <TextBox x:Name="GruppeMax" Width="90" HorizontalAlignment="Left" LostFocus="AufGruppeFeld" />
+                            <TextBlock Text="Mindestens je Klasse (nur Bündelung; leer = alle in einer Klasse)" Style="{StaticResource Feldbeschriftung}" />
+                            <TextBox x:Name="GruppeMin" Width="90" HorizontalAlignment="Left" LostFocus="AufGruppeFeld"
+                                     ToolTip="Bündelung in Grüppchen: wo die Gruppe in einer Klasse vorkommt, sitzen mindestens so viele Mitglieder. Klassen ohne Mitglied sind erlaubt." />
                             <StackPanel Orientation="Horizontal">
                                 <StackPanel>
                                     <TextBlock Text="Modus" Style="{StaticResource Feldbeschriftung}" />

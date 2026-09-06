@@ -339,8 +339,8 @@ auf demselben Bestand.
   Spaltenverwaltung empfiehlt wertneutrale Tags und verlinkt den
   Grundsatz "die Diagnose selbst muss nie ins System"); Einfügen aus
   Zwischenablage.
-- **Gruppen** (`buendelung`/`verteilung` + `max_pro_klasse`, Modus,
-  Prio 1-3, Kürzel), **Balance** (Attribut+Wert aus vorhandenem
+- **Gruppen** (`buendelung` wahlweise mit `min_pro_klasse` /
+  `verteilung` mit `max_pro_klasse`, Modus, Prio 1-3, Kürzel), **Balance** (Attribut+Wert aus vorhandenem
   Vokabular, Toleranz, Modus, Prio), **Wünsche** (Paar-Picker
   zusammen/getrennt, Modus, Prio) - jeweils Listen-Dialoge nach
   Grundmuster mit denselben Defaults wie das YAML (soft, Prio 2 bzw. 1).

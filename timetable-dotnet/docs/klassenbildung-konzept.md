@@ -43,6 +43,13 @@ gruppen:
     modus: soft
     prio: 3
 
+  - id: G_nordstadt             # Bündelung in Grüppchen (3.2a)
+    typ: buendelung
+    mitglieder: [S021, S022, S023, S024, S025, S026, S027]
+    min_pro_klasse: 2           # wo die Gruppe sitzt, mindestens 2 - niemand allein
+    modus: soft
+    prio: 1
+
 balance:
   - attribut: geschlecht
     wert: w
@@ -101,6 +108,27 @@ Strafe: w_G · (spread[G] − 1)        # 0, wenn alle in einer Klasse
 ```
 
 Die Implikation genügt in eine Richtung, weil die Minimierung `used` von selbst auf 0 drückt, wo kein Mitglied sitzt.
+
+### 3.2a Bündelung in Grüppchen (mit Mindestzahl m, `min_pro_klasse`)
+
+Für große Gruppen (Kita-Jahrgang, Wohngebiet) ist „alle in eine Klasse“
+unrealistisch; gewollt ist: **wo die Gruppe in einer Klasse vorkommt,
+sitzen mindestens m Mitglieder** — kein Kind bleibt allein. Klassen ohne
+Mitglied sind erlaubt, die Streuung wird nicht bestraft (Nutzerentscheidung
+06.09.2026). Das Feld sitzt an der Bündelung; ohne `min_pro_klasse` gilt 3.2.
+
+```
+used[G,c] ∈ {0,1}                    # echter Belegungsindikator, BEIDE Richtungen:
+x[s,c] = 1  ⇒  used[G,c] = 1         #   used ≥ x[s,c] je Mitglied
+Σ_{s∈G} x[s,c] ≥ used[G,c]           #   und used ≤ Belegung
+Hart:  Σ_{s∈G} x[s,c] ≥ m · used[G,c]
+Weich: fehl[G,c] ∈ ℤ≥0, fehl[G,c] ≥ m · used[G,c] − Σ_{s∈G} x[s,c]
+       Strafe: w_G · Σ_c fehl[G,c]
+```
+
+Die zweite Richtung der Implikation ist hier Pflicht: mit der einseitigen
+Schranke aus 3.2 setzte die Minimierung `used` auf 0, und die Mindestzahl
+liefe leer. Gültig ist `1 ≤ m ≤ |G|`, sonst Validierungsfehler.
 
 ### 3.3 Verteilungsgruppe D (mit Kappe k)
 
@@ -412,7 +440,7 @@ Jedes Kind erhält auf seiner Karte eine Reihe kleiner Status-Chips — **ein Ch
 | Farbe | Symbol | Bedeutung (je Kriterium) |
 |---|---|---|
 | 🟢 Grün | ✓ | Erfüllt und unkritisch |
-| 🟡 Gelb | ! | Erfüllt, aber *knapp oder fragil*: Verteilungs-Kappe exakt ausgeschöpft, Balance am Toleranzrand, Wunsch erfüllt, kollidiert aber mit einer anderen Regel — **oder** Kriterium gehört zu einer als *diskussionswürdig* markierten Gruppe |
+| 🟡 Gelb | ! | Erfüllt, aber *knapp oder fragil*: Verteilungs-Kappe exakt ausgeschöpft, Mindestzahl einer Bündelung (3.2a) gerade erreicht, Balance am Toleranzrand, Wunsch erfüllt, kollidiert aber mit einer anderen Regel — **oder** Kriterium gehört zu einer als *diskussionswürdig* markierten Gruppe |
 | 🔴 Rot | ✗ | Weiche Regel verletzt (harte Regeln können in einer gültigen Lösung nie verletzt sein) |
 | ⚪ Grau | – | Kind ist von keinem Kriterium betroffen („freies Kind“) |
 
