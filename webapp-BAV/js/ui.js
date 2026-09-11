@@ -705,16 +705,44 @@
 
       if (r.anordnung) {
         var an = r.anordnung;
+        var extern = an.teilungsart === E.TEILUNGSART.EXTERN;
+        var hatKapital = extern && H.isNum(an.uebertragungskapital);
+        /* Bei externer Teilung ist der Kapitalbetrag die maßgebliche Größe des Tenors –
+           bei Rentenanrechten weicht er von der Einheit des Anrechts ab. */
+        var kapitalFuehrt = hatKapital && an.einheit === E.EINHEIT.RENTE_MONAT;
+
+        var felder = [
+          el('dt', { text: 'Anrecht' }),
+          el('dd', { text: (an.anrecht_id || '–') + (an.traeger ? ', ' + an.traeger : '') }),
+          el('dt', { text: 'Teilungsart' }),
+          el('dd', { text: label('teilungsart', an.teilungsart) })
+        ];
+        if (extern) {
+          felder.push(el('dt', { text: 'Zielversorgung' }));
+          felder.push(el('dd', { text: an.zielversorgung || 'nicht gewählt – Auffangversorgung' }));
+        }
+        if (kapitalFuehrt) {
+          felder.push(el('dt', { text: 'Ausgleichswert' }));
+          felder.push(el('dd', { text: H.fmtWert(an.betrag, an.einheit) + ' (Einheit des Anrechts)' }));
+        } else if (hatKapital) {
+          felder.push(el('dt', { text: 'Zu übertragendes Kapital' }));
+          felder.push(el('dd', { text: H.fmtEur(an.uebertragungskapital) }));
+        }
+        felder.push(el('dt', { text: 'Kostenabzug' }));
+        felder.push(el('dd', { text: H.fmtWert(an.kosten_abzug, an.einheit) }));
+        felder.push(el('dt', { text: 'Stichtag' }));
+        felder.push(el('dd', { text: fmtDatum(an.stichtag) }));
+        felder.push(el('dt', { text: 'Konfigurationsjahr' }));
+        felder.push(el('dd', { text: String(an.bezugsgroesse_jahr) }));
+
         c.appendChild(el('div', { class: 'anordnung' }, [
-          el('div', { style: 'font-size:.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;', text: 'Vorschlag für die Anordnung' }),
-          el('div', { class: 'betrag', text: H.fmtWert(an.betrag, an.einheit) }),
-          el('dl', {}, [
-            el('dt', { text: 'Anrecht' }), el('dd', { text: (an.anrecht_id || '–') + (an.traeger ? ', ' + an.traeger : '') }),
-            el('dt', { text: 'Teilungsart' }), el('dd', { text: label('teilungsart', an.teilungsart) }),
-            el('dt', { text: 'Kostenabzug' }), el('dd', { text: H.fmtWert(an.kosten_abzug, an.einheit) }),
-            el('dt', { text: 'Stichtag' }), el('dd', { text: fmtDatum(an.stichtag) }),
-            el('dt', { text: 'Konfigurationsjahr' }), el('dd', { text: String(an.bezugsgroesse_jahr) })
-          ])
+          el('div', { style: 'font-size:.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;',
+            text: 'Vorschlag für die Anordnung' }),
+          el('div', { class: 'betrag',
+            text: kapitalFuehrt ? H.fmtEur(an.uebertragungskapital) : H.fmtWert(an.betrag, an.einheit) }),
+          kapitalFuehrt ? el('div', { class: 'betrag-hinweis',
+            text: 'Kapitalbetrag an die Zielversorgung – bei externer Teilung lautet der Tenor hierauf, nicht auf die Monatsrente.' }) : null,
+          el('dl', {}, felder)
         ]));
       } else {
         c.appendChild(el('div', { class: 'anordnung' }, [
@@ -833,7 +861,14 @@
         el('td', { text: a.traeger || '–' }),
         el('td', {}, [el('span', { class: 'badge ' + st.badge, text: st.text })]),
         el('td', { text: r.anordnung ? label('teilungsart', r.anordnung.teilungsart) : '–' }),
-        el('td', { class: 'num', text: r.anordnung ? H.fmtWert(r.anordnung.betrag, r.anordnung.einheit) : '–' }),
+        el('td', { class: 'num' }, [
+          el('span', { text: r.anordnung ? H.fmtWert(r.anordnung.betrag, r.anordnung.einheit) : '–' }),
+          (r.anordnung && H.isNum(r.anordnung.uebertragungskapital) &&
+           r.anordnung.einheit === E.EINHEIT.RENTE_MONAT)
+            ? el('div', { style: 'font-size:.74rem;color:var(--text-muted);font-weight:400;',
+                text: 'Kapital ' + H.fmtEur(r.anordnung.uebertragungskapital) })
+            : null
+        ]),
         el('td', { text: zaehle(r.befunde, 'ERROR') + '/' + zaehle(r.befunde, 'WARN') + '/' + zaehle(r.befunde, 'INFO') })
       ]);
       zeileEl.querySelector('button').addEventListener('click', function () {

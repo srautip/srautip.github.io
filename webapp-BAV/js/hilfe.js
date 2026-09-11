@@ -594,7 +594,9 @@
       ],
       wirkung: [
         'Schritt 6: Ausgangspunkt der Prüfung der Teilungsart.',
-        'Schritt 7: Bei externer Teilung entfällt der Kostenabzug vollständig.'
+        'Schritt 6: Bei externer Teilung wird zusätzlich der Kapitalbetrag ausgewiesen, der an die Zielversorgung fließt – die Hälfte des korrespondierenden Kapitalwerts.',
+        'Schritt 7: Bei externer Teilung entfällt der Kostenabzug vollständig.',
+        'Schritt 8: Bei externer Teilung eines Rentenanrechts führt der Tenorvorschlag den Kapitalbetrag, nicht die Monatsrente.'
       ],
       befunde: ['TA01 – externe Teilung ohne Rechtsgrundlage verlangt',
                 'TA02 bis TA05 – Folgeprüfungen der externen Teilung'],
@@ -847,7 +849,9 @@
                          'Sicherstellen, dass die Mindestleistung auch beim Berechtigten abgebildet wird.'] },
     ER05: { ursachen: ['Zusammenfassung des Ergebnisses – kein Mangel.'],
             massnahmen: ['Tenor formulieren: Anrecht, Träger, Ausgleichswert, Teilungsart, Stichtag Ehezeitende.',
-                         'Bei interner Teilung auf die Teilungsordnung Bezug nehmen.'] }
+                         'Bei interner Teilung auf die Teilungsordnung Bezug nehmen.',
+                         'Bei externer Teilung den zu übertragenden Kapitalbetrag und die Zielversorgung benennen – nicht die Monatsrente.'],
+            vertiefung: 'Bei externer Teilung eines Rentenanrechts weichen zwei Größen auseinander: Der Ausgleichswert beträgt die Hälfte des Ehezeitanteils und steht in der Einheit des Anrechts, an die Zielversorgung fließt aber die Hälfte des korrespondierenden Kapitalwerts. Die Anwendung stellt deshalb bei externer Teilung den Kapitalbetrag voran.' }
   };
 
   /* ====================================================================
@@ -983,6 +987,7 @@
           'Beitragsbemessungsgrenze (§ 17)?',
         'Übrige Wege: Liegt der Ausgleichswert unter 2 % beziehungsweise 240 % der Bezugsgröße ' +
           '(§ 14 Abs. 2 Nr. 2)?',
+        'Bei externer Teilung: Welcher Kapitalbetrag fließt an die Zielversorgung?',
         'Bei externer Teilung: Zielversorgung gewählt, Transferverlust unter 10 %, kein ' +
           'Leistungsbezug?',
         'Bei interner Teilung einer Direktzusage: Liegt die Teilungsordnung vor?'

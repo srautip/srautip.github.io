@@ -708,6 +708,15 @@
     }
 
     if (a.teilungsart === TEILUNGSART.EXTERN) {
+      /* Bei externer Teilung fließt ein Kapitalbetrag an die Zielversorgung.
+         Er wird immer ausgewiesen – auch ohne Vergleichswert für den Transferverlust. */
+      a.uebertragungskapital = isNum(a.korr_kapitalwert) ? round(a.korr_kapitalwert / 2, 2) : null;
+      zeile(s, 'Zu übertragendes Kapital', fmtEur(a.uebertragungskapital),
+        'korrespondierender Kapitalwert / 2 – dieser Betrag ist bei externer Teilung zu zahlen (§ 14 VersAusglG)',
+        a.einheit === EINHEIT.RENTE_MONAT
+          ? 'Das Anrecht ist als Monatsrente ausgewiesen; der Tenor der externen Teilung lautet auf diesen Kapitalbetrag.'
+          : '');
+
       if (!a.zielversorgung) {
         b.push(befund('TA02', 'Auffangzielversorgung: ' +
           ((a.durchfuehrungsweg === DURCHFUEHRUNGSWEG.DIREKTZUSAGE || a.durchfuehrungsweg === DURCHFUEHRUNGSWEG.UKASSE)
@@ -719,9 +728,8 @@
       if (!isNum(a.intern_vergleichswert)) {
         b.push(befund('TA03', 'Es fehlt die Angabe, welche Leistung der Berechtigte bei interner Teilung erhielte.'));
       } else {
-        var uebertrag = isNum(a.korr_kapitalwert) ? a.korr_kapitalwert / 2 : null;
+        var uebertrag = a.uebertragungskapital;
         var externWert = erwarteteRenteZielversorgung(uebertrag, a);
-        zeile(s, 'Übertragenes Kapital', fmtEur(uebertrag), 'korrespondierender Kapitalwert / 2');
         zeile(s, 'Leistung bei interner Teilung', fmtWert(a.intern_vergleichswert, EINHEIT.RENTE_MONAT), 'Angabe des Trägers');
         if (externWert === null) {
           zeile(s, 'Leistung in der Zielversorgung', 'nicht ermittelbar',
@@ -847,8 +855,13 @@
     if (a.zusageart === ZUSAGEART.BEITRAGSZUSAGE_MIT_MINDESTLEISTUNG && a.einheit === EINHEIT.RENTE_MONAT) {
       b.push(befund('ER04', 'Das Anrecht ist als Monatsrente ausgewiesen, die Mindestleistung ist aber kapitalbezogen.'));
     }
-    b.push(befund('ER05', 'Anordnung: ' + fmtWert(round(betrag, 2), a.einheit) + ', ' +
-      ctx.label('teilungsart', a.teilungsart) + ', Kostenabzug ' + fmtWert(round(a.kosten_abzug, 2), a.einheit) + '.'));
+    var tenor = 'Anordnung: ' + fmtWert(round(betrag, 2), a.einheit) + ', ' +
+      ctx.label('teilungsart', a.teilungsart) + ', Kostenabzug ' + fmtWert(round(a.kosten_abzug, 2), a.einheit) + '.';
+    if (a.teilungsart === TEILUNGSART.EXTERN) {
+      tenor += ' Zu übertragen sind ' + fmtEur(a.uebertragungskapital) + ' an ' +
+        (a.zielversorgung || 'die Auffangversorgung') + '.';
+    }
+    b.push(befund('ER05', tenor));
 
     return b;
   }
@@ -1012,6 +1025,11 @@
     zeile(s8, 'Ausgleichsbetrag', fmtWert(round(betrag, 2), a.einheit),
       'halber Ehezeitanteil − Kostenabzug');
     zeile(s8, 'Teilungsart', ctx.label('teilungsart', a.teilungsart), 'aus Schritt 6');
+    if (a.teilungsart === TEILUNGSART.EXTERN) {
+      zeile(s8, 'Zu übertragendes Kapital', fmtEur(a.uebertragungskapital),
+        'an die Zielversorgung zu zahlender Betrag (aus Schritt 6)',
+        a.zielversorgung ? 'Zielversorgung: ' + a.zielversorgung : 'Zielversorgung noch nicht gewählt – Auffangversorgung.');
+    }
     s8.befunde = checkErgebnis(a, betrag, cfg, ctx, s8);
     befunde = befunde.concat(s8.befunde);
     schritte.push(s8);
@@ -1035,6 +1053,11 @@
       einheit: a.einheit,
       teilungsart: a.teilungsart,
       kosten_abzug: round(a.kosten_abzug, 2),
+      /* Nur bei externer Teilung: der Kapitalbetrag, der an die Zielversorgung fließt */
+      uebertragungskapital: a.teilungsart === TEILUNGSART.EXTERN
+        ? (isNum(a.uebertragungskapital) ? a.uebertragungskapital : null)
+        : null,
+      zielversorgung: a.teilungsart === TEILUNGSART.EXTERN ? (a.zielversorgung || null) : null,
       bezugsgroesse_jahr: cfg.jahr,
       stichtag: ez.ende
     };

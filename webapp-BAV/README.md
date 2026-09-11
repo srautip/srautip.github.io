@@ -135,10 +135,35 @@ die ausgelösten Befunde und ein Zwischenergebnis.
    Erkennung eines bereits vorgenommenen Kostenabzugs auf Renten- oder Kapitalebene.
 5. **Geringfügigkeit** (BG01) – § 18 Abs. 2, 3 VersAusglG.
 6. **Teilungsart** (TA01–TA06) – §§ 10, 14, 17 VersAusglG, Transferverlustprüfung
-   nach BVerfG 26.05.2020 – 1 BvL 5/18.
+   nach BVerfG 26.05.2020 – 1 BvL 5/18. Bei externer Teilung wird zusätzlich der
+   Kapitalbetrag ausgewiesen, der an die Zielversorgung fließt.
 7. **Teilungskosten** (TK01–TK07) – § 13 VersAusglG, Umrechnung von Eurokosten auf
    Rentenanrechte über den Kapitalwert.
 8. **Ergebnis** (ER01–ER05) – Schlüssigkeitsprüfung und Tenorvorschlag.
+
+### Interne und externe Teilung
+
+Die Unterscheidung durchzieht die Schritte 6 bis 8 und wirkt sich auf das
+Ergebnis aus:
+
+* **Schritt 6** entscheidet die Teilungsart, statt den Vorschlag des Trägers zu
+  übernehmen: interner Vorschlag wird übernommen (§ 10 als Regelfall), externer
+  nur bei Zustimmung des Berechtigten, innerhalb der Grenzwerte des § 14 Abs. 2
+  Nr. 2 oder – bei Direktzusage und Unterstützungskasse – bis zur
+  Beitragsbemessungsgrenze (§ 17). Trägt keine Grundlage, wird intern angeordnet
+  und TA01 gemeldet.
+* **Nur extern** geprüft werden Zielversorgung (TA02), Transferverlust
+  (TA03, TA04) und der Leistungsbezug (TA05); **nur intern** die Teilungsordnung
+  (TA06).
+* **Schritt 7** zieht bei externer Teilung keine Kosten ab (§ 13 gilt nur für die
+  interne Teilung, Hinweis TK06); bei interner Teilung läuft die volle
+  Kostenprüfung samt Umrechnung bei Rentenanrechten.
+* **Schritt 8** führt bei externer Teilung den Kapitalbetrag, der an die
+  Zielversorgung fließt – die Hälfte des korrespondierenden Kapitalwerts. Bei
+  einem Rentenanrecht weicht er von der Einheit des Anrechts ab: Der
+  Ausgleichswert lautet etwa auf 400,00 €/Monat, übertragen werden 45.000 €.
+  Der Tenorvorschlag stellt deshalb den Kapitalbetrag voran und weist den
+  Ausgleichswert daneben aus.
 
 Befunde tragen die Schweregrade `ERROR` (Abbruch), `WARN` (manuelle Freigabe) und
 `INFO` (Hinweis). Der Status `FREIGABE_ERFORDERLICH` bedeutet, dass die Rechnung
@@ -186,3 +211,11 @@ Beitragsbemessungsgrenze sind vorbelegt und vor dem Einsatz gegen die amtlichen 
 des jeweiligen Jahres zu prüfen; die Werte für 2026 sind ausdrücklich als vorläufig
 gekennzeichnet. Die Kostenrechtsprechung ändert sich laufend – die Grenzwerte in
 Abschnitt 8 sind deshalb frei einstellbar.
+
+Nicht abgebildet sind unter anderem: die Verzinsung des Ausgleichswerts zwischen
+Ehezeitende und Rechtskraft, die bei externer Teilung regelmäßig anfällt; die
+Umrechnung eines Ausgleichskapitals in Entgeltpunkte der gesetzlichen
+Rentenversicherung (die Transferverlustprüfung arbeitet stattdessen mit einem
+Rentenfaktor oder einer direkt eingegebenen Leistung); die Gesamtschau mehrerer
+geringfügiger Anrechte nach § 18 Abs. 1 VersAusglG; und die reine Beitragszusage
+des Sozialpartnermodells.
