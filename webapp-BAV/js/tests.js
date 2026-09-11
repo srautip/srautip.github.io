@@ -149,6 +149,47 @@
     gleich(r.schritte.length, 5, 'Abbruch nach Schritt 5');
   });
 
+  test('Externe Teilung weist den zu übertragenden Kapitalbetrag aus', function () {
+    var r = laufeBeispiel('transferverlust');
+    gleich(r.anordnung.teilungsart, 'EXTERN', 'Teilungsart');
+    /* Kapitalwert 90.000 € -> die Hälfte fließt an die Zielversorgung */
+    nahebei(r.anordnung.uebertragungskapital, 45000, 0.005, 'Übertragungskapital');
+    gleich(r.anordnung.zielversorgung, 'Versorgungsausgleichskasse', 'Zielversorgung');
+    var er05 = r.befunde.filter(function (b) { return b.code === 'ER05'; })[0];
+    if (er05.text.indexOf('45.000,00') < 0) {
+      throw new Error('Der Tenorvorschlag nennt den Kapitalbetrag nicht: ' + er05.text);
+    }
+  });
+
+  test('Der Kapitalbetrag erscheint auch ohne Vergleichswert für den Transferverlust', function () {
+    var r = laufeBeispiel('transferverlust', { intern_vergleichswert: null });
+    enthaelt(r.befunde, 'TA03');
+    nahebei(r.anordnung.uebertragungskapital, 45000, 0.005, 'Übertragungskapital');
+    var s6 = r.schritte.filter(function (s) { return s.nr === 6; })[0];
+    if (!s6.zeilen.some(function (z) { return z.label === 'Zu übertragendes Kapital'; })) {
+      throw new Error('Schritt 6 weist das Übertragungskapital nicht aus');
+    }
+  });
+
+  test('Interne Teilung führt keinen Kapitalbetrag und keine Zielversorgung', function () {
+    var r = laufeBeispiel('transferverlust', {
+      teilungsart_vorschlag: 'INTERN', traeger_teilungsordnung_vorhanden: true
+    });
+    gleich(r.anordnung.teilungsart, 'INTERN', 'Teilungsart');
+    gleich(r.anordnung.uebertragungskapital, null, 'kein Übertragungskapital');
+    gleich(r.anordnung.zielversorgung, null, 'keine Zielversorgung');
+  });
+
+  test('Bei Kapitalanrechten stimmen Ausgleichswert und Übertragungskapital überein', function () {
+    /* Kapitalwert 165.000 -> Ausgleichswert 82.500 <= BBG 82.800 (2020), also extern */
+    var r = laufeBeispiel('bbg-grenze', {
+      ehezeitanteil: 165000, ausgleichswert: 82500, korr_kapitalwert: 165000, gesamtanrecht: 397290
+    });
+    gleich(r.anordnung.teilungsart, 'EXTERN', 'Teilungsart');
+    nahebei(r.anordnung.uebertragungskapital, r.anordnung.betrag, 0.005,
+      'Kapitalbetrag gleich Ausgleichswert');
+  });
+
   /* ---------------- Gezielte Fehlerfälle ---------------- */
   test('Abweichende Ehezeitmonate brechen die Prüfung ab (GD02)', function () {
     var r = laufeBeispiel('standard', { ehezeit_monate_traeger: 179 });

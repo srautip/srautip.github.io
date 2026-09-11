@@ -397,3 +397,11 @@ footer.app-footer {
 .befund .kopf .legal { margin-left: auto; }
 .info-titelzeile { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
 .info-titelzeile h2 { margin: 0; }
+
+/* Hinweis unter dem Tenorbetrag bei externer Teilung */
+.anordnung .betrag-hinweis {
+  margin-top: .15rem;
+  font-size: .78rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
